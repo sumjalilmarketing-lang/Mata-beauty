@@ -11,12 +11,13 @@ test("the public experience is a real booking application", async () => {
     readFile(new URL("app/layout.tsx", root), "utf8"),
   ]);
   assert.match(page, /MataBeautyApp/);
-  assert.match(app, /De quoi avez-vous envie aujourd’hui/);
-  assert.match(app, /Professionnels disponibles/);
-  assert.match(app, /Étape \$\{step\} sur 8/);
+  assert.match(app, /Prenez soin de vous/);
+  assert.match(app, /Catégories populaires/);
+  assert.match(app, /Étape \$\{step\} sur 5/);
   assert.match(app, /Votre rendez-vous est créé/);
   assert.doesNotMatch(app, /Awa Signature|Demande simulée|Mode démonstration/);
   assert.match(layout, /Mata Beauty/);
+  assert.match(layout, /mata-category-atlas\.webp/);
   assert.doesNotMatch(page + layout, /codex-preview|SkeletonPreview/);
 });
 

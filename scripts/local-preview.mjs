@@ -25,7 +25,11 @@ const child = spawn(process.execPath, [vinextCli, "start"], {
 
 const server = createServer((incoming, outgoing) => {
   const pathname = new URL(incoming.url ?? "/", `http://${incoming.headers.host ?? "localhost"}`).pathname;
-  if (pathname.startsWith("/assets/") || ["/og.png", "/favicon.svg"].includes(pathname)) {
+  if (
+    pathname.startsWith("/assets/") ||
+    pathname.startsWith("/images/") ||
+    ["/og.png", "/favicon.svg", "/sw.js"].includes(pathname)
+  ) {
     const candidate = resolve(clientRoot, normalize(pathname).replace(/^[/\\]+/, ""));
     if (candidate.startsWith(clientRoot) && existsSync(candidate) && statSync(candidate).isFile()) {
       outgoing.writeHead(200, {
