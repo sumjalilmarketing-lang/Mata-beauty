@@ -13,7 +13,9 @@ test("the public experience is a real booking application", async () => {
   assert.match(page, /MataBeautyApp/);
   assert.match(app, /Prenez soin de vous/);
   assert.match(app, /Catégories populaires/);
-  assert.match(app, /Étape \$\{step\} sur 5/);
+  assert.match(app, /Étape \$\{step\} sur 2/);
+  assert.match(app, /Voir les créneaux/);
+  assert.match(app, /Mis à jour en direct/);
   assert.match(app, /Votre rendez-vous est créé/);
   assert.doesNotMatch(app, /Awa Signature|Demande simulée|Mode démonstration/);
   assert.match(layout, /Mata Beauty/);

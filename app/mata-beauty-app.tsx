@@ -38,6 +38,7 @@ type BookingRequest = {
 type BookingConfirmation = { id: string; date: string; time: string; location: string };
 type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number };
 type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[] };
+type BookingSelection = { provider: Provider; service: ProviderService };
 type AvailabilityRule = { starts_at: string; ends_at: string; slot_interval_minutes: number };
 type AvailabilityException = { starts_at: string; ends_at: string; is_available: boolean };
 
@@ -77,7 +78,7 @@ export function MataBeautyApp() {
   const [promotions, setPromotions] = useState<CatalogPromotion[]>([]);
   const [upcomingBookings, setUpcomingBookings] = useState<Array<{ id: string; starts_at: string; status: string }>>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [booking, setBooking] = useState<Provider | null>(null);
+  const [booking, setBooking] = useState<BookingSelection | null>(null);
   const [profile, setProfile] = useState<Provider | null>(null);
   const [view, setView] = useState<"home" | "client" | "provider" | "admin">("home");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -181,6 +182,7 @@ export function MataBeautyApp() {
 
   async function confirmBooking(request: BookingRequest): Promise<BookingConfirmation | null> {
     if (!booking) return null;
+    const { provider, service } = booking;
     if (!authenticated || authenticated.role !== "client") {
       setAuthRequest({ role: "client", mode: "login" });
       return null;
@@ -188,12 +190,12 @@ export function MataBeautyApp() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return null;
     const startsAt = new Date(`${request.date}T${request.time}:00+00:00`);
-    const endsAt = calculateBookingEnd(startsAt, booking.durationMinutes);
-    const quote = calculateBookingQuote(booking.price);
+    const endsAt = calculateBookingEnd(startsAt, service.duration_minutes);
+    const quote = calculateBookingQuote(service.price_amount);
     const { data: created, error } = await supabase.from("bookings").insert({
       client_id: authenticated.userId,
-      provider_id: booking.profileId,
-      provider_service_id: booking.serviceId,
+      provider_id: provider.profileId,
+      provider_service_id: service.id,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
       status: "pending",
@@ -215,7 +217,7 @@ export function MataBeautyApp() {
       currency: quote.currency,
       is_test: true,
     });
-    return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? `Chez ${booking.name}` : request.address };
+    return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? `Chez ${provider.name}` : request.address };
   }
 
   async function signOut() {
@@ -230,7 +232,7 @@ export function MataBeautyApp() {
   }
 
   if (profile) {
-    return <ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.id)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={() => { setBooking(profile); }} />;
+    return <ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.id)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service) => setBooking({ provider: profile, service })} />;
   }
 
   return (
@@ -255,6 +257,7 @@ export function MataBeautyApp() {
             onSearch={runSearch}
             onCategory={selectCategory}
             onViewProvider={setProfile}
+            onBook={(provider) => setBooking({ provider, service: defaultService(provider) })}
             onFavorite={(provider) => void toggleFavorite(provider)}
             onAccount={() => openAccount()}
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
@@ -280,6 +283,7 @@ export function MataBeautyApp() {
             setMaxPrice={setMaxPrice}
             onBack={() => setScreen("home")}
             onViewProvider={setProfile}
+            onBook={(provider) => setBooking({ provider, service: defaultService(provider) })}
             onFavorite={(provider) => void toggleFavorite(provider)}
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
           />
@@ -287,8 +291,8 @@ export function MataBeautyApp() {
         <BottomNav active={screen === "home" ? "home" : "search"} onHome={() => setScreen("home")} onSearch={() => setScreen("results")} onAccount={openAccount} />
       </div>
 
-      {booking && <BookingModal provider={booking} initialDate={date} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}
-      {authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={(signedIn) => { setAuthenticated(signedIn); setAuthRequest(null); setView(signedIn.role); }} />}
+      {booking && <BookingModal selection={booking} initialDate={date} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}
+      {authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={(signedIn) => { setAuthenticated(signedIn); setAuthRequest(null); if (!booking) setView(signedIn.role); }} />}
     </main>
   );
 }
@@ -299,7 +303,7 @@ function Brand() {
 
 function HomeScreen({
   authenticated, query, setQuery, area, setArea, date, setDate, suggestions, catalog, catalogState, promotions,
-  upcomingBookings, favorites, onSearch, onCategory, onViewProvider, onFavorite, onAccount, onProviderRegister,
+  upcomingBookings, favorites, onSearch, onCategory, onViewProvider, onBook, onFavorite, onAccount, onProviderRegister,
 }: {
   authenticated: AuthenticatedProfile | null;
   query: string; setQuery: (value: string) => void; area: string; setArea: (value: string) => void;
@@ -307,7 +311,7 @@ function HomeScreen({
   catalogState: "loading" | "live" | "empty" | "error"; promotions: CatalogPromotion[];
   upcomingBookings: Array<{ id: string; starts_at: string; status: string }>; favorites: string[];
   onSearch: (event?: FormEvent) => void; onCategory: (label: string) => void;
-  onViewProvider: (provider: Provider) => void; onFavorite: (provider: Provider) => void;
+  onViewProvider: (provider: Provider) => void; onBook: (provider: Provider) => void; onFavorite: (provider: Provider) => void;
   onAccount: () => void; onProviderRegister: () => void;
 }) {
   return <div className="mobile-screen home-screen">
@@ -318,7 +322,7 @@ function HomeScreen({
     <div className="section-title"><h2>Catégories populaires</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
     <div className="photo-category-grid">{categories.map((item) => <button key={item.label} onClick={() => onCategory(item.label)}><span className="category-photo" style={{ backgroundImage: `url(${categoryAtlas})`, backgroundPosition: item.position }} role="img" aria-label={`Photographie ${item.label}`} /><strong>{item.label}</strong></button>)}</div>
     <div className="section-title"><h2>Prestataires proches</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
-    <CatalogBlock providers={catalog.slice(0, 4)} catalogState={catalogState} favorites={favorites} onView={onViewProvider} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
+    <CatalogBlock providers={catalog.slice(0, 4)} catalogState={catalogState} favorites={favorites} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
     {promotions.length > 0 && <section className="premium-offers"><div className="section-title"><h2>Offres du moment</h2></div>{promotions.slice(0, 2).map((promotion) => <article key={promotion.id}><span>{promotion.discountType === "percentage" ? `−${promotion.discountValue}%` : `−${formatPrice(promotion.discountValue)}`}</span><div><strong>{promotion.title}</strong><small>{promotion.description}</small></div></article>)}</section>}
     {upcomingBookings.length > 0 && <section className="premium-upcoming"><div className="section-title"><h2>Vos rendez-vous</h2></div>{upcomingBookings.map((booking) => <button key={booking.id} onClick={onAccount}><span>▣</span><div><strong>{new Date(booking.starts_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}</strong><small>{booking.status}</small></div><b>›</b></button>)}</section>}
     <div className="mobile-date-helper"><label>Quand souhaitez-vous réserver ?<input type="date" min={today} value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
@@ -328,14 +332,14 @@ function HomeScreen({
 function ResultsScreen({
   category, subcategory, setSubcategory, area, providers, catalogState, favorites, filtersOpen, setFiltersOpen,
   homeOnly, setHomeOnly, verifiedOnly, setVerifiedOnly, minRating, setMinRating, maxPrice, setMaxPrice,
-  onBack, onViewProvider, onFavorite, onProviderRegister,
+  onBack, onViewProvider, onBook, onFavorite, onProviderRegister,
 }: {
   category: string; subcategory: string; setSubcategory: (value: string) => void; area: string; providers: Provider[];
   catalogState: "loading" | "live" | "empty" | "error"; favorites: string[]; filtersOpen: boolean;
   setFiltersOpen: (open: boolean) => void; homeOnly: boolean; setHomeOnly: (value: boolean) => void;
   verifiedOnly: boolean; setVerifiedOnly: (value: boolean) => void; minRating: string; setMinRating: (value: string) => void;
   maxPrice: string; setMaxPrice: (value: string) => void; onBack: () => void;
-  onViewProvider: (provider: Provider) => void; onFavorite: (provider: Provider) => void; onProviderRegister: () => void;
+  onViewProvider: (provider: Provider) => void; onBook: (provider: Provider) => void; onFavorite: (provider: Provider) => void; onProviderRegister: () => void;
 }) {
   const chips = subcategories[category] || ["Tout", category, "À domicile", "Disponible aujourd’hui"];
   return <div className="mobile-screen results-screen">
@@ -347,25 +351,25 @@ function ResultsScreen({
       <label><input type="checkbox" checked={homeOnly} onChange={(event) => setHomeOnly(event.target.checked)} /> À domicile</label>
       <label><input type="checkbox" checked={verifiedOnly} onChange={(event) => setVerifiedOnly(event.target.checked)} /> Vérifié</label>
     </aside>}
-    <CatalogBlock providers={providers} catalogState={catalogState} favorites={favorites} onView={onViewProvider} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
+    <CatalogBlock providers={providers} catalogState={catalogState} favorites={favorites} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
   </div>;
 }
 
-function CatalogBlock({ providers, catalogState, favorites, onView, onFavorite, onProviderRegister }: { providers: Provider[]; catalogState: "loading" | "live" | "empty" | "error"; favorites: string[]; onView: (provider: Provider) => void; onFavorite: (provider: Provider) => void; onProviderRegister: () => void }) {
+function CatalogBlock({ providers, catalogState, favorites, onView, onBook, onFavorite, onProviderRegister }: { providers: Provider[]; catalogState: "loading" | "live" | "empty" | "error"; favorites: string[]; onView: (provider: Provider) => void; onBook: (provider: Provider) => void; onFavorite: (provider: Provider) => void; onProviderRegister: () => void }) {
   if (catalogState === "loading") return <div className="mobile-skeletons" aria-label="Chargement"><i /><i /><i /></div>;
   if (catalogState === "empty" || catalogState === "error") return <div className="premium-empty"><span>✦</span><h3>{catalogState === "error" ? "Catalogue indisponible" : "Les premiers talents arrivent"}</h3><p>{catalogState === "error" ? "Vérifiez votre connexion puis réessayez." : "Aucun professionnel approuvé n’est encore publié dans cette zone."}</p><button onClick={onProviderRegister}>Devenir prestataire</button></div>;
   if (!providers.length) return <div className="premium-empty compact"><span>⌕</span><h3>Aucun résultat</h3><p>Essayez une autre catégorie ou élargissez vos filtres.</p></div>;
-  return <div className="premium-provider-list">{providers.map((provider) => <ProviderCard key={provider.id} provider={provider} favorite={favorites.includes(provider.id)} onFavorite={() => onFavorite(provider)} onView={() => onView(provider)} />)}</div>;
+  return <div className="premium-provider-list">{providers.map((provider) => <ProviderCard key={provider.id} provider={provider} favorite={favorites.includes(provider.id)} onFavorite={() => onFavorite(provider)} onView={() => onView(provider)} onBook={() => onBook(provider)} />)}</div>;
 }
 
-function ProviderCard({ provider, favorite, onFavorite, onView }: { provider: Provider; favorite: boolean; onFavorite: () => void; onView: () => void }) {
+function ProviderCard({ provider, favorite, onFavorite, onView, onBook }: { provider: Provider; favorite: boolean; onFavorite: () => void; onView: () => void; onBook: () => void }) {
   return <article className="premium-provider-card" onClick={onView} onKeyDown={(event) => { if (event.key === "Enter") onView(); }} role="button" tabIndex={0}>
     <div className="premium-provider-photo">{provider.coverUrl ? <Image src={provider.coverUrl} alt={`Espace de ${provider.name}`} fill sizes="120px" /> : <span>{provider.initials}</span>}</div>
-    <div><div className="provider-name-row"><h3>{provider.name}</h3><button aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"} onClick={(event) => { event.stopPropagation(); onFavorite(); }}>{favorite ? "♥" : "♡"}</button></div>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}<p>★ {provider.rating.toFixed(1)} ({provider.reviews} avis)</p><p>⌖ {provider.area}</p><strong>À partir de <em>{formatPrice(provider.price)}</em></strong></div>
+    <div><div className="provider-name-row"><h3>{provider.name}</h3><button aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"} onClick={(event) => { event.stopPropagation(); onFavorite(); }}>{favorite ? "♥" : "♡"}</button></div>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}<p>★ {provider.rating.toFixed(1)} ({provider.reviews} avis) · {provider.area}</p><div className="provider-booking-line"><span><strong>{formatPrice(provider.price)}</strong><small>{formatDuration(provider.durationMinutes)}</small></span><button onClick={(event) => { event.stopPropagation(); onBook(); }}>Voir les créneaux</button></div></div>
   </article>;
 }
 
-function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook }: { provider: Provider; favorite: boolean; onBack: () => void; onFavorite: () => void; onBook: () => void }) {
+function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook }: { provider: Provider; favorite: boolean; onBack: () => void; onFavorite: () => void; onBook: (service: ProviderService) => void }) {
   const [tab, setTab] = useState<"services" | "reviews" | "about">("services");
   const [detail, setDetail] = useState<ProviderDetail>({ bio: null, services: [], portfolio: [] });
   useEffect(() => {
@@ -394,15 +398,16 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
     </section>
     <div className="profile-tabs"><button className={tab === "services" ? "active" : ""} onClick={() => setTab("services")}>Prestations</button><button className={tab === "reviews" ? "active" : ""} onClick={() => setTab("reviews")}>Avis</button><button className={tab === "about" ? "active" : ""} onClick={() => setTab("about")}>À propos</button></div>
     <section className="profile-tab-content">
-      {tab === "services" && services.map((service) => <button className="profile-service-row" key={service.id} onClick={onBook}><span><strong>{service.title}</strong><small>À partir de <em>{formatPrice(service.price_amount)}</em></small></span><span>{formatDuration(service.duration_minutes)} <b>›</b></span></button>)}
+      {tab === "services" && services.map((service) => <button className="profile-service-row" key={service.id} onClick={() => onBook(service)}><span><strong>{service.title}</strong><small><em>{formatPrice(service.price_amount)}</em> · {formatDuration(service.duration_minutes)}</small></span><span>Choisir <b>›</b></span></button>)}
       {tab === "reviews" && <div className="profile-empty-tab"><strong>{provider.rating.toFixed(1)} / 5</strong><p>{provider.reviews ? `${provider.reviews} avis vérifiés sont associés à ce profil.` : "Aucun avis publié pour le moment."}</p></div>}
       {tab === "about" && <div className="profile-empty-tab"><strong>Informations pratiques</strong><p>{detail.bio || `Prestations disponibles à ${provider.area}. Les coordonnées complètes sont communiquées pendant la réservation.`}</p></div>}
     </section>
-    <div className="profile-book-bar"><button onClick={onBook}>Réserver un rendez-vous</button></div>
+    <div className="profile-book-bar"><button onClick={() => onBook(services[0])}>Voir les disponibilités</button></div>
   </div></div></main>;
 }
 
-function BookingModal({ provider, initialDate, onClose, onSubmit }: { provider: Provider; initialDate: string; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<BookingConfirmation | null> }) {
+function BookingModal({ selection, initialDate, onClose, onSubmit }: { selection: BookingSelection; initialDate: string; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<BookingConfirmation | null> }) {
+  const { provider, service } = selection;
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
@@ -410,11 +415,13 @@ function BookingModal({ provider, initialDate, onClose, onSubmit }: { provider: 
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [form, setForm] = useState<BookingRequest>({ date: initialDate || defaultBookingDate, time: "", locationMode: "salon", address: "", note: "", paymentMethod: "on_site" });
-  const steps = ["Prestation", "Professionnel", "Date", "Heure", "Confirmation"];
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
+    if (!supabase) {
+      void Promise.resolve().then(() => setAvailabilityLoading(false));
+      return;
+    }
     let active = true;
     void Promise.resolve().then(() => { if (active) setAvailabilityLoading(true); });
     const start = `${form.date}T00:00:00+00:00`;
@@ -431,28 +438,25 @@ function BookingModal({ provider, initialDate, onClose, onSubmit }: { provider: 
     return () => { active = false; };
   }, [form.date, provider.profileId]);
 
-  const slots = useMemo(() => buildSlots(form.date, rules, exceptions, provider.durationMinutes), [exceptions, form.date, provider.durationMinutes, rules]);
-  const calendarDays = useMemo(() => buildCalendarDays(form.date), [form.date]);
+  const slots = useMemo(() => buildSlots(form.date, rules, exceptions, service.duration_minutes), [exceptions, form.date, rules, service.duration_minutes]);
+  const quickDates = useMemo(() => buildQuickDates(), []);
   async function confirm() {
     setSubmitting(true);
     const result = await onSubmit(form);
     setSubmitting(false);
     if (result) setConfirmation(result);
   }
-  const canContinue = step !== 4 || Boolean(form.time);
+  const canConfirm = Boolean(form.time) && (form.locationMode === "salon" || Boolean(form.address.trim()));
   return <div className="modal-backdrop premium-booking-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="modal premium-booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
-      <header className="booking-screen-header"><button aria-label="Fermer" onClick={onClose}>‹</button><div><h2 id="booking-title">Réserver</h2><p>{provider.name}</p></div></header>
+      <header className="booking-screen-header"><button aria-label="Fermer" onClick={onClose}>‹</button><div><h2 id="booking-title">Réserver</h2><p>{provider.name} · réservation rapide</p></div></header>
       {confirmation ? <BookingSuccess provider={provider} confirmation={confirmation} onClose={onClose} /> : <>
-        <div className="five-step-progress" aria-label={`Étape ${step} sur 5`}>{steps.map((label, index) => <span className={step >= index + 1 ? "active" : ""} key={label}><i>{index + 1}</i><small>{label}</small></span>)}</div>
+        <div className="fast-booking-progress" aria-label={`Étape ${step} sur 2`}><span className={step >= 1 ? "active" : ""}>1 <small>Créneau</small></span><i /><span className={step >= 2 ? "active" : ""}>2 <small>Confirmation</small></span></div>
         <div className="premium-booking-content">
-          {step === 1 && <><h3>Choisissez la prestation</h3><label className="dark-service-choice"><input type="radio" checked readOnly /><span><strong>{provider.specialty}</strong><small>{formatDuration(provider.durationMinutes)}</small></span><b>{formatPrice(provider.price)}</b></label></>}
-          {step === 2 && <><h3>Choisissez un professionnel</h3><label className="dark-service-choice"><input type="radio" checked readOnly /><span><strong>Sans préférence</strong><small>Le premier professionnel disponible</small></span></label></>}
-          {step === 3 && <><h3>Choisissez une date</h3><div className="calendar-heading"><strong>{new Date(`${form.date}T12:00:00`).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</strong><input aria-label="Choisir une autre date" type="date" min={today} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "" })} /></div><div className="calendar-week"><span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span></div><div className="calendar-grid">{calendarDays.map((day) => <button key={day.date} disabled={!day.inMonth || day.date < today} className={form.date === day.date ? "active" : ""} onClick={() => setForm({ ...form, date: day.date, time: "" })}>{day.day}</button>)}</div></>}
-          {step === 4 && <><h3>Choisissez une heure</h3>{availabilityLoading ? <div className="slot-loading">Chargement des disponibilités…</div> : slots.length ? <div className="premium-slot-grid">{slots.map((time) => <button className={form.time === time ? "active" : ""} key={time} onClick={() => setForm({ ...form, time })}>{time}</button>)}</div> : <div className="no-slots">Aucun créneau publié pour cette date. Choisissez un autre jour.</div>}</>}
-          {step === 5 && <><h3>Confirmez votre rendez-vous</h3><div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="70px" /> : provider.initials}</div><div><strong>{provider.specialty}</strong><small>{formatDuration(provider.durationMinutes)} · {form.date} à {form.time}</small></div><b>{formatPrice(provider.price)}</b></div><label>Lieu<select value={form.locationMode} onChange={(event) => setForm({ ...form, locationMode: event.target.value as BookingRequest["locationMode"] })}><option value="salon">Chez le prestataire</option>{provider.homeService && <option value="client_address">À mon domicile</option>}</select></label>{form.locationMode === "client_address" && <label>Adresse<textarea value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}<label>Note<textarea maxLength={1000} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label><div className="payment-note">Paiement sur place · Wave et Orange Money restent en mode test.</div><p className="cancellation-note">Annulation possible depuis votre espace selon les conditions du prestataire.</p></>}
+          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount)}</b></div><h3>Quand êtes-vous disponible ?</h3><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>Autre</small><strong>＋</strong><input aria-label="Choisir une autre date" type="date" min={today} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "" })} /></label></div><div className="slot-section-title"><strong>Créneaux disponibles</strong><small>Mis à jour en direct</small></div>{availabilityLoading ? <div className="slot-loading">Recherche des meilleurs créneaux…</div> : slots.length ? <div className="premium-slot-grid">{slots.map((time) => <button className={form.time === time ? "active" : ""} key={time} onClick={() => { setForm({ ...form, time }); setStep(2); }}>{time}</button>)}</div> : <div className="no-slots">Aucun créneau publié ce jour. Essayez une autre date.</div>}</>}
+          {step === 2 && <><h3>Vérifiez et confirmez</h3><div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date)} à {form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name}</small></div><b>{formatPrice(service.price_amount)}</b></div><fieldset className="location-choice"><legend>Où ?</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>Chez le professionnel</strong><small>{provider.area}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>À mon domicile</strong><small>Le professionnel se déplace</small></span></label>}</fieldset>{form.locationMode === "client_address" && <label>Adresse<textarea autoFocus value={form.address} placeholder="Votre adresse complète" onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}<details className="booking-options"><summary>Ajouter une note (facultatif)</summary><label>Note<textarea maxLength={1000} value={form.note} placeholder="Précision utile pour le professionnel" onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></details><div className="payment-note">Paiement sur place · aucun débit aujourd’hui.</div></>}
         </div>
-        <div className="premium-booking-nav">{step > 1 && <button className="back-button" onClick={() => setStep((current) => current - 1)}>Retour</button>}{step < 5 ? <button disabled={!canContinue} onClick={() => setStep((current) => current + 1)}>Continuer</button> : <button disabled={submitting || !form.time} onClick={() => void confirm()}>{submitting ? "Enregistrement…" : "Confirmer le rendez-vous"}</button>}</div>
+        {step === 2 && <div className="premium-booking-nav"><button className="back-button" onClick={() => setStep(1)}>Modifier</button><button disabled={submitting || !canConfirm} onClick={() => void confirm()}>{submitting ? "Enregistrement…" : "Confirmer · " + formatPrice(service.price_amount)}</button></div>}
       </>}
     </section>
   </div>;
@@ -474,16 +478,26 @@ function formatDuration(minutes: number) {
   return remaining ? `${hours} h ${remaining}` : `${hours} h`;
 }
 
-function buildCalendarDays(dateValue: string) {
-  const selected = new Date(`${dateValue}T12:00:00`);
-  const year = selected.getFullYear();
-  const month = selected.getMonth();
-  const first = new Date(year, month, 1);
-  const offset = (first.getDay() + 6) % 7;
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(year, month, index - offset + 1);
-    return { day: date.getDate(), date: date.toISOString().slice(0, 10), inMonth: date.getMonth() === month };
+function defaultService(provider: Provider): ProviderService {
+  return { id: provider.serviceId, title: provider.specialty, duration_minutes: provider.durationMinutes, price_amount: provider.price };
+}
+
+function buildQuickDates() {
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() + index);
+    return {
+      date: date.toISOString().slice(0, 10),
+      weekday: index === 0 ? "Aujourd’hui" : date.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", ""),
+      day: date.getDate(),
+      month: date.toLocaleDateString("fr-FR", { month: "short" }).replace(".", ""),
+    };
   });
+}
+
+function formatBookingDate(dateValue: string) {
+  return new Date(`${dateValue}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 }
 
 function buildSlots(dateValue: string, rules: AvailabilityRule[], exceptions: AvailabilityException[], durationMinutes: number) {
