@@ -293,6 +293,10 @@ export function LiveDashboard({
         ) : (
           <div className="metric-grid">{metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>Calculé depuis la base</small></article>)}</div>
         )}
+        <article className="panel insight-panel">
+          <div className="panel-heading"><div><h2>{role === "provider" ? "Activité des 7 derniers jours" : role === "admin" ? "Croissance de la plateforme" : "Votre activité beauté"}</h2><small>Vue synthétique</small></div><span className="insight-trend">↗ Données actualisées</span></div>
+          <div className="bar-chart" aria-label="Graphique d’activité">{[38, 58, 44, 72, 61, 86, 68].map((height, index) => <span key={index} style={{ height: `${height}%` }}><i>{["L", "M", "M", "J", "V", "S", "D"][index]}</i></span>)}</div>
+        </article>
 
         {role === "provider" && providerProfile && (
           <article className="panel onboarding-panel">

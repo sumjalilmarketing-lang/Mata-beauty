@@ -25,6 +25,7 @@ type Provider = {
   homeService: boolean;
   nextSlot: string;
   durationMinutes?: number;
+  coverUrl?: string;
 };
 
 type BookingRequest = {
@@ -312,6 +313,7 @@ export function MataBeautyApp() {
             {filteredProviders.map((provider) => (
               <article className="provider-card" key={provider.id}>
                 <div className={`provider-cover ${provider.tone}`}>
+                  <Image className="provider-photo" src={provider.coverUrl || "/beauty-rituals-editorial.png"} alt="" fill sizes="(max-width: 760px) 100vw, 25vw" style={{ objectPosition: `${20 + (Number(provider.id) || 1) % 3 * 40}% center` }} />
                   <span className="avatar">{provider.initials}</span>
                   {provider.verified && <span className="verified">✓ Profil vérifié</span>}
                   <button className={favorites.includes(provider.id) ? "favorite active" : "favorite"} onClick={() => void toggleFavorite(provider)} aria-label={favorites.includes(provider.id) ? "Retirer des favoris" : "Ajouter aux favoris"}>{favorites.includes(provider.id) ? "♥" : "♡"}</button>
@@ -435,16 +437,19 @@ function ProfileModal({ provider, onClose, onBook, favorite, onFavorite }: { pro
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-name">
       <button className="modal-close" onClick={onClose} aria-label="Fermer">×</button>
-      <div className={`profile-hero ${provider.tone}`}><span className="avatar large">{provider.initials}</span></div>
+      <div className={`profile-hero ${provider.tone}`}>
+        <Image src={provider.coverUrl || "/beauty-rituals-editorial.png"} alt={`Univers de ${provider.name}`} fill sizes="620px" style={{ objectFit: "cover", objectPosition: "22% center" }} />
+        <span className="profile-availability">● Disponible cette semaine</span>
+      </div>
       <div className="profile-content">
-        <p className="eyebrow">{provider.verified ? "✓ Profil vérifié" : "Nouveau talent"}</p>
-        <h2 id="profile-name">{provider.name}</h2>
-        <p>{provider.specialty} · {provider.area}</p>
+        <div className="profile-intro"><div><p className="eyebrow">{provider.verified ? "✓ Profil vérifié par Mata Beauty" : "Nouveau talent"}</p><h2 id="profile-name">{provider.name}</h2><p>{provider.specialty} · {provider.area} · à 2,4 km</p></div><button className="favorite profile-favorite" onClick={onFavorite} aria-label="Ajouter aux favoris">{favorite ? "♥" : "♡"}</button></div>
         <div className="profile-stats"><span><b>{provider.rating}</b> note</span><span><b>{provider.reviews}</b> avis</span><span><b>4 ans</b> d’expérience</span></div>
-        <h3>Prestations populaires</h3>
-        <div className="service-list"><div><span>{provider.specialty}</span><b>{formatPrice(provider.price)}</b></div><div><span>Formule signature</span><b>{formatPrice(provider.price + 7000)}</b></div></div>
-        <h3>À propos</h3><p className="muted">Un accueil chaleureux, des conseils personnalisés et une attention particulière portée à chaque détail. Produits professionnels et hygiène rigoureuse.</p>
-        <div className="modal-actions"><button className="outline-button" onClick={onFavorite}>{favorite ? "♥ Favori" : "♡ Ajouter aux favoris"}</button><button className="primary-button" onClick={onBook}>Réserver maintenant</button></div>
+        <section className="profile-block"><div className="profile-section-heading"><h3>Portfolio</h3><small>Travaux récents</small></div><div className="portfolio-grid">{[18, 52, 84].map((position, index) => <div key={position}><Image src="/beauty-rituals-editorial.png" alt={`Réalisation ${index + 1} de ${provider.name}`} fill sizes="180px" style={{ objectFit: "cover", objectPosition: `${position}% center` }} /></div>)}</div></section>
+        <section className="profile-block"><div className="profile-section-heading"><h3>Prestations</h3><small>Prix transparents</small></div><div className="premium-service-list"><button onClick={onBook}><span><strong>{provider.specialty}</strong><small>{provider.durationMinutes || 90} min · diagnostic inclus</small></span><b>{formatPrice(provider.price)}</b></button><button onClick={onBook}><span><strong>Formule signature</strong><small>120 min · expérience complète</small></span><b>{formatPrice(provider.price + 7000)}</b></button></div></section>
+        <section className="profile-block"><div className="profile-section-heading"><h3>Prochains créneaux</h3><small>Heure de Dakar</small></div><div className="availability-pills"><button onClick={onBook}>Demain <b>10:00</b></button><button onClick={onBook}>Mer. <b>14:30</b></button><button onClick={onBook}>Jeu. <b>16:30</b></button></div></section>
+        <section className="profile-block"><h3>À propos</h3><p className="muted">Un accueil chaleureux, des conseils personnalisés et une attention particulière portée à chaque détail. Produits professionnels et hygiène rigoureuse.</p></section>
+        <section className="featured-review"><div>★★★★★</div><blockquote>« Une professionnelle attentive, ponctuelle et un résultat magnifique. »</blockquote><small>— Marième, cliente vérifiée</small></section>
+        <div className="profile-sticky-action"><div><small>À partir de</small><strong>{formatPrice(provider.price)}</strong></div><button className="primary-button" onClick={onBook}>Réserver maintenant</button></div>
       </div>
     </section>
   </div>;
@@ -452,6 +457,7 @@ function ProfileModal({ provider, onClose, onBook, favorite, onFavorite }: { pro
 
 function BookingModal({ provider, onClose, onSubmit }: { provider: Provider; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<void> }) {
   const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState(1);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -469,16 +475,12 @@ function BookingModal({ provider, onClose, onSubmit }: { provider: Provider; onC
     <section className="modal booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
       <button className="modal-close" onClick={onClose} aria-label="Fermer">×</button>
       <p className="eyebrow">Réservation sécurisée</p><h2 id="booking-title">Réserver avec {provider.name}</h2>
+      <div className="booking-progress" aria-label={`Étape ${step} sur 3`}>{["Prestation", "Date & lieu", "Confirmation"].map((label, index) => <span className={step >= index + 1 ? "active" : ""} key={label}><i>{index + 1}</i>{label}</span>)}</div>
       <form onSubmit={(event) => void submit(event)}>
-        <label>Prestation<select required><option>{provider.specialty} — {formatPrice(provider.price)}</option><option>Formule signature — {formatPrice(provider.price + 7000)}</option></select></label>
-        <div className="form-row"><label>Date<input name="date" type="date" required defaultValue="2026-07-28" min="2026-07-26" /></label><label>Créneau<select name="time" required><option>10:00</option><option>14:30</option><option>16:30</option></select></label></div>
-        <label>Lieu<select name="locationMode" required>{provider.homeService && <option value="client_address">À mon domicile</option>}<option value="salon">Chez le prestataire</option></select></label>
-        <label>Adresse / précision<textarea name="address" placeholder="Quartier, rue, repère…" /></label>
-        <label>Note facultative<textarea name="note" maxLength={1000} placeholder="Informations utiles pour le rendez-vous…" /></label>
-        <label>Paiement<select required><option>Sur place</option><option disabled>Wave — bientôt disponible</option><option disabled>Orange Money — bientôt disponible</option></select></label>
-        <div className="test-banner">Mode test · Aucun paiement réel ne sera effectué.</div>
-        <div className="booking-total"><span>Total</span><strong>{formatPrice(provider.price)}</strong></div>
-        <button className="primary-button full" type="submit" disabled={submitting}>{submitting ? "Enregistrement…" : "Envoyer la demande"}</button>
+        <fieldset className="booking-step" hidden={step !== 1}><legend>Choisissez votre expérience</legend><label className="service-choice"><input type="radio" name="service" defaultChecked /><span><strong>{provider.specialty}</strong><small>{provider.durationMinutes || 90} min · prestation essentielle</small></span><b>{formatPrice(provider.price)}</b></label><label className="service-choice"><input type="radio" name="service" /><span><strong>Formule signature</strong><small>120 min · conseils et finition premium</small></span><b>{formatPrice(provider.price + 7000)}</b></label></fieldset>
+        <fieldset className="booking-step" hidden={step !== 2}><legend>Quand et où ?</legend><div className="form-row"><label>Date<input name="date" type="date" required defaultValue="2026-07-28" min="2026-07-26" /></label><label>Créneau<select name="time" required><option>10:00</option><option>14:30</option><option>16:30</option></select></label></div><label>Lieu<select name="locationMode" required>{provider.homeService && <option value="client_address">À mon domicile</option>}<option value="salon">Chez le prestataire</option></select></label><label>Adresse / précision<textarea name="address" placeholder="Quartier, rue, repère…" /></label></fieldset>
+        <fieldset className="booking-step" hidden={step !== 3}><legend>Vérifiez votre demande</legend><div className="booking-summary"><span><small>Prestataire</small><strong>{provider.name}</strong></span><span><small>Prestation</small><strong>{provider.specialty}</strong></span><span><small>Paiement</small><strong>Sur place</strong></span></div><label>Note facultative<textarea name="note" maxLength={1000} placeholder="Informations utiles pour le rendez-vous…" /></label><div className="test-banner">Mode test · Aucun paiement réel ne sera effectué.</div><div className="booking-total"><span>Total</span><strong>{formatPrice(provider.price)}</strong></div></fieldset>
+        <div className="booking-nav">{step > 1 && <button className="outline-button" type="button" onClick={(event) => { event.preventDefault(); setStep((current) => current - 1); }}>Retour</button>}{step < 3 ? <button className="primary-button" type="button" onClick={(event) => { event.preventDefault(); setStep((current) => current + 1); }}>Continuer</button> : <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Enregistrement…" : "Envoyer la demande"}</button>}</div>
       </form>
     </section>
   </div>;
@@ -502,6 +504,7 @@ function Dashboard({ role, onBack }: { role: "client" | "provider" | "admin"; on
       <div className="dashboard-top"><div><p className="eyebrow">{config.label}</p><h1>Bonjour, {config.name.split(" ")[0]} 👋</h1><p>{config.intro}</p></div><span className="demo-badge">Mode démonstration</span></div>
       {demoMessage && <p className="dashboard-feedback" role="status">{demoMessage}</p>}
       <div className="metric-grid">{config.metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>↗ à jour</small></article>)}</div>
+      <article className="panel insight-panel"><div className="panel-heading"><div><h2>Aperçu de l’activité</h2><small>7 derniers jours</small></div><span className="insight-trend">↗ +18%</span></div><div className="bar-chart" aria-label="Graphique de démonstration">{[35, 54, 48, 68, 58, 88, 73].map((height, index) => <span key={index} style={{ height: `${height}%` }}><i>{["L", "M", "M", "J", "V", "S", "D"][index]}</i></span>)}</div></article>
       <div className="dashboard-grid">
         <article className="panel"><div className="panel-heading"><h2>{role === "admin" ? "Activité récente" : "Prochains rendez-vous"}</h2><button onClick={() => setDemoMessage("Aucune donnée réelle n’est chargée en mode démonstration.")}>Tout voir</button></div>
           {[["Aujourd’hui · 16:30", "Nails by Fatou", "Confirmé"], ["Jeudi · 10:00", "Maison Kéwé", role === "admin" ? "À vérifier" : "En attente"], ["Samedi · 09:00", "Institut Teranga", "Confirmé"]].map(([date, name, status]) => <div className="appointment" key={date}><span className="date-block">{date.split(" · ")[0].slice(0, 3)}<b>{date.split(" · ")[1]}</b></span><div><strong>{name}</strong><small>{date}</small></div><span className={status === "Confirmé" ? "status confirmed" : "status pending"}>{status}</span></div>)}

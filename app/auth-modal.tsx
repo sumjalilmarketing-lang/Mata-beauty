@@ -115,8 +115,10 @@ export function AuthModal({
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <button className="modal-close" onClick={onClose} aria-label="Fermer">×</button>
+        <div className="auth-brand"><span>M</span><div><strong>MATA</strong><small>BEAUTY</small></div></div>
         <p className="eyebrow">Compte sécurisé</p>
         <h2 id="auth-title">{title}</h2>
+        <p className="auth-lead">{mode === "login" ? "Retrouvez vos rendez-vous, favoris et recommandations personnalisées." : mode === "register" ? "Rejoignez l’expérience beauté premium pensée pour vous." : "Nous vous aidons à retrouver rapidement votre espace."}</p>
         {!configuration.configured && (
           <div className="configuration-warning" role="alert">
             Le mode réel attend la clé publique Supabase. Vous pouvez consulter uniquement l’aperçu de démonstration.

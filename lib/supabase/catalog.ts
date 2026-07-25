@@ -14,6 +14,7 @@ export type CatalogProvider = {
   verified: boolean;
   homeService: boolean;
   durationMinutes: number;
+  coverUrl?: string;
 };
 
 type ProviderRecord = {
@@ -24,6 +25,7 @@ type ProviderRecord = {
   average_rating: number | string;
   review_count: number;
   verified_at: string | null;
+  cover_url: string | null;
   provider_services: Array<{
     id: string;
     title: string;
@@ -37,7 +39,7 @@ export async function fetchPublishedProviders(client: SupabaseClient): Promise<C
   const { data, error } = await client
     .from("provider_profiles")
     .select(`
-      profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,
+      profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,cover_url,
       provider_services!inner(
         id,title,duration_minutes,price_amount,
         services(name,categories(name))
@@ -67,6 +69,7 @@ export async function fetchPublishedProviders(client: SupabaseClient): Promise<C
       verified: Boolean(provider.verified_at),
       homeService: provider.service_mode !== "salon",
       durationMinutes: service.duration_minutes,
+      coverUrl: provider.cover_url ?? undefined,
     }];
   });
 }

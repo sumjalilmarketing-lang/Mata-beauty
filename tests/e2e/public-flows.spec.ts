@@ -14,6 +14,10 @@ test("catalogue search and provider booking demo are explicit", async ({ page })
   await page.getByRole("article").filter({ hasText: "Awa Signature" }).getByRole("button", { name: "Voir le profil" }).click();
   await expect(page.getByRole("dialog")).toContainText("Profil vérifié");
   await page.getByRole("button", { name: "Réserver maintenant" }).click();
+  await expect(page.getByLabel("Étape 1 sur 3")).toBeVisible();
+  await page.getByRole("button", { name: "Continuer" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Quand et où");
+  await page.getByRole("button", { name: "Continuer" }).click();
   await expect(page.getByRole("dialog")).toContainText("Mode test");
   await page.getByRole("button", { name: "Envoyer la demande" }).click();
   await expect(page.getByRole("status")).toContainText("Demande simulée");
