@@ -67,6 +67,8 @@ const defaultBookingDate = new Date(Date.now() + 86400000).toISOString().slice(0
 
 export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: string; supabaseAnonKey: string }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
+  const [showSplash, setShowSplash] = useState(true);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Toutes");
   const [subcategory, setSubcategory] = useState("Tout");
@@ -90,6 +92,22 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   const [notice, setNotice] = useState("");
   const [authenticated, setAuthenticated] = useState<AuthenticatedProfile | null>(null);
   const [authRequest, setAuthRequest] = useState<{ role: "client" | "provider" | "admin"; mode: "login" | "register" } | null>(null);
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("mata-theme");
+    const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    void Promise.resolve().then(() => setTheme(savedTheme === "dark" || savedTheme === "light" ? savedTheme : preferredTheme));
+    const splashTimer = window.setTimeout(() => setShowSplash(false), 1350);
+    return () => window.clearTimeout(splashTimer);
+  }, []);
+
+  function toggleTheme() {
+    setTheme((current) => {
+      const next = current === "light" ? "dark" : "light";
+      window.localStorage.setItem("mata-theme", next);
+      return next;
+    });
+  }
 
   const suggestions = useMemo(
     () => [...new Set([...categories.map((item) => item.label), ...catalog.flatMap((provider) => [provider.name, provider.specialty, provider.area])])],
@@ -261,7 +279,8 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   }
 
   return (
-    <main className="premium-mobile-app">
+    <main className="premium-mobile-app" data-theme={theme}>
+      {showSplash && <div className="mata-splash" role="status" aria-label="Ouverture de Mata Beauty"><Image src="/brand/mata-app-icon.webp" alt="" width={172} height={172} priority unoptimized /><strong>MATA</strong><span>BEAUTY</span><i /></div>}
       {notice && <div className="toast" role="status">{notice}</div>}
       <div className="premium-app-frame">
         {screen === "home" ? (
@@ -287,6 +306,8 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
             onFavorite={(provider) => void toggleFavorite(provider)}
             onAccount={() => openAccount()}
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
+            theme={theme}
+            onToggleTheme={toggleTheme}
           />
         ) : (
           <ResultsScreen
@@ -325,12 +346,12 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
 }
 
 function Brand() {
-  return <div className="premium-brand"><Image src="/favicon.svg" alt="" width={46} height={46} /><span><strong>MATA</strong><small>BEAUTY</small></span></div>;
+  return <div className="premium-brand"><Image src="/brand/mata-app-icon.webp" alt="Mata Beauty" width={48} height={48} priority unoptimized /><span><strong>MATA</strong><small>BEAUTY</small></span></div>;
 }
 
 function HomeScreen({
   authenticated, query, setQuery, area, setArea, date, setDate, suggestions, catalog, catalogState, nextAvailability, promotions,
-  upcomingBookings, favorites, onSearch, onCategory, onViewProvider, onBook, onFavorite, onAccount, onProviderRegister,
+  upcomingBookings, favorites, onSearch, onCategory, onViewProvider, onBook, onFavorite, onAccount, onProviderRegister, theme, onToggleTheme,
 }: {
   authenticated: AuthenticatedProfile | null;
   query: string; setQuery: (value: string) => void; area: string; setArea: (value: string) => void;
@@ -339,17 +360,19 @@ function HomeScreen({
   upcomingBookings: Array<{ id: string; starts_at: string; status: string }>; favorites: string[];
   onSearch: (event?: FormEvent) => void; onCategory: (label: string) => void;
   onViewProvider: (provider: Provider) => void; onBook: (provider: Provider) => void; onFavorite: (provider: Provider) => void;
-  onAccount: () => void; onProviderRegister: () => void;
+  onAccount: () => void; onProviderRegister: () => void; theme: "light" | "dark"; onToggleTheme: () => void;
 }) {
   return <div className="mobile-screen home-screen">
-    <header className="mobile-topbar"><Brand /><div><button aria-label="Notifications" onClick={onAccount}>♢<i>3</i></button><button className="user-orb" aria-label="Ouvrir mon compte" onClick={onAccount}>{authenticated ? "MB" : "○"}</button></div></header>
+    <header className="mobile-topbar"><Brand /><div><button aria-label={theme === "dark" ? "Activer le thème clair" : "Activer le thème sombre"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button><button aria-label="Notifications" onClick={onAccount}>◇<i>3</i></button><button className="user-orb" aria-label="Ouvrir mon compte" onClick={onAccount}>{authenticated ? "MB" : "○"}</button></div></header>
     <section className="welcome-copy"><p>Bonjour {authenticated ? "à vous" : "chez Mata"} <span>👋</span></p><h1>Prenez soin de vous,<br />on s’occupe <em>du reste.</em></h1></section>
     <form className="mobile-search" onSubmit={onSearch}><span>⌕</span><input list="premium-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Que recherchez-vous ?" /><button type="button" aria-label="Ouvrir les filtres" onClick={() => onSearch()}>⌘</button><datalist id="premium-suggestions">{suggestions.map((item) => <option key={item} value={item} />)}</datalist></form>
     <button className="location-card" onClick={() => setArea(area === "Dakar, Sénégal" ? "Tout Dakar" : "Dakar, Sénégal")}><span>⌖</span><span><strong>{area}</strong><small>Changer de localisation</small></span><b>›</b></button>
+    <section className="mata-hero-card"><div><span>BEAUTÉ, SIMPLEMENT</span><h2>Trouvez votre prochain coup de cœur.</h2><p>Des professionnels vérifiés et des créneaux disponibles maintenant.</p><button onClick={() => onCategory("Toutes")}>Réserver maintenant</button></div><Image src="/brand/mata-app-icon.webp" alt="" width={180} height={180} unoptimized /></section>
     <div className="section-title"><h2>Catégories populaires</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
     <div className="photo-category-grid">{categories.map((item) => <button key={item.label} onClick={() => onCategory(item.label)}><span className="category-photo" style={{ backgroundImage: `url(${categoryAtlas})`, backgroundPosition: item.position }} role="img" aria-label={`Photographie ${item.label}`} /><strong>{item.label}</strong></button>)}</div>
     <div className="section-title"><h2>Disponibles aujourd’hui</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
     <CatalogBlock providers={catalog.filter((provider) => isToday(nextAvailability[provider.id])).slice(0, 4)} fallbackProviders={catalog.slice(0, 4)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
+    {catalog.length > 0 && <section className="mata-recommendations"><div className="section-title"><h2>Choisis pour vous</h2><span>✦ Sélection intelligente</span></div><button onClick={() => onViewProvider(catalog[0])}><strong>{catalog[0].name}</strong><small>{catalog[0].specialty} · {catalog[0].rating.toFixed(1)} ★</small><b>Découvrir</b></button></section>}
     {catalog.some((provider) => nextAvailability[provider.id]) && <section className="next-availability-strip"><strong>Prochaines disponibilités</strong>{catalog.filter((provider) => nextAvailability[provider.id]).slice(0, 5).map((provider) => <button key={provider.id} onClick={() => onBook(provider)}><span>{formatSlotLabel(nextAvailability[provider.id])}</span><small>{provider.name}</small></button>)}</section>}
     {promotions.length > 0 && <section className="premium-offers"><div className="section-title"><h2>Offres du moment</h2></div>{promotions.slice(0, 2).map((promotion) => <article key={promotion.id}><span>{promotion.discountType === "percentage" ? `−${promotion.discountValue}%` : `−${formatPrice(promotion.discountValue)}`}</span><div><strong>{promotion.title}</strong><small>{promotion.description}</small></div></article>)}</section>}
     {upcomingBookings.length > 0 && <section className="premium-upcoming"><div className="section-title"><h2>Vos rendez-vous</h2></div>{upcomingBookings.map((booking) => <button key={booking.id} onClick={onAccount}><span>▣</span><div><strong>{new Date(booking.starts_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}</strong><small>{booking.status}</small></div><b>›</b></button>)}</section>}
@@ -506,7 +529,7 @@ function BookingSuccess({ provider, confirmation, onClose }: { provider: Provide
 }
 
 function BottomNav({ active, onHome, onSearch, onAccount }: { active: "home" | "search"; onHome: () => void; onSearch: () => void; onAccount: (section?: "client" | "provider" | "admin") => void }) {
-  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={active === "home" ? "active" : ""} onClick={onHome}><i>⌂</i>Accueil</button><button className={active === "search" ? "active" : ""} onClick={onSearch}><i>⌕</i>Rechercher</button><button onClick={() => onAccount()}><i>▣</i>Rendez-vous</button><button onClick={() => onAccount()}><i>○</i>Mon compte</button></nav>;
+  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={active === "home" ? "active" : ""} onClick={onHome}><i>⌂</i>Accueil</button><button className={active === "search" ? "active" : ""} onClick={onSearch}><i>⌕</i>Recherche</button><button onClick={() => onAccount()}><i>▣</i>Réservations</button><button onClick={() => onAccount()}><i>□</i>Messages</button><button onClick={() => onAccount()}><i>○</i>Profil</button></nav>;
 }
 
 function formatDuration(minutes: number) {

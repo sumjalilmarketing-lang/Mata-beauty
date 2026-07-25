@@ -1,5 +1,5 @@
-const CACHE_NAME = "mata-beauty-shell-v1";
-const SAFE_ASSETS = ["/offline", "/favicon.svg", "/images/categories/mata-category-atlas.webp"];
+const CACHE_NAME = "mata-beauty-shell-v2";
+const SAFE_ASSETS = ["/offline", "/brand/icon-192.png", "/brand/mata-app-icon.webp", "/images/categories/mata-category-atlas.webp"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SAFE_ASSETS)));

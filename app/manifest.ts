@@ -9,13 +9,15 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#160b15",
-    theme_color: "#160b15",
+    background_color: "#fff9f6",
+    theme_color: "#5b0b45",
     lang: "fr",
     orientation: "any",
     categories: ["beauty", "lifestyle"],
     icons: [
-      { src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+      { src: "/brand/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/brand/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/brand/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

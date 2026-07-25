@@ -388,3 +388,90 @@ body { background: var(--cream); }
   .dashboard{display:block}.dashboard .sidebar{height:auto;padding:15px;position:static}.dashboard .sidebar nav{display:flex;overflow:auto}.dashboard .dashboard-main{padding:22px 15px 90px}.dashboard .dashboard-top{align-items:flex-start;flex-direction:column}.dashboard .metric-grid{grid-template-columns:1fr}.dashboard .dashboard-grid{grid-template-columns:1fr}
 }
 @media(max-width:360px){.photo-category-grid{grid-template-columns:repeat(2,1fr)}.photo-category-grid button{height:145px}.premium-slot-grid{grid-template-columns:repeat(2,1fr)}.profile-facts{grid-template-columns:1fr}.five-step-progress{padding-inline:12px}}
+
+/* Mata Beauty Design System — official logo palette */
+:root{
+  --mata-primary:#5b0b45;
+  --mata-primary-strong:#350625;
+  --mata-secondary:#8f1b6b;
+  --mata-accent:#d6a33d;
+  --mata-accent-soft:#f0cf82;
+  --mata-rose:#c92f78;
+  --mata-background:#fff9f6;
+  --mata-surface:#fffefd;
+  --mata-card:#ffffff;
+  --mata-text:#24131f;
+  --mata-text-secondary:#715f6b;
+  --mata-border:#eadde4;
+  --mata-success:#187b52;
+  --mata-warning:#a66512;
+  --mata-danger:#b52f4b;
+  --mata-radius-sm:10px;
+  --mata-radius-md:16px;
+  --mata-radius-lg:24px;
+  --mata-shadow-sm:0 8px 24px rgba(61,12,43,.08);
+  --mata-shadow-lg:0 24px 70px rgba(61,12,43,.16);
+  --mata-transition:180ms cubic-bezier(.2,.8,.2,1);
+}
+.premium-mobile-app{
+  --mb-bg:var(--mata-background);
+  --mb-bg-soft:var(--mata-surface);
+  --mb-card:var(--mata-card);
+  --mb-card-2:#f9edf3;
+  --mb-line:var(--mata-border);
+  --mb-gold:var(--mata-accent);
+  --mb-gold-2:#9d6812;
+  --mb-ivory:var(--mata-text);
+  --mb-muted:var(--mata-text-secondary);
+  color:var(--mata-text);
+  background:radial-gradient(circle at 10% 0,#f9e4ee 0,transparent 35%),var(--mata-background);
+  color-scheme:light;
+}
+.premium-mobile-app[data-theme="dark"]{
+  --mb-bg:#160713;
+  --mb-bg-soft:#230d1e;
+  --mb-card:#2d1226;
+  --mb-card-2:#38152e;
+  --mb-line:rgba(240,207,130,.2);
+  --mb-gold:#d9aa48;
+  --mb-gold-2:#f0cf82;
+  --mb-ivory:#fff8f2;
+  --mb-muted:#c7b6c1;
+  color:#fff8f2;
+  background:radial-gradient(circle at 45% -10%,#50163e 0,#210a1b 45%,#11060e 100%);
+  color-scheme:dark;
+}
+.premium-app-frame{border-color:var(--mb-line);background:color-mix(in srgb,var(--mb-bg) 96%,white);box-shadow:0 0 70px rgba(63,13,45,.1)}
+.mobile-topbar{position:relative;z-index:3}.mobile-topbar button,.screen-header>button{border-color:var(--mb-line);color:var(--mb-ivory);background:var(--mb-card);box-shadow:var(--mata-shadow-sm)}
+.mobile-topbar .user-orb{color:white;background:linear-gradient(135deg,var(--mata-primary),var(--mata-secondary))}
+.premium-brand img{border-radius:50%;filter:none;box-shadow:0 4px 18px rgba(91,11,69,.14)}.premium-brand{color:var(--mata-primary)}.premium-brand strong{font-family:Georgia,serif}.premium-brand small{color:var(--mata-secondary)}
+.welcome-copy p{color:var(--mb-muted)}.welcome-copy h1,.section-title h2,.provider-name-row h3{color:var(--mb-ivory)}.welcome-copy h1 em{color:var(--mata-secondary)}
+.section-title>button{min-height:44px;padding:8px;color:var(--mata-secondary)}
+.mobile-search{border-color:var(--mata-border);box-shadow:0 18px 45px rgba(91,11,69,.13)}
+.location-card{border-color:var(--mb-line);color:var(--mb-ivory);background:var(--mb-card);box-shadow:var(--mata-shadow-sm)}
+.location-card>span:first-child{color:var(--mata-secondary)}
+.photo-category-grid button{border-color:var(--mb-line);background:var(--mb-card);box-shadow:var(--mata-shadow-sm);transition:transform var(--mata-transition),box-shadow var(--mata-transition)}
+.photo-category-grid button:hover,.photo-category-grid button:focus-visible{box-shadow:var(--mata-shadow-lg)}
+.premium-provider-card{border-color:var(--mb-line);background:var(--mb-card);box-shadow:var(--mata-shadow-sm);transition:transform var(--mata-transition),box-shadow var(--mata-transition)}
+.premium-provider-card:hover,.premium-provider-card:focus-visible{box-shadow:var(--mata-shadow-lg)}
+.premium-provider-photo{background:linear-gradient(135deg,#f3dce8,#ead0dc)}
+.provider-name-row button{color:var(--mata-secondary)}.premium-provider-card p:first-of-type{color:var(--mata-text-secondary)}
+.gold-verified{color:#7d5010;background:#fff1cd}.provider-booking-line button{color:white;background:linear-gradient(135deg,var(--mata-primary),var(--mata-secondary))}
+.premium-provider-card .next-slot-badge{color:var(--mata-success);background:#e6f5ed}
+.premium-empty,.next-availability-strip,.premium-offers article,.premium-upcoming button{border-color:var(--mb-line);color:var(--mb-ivory);background:var(--mb-card)}
+.premium-empty h3,.next-availability-strip>strong{color:var(--mb-ivory)}
+.premium-bottom-nav{grid-template-columns:repeat(5,1fr);border-color:var(--mb-line);background:color-mix(in srgb,var(--mb-card) 92%,transparent);box-shadow:0 -8px 28px rgba(61,12,43,.08)}
+.premium-bottom-nav button{min-width:0;color:var(--mb-muted);font-size:8px}.premium-bottom-nav button.active{color:var(--mata-secondary)}.premium-bottom-nav i{font-family:Arial,sans-serif}
+.mata-hero-card{min-height:190px;margin-top:18px;padding:24px;position:relative;display:grid;grid-template-columns:minmax(0,1fr) 170px;align-items:center;overflow:hidden;border-radius:var(--mata-radius-lg);color:white;background:radial-gradient(circle at 85% 30%,#b9337c 0,transparent 38%),linear-gradient(135deg,var(--mata-primary-strong),var(--mata-secondary));box-shadow:var(--mata-shadow-lg)}
+.mata-hero-card:after{content:"";width:220px;height:220px;position:absolute;right:-100px;bottom:-135px;border:1px solid rgba(240,207,130,.5);border-radius:50%}
+.mata-hero-card>div{position:relative;z-index:2}.mata-hero-card>div>span{color:var(--mata-accent-soft);font-size:9px;font-weight:800;letter-spacing:.18em}.mata-hero-card h2{max-width:420px;margin:9px 0 8px;font:32px/1.05 Georgia,serif}.mata-hero-card p{max-width:430px;margin:0;color:#f4dae9;font-size:11px;line-height:1.5}.mata-hero-card button{margin-top:15px;min-height:44px;padding:10px 16px;border-radius:12px;color:var(--mata-primary-strong);background:linear-gradient(135deg,var(--mata-accent-soft),var(--mata-accent));font-weight:800}.mata-hero-card>img{width:170px;height:170px;position:relative;z-index:1;border-radius:50%;mix-blend-mode:screen}
+.mata-recommendations{margin-top:24px}.mata-recommendations .section-title>span{color:var(--mata-secondary);font-size:9px;font-weight:800}.mata-recommendations>button{width:100%;min-height:76px;padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;border:1px solid var(--mb-line);border-radius:var(--mata-radius-md);color:var(--mb-ivory);background:linear-gradient(120deg,var(--mb-card),color-mix(in srgb,var(--mb-card) 82%,#f5d8e7));text-align:left;box-shadow:var(--mata-shadow-sm)}.mata-recommendations strong,.mata-recommendations small{display:block}.mata-recommendations small{color:var(--mb-muted)}.mata-recommendations b{grid-column:2;grid-row:1/3;color:var(--mata-secondary)}
+.mata-splash{position:fixed;z-index:200;inset:0;display:grid;place-items:center;align-content:center;color:#fff8f2;background:radial-gradient(circle at 50% 35%,#721454 0,#350625 48%,#170512 100%);animation:mata-splash-out .45s 1s ease forwards}.mata-splash img{border-radius:50%;box-shadow:0 22px 80px rgba(0,0,0,.25);animation:mata-logo-in .8s cubic-bezier(.2,.85,.2,1) both}.mata-splash strong{margin-top:18px;color:var(--mata-accent-soft);font:36px Georgia,serif;letter-spacing:.2em}.mata-splash span{margin-top:5px;color:#f5d9e7;font-size:9px;letter-spacing:.55em}.mata-splash i{width:52px;height:2px;margin-top:24px;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.16)}.mata-splash i:after{content:"";width:60%;height:100%;display:block;background:var(--mata-accent);animation:mata-progress 1s ease-in-out infinite}
+.premium-mobile-app[data-theme="dark"] .premium-app-frame{background:linear-gradient(155deg,rgba(49,18,41,.97),rgba(18,5,15,.99));box-shadow:0 0 70px rgba(0,0,0,.45)}
+.premium-mobile-app[data-theme="dark"] .premium-brand{color:var(--mata-accent-soft)}.premium-mobile-app[data-theme="dark"] .premium-brand small{color:#e8b6d1}
+.premium-mobile-app[data-theme="dark"] .mobile-topbar button,.premium-mobile-app[data-theme="dark"] .location-card,.premium-mobile-app[data-theme="dark"] .premium-provider-card,.premium-mobile-app[data-theme="dark"] .next-availability-strip,.premium-mobile-app[data-theme="dark"] .premium-offers article,.premium-mobile-app[data-theme="dark"] .premium-upcoming button{background:rgba(255,255,255,.035);box-shadow:none}
+.premium-mobile-app[data-theme="dark"] .provider-name-row button{color:#fff}.premium-mobile-app[data-theme="dark"] .gold-verified{color:var(--mata-accent-soft);background:rgba(214,163,61,.13)}.premium-mobile-app[data-theme="dark"] .premium-provider-card p:first-of-type{color:var(--mata-accent-soft)}.premium-mobile-app[data-theme="dark"] .premium-provider-card .next-slot-badge{color:#8be0b3;background:rgba(24,123,82,.18)}
+@keyframes mata-logo-in{from{opacity:0;transform:scale(.78) rotate(-4deg)}to{opacity:1;transform:scale(1) rotate(0)}}@keyframes mata-splash-out{to{opacity:0;visibility:hidden;pointer-events:none}}@keyframes mata-progress{from{transform:translateX(-110%)}to{transform:translateX(180%)}}
+@media(max-width:560px){.mata-hero-card{min-height:178px;grid-template-columns:minmax(0,1fr) 98px;padding:20px}.mata-hero-card h2{font-size:25px}.mata-hero-card>img{width:112px;height:112px;margin-left:-12px}.mata-hero-card p{font-size:10px}.premium-bottom-nav button{font-size:7px}.premium-bottom-nav i{font-size:17px}}
+@media(max-width:340px){.mobile-screen{padding-inline:12px}.mobile-topbar button{width:44px;height:44px}.premium-brand span{display:none}.mata-hero-card{grid-template-columns:1fr}.mata-hero-card>img{display:none}.photo-category-grid{grid-template-columns:repeat(2,1fr)}.premium-provider-card{grid-template-columns:88px 1fr;gap:9px}.premium-provider-photo{min-height:102px}.provider-booking-line{align-items:flex-start;flex-direction:column}.provider-booking-line button{width:100%}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

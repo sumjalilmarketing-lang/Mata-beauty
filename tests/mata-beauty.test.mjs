@@ -67,3 +67,50 @@ test("provider moderation and the PWA shell remain protected", async () => {
   assert.match(worker, /\/offline/);
   assert.doesNotMatch(worker, /supabase|auth|api/);
 });
+
+test("the official Mata identity drives the design system and installable assets", async () => {
+  const [styles, app, admin, manifest, lightLogo, darkLogo, appIcon] = await Promise.all([
+    readFile(new URL("app/globals.css", root), "utf8"),
+    readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
+    readFile(new URL("app/super-admin.tsx", root), "utf8"),
+    readFile(new URL("app/manifest.ts", root), "utf8"),
+    readFile(new URL("public/brand/mata-logo-light.webp", root)),
+    readFile(new URL("public/brand/mata-logo-dark.webp", root)),
+    readFile(new URL("public/brand/mata-app-icon.webp", root)),
+  ]);
+  for (const token of ["--mata-primary", "--mata-secondary", "--mata-accent", "--mata-background", "--mata-success", "--mata-danger"]) {
+    assert.match(styles, new RegExp(token));
+  }
+  assert.match(styles, /prefers-reduced-motion/);
+  assert.match(styles, /data-theme="dark"/);
+  assert.match(app, /mata-splash/);
+  assert.match(app, /mata-hero-card/);
+  assert.match(app + admin, /\/brand\/mata-app-icon\.webp/);
+  assert.match(manifest, /icon-192\.png/);
+  assert.match(manifest, /purpose: "maskable"/);
+  for (const asset of [lightLogo, darkLogo, appIcon]) assert.ok(asset.byteLength > 10_000 && asset.byteLength < 120_000);
+});
+
+test("the Super Admin control center is protected by RBAC and audited RPCs", async () => {
+  const [migration, adminPage, adminApp] = await Promise.all([
+    readFile(new URL("supabase/migrations/20260725233000_super_admin_control_center.sql", root), "utf8"),
+    readFile(new URL("app/admin/page.tsx", root), "utf8"),
+    readFile(new URL("app/super-admin.tsx", root), "utf8"),
+  ]);
+
+  for (const role of ["super_admin", "support", "moderator", "verification_agent", "finance", "content_manager"]) {
+    assert.match(migration, new RegExp(`'${role}'`));
+  }
+  for (const permission of ["roles.manage", "documents.review", "payments.refund", "settings.update", "audit.read"]) {
+    assert.match(migration, new RegExp(permission.replace(".", "\\.")));
+  }
+  for (const rpc of ["has_admin_permission", "admin_assign_role", "admin_set_user_suspension", "admin_set_provider_status", "admin_update_booking_status", "admin_update_setting"]) {
+    assert.match(migration, new RegExp(`function public\\.${rpc}`));
+  }
+  assert.match(migration, /target_user_id = auth\.uid\(\).*Impossible de modifier ses propres permissions/s);
+  assert.match(migration, /alter table public\..*enable row level security/);
+  assert.doesNotMatch(adminPage + adminApp, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(adminApp, /Compte non autorisé/);
+  assert.match(adminApp, /PermissionGuard/);
+  assert.match(adminApp, /ConfirmationModal/);
+});

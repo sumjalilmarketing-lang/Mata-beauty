@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   applicationName: "Mata Beauty",
   keywords: ["beauté Dakar", "coiffure Sénégal", "tresses Dakar", "maquillage", "onglerie", "réservation beauté"],
-  icons: { icon: "/favicon.svg", shortcut: "/favicon.svg", apple: "/favicon.svg" },
+  icons: { icon: "/brand/icon-64.png", shortcut: "/brand/icon-64.png", apple: "/brand/icon-192.png" },
   manifest: "/manifest.webmanifest",
   openGraph: {
     title: "Mata Beauty — L’application beauté du Sénégal",
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "Mata Beauty", description: "Réservez votre beauté au Sénégal.", images: ["/images/categories/mata-category-atlas.webp"] },
 };
 
-export const viewport: Viewport = { themeColor: "#160b15", colorScheme: "dark" };
+export const viewport: Viewport = { themeColor: "#5b0b45", colorScheme: "light dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="fr"><body><PwaRegister />{children}</body></html>;
