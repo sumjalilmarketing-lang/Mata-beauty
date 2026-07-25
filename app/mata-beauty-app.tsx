@@ -75,6 +75,7 @@ export function MataBeautyApp() {
   const [profile, setProfile] = useState<Provider | null>(null);
   const [view, setView] = useState<"home" | "client" | "provider" | "admin">("home");
   const [notice, setNotice] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState<AuthenticatedProfile | null>(null);
   const [authRequest, setAuthRequest] = useState<{
     role: "client" | "provider" | "admin";
@@ -210,27 +211,39 @@ export function MataBeautyApp() {
   return (
     <main>
       {notice && <div className="toast" role="status">✓ {notice}</div>}
-      <header className="topbar">
-        <a className="brand" href="#accueil" aria-label="Mata Beauty, accueil">
-          <span className="brand-mark">M</span>
-          <span>Mata <i>Beauty</i></span>
+      <header className="topbar premium-nav">
+        <a className="official-brand" href="#accueil" aria-label="Mata Beauty, accueil">
+          <span className="brand-emblem">M</span>
+          <span><strong>MATA</strong><small>BEAUTY</small></span>
         </a>
         <nav className="desktop-nav" aria-label="Navigation principale">
-          <a href="#explorer">Explorer</a>
-          <a href="#fonctionnement">Comment ça marche</a>
-          <button className="link-button" onClick={() => setAuthRequest({ role: "provider", mode: "login" })}>Espace pro</button>
+          <a href="#accueil">Accueil</a>
+          <div className="mega-trigger">
+            <a href="#explorer">Prestataires</a>
+            <div className="mega-menu">
+              <div><small>Explorer</small><strong>Les talents les mieux notés</strong><p>Des profils contrôlés, des disponibilités claires et des avis authentiques.</p></div>
+              {["Coiffure femme", "Tresses africaines", "Maquillage", "Onglerie"].map((item) => <button key={item} onClick={() => { setCategory(item); document.getElementById("explorer")?.scrollIntoView(); }}>{item}<span>→</span></button>)}
+            </div>
+          </div>
+          <a href="#categories">Catégories</a>
+          <a href="#manifeste">À propos</a>
+          <a href="#contact">Contact</a>
         </nav>
         <div className="header-actions">
+          <button className="nav-icon" aria-label="Favoris" onClick={() => setAuthRequest({ role: "client", mode: "login" })}>♡</button>
+          <button className="nav-icon" aria-label="Notifications" onClick={() => setAuthRequest({ role: "client", mode: "login" })}>◌</button>
           <button className="ghost-button" onClick={() => setAuthRequest({ role: "client", mode: "login" })}>Se connecter</button>
-          <button className="primary-button small" onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Devenir prestataire</button>
+          <button className="gold-button compact" onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Rejoindre Mata</button>
+          <button className="menu-toggle" aria-expanded={mobileMenuOpen} aria-label="Ouvrir le menu" onClick={() => setMobileMenuOpen((open) => !open)}>☰</button>
         </div>
+        {mobileMenuOpen && <nav className="mobile-menu" aria-label="Navigation mobile"><a href="#explorer" onClick={() => setMobileMenuOpen(false)}>Prestataires</a><a href="#categories" onClick={() => setMobileMenuOpen(false)}>Catégories</a><a href="#manifeste" onClick={() => setMobileMenuOpen(false)}>À propos</a><button onClick={() => setAuthRequest({ role: "client", mode: "login" })}>Se connecter</button></nav>}
       </header>
 
-      <section className="hero" id="accueil">
+      <section className="hero premium-hero" id="accueil">
         <div className="hero-copy">
-          <p className="eyebrow"><span>✦</span> La beauté, près de chez vous</p>
-          <h1>Votre beauté.<br /><em>Votre moment.</em></h1>
-          <p className="hero-lead">Trouvez les meilleurs professionnels de beauté au Sénégal et réservez en quelques instants, en toute confiance.</p>
+          <p className="eyebrow light"><span>✦</span> La beauté d’exception, à Dakar</p>
+          <h1>Votre beauté,<br /><em>notre passion.</em></h1>
+          <p className="hero-lead">Découvrez une sélection exigeante de professionnels et réservez votre prochain moment beauté avec une simplicité absolue.</p>
           <form className="search-bar" onSubmit={(event) => event.preventDefault()}>
             <label>
               <span>Que recherchez-vous ?</span>
@@ -243,37 +256,28 @@ export function MataBeautyApp() {
                 {[...new Set(catalog.map((provider) => provider.area))].map((item) => <option key={item}>{item}</option>)}
               </select>
             </label>
-            <button className="search-button" type="submit" onClick={() => document.getElementById("explorer")?.scrollIntoView({ behavior: "smooth" })}>Rechercher</button>
+            <button className="search-button" type="submit" onClick={() => document.getElementById("explorer")?.scrollIntoView({ behavior: "smooth" })}>Découvrir</button>
           </form>
           <div className="trust-row">
-            <span><b>4,8/5</b> note moyenne</span>
-            <span><b>+120</b> professionnels</span>
-            <span><b>100%</b> profils contrôlés</span>
+            <span><b>✓</b> Professionnels vérifiés</span>
+            <span><b>◫</b> Réservation facile</span>
+            <span><b>◇</b> Accompagnement personnalisé</span>
           </div>
         </div>
-        <div className="hero-visual" aria-label="Professionnelle réalisant des tresses en salon">
-          <div className="image-frame">
-            <Image
-              src="https://images.unsplash.com/photo-1763048208932-cbe149724374?auto=format&fit=crop&q=84&w=1200"
-              alt="Professionnelle réalisant des tresses dans un salon"
-              width={1200}
-              height={1500}
-              priority
-              unoptimized
-            />
-          </div>
-          <div className="floating-card rating-card">
-            <span className="floating-icon">★</span>
-            <div><strong>4,9 sur 5</strong><small>1 240 avis vérifiés</small></div>
-          </div>
-          <div className="floating-card booking-card">
-            <span className="floating-icon calendar">25</span>
-            <div><strong>Créneau confirmé</strong><small>Aujourd’hui à 16:30</small></div>
-          </div>
+        <div className="hero-visual founder-visual" aria-label="Fondatrice de Mata Beauty dans un salon premium">
+          <Image src="/mata-founder-hero.png" alt="Fondatrice de Mata Beauty en tenue business élégante" fill priority sizes="(max-width: 900px) 100vw, 52vw" />
+          <span className="founder-caption"><small>Une vision portée par</small><strong>Mata Beauty</strong></span>
         </div>
       </section>
 
-      <section className="section categories-section" aria-labelledby="category-title">
+      <section className="brand-manifesto" id="manifeste">
+        <p className="eyebrow">L’excellence, sans compromis</p>
+        <h2>Plus qu’une réservation.<br />Une nouvelle façon de vivre la beauté.</h2>
+        <p>Mata Beauty réunit le meilleur du savoir-faire local dans une expérience pensée pour votre temps, votre confiance et votre bien-être.</p>
+        <div className="manifesto-metrics"><span><strong>100%</strong> profils contrôlés</span><span><strong>4,9/5</strong> satisfaction moyenne</span><span><strong>7j/7</strong> réservation en ligne</span></div>
+      </section>
+
+      <section className="section categories-section" id="categories" aria-labelledby="category-title">
         <div className="section-heading">
           <div><p className="eyebrow">Nos expertises</p><h2 id="category-title">Que souhaitez-vous réserver ?</h2></div>
           <a href="#explorer">Voir toutes les catégories →</a>
@@ -329,6 +333,38 @@ export function MataBeautyApp() {
         )}
       </section>
 
+      <section className="editorial-story" aria-labelledby="editorial-title">
+        <div className="editorial-image"><Image src="/beauty-rituals-editorial.png" alt="Trois rituels beauté premium : coiffure, maquillage et manucure" fill sizes="100vw" /></div>
+        <div className="editorial-copy">
+          <p className="eyebrow light">Savoir-faire & transformation</p>
+          <h2 id="editorial-title">Chaque détail révèle votre éclat.</h2>
+          <p>Des gestes précis, des produits choisis et des artistes qui comprennent votre style. Découvrez des résultats qui vous ressemblent, sans compromis.</p>
+          <a href="#explorer">Trouver mon experte <span>→</span></a>
+        </div>
+      </section>
+
+      <section className="section social-proof" aria-labelledby="reviews-title">
+        <div className="section-heading">
+          <div><p className="eyebrow">Paroles de clientes</p><h2 id="reviews-title">Elles ont trouvé leur adresse beauté.</h2></div>
+          <span className="review-score">★ 4,9 <small>sur 1 240 avis</small></span>
+        </div>
+        <div className="testimonial-grid">
+          <article><div className="stars">★★★★★</div><blockquote>« Une réservation limpide et une prestataire exceptionnelle. J’ai enfin trouvé mon salon de confiance. »</blockquote><footer><span>AM</span><div><strong>Aminata M.</strong><small>Cliente vérifiée · Almadies</small></div></footer></article>
+          <article><div className="stars">★★★★★</div><blockquote>« Le niveau de service est vraiment premium. Tout était clair, ponctuel et parfaitement exécuté. »</blockquote><footer><span>NK</span><div><strong>Ndeye K.</strong><small>Cliente vérifiée · Mermoz</small></div></footer></article>
+          <article><div className="stars">★★★★★</div><blockquote>« Mata Beauty m’a fait gagner du temps sans sacrifier la qualité. Une expérience que je recommande. »</blockquote><footer><span>FS</span><div><strong>Fatou S.</strong><small>Cliente vérifiée · Point E</small></div></footer></article>
+        </div>
+      </section>
+
+      <section className="why-mata" aria-labelledby="why-title">
+        <div><p className="eyebrow light">Pourquoi Mata Beauty</p><h2 id="why-title">La confiance est notre plus beau service.</h2></div>
+        <div className="promise-grid">
+          <article><span>01</span><h3>Sélection exigeante</h3><p>Identité, expertise et qualité de service sont vérifiées avant publication.</p></article>
+          <article><span>02</span><h3>Prix transparents</h3><p>Vous connaissez le tarif, la durée et les conditions avant de confirmer.</p></article>
+          <article><span>03</span><h3>Expérience maîtrisée</h3><p>Rappels, suivi et assistance vous accompagnent à chaque étape.</p></article>
+          <article><span>04</span><h3>Beauté locale valorisée</h3><p>Nous faisons rayonner les talents et savoir-faire du Sénégal.</p></article>
+        </div>
+      </section>
+
       <section className="how-section" id="fonctionnement">
         <div className="section-heading centered"><div><p className="eyebrow">Simple & serein</p><h2>Votre rendez-vous en 3 étapes</h2></div></div>
         <div className="steps">
@@ -338,16 +374,39 @@ export function MataBeautyApp() {
         </div>
       </section>
 
+      <section className="mobile-showcase">
+        <div>
+          <p className="eyebrow">Bientôt dans votre poche</p>
+          <h2>Votre rituel beauté,<br />où que vous soyez.</h2>
+          <p>Retrouvez vos favoris, vos rendez-vous et vos recommandations personnalisées dans une expérience mobile conçue pour aller à l’essentiel.</p>
+          <div className="app-pills"><span>Disponible prochainement sur iOS</span><span>Android</span></div>
+        </div>
+        <div className="phone-mockup" aria-label="Aperçu de l’application mobile Mata Beauty"><div className="phone-top">MATA <small>BEAUTY</small></div><p>Bonjour Aïssatou,</p><h3>Que souhaitez-vous réserver ?</h3><div className="mini-search">Rechercher un soin…</div><div className="mini-card"><span>MB</span><div><strong>Votre experte du jour</strong><small>★ 4,9 · Almadies</small></div></div></div>
+      </section>
+
+      <section className="section faq-section" aria-labelledby="faq-title">
+        <div className="faq-intro"><p className="eyebrow">Questions fréquentes</p><h2 id="faq-title">Tout ce qu’il faut savoir.</h2><p>Une question supplémentaire ? Notre équipe vous accompagne.</p><a href="mailto:contact@matabeauty.sn">Nous contacter →</a></div>
+        <div className="faq-list">
+          <details open><summary>Comment les prestataires sont-ils sélectionnés ?</summary><p>Chaque profil passe par une vérification de son identité, de ses informations professionnelles et de la qualité de sa présentation.</p></details>
+          <details><summary>Puis-je modifier ou annuler un rendez-vous ?</summary><p>Oui, depuis votre espace client, selon le délai d’annulation indiqué lors de la réservation.</p></details>
+          <details><summary>Le paiement en ligne est-il disponible ?</summary><p>Le paiement reste actuellement en mode test. Vous réglez directement selon les modalités affichées par le prestataire.</p></details>
+          <details><summary>Comment devenir prestataire Mata Beauty ?</summary><p>Créez votre espace professionnel, complétez votre profil et envoyez-le à notre équipe pour validation.</p></details>
+        </div>
+      </section>
+
       <section className="pro-cta">
         <div><p className="eyebrow light">Professionnels de beauté</p><h2>Votre talent mérite<br />d’être découvert.</h2><p>Développez votre clientèle, gérez votre agenda et faites rayonner votre savoir-faire.</p></div>
         <button className="gold-button" onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Créer mon profil professionnel →</button>
       </section>
 
-      <footer>
-        <a className="brand inverted" href="#accueil"><span className="brand-mark">M</span><span>Mata <i>Beauty</i></span></a>
-        <p>La plateforme beauté de confiance au Sénégal.</p>
-        <div><button onClick={() => setAuthRequest({ role: "client", mode: "login" })}>Espace client</button><button onClick={() => setAuthRequest({ role: "provider", mode: "login" })}>Espace prestataire</button><button onClick={() => setAuthRequest({ role: "admin", mode: "login" })}>Administration</button></div>
-        <small>© 2026 Mata Beauty · Dakar, Sénégal · Paiements en mode test</small>
+      <footer id="contact" className="premium-footer">
+        <div className="footer-grid">
+          <div><a className="official-brand footer-brand" href="#accueil"><span className="brand-emblem">M</span><span><strong>MATA</strong><small>BEAUTY</small></span></a><p>La plateforme beauté de confiance au Sénégal.</p></div>
+          <div><strong>Découvrir</strong><a href="#explorer">Prestataires</a><a href="#categories">Catégories</a><a href="#fonctionnement">Comment ça marche</a><button onClick={() => setAuthRequest({ role: "client", mode: "login" })}>Espace client</button></div>
+          <div><strong>Professionnels</strong><button onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Rejoindre Mata Beauty</button><button onClick={() => setAuthRequest({ role: "provider", mode: "login" })}>Espace prestataire</button></div>
+          <div><strong>Contact</strong><a href="mailto:contact@matabeauty.sn">contact@matabeauty.sn</a><span>Dakar, Sénégal</span></div>
+        </div>
+        <div className="footer-bottom"><small>© 2026 Mata Beauty. Tous droits réservés.</small><div><button onClick={() => setAuthRequest({ role: "admin", mode: "login" })}>Administration</button><span>Paiements en mode test</span></div></div>
       </footer>
 
       {profile && <ProfileModal provider={profile} onClose={() => setProfile(null)} onBook={() => { setBooking(profile); setProfile(null); }} favorite={favorites.includes(profile.id)} onFavorite={() => void toggleFavorite(profile)} />}
