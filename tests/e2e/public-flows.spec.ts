@@ -18,7 +18,8 @@ test("premium home opens a real category results screen", async ({ page }) => {
 test("authentication has no fake preview mode", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Ouvrir mon compte" }).click();
-  await expect(page.getByRole("alert")).toContainText("connexion sécurisée");
+  await expect(page.getByRole("heading", { name: "Bienvenue" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Se connecter", exact: true })).toBeEnabled();
   await expect(page.getByRole("dialog")).not.toContainText("aperçu");
 });
 

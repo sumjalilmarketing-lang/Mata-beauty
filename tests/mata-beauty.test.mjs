@@ -16,6 +16,8 @@ test("the public experience is a real booking application", async () => {
   assert.match(app, /Étape \$\{step\} sur 2/);
   assert.match(app, /Voir les créneaux/);
   assert.match(app, /Mis à jour en direct/);
+  assert.match(app, /waitingForAuthentication/);
+  assert.match(app, /get_available_slots/);
   assert.match(app, /Votre rendez-vous est créé/);
   assert.doesNotMatch(app, /Awa Signature|Demande simulée|Mode démonstration/);
   assert.match(layout, /Mata Beauty/);
@@ -24,9 +26,10 @@ test("the public experience is a real booking application", async () => {
 });
 
 test("the database migrations cover the MVP and protected business domains", async () => {
-  const [initial, application] = await Promise.all([
+  const [initial, application, availability] = await Promise.all([
     readFile(new URL("supabase/migrations/20260725180000_initial_schema.sql", root), "utf8"),
     readFile(new URL("supabase/migrations/20260725204500_businesses_collaborators_promotions.sql", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260725221000_secure_available_slots.sql", root), "utf8"),
   ]);
   const initialTables = [
     "profiles", "client_profiles", "provider_profiles", "provider_documents",
@@ -44,6 +47,9 @@ test("the database migrations cover the MVP and protected business domains", asy
   assert.match(initial, /exclude using gist/);
   assert.match(application, /enable row level security/g);
   assert.match(application, /providers manage own promotions/);
+  assert.match(availability, /get_available_slots/);
+  assert.match(availability, /not exists[\s\S]*public\.bookings/);
+  assert.match(availability, /pending', 'confirmed', 'in_progress/);
 });
 
 test("provider moderation and the PWA shell remain protected", async () => {

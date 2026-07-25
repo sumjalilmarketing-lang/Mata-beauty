@@ -21,5 +21,9 @@ export default defineConfig({
     url: "http://127.0.0.1:3000",
     reuseExistingServer: true,
     timeout: 120_000,
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: "https://audit.supabase.test",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "audit-public-anon-key",
+    },
   },
 });

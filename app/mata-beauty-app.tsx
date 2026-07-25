@@ -6,7 +6,7 @@ import { AuthModal, type AuthenticatedProfile } from "./auth-modal";
 import { LiveDashboard } from "./live-dashboard";
 import { calculateBookingEnd, calculateBookingQuote } from "@/lib/domain/booking";
 import { fetchActivePromotions, fetchPublishedProviders, type CatalogPromotion } from "@/lib/supabase/catalog";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Provider = {
   id: string;
@@ -39,8 +39,7 @@ type BookingConfirmation = { id: string; date: string; time: string; location: s
 type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number };
 type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[] };
 type BookingSelection = { provider: Provider; service: ProviderService };
-type AvailabilityRule = { starts_at: string; ends_at: string; slot_interval_minutes: number };
-type AvailabilityException = { starts_at: string; ends_at: string; is_available: boolean };
+type AvailabilitySlot = { slot_start: string };
 
 const categoryAtlas = "/images/categories/mata-category-atlas.webp";
 const categories = [
@@ -66,7 +65,8 @@ const formatPrice = (value: number) => `${new Intl.NumberFormat("fr-FR").format(
 const today = new Date().toISOString().slice(0, 10);
 const defaultBookingDate = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
-export function MataBeautyApp() {
+export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: string; supabaseAnonKey: string }) {
+  configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Toutes");
   const [subcategory, setSubcategory] = useState("Tout");
@@ -76,6 +76,7 @@ export function MataBeautyApp() {
   const [catalog, setCatalog] = useState<Provider[]>([]);
   const [catalogState, setCatalogState] = useState<"loading" | "live" | "empty" | "error">("loading");
   const [promotions, setPromotions] = useState<CatalogPromotion[]>([]);
+  const [nextAvailability, setNextAvailability] = useState<Record<string, string>>({});
   const [upcomingBookings, setUpcomingBookings] = useState<Array<{ id: string; starts_at: string; status: string }>>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [booking, setBooking] = useState<BookingSelection | null>(null);
@@ -143,6 +144,24 @@ export function MataBeautyApp() {
     });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !catalog.length) return;
+    let active = true;
+    void Promise.all(catalog.slice(0, 12).map(async (provider) => {
+      const { data } = await supabase.rpc("get_available_slots", {
+        target_provider_id: provider.profileId,
+        target_provider_service_id: provider.serviceId,
+        from_date: today,
+        days: 7,
+      }).limit(1);
+      return [provider.id, ((data ?? []) as AvailabilitySlot[])[0]?.slot_start ?? ""] as const;
+    })).then((entries) => {
+      if (active) setNextAvailability(Object.fromEntries(entries));
+    });
+    return () => { active = false; };
+  }, [catalog]);
 
   function openAccount(section: "client" | "provider" | "admin" = "client") {
     if (authenticated?.role === section) setView(section);
@@ -227,12 +246,18 @@ export function MataBeautyApp() {
     setView("home");
   }
 
+  function handleAuthenticated(signedIn: AuthenticatedProfile) {
+    setAuthenticated(signedIn);
+    setAuthRequest(null);
+    if (!booking) setView(signedIn.role);
+  }
+
   if (view !== "home" && authenticated?.role === view) {
     return <LiveDashboard role={view} userId={authenticated.userId} displayName="votre espace" onBack={() => setView("home")} onSignOut={signOut} />;
   }
 
   if (profile) {
-    return <ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.id)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service) => setBooking({ provider: profile, service })} />;
+    return <><ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.id)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service) => setBooking({ provider: profile, service })} />{booking && <BookingModal selection={booking} initialDate={date} authenticated={authenticated?.role === "client"} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}{authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}</>;
   }
 
   return (
@@ -251,6 +276,7 @@ export function MataBeautyApp() {
             suggestions={suggestions}
             catalog={catalog}
             catalogState={catalogState}
+            nextAvailability={nextAvailability}
             promotions={promotions}
             upcomingBookings={upcomingBookings}
             favorites={favorites}
@@ -269,6 +295,7 @@ export function MataBeautyApp() {
             setSubcategory={setSubcategory}
             area={area}
             providers={filteredProviders}
+            nextAvailability={nextAvailability}
             catalogState={catalogState}
             favorites={favorites}
             filtersOpen={filtersOpen}
@@ -291,8 +318,8 @@ export function MataBeautyApp() {
         <BottomNav active={screen === "home" ? "home" : "search"} onHome={() => setScreen("home")} onSearch={() => setScreen("results")} onAccount={openAccount} />
       </div>
 
-      {booking && <BookingModal selection={booking} initialDate={date} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}
-      {authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={(signedIn) => { setAuthenticated(signedIn); setAuthRequest(null); if (!booking) setView(signedIn.role); }} />}
+      {booking && <BookingModal selection={booking} initialDate={date} authenticated={authenticated?.role === "client"} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}
+      {authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}
     </main>
   );
 }
@@ -302,13 +329,13 @@ function Brand() {
 }
 
 function HomeScreen({
-  authenticated, query, setQuery, area, setArea, date, setDate, suggestions, catalog, catalogState, promotions,
+  authenticated, query, setQuery, area, setArea, date, setDate, suggestions, catalog, catalogState, nextAvailability, promotions,
   upcomingBookings, favorites, onSearch, onCategory, onViewProvider, onBook, onFavorite, onAccount, onProviderRegister,
 }: {
   authenticated: AuthenticatedProfile | null;
   query: string; setQuery: (value: string) => void; area: string; setArea: (value: string) => void;
   date: string; setDate: (value: string) => void; suggestions: string[]; catalog: Provider[];
-  catalogState: "loading" | "live" | "empty" | "error"; promotions: CatalogPromotion[];
+  catalogState: "loading" | "live" | "empty" | "error"; nextAvailability: Record<string, string>; promotions: CatalogPromotion[];
   upcomingBookings: Array<{ id: string; starts_at: string; status: string }>; favorites: string[];
   onSearch: (event?: FormEvent) => void; onCategory: (label: string) => void;
   onViewProvider: (provider: Provider) => void; onBook: (provider: Provider) => void; onFavorite: (provider: Provider) => void;
@@ -321,8 +348,9 @@ function HomeScreen({
     <button className="location-card" onClick={() => setArea(area === "Dakar, Sénégal" ? "Tout Dakar" : "Dakar, Sénégal")}><span>⌖</span><span><strong>{area}</strong><small>Changer de localisation</small></span><b>›</b></button>
     <div className="section-title"><h2>Catégories populaires</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
     <div className="photo-category-grid">{categories.map((item) => <button key={item.label} onClick={() => onCategory(item.label)}><span className="category-photo" style={{ backgroundImage: `url(${categoryAtlas})`, backgroundPosition: item.position }} role="img" aria-label={`Photographie ${item.label}`} /><strong>{item.label}</strong></button>)}</div>
-    <div className="section-title"><h2>Prestataires proches</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
-    <CatalogBlock providers={catalog.slice(0, 4)} catalogState={catalogState} favorites={favorites} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
+    <div className="section-title"><h2>Disponibles aujourd’hui</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
+    <CatalogBlock providers={catalog.filter((provider) => isToday(nextAvailability[provider.id])).slice(0, 4)} fallbackProviders={catalog.slice(0, 4)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
+    {catalog.some((provider) => nextAvailability[provider.id]) && <section className="next-availability-strip"><strong>Prochaines disponibilités</strong>{catalog.filter((provider) => nextAvailability[provider.id]).slice(0, 5).map((provider) => <button key={provider.id} onClick={() => onBook(provider)}><span>{formatSlotLabel(nextAvailability[provider.id])}</span><small>{provider.name}</small></button>)}</section>}
     {promotions.length > 0 && <section className="premium-offers"><div className="section-title"><h2>Offres du moment</h2></div>{promotions.slice(0, 2).map((promotion) => <article key={promotion.id}><span>{promotion.discountType === "percentage" ? `−${promotion.discountValue}%` : `−${formatPrice(promotion.discountValue)}`}</span><div><strong>{promotion.title}</strong><small>{promotion.description}</small></div></article>)}</section>}
     {upcomingBookings.length > 0 && <section className="premium-upcoming"><div className="section-title"><h2>Vos rendez-vous</h2></div>{upcomingBookings.map((booking) => <button key={booking.id} onClick={onAccount}><span>▣</span><div><strong>{new Date(booking.starts_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}</strong><small>{booking.status}</small></div><b>›</b></button>)}</section>}
     <div className="mobile-date-helper"><label>Quand souhaitez-vous réserver ?<input type="date" min={today} value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
@@ -330,12 +358,12 @@ function HomeScreen({
 }
 
 function ResultsScreen({
-  category, subcategory, setSubcategory, area, providers, catalogState, favorites, filtersOpen, setFiltersOpen,
+  category, subcategory, setSubcategory, area, providers, catalogState, nextAvailability, favorites, filtersOpen, setFiltersOpen,
   homeOnly, setHomeOnly, verifiedOnly, setVerifiedOnly, minRating, setMinRating, maxPrice, setMaxPrice,
   onBack, onViewProvider, onBook, onFavorite, onProviderRegister,
 }: {
   category: string; subcategory: string; setSubcategory: (value: string) => void; area: string; providers: Provider[];
-  catalogState: "loading" | "live" | "empty" | "error"; favorites: string[]; filtersOpen: boolean;
+  catalogState: "loading" | "live" | "empty" | "error"; nextAvailability: Record<string, string>; favorites: string[]; filtersOpen: boolean;
   setFiltersOpen: (open: boolean) => void; homeOnly: boolean; setHomeOnly: (value: boolean) => void;
   verifiedOnly: boolean; setVerifiedOnly: (value: boolean) => void; minRating: string; setMinRating: (value: string) => void;
   maxPrice: string; setMaxPrice: (value: string) => void; onBack: () => void;
@@ -351,21 +379,22 @@ function ResultsScreen({
       <label><input type="checkbox" checked={homeOnly} onChange={(event) => setHomeOnly(event.target.checked)} /> À domicile</label>
       <label><input type="checkbox" checked={verifiedOnly} onChange={(event) => setVerifiedOnly(event.target.checked)} /> Vérifié</label>
     </aside>}
-    <CatalogBlock providers={providers} catalogState={catalogState} favorites={favorites} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
+    <CatalogBlock providers={providers} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
   </div>;
 }
 
-function CatalogBlock({ providers, catalogState, favorites, onView, onBook, onFavorite, onProviderRegister }: { providers: Provider[]; catalogState: "loading" | "live" | "empty" | "error"; favorites: string[]; onView: (provider: Provider) => void; onBook: (provider: Provider) => void; onFavorite: (provider: Provider) => void; onProviderRegister: () => void }) {
+function CatalogBlock({ providers, fallbackProviders = [], catalogState, favorites, nextAvailability, onView, onBook, onFavorite, onProviderRegister }: { providers: Provider[]; fallbackProviders?: Provider[]; catalogState: "loading" | "live" | "empty" | "error"; favorites: string[]; nextAvailability: Record<string, string>; onView: (provider: Provider) => void; onBook: (provider: Provider) => void; onFavorite: (provider: Provider) => void; onProviderRegister: () => void }) {
   if (catalogState === "loading") return <div className="mobile-skeletons" aria-label="Chargement"><i /><i /><i /></div>;
   if (catalogState === "empty" || catalogState === "error") return <div className="premium-empty"><span>✦</span><h3>{catalogState === "error" ? "Catalogue indisponible" : "Les premiers talents arrivent"}</h3><p>{catalogState === "error" ? "Vérifiez votre connexion puis réessayez." : "Aucun professionnel approuvé n’est encore publié dans cette zone."}</p><button onClick={onProviderRegister}>Devenir prestataire</button></div>;
-  if (!providers.length) return <div className="premium-empty compact"><span>⌕</span><h3>Aucun résultat</h3><p>Essayez une autre catégorie ou élargissez vos filtres.</p></div>;
-  return <div className="premium-provider-list">{providers.map((provider) => <ProviderCard key={provider.id} provider={provider} favorite={favorites.includes(provider.id)} onFavorite={() => onFavorite(provider)} onView={() => onView(provider)} onBook={() => onBook(provider)} />)}</div>;
+  const displayedProviders = providers.length ? providers : fallbackProviders;
+  if (!displayedProviders.length) return <div className="premium-empty compact"><span>⌕</span><h3>Aucun résultat</h3><p>Essayez une autre catégorie ou élargissez vos filtres.</p></div>;
+  return <div className="premium-provider-list">{displayedProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} nextSlot={nextAvailability[provider.id]} favorite={favorites.includes(provider.id)} onFavorite={() => onFavorite(provider)} onView={() => onView(provider)} onBook={() => onBook(provider)} />)}</div>;
 }
 
-function ProviderCard({ provider, favorite, onFavorite, onView, onBook }: { provider: Provider; favorite: boolean; onFavorite: () => void; onView: () => void; onBook: () => void }) {
+function ProviderCard({ provider, nextSlot, favorite, onFavorite, onView, onBook }: { provider: Provider; nextSlot?: string; favorite: boolean; onFavorite: () => void; onView: () => void; onBook: () => void }) {
   return <article className="premium-provider-card" onClick={onView} onKeyDown={(event) => { if (event.key === "Enter") onView(); }} role="button" tabIndex={0}>
     <div className="premium-provider-photo">{provider.coverUrl ? <Image src={provider.coverUrl} alt={`Espace de ${provider.name}`} fill sizes="120px" /> : <span>{provider.initials}</span>}</div>
-    <div><div className="provider-name-row"><h3>{provider.name}</h3><button aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"} onClick={(event) => { event.stopPropagation(); onFavorite(); }}>{favorite ? "♥" : "♡"}</button></div>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}<p>★ {provider.rating.toFixed(1)} ({provider.reviews} avis) · {provider.area}</p><div className="provider-booking-line"><span><strong>{formatPrice(provider.price)}</strong><small>{formatDuration(provider.durationMinutes)}</small></span><button onClick={(event) => { event.stopPropagation(); onBook(); }}>Voir les créneaux</button></div></div>
+    <div><div className="provider-name-row"><h3>{provider.name}</h3><button aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"} onClick={(event) => { event.stopPropagation(); onFavorite(); }}>{favorite ? "♥" : "♡"}</button></div>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}<p>★ {provider.rating.toFixed(1)} ({provider.reviews} avis) · {provider.area}</p>{nextSlot && <p className="next-slot-badge">● {formatSlotLabel(nextSlot)}</p>}<div className="provider-booking-line"><span><strong>{formatPrice(provider.price)}</strong><small>{formatDuration(provider.durationMinutes)}</small></span><button onClick={(event) => { event.stopPropagation(); onBook(); }}>Voir les créneaux</button></div></div>
   </article>;
 }
 
@@ -406,14 +435,14 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
   </div></div></main>;
 }
 
-function BookingModal({ selection, initialDate, onClose, onSubmit }: { selection: BookingSelection; initialDate: string; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<BookingConfirmation | null> }) {
+function BookingModal({ selection, initialDate, authenticated, onClose, onSubmit }: { selection: BookingSelection; initialDate: string; authenticated: boolean; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<BookingConfirmation | null> }) {
   const { provider, service } = selection;
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
-  const [rules, setRules] = useState<AvailabilityRule[]>([]);
-  const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
+  const [slots, setSlots] = useState<string[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
+  const [waitingForAuthentication, setWaitingForAuthentication] = useState(false);
   const [form, setForm] = useState<BookingRequest>({ date: initialDate || defaultBookingDate, time: "", locationMode: "salon", address: "", note: "", paymentMethod: "on_site" });
 
   useEffect(() => {
@@ -424,28 +453,37 @@ function BookingModal({ selection, initialDate, onClose, onSubmit }: { selection
     }
     let active = true;
     void Promise.resolve().then(() => { if (active) setAvailabilityLoading(true); });
-    const start = `${form.date}T00:00:00+00:00`;
-    const end = `${form.date}T23:59:59+00:00`;
-    void Promise.all([
-      supabase.from("availability_rules").select("starts_at,ends_at,slot_interval_minutes").eq("provider_id", provider.profileId).eq("weekday", new Date(`${form.date}T12:00:00Z`).getUTCDay()),
-      supabase.from("availability_exceptions").select("starts_at,ends_at,is_available").eq("provider_id", provider.profileId).gte("ends_at", start).lte("starts_at", end),
-    ]).then(([ruleResult, exceptionResult]) => {
+    void supabase.rpc("get_available_slots", {
+      target_provider_id: provider.profileId,
+      target_provider_service_id: service.id,
+      from_date: form.date,
+      days: 1,
+    }).then(({ data, error }) => {
       if (!active) return;
-      setRules((ruleResult.data ?? []) as AvailabilityRule[]);
-      setExceptions((exceptionResult.data ?? []) as AvailabilityException[]);
+      setSlots(error ? [] : ((data ?? []) as AvailabilitySlot[]).map((slot) => new Date(slot.slot_start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" })));
       setAvailabilityLoading(false);
     });
     return () => { active = false; };
-  }, [form.date, provider.profileId]);
+  }, [form.date, provider.profileId, service.id]);
 
-  const slots = useMemo(() => buildSlots(form.date, rules, exceptions, service.duration_minutes), [exceptions, form.date, rules, service.duration_minutes]);
   const quickDates = useMemo(() => buildQuickDates(), []);
   async function confirm() {
     setSubmitting(true);
     const result = await onSubmit(form);
     setSubmitting(false);
     if (result) setConfirmation(result);
+    else if (!authenticated) setWaitingForAuthentication(true);
   }
+  useEffect(() => {
+    if (!authenticated || !waitingForAuthentication) return;
+    void Promise.resolve().then(async () => {
+      setWaitingForAuthentication(false);
+      setSubmitting(true);
+      const result = await onSubmit(form);
+      if (result) setConfirmation(result);
+      setSubmitting(false);
+    });
+  }, [authenticated, form, onSubmit, waitingForAuthentication]);
   const canConfirm = Boolean(form.time) && (form.locationMode === "salon" || Boolean(form.address.trim()));
   return <div className="modal-backdrop premium-booking-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="modal premium-booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
@@ -468,7 +506,7 @@ function BookingSuccess({ provider, confirmation, onClose }: { provider: Provide
 }
 
 function BottomNav({ active, onHome, onSearch, onAccount }: { active: "home" | "search"; onHome: () => void; onSearch: () => void; onAccount: (section?: "client" | "provider" | "admin") => void }) {
-  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={active === "home" ? "active" : ""} onClick={onHome}><i>⌂</i>Accueil</button><button className={active === "search" ? "active" : ""} onClick={onSearch}><i>⌕</i>Rechercher</button><button onClick={() => onAccount()}><i>▣</i>Rendez-vous</button><button onClick={() => onAccount()}><i>◌</i>Messages</button><button onClick={() => onAccount()}><i>○</i>Profil</button></nav>;
+  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={active === "home" ? "active" : ""} onClick={onHome}><i>⌂</i>Accueil</button><button className={active === "search" ? "active" : ""} onClick={onSearch}><i>⌕</i>Rechercher</button><button onClick={() => onAccount()}><i>▣</i>Rendez-vous</button><button onClick={() => onAccount()}><i>○</i>Mon compte</button></nav>;
 }
 
 function formatDuration(minutes: number) {
@@ -500,21 +538,13 @@ function formatBookingDate(dateValue: string) {
   return new Date(`${dateValue}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 }
 
-function buildSlots(dateValue: string, rules: AvailabilityRule[], exceptions: AvailabilityException[], durationMinutes: number) {
-  const slots: string[] = [];
-  for (const rule of rules) {
-    const [startHour, startMinute] = rule.starts_at.split(":").map(Number);
-    const [endHour, endMinute] = rule.ends_at.split(":").map(Number);
-    let cursor = startHour * 60 + startMinute;
-    const end = endHour * 60 + endMinute;
-    while (cursor + durationMinutes <= end) {
-      const time = `${String(Math.floor(cursor / 60)).padStart(2, "0")}:${String(cursor % 60).padStart(2, "0")}`;
-      const slotStart = new Date(`${dateValue}T${time}:00+00:00`);
-      const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000);
-      const blocked = exceptions.some((exception) => !exception.is_available && slotStart < new Date(exception.ends_at) && slotEnd > new Date(exception.starts_at));
-      if (!blocked && slotStart > new Date()) slots.push(time);
-      cursor += rule.slot_interval_minutes;
-    }
-  }
-  return [...new Set(slots)];
+function isToday(slot?: string) {
+  if (!slot) return false;
+  return new Date(slot).toLocaleDateString("fr-CA", { timeZone: "Africa/Dakar" }) === new Date().toLocaleDateString("fr-CA", { timeZone: "Africa/Dakar" });
+}
+
+function formatSlotLabel(slot: string) {
+  const date = new Date(slot);
+  const prefix = isToday(slot) ? "Aujourd’hui" : date.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", timeZone: "Africa/Dakar" });
+  return `${prefix} à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" })}`;
 }
