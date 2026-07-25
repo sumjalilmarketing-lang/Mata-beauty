@@ -1,10 +1,17 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { AuthModal, type AuthenticatedProfile } from "./auth-modal";
+import { LiveDashboard } from "./live-dashboard";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { fetchPublishedProviders } from "@/lib/supabase/catalog";
+import { calculateBookingEnd, calculateBookingQuote } from "@/lib/domain/booking";
 
 type Provider = {
-  id: number;
+  id: string | number;
+  profileId?: string;
+  serviceId?: string;
   name: string;
   specialty: string;
   category: string;
@@ -17,6 +24,15 @@ type Provider = {
   verified: boolean;
   homeService: boolean;
   nextSlot: string;
+  durationMinutes?: number;
+};
+
+type BookingRequest = {
+  date: string;
+  time: string;
+  locationMode: "salon" | "client_address";
+  address: string;
+  note: string;
 };
 
 const categories = [
@@ -52,34 +68,135 @@ export function MataBeautyApp() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Toutes");
   const [area, setArea] = useState("Tout Dakar");
-  const [favorites, setFavorites] = useState<number[]>([2]);
+  const [catalog, setCatalog] = useState<Provider[]>(providers);
+  const [favorites, setFavorites] = useState<Array<string | number>>([2]);
   const [booking, setBooking] = useState<Provider | null>(null);
   const [profile, setProfile] = useState<Provider | null>(null);
   const [view, setView] = useState<"home" | "client" | "provider" | "admin">("home");
   const [notice, setNotice] = useState("");
+  const [authenticated, setAuthenticated] = useState<AuthenticatedProfile | null>(null);
+  const [authRequest, setAuthRequest] = useState<{
+    role: "client" | "provider" | "admin";
+    mode: "login" | "register";
+  } | null>(null);
 
   const filteredProviders = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return providers.filter((provider) => {
+    return catalog.filter((provider) => {
       const matchesText = !normalized || `${provider.name} ${provider.specialty} ${provider.area}`.toLowerCase().includes(normalized);
       const matchesCategory = category === "Toutes" || provider.category === category;
       const matchesArea = area === "Tout Dakar" || provider.area === area;
       return matchesText && matchesCategory && matchesArea;
     });
-  }, [query, category, area]);
+  }, [query, category, area, catalog]);
 
-  function toggleFavorite(id: number) {
-    setFavorites((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    let active = true;
+
+    void fetchPublishedProviders(supabase)
+      .then((items) => {
+        if (!active) return;
+        setCatalog(items.map((item, index) => ({
+          ...item,
+          initials: item.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
+          tone: ["plum", "gold", "rose", "berry", "sand"][index % 5],
+          nextSlot: "Disponibilités à consulter",
+        })));
+      })
+      .catch(() => {
+        if (active) setNotice("Le catalogue réel est momentanément indisponible. Les exemples restent affichés.");
+      });
+
+    void supabase.auth.getSession().then(async ({ data }) => {
+      const user = data.session?.user;
+      if (!active || !user) return;
+      const { data: account } = await supabase.from("profiles").select("role,is_suspended").eq("id", user.id).maybeSingle();
+      if (!active || !account || account.is_suspended) return;
+      setAuthenticated({ userId: user.id, role: account.role });
+      if (account.role === "client") {
+        const { data: favoriteData } = await supabase.from("favorites").select("provider_id").eq("client_id", user.id);
+        if (active && favoriteData) setFavorites(favoriteData.map((item) => item.provider_id));
+      }
+    });
+
+    return () => { active = false; };
+  }, []);
+
+  async function toggleFavorite(provider: Provider) {
+    const exists = favorites.includes(provider.id);
+    if (!provider.profileId) {
+      setFavorites((current) => exists ? current.filter((item) => item !== provider.id) : [...current, provider.id]);
+      setNotice("Favori enregistré uniquement dans cet aperçu de démonstration.");
+      return;
+    }
+    if (!authenticated || authenticated.role !== "client") {
+      setAuthRequest({ role: "client", mode: "login" });
+      return;
+    }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const request = exists
+      ? supabase.from("favorites").delete().eq("client_id", authenticated.userId).eq("provider_id", provider.profileId)
+      : supabase.from("favorites").insert({ client_id: authenticated.userId, provider_id: provider.profileId });
+    const { error } = await request;
+    if (error) {
+      setNotice(`Impossible de modifier le favori : ${error.message}`);
+      return;
+    }
+    setFavorites((current) => exists ? current.filter((item) => item !== provider.id) : [...current, provider.id]);
   }
 
-  function confirmBooking(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function confirmBooking(request: BookingRequest) {
+    if (!booking) return;
+    if (!booking.profileId || !booking.serviceId) {
+      setBooking(null);
+      setNotice("Demande simulée : aucune donnée n’a été envoyée en mode démonstration.");
+      return;
+    }
+    if (!authenticated || authenticated.role !== "client") {
+      setAuthRequest({ role: "client", mode: "login" });
+      return;
+    }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const startsAt = new Date(`${request.date}T${request.time}:00Z`);
+    const endsAt = calculateBookingEnd(startsAt, booking.durationMinutes ?? 60);
+    const quote = calculateBookingQuote(booking.price);
+    const { error } = await supabase.from("bookings").insert({
+      client_id: authenticated.userId,
+      provider_id: booking.profileId,
+      provider_service_id: booking.serviceId,
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
+      status: "pending",
+      location_mode: request.locationMode,
+      appointment_address: request.locationMode === "client_address" ? request.address.trim() : null,
+      total_amount: quote.totalAmount,
+      currency: quote.currency,
+      client_note: request.note.trim() || null,
+    });
+    if (error) {
+      setNotice(error.code === "23P01" ? "Ce créneau vient d’être réservé. Choisissez-en un autre." : `Réservation impossible : ${error.message}`);
+      return;
+    }
     setBooking(null);
-    setNotice("Réservation envoyée ! Le prestataire doit maintenant la confirmer.");
+    setNotice("Réservation enregistrée. Le prestataire a reçu une notification.");
     window.setTimeout(() => setNotice(""), 4500);
   }
 
+  async function signOut() {
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) await supabase.auth.signOut();
+    setAuthenticated(null);
+    setView("home");
+  }
+
   if (view !== "home") {
+    if (authenticated && authenticated.role === view) {
+      return <LiveDashboard role={view} userId={authenticated.userId} displayName="votre espace" onBack={() => setView("home")} onSignOut={signOut} />;
+    }
     return <Dashboard role={view} onBack={() => setView("home")} />;
   }
 
@@ -94,11 +211,11 @@ export function MataBeautyApp() {
         <nav className="desktop-nav" aria-label="Navigation principale">
           <a href="#explorer">Explorer</a>
           <a href="#fonctionnement">Comment ça marche</a>
-          <button className="link-button" onClick={() => setView("provider")}>Espace pro</button>
+          <button className="link-button" onClick={() => setAuthRequest({ role: "provider", mode: "login" })}>Espace pro</button>
         </nav>
         <div className="header-actions">
-          <button className="ghost-button" onClick={() => setView("client")}>Se connecter</button>
-          <button className="primary-button small" onClick={() => setView("provider")}>Devenir prestataire</button>
+          <button className="ghost-button" onClick={() => setAuthRequest({ role: "client", mode: "login" })}>Se connecter</button>
+          <button className="primary-button small" onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Devenir prestataire</button>
         </div>
       </header>
 
@@ -116,7 +233,7 @@ export function MataBeautyApp() {
               <span>Où ?</span>
               <select value={area} onChange={(event) => setArea(event.target.value)}>
                 <option>Tout Dakar</option>
-                {[...new Set(providers.map((provider) => provider.area))].map((item) => <option key={item}>{item}</option>)}
+                {[...new Set(catalog.map((provider) => provider.area))].map((item) => <option key={item}>{item}</option>)}
               </select>
             </label>
             <button className="search-button" type="submit" onClick={() => document.getElementById("explorer")?.scrollIntoView({ behavior: "smooth" })}>Rechercher</button>
@@ -180,7 +297,7 @@ export function MataBeautyApp() {
                 <div className={`provider-cover ${provider.tone}`}>
                   <span className="avatar">{provider.initials}</span>
                   {provider.verified && <span className="verified">✓ Profil vérifié</span>}
-                  <button className={favorites.includes(provider.id) ? "favorite active" : "favorite"} onClick={() => toggleFavorite(provider.id)} aria-label={favorites.includes(provider.id) ? "Retirer des favoris" : "Ajouter aux favoris"}>{favorites.includes(provider.id) ? "♥" : "♡"}</button>
+                  <button className={favorites.includes(provider.id) ? "favorite active" : "favorite"} onClick={() => void toggleFavorite(provider)} aria-label={favorites.includes(provider.id) ? "Retirer des favoris" : "Ajouter aux favoris"}>{favorites.includes(provider.id) ? "♥" : "♡"}</button>
                 </div>
                 <div className="provider-body">
                   <div className="provider-title"><div><h3>{provider.name}</h3><p>{provider.specialty}</p></div><span className="rating">★ {provider.rating}</span></div>
@@ -210,18 +327,34 @@ export function MataBeautyApp() {
 
       <section className="pro-cta">
         <div><p className="eyebrow light">Professionnels de beauté</p><h2>Votre talent mérite<br />d’être découvert.</h2><p>Développez votre clientèle, gérez votre agenda et faites rayonner votre savoir-faire.</p></div>
-        <button className="gold-button" onClick={() => setView("provider")}>Créer mon profil professionnel →</button>
+        <button className="gold-button" onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Créer mon profil professionnel →</button>
       </section>
 
       <footer>
         <a className="brand inverted" href="#accueil"><span className="brand-mark">M</span><span>Mata <i>Beauty</i></span></a>
         <p>La plateforme beauté de confiance au Sénégal.</p>
-        <div><button onClick={() => setView("client")}>Espace client</button><button onClick={() => setView("provider")}>Espace prestataire</button><button onClick={() => setView("admin")}>Administration</button></div>
+        <div><button onClick={() => setAuthRequest({ role: "client", mode: "login" })}>Espace client</button><button onClick={() => setAuthRequest({ role: "provider", mode: "login" })}>Espace prestataire</button><button onClick={() => setAuthRequest({ role: "admin", mode: "login" })}>Administration</button></div>
         <small>© 2026 Mata Beauty · Dakar, Sénégal · Paiements en mode test</small>
       </footer>
 
-      {profile && <ProfileModal provider={profile} onClose={() => setProfile(null)} onBook={() => { setBooking(profile); setProfile(null); }} favorite={favorites.includes(profile.id)} onFavorite={() => toggleFavorite(profile.id)} />}
+      {profile && <ProfileModal provider={profile} onClose={() => setProfile(null)} onBook={() => { setBooking(profile); setProfile(null); }} favorite={favorites.includes(profile.id)} onFavorite={() => void toggleFavorite(profile)} />}
       {booking && <BookingModal provider={booking} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}
+      {authRequest && (
+        <AuthModal
+          initialMode={authRequest.mode}
+          intendedRole={authRequest.role === "provider" ? "provider" : "client"}
+          onClose={() => setAuthRequest(null)}
+          onAuthenticated={(profile) => {
+            setAuthenticated(profile);
+            setAuthRequest(null);
+            setView(profile.role);
+          }}
+          onDemo={() => {
+            setAuthRequest(null);
+            setView(authRequest.role);
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -245,26 +378,42 @@ function ProfileModal({ provider, onClose, onBook, favorite, onFavorite }: { pro
   </div>;
 }
 
-function BookingModal({ provider, onClose, onSubmit }: { provider: Provider; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+function BookingModal({ provider, onClose, onSubmit }: { provider: Provider; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<void> }) {
+  const [submitting, setSubmitting] = useState(false);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setSubmitting(true);
+    await onSubmit({
+      date: String(form.get("date") ?? ""),
+      time: String(form.get("time") ?? ""),
+      locationMode: String(form.get("locationMode")) === "client_address" ? "client_address" : "salon",
+      address: String(form.get("address") ?? ""),
+      note: String(form.get("note") ?? ""),
+    });
+    setSubmitting(false);
+  }
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="modal booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
       <button className="modal-close" onClick={onClose} aria-label="Fermer">×</button>
       <p className="eyebrow">Réservation sécurisée</p><h2 id="booking-title">Réserver avec {provider.name}</h2>
-      <form onSubmit={onSubmit}>
+      <form onSubmit={(event) => void submit(event)}>
         <label>Prestation<select required><option>{provider.specialty} — {formatPrice(provider.price)}</option><option>Formule signature — {formatPrice(provider.price + 7000)}</option></select></label>
-        <div className="form-row"><label>Date<input type="date" required defaultValue="2026-07-28" min="2026-07-26" /></label><label>Créneau<select required><option>10:00</option><option>14:30</option><option>16:30</option></select></label></div>
-        <label>Lieu<select required><option>{provider.homeService ? "À mon domicile" : "Chez le prestataire"}</option><option>Chez le prestataire</option></select></label>
-        <label>Adresse / précision<textarea placeholder="Quartier, rue, repère…" required /></label>
+        <div className="form-row"><label>Date<input name="date" type="date" required defaultValue="2026-07-28" min="2026-07-26" /></label><label>Créneau<select name="time" required><option>10:00</option><option>14:30</option><option>16:30</option></select></label></div>
+        <label>Lieu<select name="locationMode" required>{provider.homeService && <option value="client_address">À mon domicile</option>}<option value="salon">Chez le prestataire</option></select></label>
+        <label>Adresse / précision<textarea name="address" placeholder="Quartier, rue, repère…" /></label>
+        <label>Note facultative<textarea name="note" maxLength={1000} placeholder="Informations utiles pour le rendez-vous…" /></label>
         <label>Paiement<select required><option>Sur place</option><option disabled>Wave — bientôt disponible</option><option disabled>Orange Money — bientôt disponible</option></select></label>
         <div className="test-banner">Mode test · Aucun paiement réel ne sera effectué.</div>
         <div className="booking-total"><span>Total</span><strong>{formatPrice(provider.price)}</strong></div>
-        <button className="primary-button full" type="submit">Envoyer la demande</button>
+        <button className="primary-button full" type="submit" disabled={submitting}>{submitting ? "Enregistrement…" : "Envoyer la demande"}</button>
       </form>
     </section>
   </div>;
 }
 
 function Dashboard({ role, onBack }: { role: "client" | "provider" | "admin"; onBack: () => void }) {
+  const [demoMessage, setDemoMessage] = useState("");
   const config = {
     client: { label: "Espace client", name: "Aïssatou Ndiaye", intro: "Retrouvez vos rendez-vous et vos favoris.", metrics: [["2", "Réservations à venir"], ["6", "Favoris"], ["1", "Message non lu"]] },
     provider: { label: "Espace prestataire", name: "Awa Signature", intro: "Voici l’activité de votre établissement.", metrics: [["8", "Rendez-vous cette semaine"], ["124 000 F", "Revenus simulés"], ["4,9", "Note moyenne"]] },
@@ -274,17 +423,18 @@ function Dashboard({ role, onBack }: { role: "client" | "provider" | "admin"; on
     <aside className="sidebar">
       <button className="brand brand-button" onClick={onBack}><span className="brand-mark">M</span><span>Mata <i>Beauty</i></span></button>
       <p className="role-pill">{config.label}</p>
-      <nav><button className="active">⌂ Vue d’ensemble</button><button>▣ Réservations</button><button>◌ Messages <i>1</i></button><button>{role === "client" ? "♡ Favoris" : role === "provider" ? "◇ Prestations" : "♢ Vérifications"}</button><button>⚙ Paramètres</button></nav>
+      <nav><button className="active" onClick={() => setDemoMessage("Vue d’ensemble de démonstration.")}>⌂ Vue d’ensemble</button><button onClick={() => setDemoMessage("Les réservations réelles apparaîtront après connexion Supabase.")}>▣ Réservations</button><button onClick={() => setDemoMessage("La messagerie nécessite un compte connecté.")}>◌ Messages <i>1</i></button><button onClick={() => setDemoMessage("Cette rubrique est disponible après connexion.")}>{role === "client" ? "♡ Favoris" : role === "provider" ? "◇ Prestations" : "♢ Vérifications"}</button><button onClick={() => setDemoMessage("Les paramètres de démonstration ne sont pas persistés.")}>⚙ Paramètres</button></nav>
       <button className="back-link" onClick={onBack}>← Retour au site</button>
     </aside>
     <section className="dashboard-main">
       <div className="dashboard-top"><div><p className="eyebrow">{config.label}</p><h1>Bonjour, {config.name.split(" ")[0]} 👋</h1><p>{config.intro}</p></div><span className="demo-badge">Mode démonstration</span></div>
+      {demoMessage && <p className="dashboard-feedback" role="status">{demoMessage}</p>}
       <div className="metric-grid">{config.metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>↗ à jour</small></article>)}</div>
       <div className="dashboard-grid">
-        <article className="panel"><div className="panel-heading"><h2>{role === "admin" ? "Activité récente" : "Prochains rendez-vous"}</h2><button>Tout voir</button></div>
+        <article className="panel"><div className="panel-heading"><h2>{role === "admin" ? "Activité récente" : "Prochains rendez-vous"}</h2><button onClick={() => setDemoMessage("Aucune donnée réelle n’est chargée en mode démonstration.")}>Tout voir</button></div>
           {[["Aujourd’hui · 16:30", "Nails by Fatou", "Confirmé"], ["Jeudi · 10:00", "Maison Kéwé", role === "admin" ? "À vérifier" : "En attente"], ["Samedi · 09:00", "Institut Teranga", "Confirmé"]].map(([date, name, status]) => <div className="appointment" key={date}><span className="date-block">{date.split(" · ")[0].slice(0, 3)}<b>{date.split(" · ")[1]}</b></span><div><strong>{name}</strong><small>{date}</small></div><span className={status === "Confirmé" ? "status confirmed" : "status pending"}>{status}</span></div>)}
         </article>
-        <article className="panel"><div className="panel-heading"><h2>Actions rapides</h2></div><div className="quick-actions"><button>＋ {role === "provider" ? "Ajouter une prestation" : role === "admin" ? "Valider un profil" : "Nouvelle réservation"}</button><button>◌ Consulter les messages</button><button>⚙ Mettre à jour le profil</button></div></article>
+        <article className="panel"><div className="panel-heading"><h2>Actions rapides</h2></div><div className="quick-actions"><button onClick={() => setDemoMessage("Connectez Supabase pour effectuer cette action.")}>＋ {role === "provider" ? "Ajouter une prestation" : role === "admin" ? "Valider un profil" : "Nouvelle réservation"}</button><button onClick={() => setDemoMessage("La messagerie réelle nécessite une session.")}>◌ Consulter les messages</button><button onClick={() => setDemoMessage("Les changements ne sont pas enregistrés en mode démonstration.")}>⚙ Mettre à jour le profil</button></div></article>
       </div>
     </section>
   </main>;

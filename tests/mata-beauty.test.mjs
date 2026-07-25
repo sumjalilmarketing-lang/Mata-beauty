@@ -12,7 +12,8 @@ test("the Mata Beauty experience replaces the starter preview", async () => {
   ]);
   assert.match(page, /MataBeautyApp/);
   assert.match(app, /Votre beauté/);
-  assert.match(app, /Réservation envoyée/);
+  assert.match(app, /Réservation enregistrée/);
+  assert.match(app, /Demande simulée/);
   assert.match(app, /Mode démonstration/);
   assert.match(layout, /Mata Beauty/);
   assert.doesNotMatch(page + layout, /codex-preview|SkeletonPreview/);
