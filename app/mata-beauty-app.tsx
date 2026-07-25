@@ -69,6 +69,7 @@ export function MataBeautyApp() {
   const [category, setCategory] = useState("Toutes");
   const [area, setArea] = useState("Tout Dakar");
   const [catalog, setCatalog] = useState<Provider[]>(providers);
+  const [catalogSource, setCatalogSource] = useState<"demo" | "live" | "error">("demo");
   const [favorites, setFavorites] = useState<Array<string | number>>([2]);
   const [booking, setBooking] = useState<Provider | null>(null);
   const [profile, setProfile] = useState<Provider | null>(null);
@@ -98,15 +99,21 @@ export function MataBeautyApp() {
     void fetchPublishedProviders(supabase)
       .then((items) => {
         if (!active) return;
-        setCatalog(items.map((item, index) => ({
-          ...item,
-          initials: item.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
-          tone: ["plum", "gold", "rose", "berry", "sand"][index % 5],
-          nextSlot: "Disponibilités à consulter",
-        })));
+        if (items.length > 0) {
+          setCatalog(items.map((item, index) => ({
+            ...item,
+            initials: item.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
+            tone: ["plum", "gold", "rose", "berry", "sand"][index % 5],
+            nextSlot: "Disponibilités à consulter",
+          })));
+          setCatalogSource("live");
+        }
       })
       .catch(() => {
-        if (active) setNotice("Le catalogue réel est momentanément indisponible. Les exemples restent affichés.");
+        if (active) {
+          setCatalogSource("error");
+          setNotice("Le catalogue réel est momentanément indisponible. Les exemples restent affichés.");
+        }
       });
 
     void supabase.auth.getSession().then(async ({ data }) => {
@@ -282,7 +289,13 @@ export function MataBeautyApp() {
 
       <section className="section providers-section" id="explorer" aria-labelledby="provider-title">
         <div className="section-heading">
-          <div><p className="eyebrow">Près de vous</p><h2 id="provider-title">Les professionnels du moment</h2></div>
+          <div>
+            <p className="eyebrow">Près de vous</p>
+            <h2 id="provider-title">Les professionnels du moment</h2>
+            <small className={`catalog-source ${catalogSource}`}>
+              {catalogSource === "live" ? "Catalogue vérifié en direct" : "Aperçu de démonstration — aucun prestataire publié"}
+            </small>
+          </div>
           <span className="result-count">{filteredProviders.length} résultat{filteredProviders.length !== 1 ? "s" : ""}</span>
         </div>
         <div className="filters" aria-label="Filtres">

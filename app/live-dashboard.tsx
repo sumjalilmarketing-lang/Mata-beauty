@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Role = "client" | "provider" | "admin";
+type ProviderStatus = "draft" | "pending_review" | "approved" | "rejected" | "suspended";
 type BookingRow = {
   id: string;
   starts_at: string;
@@ -19,6 +20,33 @@ type NotificationRow = {
   body: string;
   read_at: string | null;
   created_at: string;
+};
+type ProviderProfileRow = {
+  profile_id: string;
+  business_name: string;
+  bio: string | null;
+  city: string;
+  service_mode: "salon" | "mobile" | "both";
+  status: ProviderStatus;
+};
+type PendingProviderRow = {
+  profile_id: string;
+  business_name: string;
+  city: string;
+  status: ProviderStatus;
+  created_at: string;
+};
+type BaseServiceRow = {
+  id: string;
+  name: string;
+};
+
+const providerStatusLabels: Record<ProviderStatus, string> = {
+  draft: "Brouillon",
+  pending_review: "En cours de validation",
+  approved: "Profil publié",
+  rejected: "À corriger",
+  suspended: "Suspendu",
 };
 
 export function LiveDashboard({
@@ -36,6 +64,9 @@ export function LiveDashboard({
 }) {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [providerProfile, setProviderProfile] = useState<ProviderProfileRow | null>(null);
+  const [pendingProviders, setPendingProviders] = useState<PendingProviderRow[]>([]);
+  const [baseServices, setBaseServices] = useState<BaseServiceRow[]>([]);
   const [adminMetrics, setAdminMetrics] = useState({ users: 0, providersPending: 0, reportsOpen: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -52,18 +83,24 @@ export function LiveDashboard({
     setError("");
     try {
       if (role === "admin") {
-        const [users, pending, reports] = await Promise.all([
+        const [users, pending, reports, providerRows] = await Promise.all([
           supabase.from("profiles").select("id", { count: "exact", head: true }),
           supabase.from("provider_profiles").select("profile_id", { count: "exact", head: true }).eq("status", "pending_review"),
           supabase.from("reports").select("id", { count: "exact", head: true }).eq("status", "open"),
+          supabase
+            .from("provider_profiles")
+            .select("profile_id,business_name,city,status,created_at")
+            .eq("status", "pending_review")
+            .order("created_at", { ascending: true }),
         ]);
-        const firstError = users.error ?? pending.error ?? reports.error;
+        const firstError = users.error ?? pending.error ?? reports.error ?? providerRows.error;
         if (firstError) throw firstError;
         setAdminMetrics({
           users: users.count ?? 0,
           providersPending: pending.count ?? 0,
           reportsOpen: reports.count ?? 0,
         });
+        setPendingProviders((providerRows.data ?? []) as PendingProviderRow[]);
       } else {
         const ownerColumn = role === "client" ? "client_id" : "provider_id";
         const { data, error: bookingError } = await supabase
@@ -73,7 +110,22 @@ export function LiveDashboard({
           .order("starts_at", { ascending: true })
           .limit(30);
         if (bookingError) throw bookingError;
-        setBookings((data ?? []) as unknown as BookingRow[]);
+        setBookings((data ?? []) as BookingRow[]);
+
+        if (role === "provider") {
+          const [profileResult, serviceResult] = await Promise.all([
+            supabase
+              .from("provider_profiles")
+              .select("profile_id,business_name,bio,city,service_mode,status")
+              .eq("profile_id", userId)
+              .maybeSingle(),
+            supabase.from("services").select("id,name").eq("is_active", true).order("name"),
+          ]);
+          if (profileResult.error) throw profileResult.error;
+          if (serviceResult.error) throw serviceResult.error;
+          setProviderProfile(profileResult.data as ProviderProfileRow | null);
+          setBaseServices((serviceResult.data ?? []) as BaseServiceRow[]);
+        }
       }
       const { data: notificationData, error: notificationError } = await supabase
         .from("notifications")
@@ -82,7 +134,7 @@ export function LiveDashboard({
         .order("created_at", { ascending: false })
         .limit(10);
       if (notificationError) throw notificationError;
-      setNotifications((notificationData ?? []) as unknown as NotificationRow[]);
+      setNotifications((notificationData ?? []) as NotificationRow[]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Impossible de charger le tableau de bord.");
     } finally {
@@ -119,16 +171,90 @@ export function LiveDashboard({
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setFeedback("");
-    const { error: updateError } = await supabase
-      .from("bookings")
-      .update({ status })
-      .eq("id", booking.id);
+    const { error: updateError } = await supabase.from("bookings").update({ status }).eq("id", booking.id);
     if (updateError) {
       setFeedback(updateError.message);
       return;
     }
     setFeedback("Réservation mise à jour.");
     await load();
+  }
+
+  async function saveProviderProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const formData = new FormData(event.currentTarget);
+    const businessName = String(formData.get("businessName") ?? "").trim();
+    const bio = String(formData.get("bio") ?? "").trim();
+    const city = String(formData.get("city") ?? "").trim();
+    const serviceMode = String(formData.get("serviceMode") ?? "salon");
+    if (!businessName || !city || !["salon", "mobile", "both"].includes(serviceMode)) {
+      setFeedback("Le nom, la ville et le mode de prestation sont obligatoires.");
+      return;
+    }
+    const { error: updateError } = await supabase
+      .from("provider_profiles")
+      .update({ business_name: businessName, bio, city, service_mode: serviceMode })
+      .eq("profile_id", userId);
+    if (updateError) setFeedback(updateError.message);
+    else {
+      setFeedback("Profil professionnel enregistré.");
+      await load();
+    }
+  }
+
+  async function submitProviderForReview() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error: rpcError } = await supabase.rpc("submit_provider_for_review");
+    if (rpcError) setFeedback(rpcError.message);
+    else {
+      setFeedback("Votre profil a été envoyé à l’équipe Mata Beauty.");
+      await load();
+    }
+  }
+
+  async function addProviderService(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const serviceId = String(formData.get("serviceId") ?? "");
+    const title = String(formData.get("title") ?? "").trim();
+    const durationMinutes = Number(formData.get("durationMinutes"));
+    const priceAmount = Number(formData.get("priceAmount"));
+    const { error: insertError } = await supabase.from("provider_services").insert({
+      provider_id: userId,
+      service_id: serviceId,
+      title,
+      duration_minutes: durationMinutes,
+      price_amount: priceAmount,
+      currency: "XOF",
+    });
+    if (insertError) setFeedback(insertError.message);
+    else {
+      form.reset();
+      setFeedback("Prestation ajoutée.");
+    }
+  }
+
+  async function moderateProvider(profileId: string, decision: "approved" | "rejected") {
+    const action = decision === "approved" ? "approuver" : "refuser";
+    if (!window.confirm(`Confirmer : ${action} ce profil prestataire ?`)) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error: updateError } = await supabase
+      .from("provider_profiles")
+      .update({ status: decision, verified_at: decision === "approved" ? new Date().toISOString() : null })
+      .eq("profile_id", profileId)
+      .eq("status", "pending_review");
+    if (updateError) setFeedback(updateError.message);
+    else {
+      setFeedback(decision === "approved" ? "Prestataire approuvé et publié." : "Profil renvoyé pour correction.");
+      await load();
+    }
   }
 
   async function markNotificationRead(notificationId: string) {
@@ -150,7 +276,7 @@ export function LiveDashboard({
         <p className="role-pill">Espace {role}</p>
         <nav>
           <button className="active" onClick={() => void load()}>⌂ Vue d’ensemble</button>
-          <button onClick={() => document.getElementById("live-bookings")?.scrollIntoView({ behavior: "smooth" })}>▣ Réservations</button>
+          {role !== "admin" && <button onClick={() => document.getElementById("live-bookings")?.scrollIntoView({ behavior: "smooth" })}>▣ Réservations</button>}
           <button onClick={() => document.getElementById("live-notifications")?.scrollIntoView({ behavior: "smooth" })}>◌ Notifications <i>{notifications.filter((item) => !item.read_at).length}</i></button>
         </nav>
         <button className="back-link" onClick={() => void onSignOut()}>Se déconnecter</button>
@@ -167,6 +293,47 @@ export function LiveDashboard({
         ) : (
           <div className="metric-grid">{metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>Calculé depuis la base</small></article>)}</div>
         )}
+
+        {role === "provider" && providerProfile && (
+          <article className="panel onboarding-panel">
+            <div className="panel-heading">
+              <div><h2>Profil professionnel</h2><p className={`provider-state ${providerProfile.status}`}>{providerStatusLabels[providerProfile.status]}</p></div>
+              {["draft", "rejected"].includes(providerProfile.status) && <button className="outline-button" onClick={() => void submitProviderForReview()}>Envoyer pour validation</button>}
+            </div>
+            <form className="dashboard-form" onSubmit={(event) => void saveProviderProfile(event)}>
+              <label>Nom commercial<input name="businessName" required defaultValue={providerProfile.business_name} /></label>
+              <label>Ville<input name="city" required defaultValue={providerProfile.city} /></label>
+              <label>Mode de prestation<select name="serviceMode" defaultValue={providerProfile.service_mode}><option value="salon">En salon</option><option value="mobile">À domicile</option><option value="both">Salon et domicile</option></select></label>
+              <label className="wide">Présentation (40 caractères minimum avant validation)<textarea name="bio" rows={4} defaultValue={providerProfile.bio ?? ""} /></label>
+              <button className="primary-button" type="submit">Enregistrer le profil</button>
+            </form>
+            <form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
+              <h3 className="wide">Ajouter une prestation</h3>
+              <label>Type<select name="serviceId" required defaultValue=""><option value="" disabled>Choisir</option>{baseServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
+              <label>Nom affiché<input name="title" required minLength={2} /></label>
+              <label>Durée (minutes)<input name="durationMinutes" type="number" required min={15} max={720} step={15} /></label>
+              <label>Prix (FCFA)<input name="priceAmount" type="number" required min={0} step={500} /></label>
+              <button className="primary-button" type="submit">Ajouter la prestation</button>
+            </form>
+          </article>
+        )}
+
+        {role === "admin" && (
+          <article className="panel" id="provider-moderation">
+            <div className="panel-heading"><h2>Prestataires à valider</h2><button onClick={() => void load()}>Actualiser</button></div>
+            {!loading && pendingProviders.length === 0 && <div className="compact-empty">Aucun dossier en attente.</div>}
+            {pendingProviders.map((provider) => (
+              <div className="moderation-row" key={provider.profile_id}>
+                <div><strong>{provider.business_name}</strong><small>{provider.city} · envoyé le {new Intl.DateTimeFormat("fr-SN", { dateStyle: "medium" }).format(new Date(provider.created_at))}</small></div>
+                <div className="appointment-actions">
+                  <button onClick={() => void moderateProvider(provider.profile_id, "approved")}>Approuver</button>
+                  <button onClick={() => void moderateProvider(provider.profile_id, "rejected")}>À corriger</button>
+                </div>
+              </div>
+            ))}
+          </article>
+        )}
+
         {role !== "admin" && (
           <article className="panel" id="live-bookings">
             <div className="panel-heading"><h2>Réservations</h2><button onClick={() => void load()}>Actualiser</button></div>

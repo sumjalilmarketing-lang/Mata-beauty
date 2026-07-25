@@ -34,3 +34,15 @@ test("the database migration includes every MVP domain", async () => {
   assert.match(sql, /enable row level security/);
   assert.match(sql, /exclude using gist/);
 });
+
+test("provider onboarding and moderation remain protected in SQL", async () => {
+  const [onboarding, notifications] = await Promise.all([
+    readFile(new URL("supabase/migrations/20260725194500_provider_onboarding_and_taxonomy.sql", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260725200500_provider_moderation_notifications.sql", root), "utf8"),
+  ]);
+  assert.match(onboarding, /submit_provider_for_review/);
+  assert.match(onboarding, /auth\.uid\(\) = old\.profile_id/);
+  assert.match(onboarding, /new\.status = 'pending_review'/);
+  assert.match(notifications, /after update of status/);
+  assert.match(notifications, /insert into public\.notifications/);
+});

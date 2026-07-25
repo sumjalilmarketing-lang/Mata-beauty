@@ -1,9 +1,9 @@
 # Mata Beauty
 
 Mata Beauty est une marketplace de réservation de prestations beauté conçue
-pour le Sénégal et extensible à l’Afrique francophone. Cette première version
-livre une expérience responsive complète, trois tableaux de bord de
-démonstration et une fondation Supabase sécurisée.
+pour le Sénégal et extensible à l’Afrique francophone. Cette version livre une
+expérience responsive, trois espaces par rôle et une fondation Supabase
+sécurisée reliée au projet hébergé.
 
 ## Ce qui fonctionne
 
@@ -11,7 +11,9 @@ démonstration et une fondation Supabase sécurisée.
 - profils détaillés, favoris et états vides ;
 - parcours de réservation avec prestation, date, créneau, lieu et paiement sur
   place en mode test ;
-- espaces client, prestataire et administration ;
+- espace client relié aux réservations, favoris et notifications ;
+- onboarding prestataire avec profil, prestations et envoi à validation ;
+- administration avec métriques et modération des prestataires ;
 - adaptation mobile, tablette et ordinateur ;
 - module Supabase Auth REST pour inscription, connexion, déconnexion et
   récupération de mot de passe dès que les variables sont configurées ;
@@ -19,8 +21,9 @@ démonstration et une fondation Supabase sécurisée.
   prévention des doubles réservations, Storage et RLS ;
 - données de référence de démonstration séparées dans `supabase/seed.sql`.
 
-Le catalogue affiché est volontairement un jeu de démonstration embarqué. Les
-écritures persistantes nécessitent de relier un projet Supabase.
+Le catalogue charge les prestataires approuvés depuis Supabase. Tant qu’aucun
+profil réel n’est publié, l’interface conserve un aperçu embarqué clairement
+étiqueté comme démonstration.
 
 ## Prérequis
 
@@ -91,18 +94,17 @@ pnpm test
 pnpm build
 ```
 
-## Comptes de démonstration
+## Comptes et rôles
 
-L’interface propose des vues de démonstration sans mot de passe. Aucun compte
-Auth réel n’est committé. Après connexion Supabase, créer trois utilisateurs
-locaux via Auth puis attribuer les rôles `client`, `provider` et `admin` dans
-`profiles`. L’attribution du rôle administrateur doit être réalisée côté
+L’interface ne committe aucun compte Auth. Les inscriptions client et
+prestataire créent automatiquement leur profil associé. L’attribution du rôle
+`admin` doit être réalisée côté
 serveur ou en SQL par un opérateur autorisé, jamais depuis le navigateur.
 
 ## Structure
 
 - `app/` : expérience publique et tableaux de bord ;
-- `lib/supabase.ts` : client Auth minimal utilisant uniquement la clé anonyme ;
+- `lib/supabase/` : client navigateur utilisant uniquement la clé publiable ;
 - `supabase/migrations/` : schéma PostgreSQL et politiques RLS ;
 - `supabase/seed.sql` : catégories de démonstration idempotentes ;
 - `docs/ARCHITECTURE.md` : décisions d’architecture et frontières de sécurité ;
@@ -110,11 +112,8 @@ serveur ou en SQL par un opérateur autorisé, jamais depuis le navigateur.
 
 ## Limites du MVP
 
-- Supabase n’est pas lié tant que les variables et l’outil CLI ne sont pas
-  fournis ;
-- le catalogue embarqué ne persiste pas encore les actions dans la base ;
 - Wave, Orange Money et carte restent désactivés ; aucun faux fournisseur n’est
   utilisé ;
-- la messagerie et les notifications sont modélisées en base mais leur
-  synchronisation temps réel reste à brancher ;
+- la messagerie est modélisée en base mais son interface et sa synchronisation
+  temps réel restent à brancher ;
 - les tests RLS d’intégration nécessitent une instance Supabase locale.

@@ -187,6 +187,23 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .live-appointment { grid-template-columns: 58px 1fr auto auto; }
 .appointment-actions { display: flex; gap: 6px; }
 .appointment-actions button, .dashboard-error button { padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: white; color: var(--wine); font-size: 10px; }
+.catalog-source { display: inline-block; margin-top: 8px; color: var(--muted); font-size: 10px; }
+.catalog-source.live { color: #286246; }
+.catalog-source.error { color: #9b3d46; }
+.onboarding-panel { margin-top: 18px; }
+.provider-state { display: inline-block; margin: 6px 0 0; padding: 5px 9px; border-radius: 999px; color: #765917; background: #fff3d1; font-size: 10px; }
+.provider-state.approved { color: #286246; background: #e1f1e8; }
+.provider-state.rejected, .provider-state.suspended { color: #9b3d46; background: #f8e1e3; }
+.dashboard-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+.dashboard-form + .dashboard-form { margin-top: 22px; }
+.dashboard-form label { display: flex; flex-direction: column; gap: 7px; color: #5b4d53; font-size: 11px; font-weight: 700; }
+.dashboard-form input, .dashboard-form select, .dashboard-form textarea { width: 100%; padding: 10px 11px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: white; font: inherit; }
+.dashboard-form .wide { grid-column: 1 / -1; }
+.dashboard-form h3 { margin: 0; color: var(--plum); font-family: var(--font-display), serif; }
+.dashboard-form .primary-button { justify-self: start; align-self: end; }
+.moderation-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid var(--line); }
+.moderation-row strong, .moderation-row small { display: block; }
+.moderation-row small { margin-top: 5px; color: var(--muted); }
 .notifications-panel { margin-top: 16px; }
 .notification-row { width: 100%; padding: 13px 4px; display: flex; justify-content: space-between; gap: 15px; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; }
 .notification-row span, .notification-row small { display: block; }.notification-row small { margin-top: 4px; color: var(--muted); }
@@ -217,6 +234,7 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   .modal-backdrop { padding: 10px; }.profile-content, .booking-modal { padding: 24px 19px; }.modal-actions { grid-template-columns: 1fr; }.form-row { grid-template-columns: 1fr; }
   .dashboard { grid-template-columns: 1fr; }.sidebar { min-height: auto; padding: 18px; }.sidebar nav { flex-direction: row; overflow-x: auto; }.sidebar nav button { flex: none; }.back-link { margin-top: 15px; }.dashboard-main { padding: 32px 18px; }.dashboard-top { flex-direction: column; }.dashboard-top h1 { font-size: 37px; }.metric-grid, .dashboard-grid { grid-template-columns: 1fr; }
   .auth-modal { padding: 28px 19px; }.live-appointment { grid-template-columns: 48px 1fr; }.live-appointment > .status, .live-appointment > .appointment-actions { grid-column: 2; }.appointment-actions { flex-wrap: wrap; }
+  .dashboard-form { grid-template-columns: 1fr; }.dashboard-form .wide { grid-column: auto; }.moderation-row { align-items: flex-start; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
