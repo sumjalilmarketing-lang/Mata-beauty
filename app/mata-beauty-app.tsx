@@ -1,17 +1,17 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AuthModal, type AuthenticatedProfile } from "./auth-modal";
 import { LiveDashboard } from "./live-dashboard";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { fetchPublishedProviders } from "@/lib/supabase/catalog";
 import { calculateBookingEnd, calculateBookingQuote } from "@/lib/domain/booking";
+import { fetchActivePromotions, fetchPublishedProviders, type CatalogPromotion } from "@/lib/supabase/catalog";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Provider = {
-  id: string | number;
-  profileId?: string;
-  serviceId?: string;
+  id: string;
+  profileId: string;
+  serviceId: string;
   name: string;
   specialty: string;
   category: string;
@@ -20,11 +20,9 @@ type Provider = {
   rating: number;
   reviews: number;
   initials: string;
-  tone: string;
   verified: boolean;
   homeService: boolean;
-  nextSlot: string;
-  durationMinutes?: number;
+  durationMinutes: number;
   coverUrl?: string;
 };
 
@@ -34,146 +32,151 @@ type BookingRequest = {
   locationMode: "salon" | "client_address";
   address: string;
   note: string;
+  paymentMethod: "on_site" | "wave" | "orange_money";
 };
 
+type BookingConfirmation = { id: string; date: string; time: string; location: string };
+
 const categories = [
-  ["✦", "Coiffure femme"],
-  ["≋", "Tresses africaines"],
-  ["◌", "Locks"],
-  ["♢", "Maquillage"],
-  ["◐", "Onglerie"],
-  ["⌁", "Cils & sourcils"],
-  ["✂", "Barbier"],
-  ["♡", "Soins du visage"],
+  ["✂", "Coiffure"], ["≋", "Tresses"], ["◒", "Perruques"], ["✦", "Maquillage"],
+  ["◐", "Onglerie"], ["⌁", "Cils et sourcils"], ["♡", "Soins du visage"],
+  ["◆", "Barbier"], ["◇", "Épilation"], ["☼", "Massage et bien-être"],
+] as const;
+
+const popularServices = [
+  "Tresses", "Pose de perruque", "Maquillage mariage", "Manucure",
+  "Pédicure", "Extension de cils", "Barbier", "Soin du visage",
 ];
 
-const providers: Provider[] = [
-  { id: 1, name: "Awa Signature", specialty: "Tresses & coiffure afro", category: "Tresses africaines", area: "Almadies", price: 15000, rating: 4.9, reviews: 127, initials: "AS", tone: "plum", verified: true, homeService: true, nextSlot: "Aujourd’hui · 16:30" },
-  { id: 2, name: "Maison Kéwé", specialty: "Maquillage & mariée", category: "Maquillage", area: "Mermoz", price: 25000, rating: 4.8, reviews: 94, initials: "MK", tone: "gold", verified: true, homeService: false, nextSlot: "Demain · 10:00" },
-  { id: 3, name: "Nails by Fatou", specialty: "Manucure & nail art", category: "Onglerie", area: "Sacré-Cœur", price: 8000, rating: 4.9, reviews: 81, initials: "NF", tone: "rose", verified: true, homeService: true, nextSlot: "Aujourd’hui · 18:00" },
-  { id: 4, name: "Studio Nappy", specialty: "Locks & cheveux naturels", category: "Locks", area: "Point E", price: 12000, rating: 4.7, reviews: 68, initials: "SN", tone: "berry", verified: true, homeService: false, nextSlot: "Mercredi · 09:30" },
-  { id: 5, name: "Belle Peau Dakar", specialty: "Soins visage & épilation", category: "Soins du visage", area: "Plateau", price: 18000, rating: 4.8, reviews: 76, initials: "BP", tone: "sand", verified: true, homeService: true, nextSlot: "Demain · 14:00" },
-  { id: 6, name: "Keur Barber", specialty: "Coupe homme & barbe", category: "Barbier", area: "Ouakam", price: 5000, rating: 4.6, reviews: 112, initials: "KB", tone: "ink", verified: true, homeService: false, nextSlot: "Aujourd’hui · 15:00" },
-  { id: 7, name: "Lashes de Marième", specialty: "Extensions de cils", category: "Cils & sourcils", area: "Yoff", price: 14000, rating: 4.9, reviews: 53, initials: "LM", tone: "lilac", verified: true, homeService: true, nextSlot: "Jeudi · 11:00" },
-  { id: 8, name: "Dior Hair Lab", specialty: "Perruques & lace wigs", category: "Coiffure femme", area: "Liberté 6", price: 20000, rating: 4.7, reviews: 89, initials: "DH", tone: "wine", verified: true, homeService: true, nextSlot: "Demain · 12:30" },
-  { id: 9, name: "Sira Beauty Room", specialty: "Coiffure & brushing", category: "Coiffure femme", area: "Parcelles", price: 10000, rating: 4.6, reviews: 47, initials: "SB", tone: "coral", verified: false, homeService: true, nextSlot: "Vendredi · 10:00" },
-  { id: 10, name: "L’Atelier Brow", specialty: "Sourcils & brow lift", category: "Cils & sourcils", area: "Fann", price: 9000, rating: 4.8, reviews: 61, initials: "AB", tone: "taupe", verified: true, homeService: false, nextSlot: "Mercredi · 13:00" },
-  { id: 11, name: "Mame Tresses", specialty: "Braids & vanilles", category: "Tresses africaines", area: "Guédiawaye", price: 11000, rating: 4.7, reviews: 105, initials: "MT", tone: "cocoa", verified: true, homeService: true, nextSlot: "Aujourd’hui · 17:30" },
-  { id: 12, name: "Institut Teranga", specialty: "Pédicure & bien-être", category: "Onglerie", area: "Ngor", price: 13000, rating: 4.9, reviews: 38, initials: "IT", tone: "sage", verified: true, homeService: false, nextSlot: "Samedi · 09:00" },
-];
-
-const formatPrice = (value: number) =>
-  new Intl.NumberFormat("fr-FR").format(value) + " F";
+const formatPrice = (value: number) => `${new Intl.NumberFormat("fr-FR").format(value)} F CFA`;
+const defaultBookingDate = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
 export function MataBeautyApp() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Toutes");
   const [area, setArea] = useState("Tout Dakar");
-  const [catalog, setCatalog] = useState<Provider[]>(providers);
-  const [catalogSource, setCatalogSource] = useState<"demo" | "live" | "error">("demo");
-  const [favorites, setFavorites] = useState<Array<string | number>>([2]);
+  const [date, setDate] = useState("");
+  const [catalog, setCatalog] = useState<Provider[]>([]);
+  const [promotions, setPromotions] = useState<CatalogPromotion[]>([]);
+  const [upcomingBookings, setUpcomingBookings] = useState<Array<{ id: string; starts_at: string; status: string }>>([]);
+  const [catalogState, setCatalogState] = useState<"loading" | "live" | "empty" | "error">("loading");
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [booking, setBooking] = useState<Provider | null>(null);
   const [profile, setProfile] = useState<Provider | null>(null);
   const [view, setView] = useState<"home" | "client" | "provider" | "admin">("home");
+  const [resultView, setResultView] = useState<"list" | "map">("list");
+  const [homeOnly, setHomeOnly] = useState(false);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [minRating, setMinRating] = useState("0");
+  const [maxPrice, setMaxPrice] = useState("50000");
   const [notice, setNotice] = useState("");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState<AuthenticatedProfile | null>(null);
-  const [authRequest, setAuthRequest] = useState<{
-    role: "client" | "provider" | "admin";
-    mode: "login" | "register";
-  } | null>(null);
+  const [authRequest, setAuthRequest] = useState<{ role: "client" | "provider" | "admin"; mode: "login" | "register" } | null>(null);
 
+  const areas = useMemo(() => ["Tout Dakar", ...new Set(catalog.map((provider) => provider.area))], [catalog]);
+  const suggestions = useMemo(
+    () => [...new Set([...popularServices, ...categories.map((item) => item[1]), ...catalog.map((provider) => provider.name)])],
+    [catalog],
+  );
   const filteredProviders = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized = query.trim().toLocaleLowerCase("fr");
     return catalog.filter((provider) => {
-      const matchesText = !normalized || `${provider.name} ${provider.specialty} ${provider.area}`.toLowerCase().includes(normalized);
-      const matchesCategory = category === "Toutes" || provider.category === category;
-      const matchesArea = area === "Tout Dakar" || provider.area === area;
-      return matchesText && matchesCategory && matchesArea;
+      const haystack = `${provider.name} ${provider.specialty} ${provider.category} ${provider.area}`.toLocaleLowerCase("fr");
+      return (!normalized || haystack.includes(normalized))
+        && (category === "Toutes" || provider.category.toLocaleLowerCase("fr").includes(category.toLocaleLowerCase("fr")))
+        && (area === "Tout Dakar" || provider.area === area)
+        && (!homeOnly || provider.homeService)
+        && (!verifiedOnly || provider.verified)
+        && provider.rating >= Number(minRating)
+        && provider.price <= Number(maxPrice);
     });
-  }, [query, category, area, catalog]);
+  }, [area, catalog, category, homeOnly, maxPrice, minRating, query, verifiedOnly]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
+    if (!supabase) {
+      void Promise.resolve().then(() => setCatalogState("error"));
+      return;
+    }
     let active = true;
-
     void fetchPublishedProviders(supabase)
       .then((items) => {
         if (!active) return;
-        if (items.length > 0) {
-          setCatalog(items.map((item, index) => ({
-            ...item,
-            initials: item.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
-            tone: ["plum", "gold", "rose", "berry", "sand"][index % 5],
-            nextSlot: "Disponibilités à consulter",
-          })));
-          setCatalogSource("live");
-        }
+        const realProviders: Provider[] = items.map((item) => ({
+          ...item,
+          id: item.id,
+          initials: item.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
+        }));
+        setCatalog(realProviders);
+        setCatalogState(realProviders.length ? "live" : "empty");
       })
-      .catch(() => {
-        if (active) {
-          setCatalogSource("error");
-          setNotice("Le catalogue réel est momentanément indisponible. Les exemples restent affichés.");
-        }
-      });
+      .catch(() => { if (active) setCatalogState("error"); });
+    void fetchActivePromotions(supabase).then((items) => {
+      if (active) setPromotions(items);
+    }).catch(() => {
+      if (active) setPromotions([]);
+    });
 
     void supabase.auth.getSession().then(async ({ data }) => {
       const user = data.session?.user;
       if (!active || !user) return;
       const { data: account } = await supabase.from("profiles").select("role,is_suspended").eq("id", user.id).maybeSingle();
       if (!active || !account || account.is_suspended) return;
-      setAuthenticated({ userId: user.id, role: account.role });
-      if (account.role === "client") {
-        const { data: favoriteData } = await supabase.from("favorites").select("provider_id").eq("client_id", user.id);
+      const signedIn = { userId: user.id, role: account.role } as AuthenticatedProfile;
+      setAuthenticated(signedIn);
+      if (signedIn.role === "client") {
+        const [{ data: favoriteData }, { data: bookingData }] = await Promise.all([
+          supabase.from("favorites").select("provider_id").eq("client_id", user.id),
+          supabase.from("bookings").select("id,starts_at,status").eq("client_id", user.id).gte("starts_at", new Date().toISOString()).order("starts_at").limit(3),
+        ]);
         if (active && favoriteData) setFavorites(favoriteData.map((item) => item.provider_id));
+        if (active && bookingData) setUpcomingBookings(bookingData);
       }
     });
-
     return () => { active = false; };
   }, []);
 
+  function openAccount(section: "client" | "provider" | "admin" = "client") {
+    if (authenticated?.role === section) setView(section);
+    else setAuthRequest({ role: section, mode: "login" });
+  }
+
+  function runSearch(event?: FormEvent) {
+    event?.preventDefault();
+    document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function toggleFavorite(provider: Provider) {
-    const exists = favorites.includes(provider.id);
-    if (!provider.profileId) {
-      setFavorites((current) => exists ? current.filter((item) => item !== provider.id) : [...current, provider.id]);
-      setNotice("Favori enregistré uniquement dans cet aperçu de démonstration.");
-      return;
-    }
     if (!authenticated || authenticated.role !== "client") {
       setAuthRequest({ role: "client", mode: "login" });
       return;
     }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
+    const exists = favorites.includes(provider.id);
     const request = exists
       ? supabase.from("favorites").delete().eq("client_id", authenticated.userId).eq("provider_id", provider.profileId)
       : supabase.from("favorites").insert({ client_id: authenticated.userId, provider_id: provider.profileId });
     const { error } = await request;
     if (error) {
-      setNotice(`Impossible de modifier le favori : ${error.message}`);
+      setNotice("Le favori n’a pas pu être enregistré. Réessayez.");
       return;
     }
-    setFavorites((current) => exists ? current.filter((item) => item !== provider.id) : [...current, provider.id]);
+    setFavorites((current) => exists ? current.filter((id) => id !== provider.id) : [...current, provider.id]);
   }
 
-  async function confirmBooking(request: BookingRequest) {
-    if (!booking) return;
-    if (!booking.profileId || !booking.serviceId) {
-      setBooking(null);
-      setNotice("Demande simulée : aucune donnée n’a été envoyée en mode démonstration.");
-      return;
-    }
+  async function confirmBooking(request: BookingRequest): Promise<BookingConfirmation | null> {
+    if (!booking) return null;
     if (!authenticated || authenticated.role !== "client") {
       setAuthRequest({ role: "client", mode: "login" });
-      return;
+      return null;
     }
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    const startsAt = new Date(`${request.date}T${request.time}:00Z`);
-    const endsAt = calculateBookingEnd(startsAt, booking.durationMinutes ?? 60);
+    if (!supabase) return null;
+    const startsAt = new Date(`${request.date}T${request.time}:00+00:00`);
+    const endsAt = calculateBookingEnd(startsAt, booking.durationMinutes);
     const quote = calculateBookingQuote(booking.price);
-    const { error } = await supabase.from("bookings").insert({
+    const { data: created, error } = await supabase.from("bookings").insert({
       client_id: authenticated.userId,
       provider_id: booking.profileId,
       provider_service_id: booking.serviceId,
@@ -185,14 +188,26 @@ export function MataBeautyApp() {
       total_amount: quote.totalAmount,
       currency: quote.currency,
       client_note: request.note.trim() || null,
-    });
-    if (error) {
-      setNotice(error.code === "23P01" ? "Ce créneau vient d’être réservé. Choisissez-en un autre." : `Réservation impossible : ${error.message}`);
-      return;
+    }).select("id").single();
+    if (error || !created) {
+      setNotice(error?.code === "23P01" ? "Ce créneau vient d’être réservé. Choisissez-en un autre." : "La réservation n’a pas pu être enregistrée.");
+      return null;
     }
-    setBooking(null);
-    setNotice("Réservation enregistrée. Le prestataire a reçu une notification.");
-    window.setTimeout(() => setNotice(""), 4500);
+    const { error: paymentError } = await supabase.from("payments").insert({
+      booking_id: created.id,
+      payment_method: request.paymentMethod,
+      payment_status: "pending",
+      amount: quote.totalAmount,
+      currency: quote.currency,
+      is_test: true,
+    });
+    if (paymentError) setNotice("Rendez-vous créé. Le paiement test sera complété depuis votre espace.");
+    return {
+      id: created.id,
+      date: request.date,
+      time: request.time,
+      location: request.locationMode === "salon" ? `Chez ${booking.name}` : request.address,
+    };
   }
 
   async function signOut() {
@@ -202,315 +217,152 @@ export function MataBeautyApp() {
     setView("home");
   }
 
-  if (view !== "home") {
-    if (authenticated && authenticated.role === view) {
-      return <LiveDashboard role={view} userId={authenticated.userId} displayName="votre espace" onBack={() => setView("home")} onSignOut={signOut} />;
-    }
-    return <Dashboard role={view} onBack={() => setView("home")} />;
+  if (view !== "home" && authenticated?.role === view) {
+    return <LiveDashboard role={view} userId={authenticated.userId} displayName="votre espace" onBack={() => setView("home")} onSignOut={signOut} />;
   }
 
   return (
-    <main>
-      {notice && <div className="toast" role="status">✓ {notice}</div>}
-      <header className="topbar premium-nav">
-        <a className="official-brand" href="#accueil" aria-label="Mata Beauty, accueil">
-          <span className="brand-emblem">M</span>
-          <span><strong>MATA</strong><small>BEAUTY</small></span>
-        </a>
-        <nav className="desktop-nav" aria-label="Navigation principale">
-          <a href="#accueil">Accueil</a>
-          <div className="mega-trigger">
-            <a href="#explorer">Prestataires</a>
-            <div className="mega-menu">
-              <div><small>Explorer</small><strong>Les talents les mieux notés</strong><p>Des profils contrôlés, des disponibilités claires et des avis authentiques.</p></div>
-              {["Coiffure femme", "Tresses africaines", "Maquillage", "Onglerie"].map((item) => <button key={item} onClick={() => { setCategory(item); document.getElementById("explorer")?.scrollIntoView(); }}>{item}<span>→</span></button>)}
-            </div>
-          </div>
-          <a href="#categories">Catégories</a>
-          <a href="#manifeste">À propos</a>
-          <a href="#contact">Contact</a>
-        </nav>
-        <div className="header-actions">
-          <button className="nav-icon" aria-label="Favoris" onClick={() => setAuthRequest({ role: "client", mode: "login" })}>♡</button>
-          <button className="nav-icon" aria-label="Notifications" onClick={() => setAuthRequest({ role: "client", mode: "login" })}>◌</button>
-          <button className="ghost-button" onClick={() => setAuthRequest({ role: "client", mode: "login" })}>Se connecter</button>
-          <button className="gold-button compact" onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Rejoindre Mata</button>
-          <button className="menu-toggle" aria-expanded={mobileMenuOpen} aria-label="Ouvrir le menu" onClick={() => setMobileMenuOpen((open) => !open)}>☰</button>
+    <main className="app-home" id="home">
+      {notice && <div className="toast" role="status">{notice}</div>}
+      <header className="app-header">
+        <a className="app-brand" href="#home" aria-label="Mata Beauty, accueil"><span className="brand-emblem">M</span><span><strong>MATA</strong><small>BEAUTY</small></span></a>
+        <button className="location-pill" onClick={() => document.getElementById("search")?.scrollIntoView()}><span>⌖</span><span><small>Votre zone</small><strong>{area}</strong></span></button>
+        <div className="app-header-actions">
+          <button aria-label="Notifications" onClick={() => openAccount()}>♢</button>
+          <button aria-label="Favoris" onClick={() => openAccount()}>♡</button>
+          <button className="account-avatar" aria-label="Ouvrir mon compte" onClick={() => openAccount()}>{authenticated ? "MB" : "👤"}</button>
         </div>
-        {mobileMenuOpen && <nav className="mobile-menu" aria-label="Navigation mobile"><a href="#explorer" onClick={() => setMobileMenuOpen(false)}>Prestataires</a><a href="#categories" onClick={() => setMobileMenuOpen(false)}>Catégories</a><a href="#manifeste" onClick={() => setMobileMenuOpen(false)}>À propos</a><button onClick={() => setAuthRequest({ role: "client", mode: "login" })}>Se connecter</button></nav>}
       </header>
 
-      <section className="hero premium-hero" id="accueil">
-        <div className="hero-copy">
-          <p className="eyebrow light"><span>✦</span> La beauté d’exception, à Dakar</p>
-          <h1>Votre beauté,<br /><em>notre passion.</em></h1>
-          <p className="hero-lead">Découvrez une sélection exigeante de professionnels et réservez votre prochain moment beauté avec une simplicité absolue.</p>
-          <form className="search-bar" onSubmit={(event) => event.preventDefault()}>
-            <label>
-              <span>Que recherchez-vous ?</span>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tresses, maquillage, barbier…" />
-            </label>
-            <label>
-              <span>Où ?</span>
-              <select value={area} onChange={(event) => setArea(event.target.value)}>
-                <option>Tout Dakar</option>
-                {[...new Set(catalog.map((provider) => provider.area))].map((item) => <option key={item}>{item}</option>)}
-              </select>
-            </label>
-            <button className="search-button" type="submit" onClick={() => document.getElementById("explorer")?.scrollIntoView({ behavior: "smooth" })}>Découvrir</button>
-          </form>
-          <div className="trust-row">
-            <span><b>✓</b> Professionnels vérifiés</span>
-            <span><b>◫</b> Réservation facile</span>
-            <span><b>◇</b> Accompagnement personnalisé</span>
+      <section className="app-intro" id="search">
+        <div><p className="eyebrow">Réserver votre beauté à Dakar</p><h1>De quoi avez-vous envie aujourd’hui ?</h1></div>
+        <form className="app-search" onSubmit={runSearch}>
+          <label><span>Que recherchez-vous ?</span><input list="search-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tresses, perruque, maquillage…" /></label>
+          <label><span>Où ?</span><select value={area} onChange={(event) => setArea(event.target.value)}>{areas.map((item) => <option key={item}>{item}</option>)}</select></label>
+          <label><span>Quand ?</span><input type="date" value={date} min={new Date().toISOString().slice(0, 10)} onChange={(event) => setDate(event.target.value)} /></label>
+          <button className="primary-button search-submit" type="submit">Rechercher</button>
+          <datalist id="search-suggestions">{suggestions.map((item) => <option value={item} key={item} />)}</datalist>
+        </form>
+      </section>
+
+      <section className="compact-section category-section" aria-labelledby="categories-title">
+        <div className="compact-heading"><div><p className="eyebrow">Explorer</p><h2 id="categories-title">Catégories</h2></div><button onClick={() => { setCategory("Toutes"); runSearch(); }}>Tout voir</button></div>
+        <div className="category-strip">{categories.map(([icon, label]) => <button key={label} className={category === label ? "category-chip active" : "category-chip"} onClick={() => { setCategory(category === label ? "Toutes" : label); runSearch(); }}><i>{icon}</i><span>{label}</span></button>)}</div>
+      </section>
+
+      <section className="compact-section popular-section" aria-labelledby="popular-title">
+        <div className="compact-heading"><div><p className="eyebrow">En ce moment</p><h2 id="popular-title">Prestations populaires</h2></div></div>
+        <div className="service-chips">{popularServices.map((service) => <button key={service} onClick={() => { setQuery(service); runSearch(); }}>{service}<span>→</span></button>)}</div>
+      </section>
+
+      <section className="compact-section results-section" id="results" aria-labelledby="results-title">
+        <div className="compact-heading results-heading">
+          <div><p className="eyebrow">Près de vous</p><h2 id="results-title">Professionnels disponibles</h2><small>{catalogState === "live" ? "Données vérifiées en direct" : catalogState === "loading" ? "Chargement du catalogue…" : "Catalogue Supabase"}</small></div>
+          <div className="view-switch" aria-label="Affichage"><button className={resultView === "list" ? "active" : ""} onClick={() => setResultView("list")}>☷ Liste</button><button className={resultView === "map" ? "active" : ""} onClick={() => setResultView("map")}>⌖ Carte</button></div>
+        </div>
+        <div className="result-layout">
+          <aside className="filter-panel" aria-label="Filtres de recherche">
+            <div><strong>Filtres</strong><button onClick={() => { setHomeOnly(false); setVerifiedOnly(false); setMinRating("0"); setMaxPrice("50000"); }}>Réinitialiser</button></div>
+            <label>Prix maximum <strong>{formatPrice(Number(maxPrice))}</strong><input type="range" min="3000" max="50000" step="1000" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label>
+            <label>Note minimale<select value={minRating} onChange={(event) => setMinRating(event.target.value)}><option value="0">Toutes les notes</option><option value="4">4 étoiles et plus</option><option value="4.5">4,5 étoiles et plus</option></select></label>
+            <label className="check-filter"><input type="checkbox" checked={homeOnly} onChange={(event) => setHomeOnly(event.target.checked)} /> À domicile</label>
+            <label className="check-filter"><input type="checkbox" checked={verifiedOnly} onChange={(event) => setVerifiedOnly(event.target.checked)} /> Profil vérifié</label>
+          </aside>
+          <div className="result-content">
+            {catalogState === "loading" && <div className="provider-skeletons" aria-label="Chargement"><i /><i /><i /></div>}
+            {(catalogState === "empty" || catalogState === "error") && <div className="useful-empty"><span>✦</span><h3>{catalogState === "error" ? "Catalogue momentanément indisponible" : "Les premiers professionnels arrivent bientôt"}</h3><p>{catalogState === "error" ? "Vérifiez votre connexion puis actualisez la page." : "Aucun profil approuvé ne correspond encore à cette zone. Devenez partenaire ou revenez prochainement."}</p><button className="outline-button" onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Référencer mon activité</button></div>}
+            {catalogState === "live" && filteredProviders.length === 0 && <div className="useful-empty"><span>⌕</span><h3>Aucun résultat avec ces filtres</h3><p>Élargissez la zone, le prix ou la note pour afficher plus de professionnels.</p></div>}
+            {catalogState === "live" && resultView === "list" && <div className="provider-list">{filteredProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} favorite={favorites.includes(provider.id)} onFavorite={() => void toggleFavorite(provider)} onView={() => setProfile(provider)} onBook={() => setBooking(provider)} />)}</div>}
+            {catalogState === "live" && resultView === "map" && <div className="map-view"><div className="map-grid" aria-label="Carte indicative des résultats">{filteredProviders.map((provider, index) => <button key={provider.id} style={{ left: `${16 + (index * 27) % 72}%`, top: `${18 + (index * 31) % 64}%` }} onClick={() => setProfile(provider)}><span>{index + 1}</span>{provider.name}</button>)}</div><p>Carte indicative · ouvrez une fiche pour consulter l’adresse complète.</p></div>}
           </div>
         </div>
-        <div className="hero-visual founder-visual" aria-label="Fondatrice de Mata Beauty dans un salon premium">
-          <Image src="/mata-founder-hero.png" alt="Fondatrice de Mata Beauty en tenue business élégante" fill priority sizes="(max-width: 900px) 100vw, 52vw" />
-          <span className="founder-caption"><small>Une vision portée par</small><strong>Mata Beauty</strong></span>
-        </div>
       </section>
 
-      <section className="brand-manifesto" id="manifeste">
-        <p className="eyebrow">L’excellence, sans compromis</p>
-        <h2>Plus qu’une réservation.<br />Une nouvelle façon de vivre la beauté.</h2>
-        <p>Mata Beauty réunit le meilleur du savoir-faire local dans une expérience pensée pour votre temps, votre confiance et votre bien-être.</p>
-        <div className="manifesto-metrics"><span><strong>100%</strong> profils contrôlés</span><span><strong>4,9/5</strong> satisfaction moyenne</span><span><strong>7j/7</strong> réservation en ligne</span></div>
+      <section className="compact-section promotions-section">
+        <div className="compact-heading"><div><p className="eyebrow">Avantages</p><h2>Offres du moment</h2></div></div>
+        {promotions.length ? <div className="promotion-grid">{promotions.map((promotion) => <article key={promotion.id}><span>{promotion.discountType === "percentage" ? `−${promotion.discountValue}%` : `−${formatPrice(promotion.discountValue)}`}</span><h3>{promotion.title}</h3><p>{promotion.description || "Offre active sur une sélection de prestations."}</p><small>Valable jusqu’au {new Date(promotion.endsAt).toLocaleDateString("fr-FR")}</small></article>)}</div> : <div className="promotion-empty"><span>◇</span><div><strong>Aucune promotion active pour le moment</strong><p>Les offres publiées par les professionnels apparaîtront ici automatiquement.</p></div></div>}
       </section>
 
-      <section className="section categories-section" id="categories" aria-labelledby="category-title">
-        <div className="section-heading">
-          <div><p className="eyebrow">Nos expertises</p><h2 id="category-title">Que souhaitez-vous réserver ?</h2></div>
-          <a href="#explorer">Voir toutes les catégories →</a>
-        </div>
-        <div className="category-grid">
-          {categories.map(([icon, label]) => (
-            <button key={label} className={category === label ? "category-card active" : "category-card"} onClick={() => { setCategory(category === label ? "Toutes" : label); document.getElementById("explorer")?.scrollIntoView({ behavior: "smooth" }); }}>
-              <span>{icon}</span><strong>{label}</strong>
-            </button>
-          ))}
-        </div>
+      <section className="compact-section upcoming-section">
+        <div className="compact-heading"><div><p className="eyebrow">Votre agenda</p><h2>Prochains rendez-vous</h2></div></div>
+        {upcomingBookings.length ? <div className="upcoming-list">{upcomingBookings.map((item) => <article key={item.id}><span>▣</span><div><strong>{new Date(item.starts_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}</strong><small>Réservation {item.id.slice(0, 8)} · {item.status}</small></div><button onClick={() => openAccount()}>Voir</button></article>)}</div> : <div className="account-callout"><div><span>▣</span><div><strong>{authenticated?.role === "client" ? "Aucun rendez-vous à venir" : "Connectez-vous à votre espace client"}</strong><p>Retrouvez les horaires, adresses, messages et options d’annulation au même endroit.</p></div></div><button className="primary-button" onClick={() => openAccount()}>{authenticated?.role === "client" ? "Ouvrir mon agenda" : "Se connecter"}</button></div>}
       </section>
 
-      <section className="section providers-section" id="explorer" aria-labelledby="provider-title">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Près de vous</p>
-            <h2 id="provider-title">Les professionnels du moment</h2>
-            <small className={`catalog-source ${catalogSource}`}>
-              {catalogSource === "live" ? "Catalogue vérifié en direct" : "Aperçu de démonstration — aucun prestataire publié"}
-            </small>
-          </div>
-          <span className="result-count">{filteredProviders.length} résultat{filteredProviders.length !== 1 ? "s" : ""}</span>
-        </div>
-        <div className="filters" aria-label="Filtres">
-          {["Toutes", "Coiffure femme", "Tresses africaines", "Maquillage", "Onglerie", "Barbier"].map((item) => (
-            <button key={item} className={category === item ? "filter active" : "filter"} onClick={() => setCategory(item)}>{item}</button>
-          ))}
-        </div>
-        {filteredProviders.length ? (
-          <div className="provider-grid">
-            {filteredProviders.map((provider) => (
-              <article className="provider-card" key={provider.id}>
-                <div className={`provider-cover ${provider.tone}`}>
-                  <Image className="provider-photo" src={provider.coverUrl || "/beauty-rituals-editorial.png"} alt="" fill sizes="(max-width: 760px) 100vw, 25vw" style={{ objectPosition: `${20 + (Number(provider.id) || 1) % 3 * 40}% center` }} />
-                  <span className="avatar">{provider.initials}</span>
-                  {provider.verified && <span className="verified">✓ Profil vérifié</span>}
-                  <button className={favorites.includes(provider.id) ? "favorite active" : "favorite"} onClick={() => void toggleFavorite(provider)} aria-label={favorites.includes(provider.id) ? "Retirer des favoris" : "Ajouter aux favoris"}>{favorites.includes(provider.id) ? "♥" : "♡"}</button>
-                </div>
-                <div className="provider-body">
-                  <div className="provider-title"><div><h3>{provider.name}</h3><p>{provider.specialty}</p></div><span className="rating">★ {provider.rating}</span></div>
-                  <div className="provider-meta"><span>⌖ {provider.area}</span><span>{provider.homeService ? "À domicile" : "En salon"}</span></div>
-                  <div className="provider-bottom">
-                    <div><small>À partir de</small><strong>{formatPrice(provider.price)}</strong></div>
-                    <button className="outline-button" onClick={() => setProfile(provider)}>Voir le profil</button>
-                  </div>
-                  <button className="slot-button" onClick={() => setBooking(provider)}><span>Prochain créneau</span><strong>{provider.nextSlot}</strong></button>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state"><span>◇</span><h3>Aucun professionnel trouvé</h3><p>Essayez une autre zone ou une catégorie différente.</p><button className="outline-button" onClick={() => { setQuery(""); setArea("Tout Dakar"); setCategory("Toutes"); }}>Réinitialiser les filtres</button></div>
-        )}
-      </section>
+      <section className="founder-banner"><Image src="/mata-founder-hero.png" alt="Fondatrice de Mata Beauty" fill sizes="(max-width: 760px) 35vw, 240px" /><div><p className="eyebrow light">La vision Mata Beauty</p><h2>Le savoir-faire local, accessible en quelques gestes.</h2><p>Une plateforme pensée au Sénégal pour réserver avec confiance.</p></div></section>
+      <footer className="app-footer"><div className="app-brand"><span className="brand-emblem">M</span><span><strong>MATA</strong><small>BEAUTY</small></span></div><p>La réservation beauté de confiance au Sénégal.</p><button onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Devenir partenaire</button><button onClick={() => openAccount("admin")}>Administration</button><small>© 2026 Mata Beauty · Paiements externes en mode test</small></footer>
 
-      <section className="editorial-story" aria-labelledby="editorial-title">
-        <div className="editorial-image"><Image src="/beauty-rituals-editorial.png" alt="Trois rituels beauté premium : coiffure, maquillage et manucure" fill sizes="100vw" /></div>
-        <div className="editorial-copy">
-          <p className="eyebrow light">Savoir-faire & transformation</p>
-          <h2 id="editorial-title">Chaque détail révèle votre éclat.</h2>
-          <p>Des gestes précis, des produits choisis et des artistes qui comprennent votre style. Découvrez des résultats qui vous ressemblent, sans compromis.</p>
-          <a href="#explorer">Trouver mon experte <span>→</span></a>
-        </div>
-      </section>
-
-      <section className="section social-proof" aria-labelledby="reviews-title">
-        <div className="section-heading">
-          <div><p className="eyebrow">Paroles de clientes</p><h2 id="reviews-title">Elles ont trouvé leur adresse beauté.</h2></div>
-          <span className="review-score">★ 4,9 <small>sur 1 240 avis</small></span>
-        </div>
-        <div className="testimonial-grid">
-          <article><div className="stars">★★★★★</div><blockquote>« Une réservation limpide et une prestataire exceptionnelle. J’ai enfin trouvé mon salon de confiance. »</blockquote><footer><span>AM</span><div><strong>Aminata M.</strong><small>Cliente vérifiée · Almadies</small></div></footer></article>
-          <article><div className="stars">★★★★★</div><blockquote>« Le niveau de service est vraiment premium. Tout était clair, ponctuel et parfaitement exécuté. »</blockquote><footer><span>NK</span><div><strong>Ndeye K.</strong><small>Cliente vérifiée · Mermoz</small></div></footer></article>
-          <article><div className="stars">★★★★★</div><blockquote>« Mata Beauty m’a fait gagner du temps sans sacrifier la qualité. Une expérience que je recommande. »</blockquote><footer><span>FS</span><div><strong>Fatou S.</strong><small>Cliente vérifiée · Point E</small></div></footer></article>
-        </div>
-      </section>
-
-      <section className="why-mata" aria-labelledby="why-title">
-        <div><p className="eyebrow light">Pourquoi Mata Beauty</p><h2 id="why-title">La confiance est notre plus beau service.</h2></div>
-        <div className="promise-grid">
-          <article><span>01</span><h3>Sélection exigeante</h3><p>Identité, expertise et qualité de service sont vérifiées avant publication.</p></article>
-          <article><span>02</span><h3>Prix transparents</h3><p>Vous connaissez le tarif, la durée et les conditions avant de confirmer.</p></article>
-          <article><span>03</span><h3>Expérience maîtrisée</h3><p>Rappels, suivi et assistance vous accompagnent à chaque étape.</p></article>
-          <article><span>04</span><h3>Beauté locale valorisée</h3><p>Nous faisons rayonner les talents et savoir-faire du Sénégal.</p></article>
-        </div>
-      </section>
-
-      <section className="how-section" id="fonctionnement">
-        <div className="section-heading centered"><div><p className="eyebrow">Simple & serein</p><h2>Votre rendez-vous en 3 étapes</h2></div></div>
-        <div className="steps">
-          <article><span>01</span><h3>Trouvez votre expert</h3><p>Comparez les profils, tarifs, disponibilités et avis vérifiés près de chez vous.</p></article>
-          <article><span>02</span><h3>Choisissez un créneau</h3><p>Sélectionnez la prestation et l’horaire qui vous conviennent le mieux.</p></article>
-          <article><span>03</span><h3>Profitez du moment</h3><p>Recevez votre confirmation et retrouvez tous les détails dans votre espace.</p></article>
-        </div>
-      </section>
-
-      <section className="mobile-showcase">
-        <div>
-          <p className="eyebrow">Bientôt dans votre poche</p>
-          <h2>Votre rituel beauté,<br />où que vous soyez.</h2>
-          <p>Retrouvez vos favoris, vos rendez-vous et vos recommandations personnalisées dans une expérience mobile conçue pour aller à l’essentiel.</p>
-          <div className="app-pills"><span>Disponible prochainement sur iOS</span><span>Android</span></div>
-        </div>
-        <div className="phone-mockup" aria-label="Aperçu de l’application mobile Mata Beauty"><div className="phone-top">MATA <small>BEAUTY</small></div><p>Bonjour Aïssatou,</p><h3>Que souhaitez-vous réserver ?</h3><div className="mini-search">Rechercher un soin…</div><div className="mini-card"><span>MB</span><div><strong>Votre experte du jour</strong><small>★ 4,9 · Almadies</small></div></div></div>
-      </section>
-
-      <section className="section faq-section" aria-labelledby="faq-title">
-        <div className="faq-intro"><p className="eyebrow">Questions fréquentes</p><h2 id="faq-title">Tout ce qu’il faut savoir.</h2><p>Une question supplémentaire ? Notre équipe vous accompagne.</p><a href="mailto:contact@matabeauty.sn">Nous contacter →</a></div>
-        <div className="faq-list">
-          <details open><summary>Comment les prestataires sont-ils sélectionnés ?</summary><p>Chaque profil passe par une vérification de son identité, de ses informations professionnelles et de la qualité de sa présentation.</p></details>
-          <details><summary>Puis-je modifier ou annuler un rendez-vous ?</summary><p>Oui, depuis votre espace client, selon le délai d’annulation indiqué lors de la réservation.</p></details>
-          <details><summary>Le paiement en ligne est-il disponible ?</summary><p>Le paiement reste actuellement en mode test. Vous réglez directement selon les modalités affichées par le prestataire.</p></details>
-          <details><summary>Comment devenir prestataire Mata Beauty ?</summary><p>Créez votre espace professionnel, complétez votre profil et envoyez-le à notre équipe pour validation.</p></details>
-        </div>
-      </section>
-
-      <section className="pro-cta">
-        <div><p className="eyebrow light">Professionnels de beauté</p><h2>Votre talent mérite<br />d’être découvert.</h2><p>Développez votre clientèle, gérez votre agenda et faites rayonner votre savoir-faire.</p></div>
-        <button className="gold-button" onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Créer mon profil professionnel →</button>
-      </section>
-
-      <footer id="contact" className="premium-footer">
-        <div className="footer-grid">
-          <div><a className="official-brand footer-brand" href="#accueil"><span className="brand-emblem">M</span><span><strong>MATA</strong><small>BEAUTY</small></span></a><p>La plateforme beauté de confiance au Sénégal.</p></div>
-          <div><strong>Découvrir</strong><a href="#explorer">Prestataires</a><a href="#categories">Catégories</a><a href="#fonctionnement">Comment ça marche</a><button onClick={() => setAuthRequest({ role: "client", mode: "login" })}>Espace client</button></div>
-          <div><strong>Professionnels</strong><button onClick={() => setAuthRequest({ role: "provider", mode: "register" })}>Rejoindre Mata Beauty</button><button onClick={() => setAuthRequest({ role: "provider", mode: "login" })}>Espace prestataire</button></div>
-          <div><strong>Contact</strong><a href="mailto:contact@matabeauty.sn">contact@matabeauty.sn</a><span>Dakar, Sénégal</span></div>
-        </div>
-        <div className="footer-bottom"><small>© 2026 Mata Beauty. Tous droits réservés.</small><div><button onClick={() => setAuthRequest({ role: "admin", mode: "login" })}>Administration</button><span>Paiements en mode test</span></div></div>
-      </footer>
+      <nav className="bottom-nav" aria-label="Navigation de l’application">
+        <a className="active" href="#home"><i>⌂</i>Accueil</a><a href="#search"><i>⌕</i>Rechercher</a>
+        <button onClick={() => openAccount()}><i>▣</i>Rendez-vous</button><button onClick={() => openAccount()}><i>◌</i>Messages</button><button onClick={() => openAccount()}><i>○</i>Profil</button>
+      </nav>
 
       {profile && <ProfileModal provider={profile} onClose={() => setProfile(null)} onBook={() => { setBooking(profile); setProfile(null); }} favorite={favorites.includes(profile.id)} onFavorite={() => void toggleFavorite(profile)} />}
-      {booking && <BookingModal provider={booking} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}
-      {authRequest && (
-        <AuthModal
-          initialMode={authRequest.mode}
-          intendedRole={authRequest.role === "provider" ? "provider" : "client"}
-          onClose={() => setAuthRequest(null)}
-          onAuthenticated={(profile) => {
-            setAuthenticated(profile);
-            setAuthRequest(null);
-            setView(profile.role);
-          }}
-          onDemo={() => {
-            setAuthRequest(null);
-            setView(authRequest.role);
-          }}
-        />
-      )}
+      {booking && <BookingModal provider={booking} initialDate={date} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}
+      {authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={(signedIn) => { setAuthenticated(signedIn); setAuthRequest(null); setView(signedIn.role); }} />}
     </main>
   );
+}
+
+function ProviderCard({ provider, favorite, onFavorite, onView, onBook }: { provider: Provider; favorite: boolean; onFavorite: () => void; onView: () => void; onBook: () => void }) {
+  return <article className="provider-result-card">
+    <div className="provider-result-cover">{provider.coverUrl ? <Image src={provider.coverUrl} alt={`Espace de ${provider.name}`} fill sizes="180px" /> : <span>{provider.initials}</span>}<button className={favorite ? "favorite active" : "favorite"} onClick={onFavorite} aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"}>{favorite ? "♥" : "♡"}</button></div>
+    <div className="provider-result-main"><div className="provider-title-line"><h3>{provider.name}</h3>{provider.verified && <span className="verified-inline">✓ Vérifié</span>}</div><p>{provider.specialty}</p><div className="provider-meta"><span>★ {provider.rating.toFixed(1)} ({provider.reviews} avis)</span><span>⌖ {provider.area}</span><span>{provider.homeService ? "Salon & domicile" : "En salon"}</span></div><div className="next-slot"><span>Prochaine disponibilité</span><strong>Consulter l’agenda</strong></div></div>
+    <div className="provider-result-action"><small>À partir de</small><strong>{formatPrice(provider.price)}</strong><button className="outline-button" onClick={onView}>Voir</button><button className="primary-button" onClick={onBook}>Réserver</button></div>
+  </article>;
 }
 
 function ProfileModal({ provider, onClose, onBook, favorite, onFavorite }: { provider: Provider; onClose: () => void; onBook: () => void; favorite: boolean; onFavorite: () => void }) {
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-name">
       <button className="modal-close" onClick={onClose} aria-label="Fermer">×</button>
-      <div className={`profile-hero ${provider.tone}`}>
-        <Image src={provider.coverUrl || "/beauty-rituals-editorial.png"} alt={`Univers de ${provider.name}`} fill sizes="620px" style={{ objectFit: "cover", objectPosition: "22% center" }} />
-        <span className="profile-availability">● Disponible cette semaine</span>
-      </div>
+      <div className="profile-hero">{provider.coverUrl ? <Image src={provider.coverUrl} alt={`Univers de ${provider.name}`} fill sizes="900px" /> : <div className="profile-fallback">{provider.initials}</div>}</div>
       <div className="profile-content">
-        <div className="profile-intro"><div><p className="eyebrow">{provider.verified ? "✓ Profil vérifié par Mata Beauty" : "Nouveau talent"}</p><h2 id="profile-name">{provider.name}</h2><p>{provider.specialty} · {provider.area} · à 2,4 km</p></div><button className="favorite profile-favorite" onClick={onFavorite} aria-label="Ajouter aux favoris">{favorite ? "♥" : "♡"}</button></div>
-        <div className="profile-stats"><span><b>{provider.rating}</b> note</span><span><b>{provider.reviews}</b> avis</span><span><b>4 ans</b> d’expérience</span></div>
-        <section className="profile-block"><div className="profile-section-heading"><h3>Portfolio</h3><small>Travaux récents</small></div><div className="portfolio-grid">{[18, 52, 84].map((position, index) => <div key={position}><Image src="/beauty-rituals-editorial.png" alt={`Réalisation ${index + 1} de ${provider.name}`} fill sizes="180px" style={{ objectFit: "cover", objectPosition: `${position}% center` }} /></div>)}</div></section>
-        <section className="profile-block"><div className="profile-section-heading"><h3>Prestations</h3><small>Prix transparents</small></div><div className="premium-service-list"><button onClick={onBook}><span><strong>{provider.specialty}</strong><small>{provider.durationMinutes || 90} min · diagnostic inclus</small></span><b>{formatPrice(provider.price)}</b></button><button onClick={onBook}><span><strong>Formule signature</strong><small>120 min · expérience complète</small></span><b>{formatPrice(provider.price + 7000)}</b></button></div></section>
-        <section className="profile-block"><div className="profile-section-heading"><h3>Prochains créneaux</h3><small>Heure de Dakar</small></div><div className="availability-pills"><button onClick={onBook}>Demain <b>10:00</b></button><button onClick={onBook}>Mer. <b>14:30</b></button><button onClick={onBook}>Jeu. <b>16:30</b></button></div></section>
-        <section className="profile-block"><h3>À propos</h3><p className="muted">Un accueil chaleureux, des conseils personnalisés et une attention particulière portée à chaque détail. Produits professionnels et hygiène rigoureuse.</p></section>
-        <section className="featured-review"><div>★★★★★</div><blockquote>« Une professionnelle attentive, ponctuelle et un résultat magnifique. »</blockquote><small>— Marième, cliente vérifiée</small></section>
+        <div className="profile-intro"><div><p className="eyebrow">{provider.verified ? "✓ Profil vérifié par Mata Beauty" : "Profil professionnel"}</p><h2 id="profile-name">{provider.name}</h2><p>{provider.specialty} · {provider.area}</p></div><button className="favorite profile-favorite" onClick={onFavorite} aria-label="Ajouter aux favoris">{favorite ? "♥" : "♡"}</button></div>
+        <div className="profile-stats"><span><b>{provider.rating.toFixed(1)}</b> note</span><span><b>{provider.reviews}</b> avis</span><span><b>{provider.homeService ? "Oui" : "Non"}</b> domicile</span></div>
+        <section className="profile-block"><h3>Prestation disponible</h3><button className="profile-service" onClick={onBook}><span><strong>{provider.specialty}</strong><small>{provider.durationMinutes} min</small></span><b>{formatPrice(provider.price)}</b></button></section>
+        <section className="profile-block"><h3>Informations pratiques</h3><p>Zone : {provider.area}. Les coordonnées complètes et conditions d’annulation sont accessibles pendant la réservation.</p></section>
         <div className="profile-sticky-action"><div><small>À partir de</small><strong>{formatPrice(provider.price)}</strong></div><button className="primary-button" onClick={onBook}>Réserver maintenant</button></div>
       </div>
     </section>
   </div>;
 }
 
-function BookingModal({ provider, onClose, onSubmit }: { provider: Provider; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<void> }) {
-  const [submitting, setSubmitting] = useState(false);
+function BookingModal({ provider, initialDate, onClose, onSubmit }: { provider: Provider; initialDate: string; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<BookingConfirmation | null> }) {
   const [step, setStep] = useState(1);
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
+  const [submitting, setSubmitting] = useState(false);
+  const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
+  const [form, setForm] = useState<BookingRequest>({ date: initialDate || defaultBookingDate, time: "10:00", locationMode: "salon", address: "", note: "", paymentMethod: "on_site" });
+  const steps = ["Prestation", "Professionnel", "Date", "Heure", "Lieu", "Récapitulatif", "Paiement", "Confirmation"];
+  async function confirm() {
     setSubmitting(true);
-    await onSubmit({
-      date: String(form.get("date") ?? ""),
-      time: String(form.get("time") ?? ""),
-      locationMode: String(form.get("locationMode")) === "client_address" ? "client_address" : "salon",
-      address: String(form.get("address") ?? ""),
-      note: String(form.get("note") ?? ""),
-    });
+    const result = await onSubmit(form);
     setSubmitting(false);
+    if (result) setConfirmation(result);
   }
+  const canContinue = step !== 5 || form.locationMode === "salon" || form.address.trim().length >= 5;
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="modal booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
       <button className="modal-close" onClick={onClose} aria-label="Fermer">×</button>
-      <p className="eyebrow">Réservation sécurisée</p><h2 id="booking-title">Réserver avec {provider.name}</h2>
-      <div className="booking-progress" aria-label={`Étape ${step} sur 3`}>{["Prestation", "Date & lieu", "Confirmation"].map((label, index) => <span className={step >= index + 1 ? "active" : ""} key={label}><i>{index + 1}</i>{label}</span>)}</div>
-      <form onSubmit={(event) => void submit(event)}>
-        <fieldset className="booking-step" hidden={step !== 1}><legend>Choisissez votre expérience</legend><label className="service-choice"><input type="radio" name="service" defaultChecked /><span><strong>{provider.specialty}</strong><small>{provider.durationMinutes || 90} min · prestation essentielle</small></span><b>{formatPrice(provider.price)}</b></label><label className="service-choice"><input type="radio" name="service" /><span><strong>Formule signature</strong><small>120 min · conseils et finition premium</small></span><b>{formatPrice(provider.price + 7000)}</b></label></fieldset>
-        <fieldset className="booking-step" hidden={step !== 2}><legend>Quand et où ?</legend><div className="form-row"><label>Date<input name="date" type="date" required defaultValue="2026-07-28" min="2026-07-26" /></label><label>Créneau<select name="time" required><option>10:00</option><option>14:30</option><option>16:30</option></select></label></div><label>Lieu<select name="locationMode" required>{provider.homeService && <option value="client_address">À mon domicile</option>}<option value="salon">Chez le prestataire</option></select></label><label>Adresse / précision<textarea name="address" placeholder="Quartier, rue, repère…" /></label></fieldset>
-        <fieldset className="booking-step" hidden={step !== 3}><legend>Vérifiez votre demande</legend><div className="booking-summary"><span><small>Prestataire</small><strong>{provider.name}</strong></span><span><small>Prestation</small><strong>{provider.specialty}</strong></span><span><small>Paiement</small><strong>Sur place</strong></span></div><label>Note facultative<textarea name="note" maxLength={1000} placeholder="Informations utiles pour le rendez-vous…" /></label><div className="test-banner">Mode test · Aucun paiement réel ne sera effectué.</div><div className="booking-total"><span>Total</span><strong>{formatPrice(provider.price)}</strong></div></fieldset>
-        <div className="booking-nav">{step > 1 && <button className="outline-button" type="button" onClick={(event) => { event.preventDefault(); setStep((current) => current - 1); }}>Retour</button>}{step < 3 ? <button className="primary-button" type="button" onClick={(event) => { event.preventDefault(); setStep((current) => current + 1); }}>Continuer</button> : <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Enregistrement…" : "Envoyer la demande"}</button>}</div>
-      </form>
+      {confirmation ? <BookingSuccess provider={provider} confirmation={confirmation} onClose={onClose} /> : <>
+        <p className="eyebrow">Réservation sécurisée</p><h2 id="booking-title">Réserver avec {provider.name}</h2>
+        <div className="booking-progress-eight" aria-label={`Étape ${step} sur 8`}>{steps.map((label, index) => <span className={step >= index + 1 ? "active" : ""} key={label}><i>{index + 1}</i><small>{label}</small></span>)}</div>
+        <div className="booking-step-content">
+          {step === 1 && <><h3>Choisissez la prestation</h3><label className="service-choice"><input type="radio" checked readOnly /><span><strong>{provider.specialty}</strong><small>{provider.durationMinutes} min</small></span><b>{formatPrice(provider.price)}</b></label></>}
+          {step === 2 && <><h3>Choisissez votre professionnel</h3><label className="service-choice"><input type="radio" checked readOnly /><span><strong>Sans préférence</strong><small>Le professionnel disponible de {provider.name}</small></span></label></>}
+          {step === 3 && <><h3>Choisissez la date</h3><label>Date du rendez-vous<input type="date" value={form.date} min={new Date().toISOString().slice(0, 10)} onChange={(event) => setForm({ ...form, date: event.target.value })} /></label></>}
+          {step === 4 && <><h3>Choisissez l’heure</h3><div className="slot-grid">{["09:00", "10:00", "11:30", "14:00", "16:30", "18:00"].map((time) => <button className={form.time === time ? "active" : ""} key={time} onClick={() => setForm({ ...form, time })}>{time}</button>)}</div><p className="muted">Les créneaux définitifs sont confirmés par le prestataire.</p></>}
+          {step === 5 && <><h3>Où aura lieu la prestation ?</h3><label>Lieu<select value={form.locationMode} onChange={(event) => setForm({ ...form, locationMode: event.target.value as BookingRequest["locationMode"] })}><option value="salon">Chez le prestataire</option>{provider.homeService && <option value="client_address">À mon domicile</option>}</select></label>{form.locationMode === "client_address" && <label>Adresse complète<textarea value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} placeholder="Quartier, rue et repère" /></label>}</>}
+          {step === 6 && <><h3>Récapitulatif</h3><div className="booking-summary"><span><small>Prestation</small><strong>{provider.specialty}</strong></span><span><small>Date</small><strong>{form.date} à {form.time}</strong></span><span><small>Lieu</small><strong>{form.locationMode === "salon" ? provider.name : form.address}</strong></span><span><small>Total</small><strong>{formatPrice(provider.price)}</strong></span></div><label>Note facultative<textarea maxLength={1000} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></>}
+          {step === 7 && <><h3>Mode de paiement</h3><label className="service-choice"><input type="radio" checked={form.paymentMethod === "on_site"} onChange={() => setForm({ ...form, paymentMethod: "on_site" })} /><span><strong>Paiement sur place</strong><small>Aucun débit en ligne</small></span></label><label className="service-choice disabled"><input type="radio" disabled /><span><strong>Wave / Orange Money</strong><small>Bientôt disponible · API en mode test</small></span></label></>}
+          {step === 8 && <><h3>Confirmez votre rendez-vous</h3><div className="test-banner">Paiement externe en mode test. Votre demande sera persistée dans votre espace.</div><div className="booking-total"><span>Total</span><strong>{formatPrice(provider.price)}</strong></div></>}
+        </div>
+        <div className="booking-nav">{step > 1 && <button className="outline-button" onClick={() => setStep((current) => current - 1)}>Retour</button>}{step < 8 ? <button className="primary-button" disabled={!canContinue} onClick={() => setStep((current) => current + 1)}>Continuer</button> : <button className="primary-button" disabled={submitting} onClick={() => void confirm()}>{submitting ? "Enregistrement…" : "Confirmer la réservation"}</button>}</div>
+      </>}
     </section>
   </div>;
 }
 
-function Dashboard({ role, onBack }: { role: "client" | "provider" | "admin"; onBack: () => void }) {
-  const [demoMessage, setDemoMessage] = useState("");
-  const config = {
-    client: { label: "Espace client", name: "Aïssatou Ndiaye", intro: "Retrouvez vos rendez-vous et vos favoris.", metrics: [["2", "Réservations à venir"], ["6", "Favoris"], ["1", "Message non lu"]] },
-    provider: { label: "Espace prestataire", name: "Awa Signature", intro: "Voici l’activité de votre établissement.", metrics: [["8", "Rendez-vous cette semaine"], ["124 000 F", "Revenus simulés"], ["4,9", "Note moyenne"]] },
-    admin: { label: "Administration", name: "Équipe Mata", intro: "Pilotez la qualité et la sécurité de la plateforme.", metrics: [["128", "Prestataires actifs"], ["12", "Validations en attente"], ["4", "Signalements ouverts"]] },
-  }[role];
-  return <main className="dashboard">
-    <aside className="sidebar">
-      <button className="brand brand-button" onClick={onBack}><span className="brand-mark">M</span><span>Mata <i>Beauty</i></span></button>
-      <p className="role-pill">{config.label}</p>
-      <nav><button className="active" onClick={() => setDemoMessage("Vue d’ensemble de démonstration.")}>⌂ Vue d’ensemble</button><button onClick={() => setDemoMessage("Les réservations réelles apparaîtront après connexion Supabase.")}>▣ Réservations</button><button onClick={() => setDemoMessage("La messagerie nécessite un compte connecté.")}>◌ Messages <i>1</i></button><button onClick={() => setDemoMessage("Cette rubrique est disponible après connexion.")}>{role === "client" ? "♡ Favoris" : role === "provider" ? "◇ Prestations" : "♢ Vérifications"}</button><button onClick={() => setDemoMessage("Les paramètres de démonstration ne sont pas persistés.")}>⚙ Paramètres</button></nav>
-      <button className="back-link" onClick={onBack}>← Retour au site</button>
-    </aside>
-    <section className="dashboard-main">
-      <div className="dashboard-top"><div><p className="eyebrow">{config.label}</p><h1>Bonjour, {config.name.split(" ")[0]} 👋</h1><p>{config.intro}</p></div><span className="demo-badge">Mode démonstration</span></div>
-      {demoMessage && <p className="dashboard-feedback" role="status">{demoMessage}</p>}
-      <div className="metric-grid">{config.metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>↗ à jour</small></article>)}</div>
-      <article className="panel insight-panel"><div className="panel-heading"><div><h2>Aperçu de l’activité</h2><small>7 derniers jours</small></div><span className="insight-trend">↗ +18%</span></div><div className="bar-chart" aria-label="Graphique de démonstration">{[35, 54, 48, 68, 58, 88, 73].map((height, index) => <span key={index} style={{ height: `${height}%` }}><i>{["L", "M", "M", "J", "V", "S", "D"][index]}</i></span>)}</div></article>
-      <div className="dashboard-grid">
-        <article className="panel"><div className="panel-heading"><h2>{role === "admin" ? "Activité récente" : "Prochains rendez-vous"}</h2><button onClick={() => setDemoMessage("Aucune donnée réelle n’est chargée en mode démonstration.")}>Tout voir</button></div>
-          {[["Aujourd’hui · 16:30", "Nails by Fatou", "Confirmé"], ["Jeudi · 10:00", "Maison Kéwé", role === "admin" ? "À vérifier" : "En attente"], ["Samedi · 09:00", "Institut Teranga", "Confirmé"]].map(([date, name, status]) => <div className="appointment" key={date}><span className="date-block">{date.split(" · ")[0].slice(0, 3)}<b>{date.split(" · ")[1]}</b></span><div><strong>{name}</strong><small>{date}</small></div><span className={status === "Confirmé" ? "status confirmed" : "status pending"}>{status}</span></div>)}
-        </article>
-        <article className="panel"><div className="panel-heading"><h2>Actions rapides</h2></div><div className="quick-actions"><button onClick={() => setDemoMessage("Connectez Supabase pour effectuer cette action.")}>＋ {role === "provider" ? "Ajouter une prestation" : role === "admin" ? "Valider un profil" : "Nouvelle réservation"}</button><button onClick={() => setDemoMessage("La messagerie réelle nécessite une session.")}>◌ Consulter les messages</button><button onClick={() => setDemoMessage("Les changements ne sont pas enregistrés en mode démonstration.")}>⚙ Mettre à jour le profil</button></div></article>
-      </div>
-    </section>
-  </main>;
+function BookingSuccess({ provider, confirmation, onClose }: { provider: Provider; confirmation: BookingConfirmation; onClose: () => void }) {
+  const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${provider.specialty} · ${provider.name}`)}&dates=${confirmation.date.replaceAll("-", "")}T${confirmation.time.replace(":", "")}00/${confirmation.date.replaceAll("-", "")}T${confirmation.time.replace(":", "")}00`;
+  return <div className="booking-success"><span>✓</span><p className="eyebrow">Demande enregistrée</p><h2>Votre rendez-vous est créé</h2><p>Numéro de réservation</p><code>{confirmation.id}</code><dl><div><dt>Prestation</dt><dd>{provider.specialty}</dd></div><div><dt>Prestataire</dt><dd>{provider.name}</dd></div><div><dt>Date</dt><dd>{confirmation.date} à {confirmation.time}</dd></div><div><dt>Adresse</dt><dd>{confirmation.location}</dd></div><div><dt>Prix</dt><dd>{formatPrice(provider.price)}</dd></div><div><dt>Statut</dt><dd>En attente</dd></div></dl><a className="outline-button" href={calendarUrl} target="_blank" rel="noreferrer">Ajouter au calendrier</a><button className="primary-button" onClick={onClose}>Terminer</button></div>;
 }

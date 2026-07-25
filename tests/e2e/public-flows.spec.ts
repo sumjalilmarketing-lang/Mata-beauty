@@ -1,39 +1,35 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
-  page.on("pageerror", (error) => {
-    throw error;
-  });
+  page.on("pageerror", (error) => { throw error; });
 });
 
-test("catalogue search and provider booking demo are explicit", async ({ page }) => {
+test("the home screen behaves like a booking application", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Votre beauté/ })).toBeVisible();
-  await page.getByPlaceholder(/Tresses, maquillage/).fill("Awa");
-  await expect(page.getByText("Awa Signature", { exact: true })).toBeVisible();
-  await page.getByRole("article").filter({ hasText: "Awa Signature" }).getByRole("button", { name: "Voir le profil" }).click();
-  await expect(page.getByRole("dialog")).toContainText("Profil vérifié");
-  await page.getByRole("button", { name: "Réserver maintenant" }).click();
-  await expect(page.getByLabel("Étape 1 sur 3")).toBeVisible();
-  await page.getByRole("button", { name: "Continuer" }).click();
-  await expect(page.getByRole("dialog")).toContainText("Quand et où");
-  await page.getByRole("button", { name: "Continuer" }).click();
-  await expect(page.getByRole("dialog")).toContainText("Mode test");
-  await page.getByRole("button", { name: "Envoyer la demande" }).click();
-  await expect(page.getByRole("status")).toContainText("Demande simulée");
+  await expect(page.getByRole("heading", { name: "De quoi avez-vous envie aujourd’hui ?" })).toBeVisible();
+  await expect(page.getByPlaceholder(/Tresses, perruque/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Catégories" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Professionnels disponibles" })).toBeVisible();
+  await expect(page.getByText("Awa Signature", { exact: true })).toHaveCount(0);
+  await page.getByPlaceholder(/Tresses, perruque/).fill("tresses");
+  await page.getByRole("button", { name: "Rechercher" }).click();
+  await expect(page.locator("#results")).toBeVisible();
 });
 
-test("authentication explains missing public configuration", async ({ page }) => {
+test("authentication explains missing public configuration without a fake mode", async ({ page }) => {
   await page.goto("/");
-  const loginTrigger = page.locator("header").getByRole("button", { name: "Se connecter" });
-  if (await loginTrigger.isVisible()) await loginTrigger.click();
-  else await page.getByRole("button", { name: "Espace client" }).click();
-  await expect(page.getByRole("alert")).toContainText("clé publique Supabase");
+  await page.getByRole("button", { name: "Ouvrir mon compte" }).click();
+  await expect(page.getByRole("alert")).toContainText("connexion sécurisée");
+  await expect(page.getByRole("dialog")).not.toContainText("aperçu");
   await expect(page.getByRole("dialog").getByRole("button", { name: "Se connecter", exact: true })).toBeDisabled();
 });
 
-test("layout has no horizontal overflow", async ({ page }) => {
+test("mobile navigation is fixed and layout has no horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
+  const navigation = page.getByRole("navigation", { name: "Navigation de l’application" });
+  await expect(navigation).toBeVisible();
+  await expect(navigation.getByText("Rendez-vous")).toBeVisible();
   const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(hasOverflow).toBe(false);
 });

@@ -24,13 +24,11 @@ export function AuthModal({
   intendedRole = "client",
   onClose,
   onAuthenticated,
-  onDemo,
 }: {
   initialMode?: AuthMode;
   intendedRole?: "client" | "provider";
   onClose: () => void;
   onAuthenticated: (profile: AuthenticatedProfile) => void;
-  onDemo: () => void;
 }) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [feedback, setFeedback] = useState("");
@@ -121,7 +119,7 @@ export function AuthModal({
         <p className="auth-lead">{mode === "login" ? "Retrouvez vos rendez-vous, favoris et recommandations personnalisées." : mode === "register" ? "Rejoignez l’expérience beauté premium pensée pour vous." : "Nous vous aidons à retrouver rapidement votre espace."}</p>
         {!configuration.configured && (
           <div className="configuration-warning" role="alert">
-            Le mode réel attend la clé publique Supabase. Vous pouvez consulter uniquement l’aperçu de démonstration.
+            La connexion sécurisée est momentanément indisponible. Réessayez ultérieurement.
           </div>
         )}
         <form onSubmit={handleSubmit(submit)} noValidate>
@@ -158,9 +156,6 @@ export function AuthModal({
           {mode === "login" && <button onClick={() => setMode("register")}>Créer un compte</button>}
           {mode === "login" && <button onClick={() => setMode("reset")}>Mot de passe oublié</button>}
         </div>
-        {!configuration.configured && (
-          <button className="outline-button demo-entry" onClick={onDemo}>Voir l’aperçu clairement identifié</button>
-        )}
       </section>
     </div>
   );

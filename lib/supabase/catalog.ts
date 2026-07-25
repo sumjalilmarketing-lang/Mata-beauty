@@ -17,6 +17,15 @@ export type CatalogProvider = {
   coverUrl?: string;
 };
 
+export type CatalogPromotion = {
+  id: string;
+  title: string;
+  description: string | null;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  endsAt: string;
+};
+
 type ProviderRecord = {
   profile_id: string;
   business_name: string;
@@ -72,4 +81,25 @@ export async function fetchPublishedProviders(client: SupabaseClient): Promise<C
       coverUrl: provider.cover_url ?? undefined,
     }];
   });
+}
+
+export async function fetchActivePromotions(client: SupabaseClient): Promise<CatalogPromotion[]> {
+  const now = new Date().toISOString();
+  const { data, error } = await client
+    .from("promotions")
+    .select("id,title,description,discount_type,discount_value,ends_at")
+    .eq("is_active", true)
+    .lte("starts_at", now)
+    .gt("ends_at", now)
+    .order("ends_at", { ascending: true })
+    .limit(6);
+  if (error) throw error;
+  return (data ?? []).map((promotion) => ({
+    id: promotion.id,
+    title: promotion.title,
+    description: promotion.description,
+    discountType: promotion.discount_type,
+    discountValue: promotion.discount_value,
+    endsAt: promotion.ends_at,
+  }));
 }
