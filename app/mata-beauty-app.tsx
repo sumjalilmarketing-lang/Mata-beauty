@@ -4,6 +4,7 @@ import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AuthModal, type AuthenticatedProfile } from "./auth-modal";
 import { LiveDashboard } from "./live-dashboard";
+import { SocialFeed } from "./social-feed";
 import { calculateBookingEnd, calculateBookingQuote } from "@/lib/domain/booking";
 import { fetchActivePromotions, fetchPublishedProviders, type CatalogPromotion } from "@/lib/supabase/catalog";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -74,7 +75,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   const [subcategory, setSubcategory] = useState("Tout");
   const [area, setArea] = useState("Dakar, Sénégal");
   const [date, setDate] = useState("");
-  const [screen, setScreen] = useState<"home" | "results">("home");
+  const [screen, setScreen] = useState<"feed" | "home" | "results">("feed");
   const [catalog, setCatalog] = useState<Provider[]>([]);
   const [catalogState, setCatalogState] = useState<"loading" | "live" | "empty" | "error">("loading");
   const [promotions, setPromotions] = useState<CatalogPromotion[]>([]);
@@ -198,6 +199,18 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
     setScreen("results");
   }
 
+  function openSocialProvider(authorId: string) {
+    const provider = catalog.find((item) => item.profileId === authorId);
+    if (provider) setProfile(provider);
+    else setNotice("Ce profil n’est pas encore disponible dans le catalogue.");
+  }
+
+  function bookSocialService(authorId: string, service: ProviderService) {
+    const provider = catalog.find((item) => item.profileId === authorId);
+    if (provider) setBooking({ provider, service });
+    else setNotice("Cette prestation n’est pas disponible actuellement.");
+  }
+
   async function toggleFavorite(provider: Provider) {
     if (!authenticated || authenticated.role !== "client") {
       setAuthRequest({ role: "client", mode: "login" });
@@ -289,7 +302,14 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
       {showSplash && <div className="mata-splash" role="status" aria-label="Ouverture de Mata Beauty"><Image src="/brand/mata-app-icon.webp" alt="" width={172} height={172} priority unoptimized /><strong>MATA</strong><span>BEAUTY</span><i /></div>}
       {notice && <div className="toast" role="status">{notice}</div>}
       <div className="premium-app-frame">
-        {screen === "home" ? (
+        {screen === "feed" ? <SocialFeed
+          authenticated={authenticated}
+          onRequireAuth={() => setAuthRequest({ role: "client", mode: "login" })}
+          onDiscover={() => setScreen("home")}
+          onPublish={() => openAccount("provider")}
+          onOpenProvider={openSocialProvider}
+          onBook={bookSocialService}
+        /> : screen === "home" ? (
           <HomeScreen
             authenticated={authenticated}
             query={query}
@@ -342,7 +362,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
           />
         )}
-        <BottomNav active={screen === "home" ? "home" : "search"} onHome={() => setScreen("home")} onSearch={() => setScreen("results")} onAccount={openAccount} />
+        <BottomNav active={screen === "feed" ? "feed" : "discover"} onFeed={() => setScreen("feed")} onDiscover={() => setScreen("home")} onPublish={() => openAccount("provider")} onAccount={openAccount} />
       </div>
 
       {booking && <BookingModal selection={booking} initialDate={date} authenticated={authenticated?.role === "client"} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}
@@ -534,8 +554,8 @@ function BookingSuccess({ provider, confirmation, onClose }: { provider: Provide
   return <div className="premium-booking-success"><span>✓</span><p>Demande enregistrée</p><h2>Votre rendez-vous est créé</h2><code>{confirmation.id}</code><dl><div><dt>Prestation</dt><dd>{provider.specialty}</dd></div><div><dt>Date</dt><dd>{confirmation.date} à {confirmation.time}</dd></div><div><dt>Adresse</dt><dd>{confirmation.location}</dd></div><div><dt>Statut</dt><dd>En attente</dd></div></dl><a href={calendarUrl} target="_blank" rel="noreferrer">Ajouter au calendrier</a><button onClick={onClose}>Terminer</button></div>;
 }
 
-function BottomNav({ active, onHome, onSearch, onAccount }: { active: "home" | "search"; onHome: () => void; onSearch: () => void; onAccount: (section?: "client" | "provider" | "admin") => void }) {
-  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={active === "home" ? "active" : ""} onClick={onHome}><i>⌂</i>Accueil</button><button className={active === "search" ? "active" : ""} onClick={onSearch}><i>⌕</i>Recherche</button><button onClick={() => onAccount()}><i>▣</i>Réservations</button><button onClick={() => onAccount()}><i>□</i>Messages</button><button onClick={() => onAccount()}><i>○</i>Profil</button></nav>;
+function BottomNav({ active, onFeed, onDiscover, onPublish, onAccount }: { active: "feed" | "discover"; onFeed: () => void; onDiscover: () => void; onPublish: () => void; onAccount: (section?: "client" | "provider" | "admin") => void }) {
+  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={active === "feed" ? "active" : ""} onClick={onFeed}><i>⌂</i>Accueil</button><button className={active === "discover" ? "active" : ""} onClick={onDiscover}><i>⌕</i>Découvrir</button><button className="publish-nav" onClick={onPublish}><i>＋</i>Publier</button><button onClick={() => onAccount()}><i>□</i>Messages</button><button onClick={() => onAccount()}><i>○</i>Profil</button></nav>;
 }
 
 function formatDuration(minutes: number) {

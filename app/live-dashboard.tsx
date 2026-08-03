@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { VideoPublisher } from "./video-publisher";
 
 type Role = "client" | "provider" | "admin";
 type ProviderStatus = "draft" | "pending_review" | "approved" | "rejected" | "suspended";
@@ -371,6 +372,8 @@ export function LiveDashboard({
         </article>}
 
         {role === "provider" && providerProfile && (
+          <>
+          <VideoPublisher userId={userId} providerApproved={providerProfile.status === "approved"} onPublished={load} />
           <article className="panel onboarding-panel">
             <div className="panel-heading">
               <div><h2>Profil professionnel</h2><p className={`provider-state ${providerProfile.status}`}>{providerStatusLabels[providerProfile.status]}</p><label>Progression {providerProfile.onboarding_progress} %<progress value={providerProfile.onboarding_progress} max="100" /></label></div>
@@ -397,6 +400,7 @@ export function LiveDashboard({
               <button className="primary-button" type="submit">Ajouter la prestation</button>
             </form>
           </article>
+          </>
         )}
 
         {role === "admin" && (

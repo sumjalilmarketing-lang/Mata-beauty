@@ -6,6 +6,7 @@ test.beforeEach(async ({ page }) => {
 
 test("premium home opens a real category results screen", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
   await expect(page.getByRole("heading", { name: /Prenez soin de vous/ })).toBeVisible();
   await expect(page.getByPlaceholder("Que recherchez-vous ?")).toBeVisible();
   await expect(page.getByRole("button", { name: "Tresses" })).toBeVisible();
@@ -17,7 +18,7 @@ test("premium home opens a real category results screen", async ({ page }) => {
 
 test("authentication has no fake preview mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Ouvrir mon compte" }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
   await expect(page.getByRole("heading", { name: "Bienvenue" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Se connecter", exact: true })).toBeEnabled();
   await expect(page.getByRole("dialog")).not.toContainText("aperçu");
@@ -25,7 +26,7 @@ test("authentication has no fake preview mode", async ({ page }) => {
 
 test("registration requires explicit legal consent", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Ouvrir mon compte" }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
   await page.getByRole("button", { name: "Créer un compte", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Créer votre compte" })).toBeVisible();
   const consent = page.getByRole("checkbox", { name: "Accepter les conditions générales et la politique de confidentialité" });
@@ -39,8 +40,8 @@ test("mobile bottom navigation works without horizontal overflow", async ({ page
   await page.goto("/");
   const navigation = page.getByRole("navigation", { name: "Navigation de l’application" });
   await expect(navigation).toBeVisible();
-  await navigation.getByRole("button", { name: /Recherche/ }).click();
-  await expect(page.getByRole("heading", { name: "Rechercher" })).toBeVisible();
+  await navigation.getByRole("button", { name: "Découvrir" }).click();
+  await expect(page.getByPlaceholder("Que recherchez-vous ?")).toBeVisible();
   const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(hasOverflow).toBe(false);
 });

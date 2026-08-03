@@ -114,3 +114,28 @@ test("the Super Admin control center is protected by RBAC and audited RPCs", asy
   assert.match(adminApp, /PermissionGuard/);
   assert.match(adminApp, /ConfirmationModal/);
 });
+
+test("the social video layer is server-counted, storage-isolated, and protected by RLS", async () => {
+  const [schema, actions, guard, feed, publisher] = await Promise.all([
+    readFile(new URL("supabase/migrations/20260804133000_social_video_feed.sql", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260804134500_social_actions_and_publish.sql", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260804143000_social_publication_guard.sql", root), "utf8"),
+    readFile(new URL("app/social-feed.tsx", root), "utf8"),
+    readFile(new URL("app/video-publisher.tsx", root), "utf8"),
+  ]);
+  for (const table of ["posts", "post_services", "post_likes", "post_saves", "follows", "post_comments", "hashtags", "video_views"]) {
+    assert.match(schema, new RegExp(`create table if not exists public\\.${table}`));
+  }
+  assert.match(schema, /social-videos/);
+  assert.match(schema, /social-thumbnails/);
+  assert.match(schema, /protect_social_counters/);
+  assert.match(actions, /record_post_share/);
+  assert.match(actions, /report_social_post/);
+  assert.match(actions, /create_video_post/);
+  assert.match(guard, /provider\.status = 'approved'/);
+  assert.match(guard, /client_consent_confirmed/);
+  assert.match(feed, /IntersectionObserver/);
+  assert.match(feed, /record_video_view/);
+  assert.match(publisher, /100 \* 1024 \* 1024/);
+  assert.doesNotMatch(feed + publisher, /SUPABASE_SERVICE_ROLE_KEY/);
+});

@@ -42,6 +42,18 @@ async function mockSupabase(page: Page, state: AuditState) {
       });
     }
     if (path === "/auth/v1/logout") return json(route, {});
+    if (path === "/rest/v1/social_feed") {
+      return json(route, [{
+        id: "66666666-6666-4666-8666-666666666666", author_id: providerId,
+        caption: "Tresses express réalisées à Dakar", video_url: `${api}/social-sample.mp4`, thumbnail_url: null,
+        duration_seconds: 18, aspect_ratio: 0.562, allow_comments: true, is_sponsored: false,
+        view_count: 120, like_count: 32, comment_count: 4, save_count: 7, share_count: 2,
+        published_at: new Date().toISOString(), business_name: "Mata Audit Tresses", slug: "mata-audit-tresses",
+        city: "Dakar", average_rating: 4.9, review_count: 48, verified_at: "2026-01-01T00:00:00Z",
+        cover_url: null, avatar_url: null, provider_service_id: serviceId, service_title: "Tresses express",
+        duration_minutes: 60, price_amount: 10000, currency: "XOF", age_hours: 0,
+      }]);
+    }
     if (path === "/rest/v1/provider_profiles" && url.searchParams.get("select")?.includes("provider_services!inner")) {
       return json(route, [{
         profile_id: providerId,
@@ -148,6 +160,7 @@ test.describe("audit chronométré de réservation", () => {
     const startedAt = Date.now();
     let actions = 0;
     await page.goto("/");
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
     await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click(); actions += 1;
     await page.locator(".premium-provider-card").click(); actions += 1;
     await page.getByRole("button", { name: /Tresses express/ }).click(); actions += 1;
@@ -169,10 +182,33 @@ test.describe("audit chronométré de réservation", () => {
     console.log(`AUDIT_METRIC actions=${actions} duration_ms=${durationMs}`);
   });
 
+  test("passe d’une vidéo à une réservation confirmée en 6 actions", async ({ page }) => {
+    const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
+    await mockSupabase(page, state);
+    const startedAt = Date.now();
+    let actions = 0;
+    await page.goto("/");
+    await expect(page.getByText("Tresses express", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Réserver" }).click(); actions += 1;
+    await page.getByRole("button", { name: "10:00" }).click(); actions += 1;
+    await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click(); actions += 1;
+    await page.getByLabel("Adresse e-mail").fill("client-social@example.test"); actions += 1;
+    await page.getByLabel("Mot de passe").fill("Audit-Only-123!"); actions += 1;
+    await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
+    await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
+    expect(state.bookingCreated).toBe(true);
+    const durationMs = Date.now() - startedAt;
+    expect(actions).toBe(6);
+    expect(durationMs).toBeLessThan(30_000);
+    console.log(`SOCIAL_BOOKING_METRIC actions=${actions} duration_ms=${durationMs}`);
+  });
+
   test("retire un créneau réservé et affiche la réservation aux deux participants", async ({ page }) => {
     const state: AuditState = { bookingCreated: true, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
     await page.goto("/");
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
     await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click();
     await page.locator(".premium-provider-card").click();
     await page.getByRole("button", { name: /Tresses express/ }).click();
@@ -195,7 +231,7 @@ test.describe("audit chronométré de réservation", () => {
     const state: AuditState = { bookingCreated: true, currentRole: "other", selectedSlot: "" };
     await mockSupabase(page, state);
     await page.goto("/");
-    await page.getByRole("button", { name: "Ouvrir mon compte" }).click();
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
     await signIn(page, "other-audit@example.test");
     await expect(page.getByText("Aucune réservation pour le moment.")).toBeVisible();
     const response = await page.evaluate(async ({ id, endpoint }) => fetch(`${endpoint}/rest/v1/bookings?id=eq.${id}`, {
