@@ -34,6 +34,21 @@ type ProviderProfileRow = {
   city: string;
   service_mode: "salon" | "mobile" | "both";
   status: ProviderStatus;
+  activity_type: "independent" | "salon" | "barber_shop" | "makeup_artist" | "hairdresser" | "nail_artist" | "esthetician" | "care_specialist" | "other";
+  years_experience: number;
+  base_address: string | null;
+  languages: string[];
+  cancellation_policy: string | null;
+  onboarding_progress: number;
+};
+type ClientAccountRow = {
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  marketing_consent: boolean;
+  city: string | null;
+  default_address: string | null;
+  preferences: Record<string, unknown>;
 };
 type PendingProviderRow = {
   profile_id: string;
@@ -71,6 +86,7 @@ export function LiveDashboard({
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [providerProfile, setProviderProfile] = useState<ProviderProfileRow | null>(null);
+  const [clientProfile, setClientProfile] = useState<ClientAccountRow | null>(null);
   const [pendingProviders, setPendingProviders] = useState<PendingProviderRow[]>([]);
   const [baseServices, setBaseServices] = useState<BaseServiceRow[]>([]);
   const [adminMetrics, setAdminMetrics] = useState({ users: 0, providersPending: 0, reportsOpen: 0 });
@@ -122,11 +138,21 @@ export function LiveDashboard({
           provider_services: Array.isArray(booking.provider_services) ? booking.provider_services[0] ?? null : booking.provider_services,
         })));
 
+        if (role === "client") {
+          const [accountResult, clientResult] = await Promise.all([
+            supabase.from("profiles").select("first_name,last_name,phone,marketing_consent").eq("id", userId).single(),
+            supabase.from("client_profiles").select("city,default_address,preferences").eq("profile_id", userId).single(),
+          ]);
+          if (accountResult.error) throw accountResult.error;
+          if (clientResult.error) throw clientResult.error;
+          setClientProfile({ ...accountResult.data, ...clientResult.data } as ClientAccountRow);
+        }
+
         if (role === "provider") {
           const [profileResult, serviceResult] = await Promise.all([
             supabase
               .from("provider_profiles")
-              .select("profile_id,business_name,bio,city,service_mode,status")
+              .select("profile_id,business_name,bio,city,service_mode,status,activity_type,years_experience,base_address,languages,cancellation_policy,onboarding_progress")
               .eq("profile_id", userId)
               .maybeSingle(),
             supabase.from("services").select("id,name").eq("is_active", true).order("name"),
@@ -199,19 +225,41 @@ export function LiveDashboard({
     const bio = String(formData.get("bio") ?? "").trim();
     const city = String(formData.get("city") ?? "").trim();
     const serviceMode = String(formData.get("serviceMode") ?? "salon");
+    const activityType = String(formData.get("activityType") ?? "independent");
+    const yearsExperience = Number(formData.get("yearsExperience"));
+    const baseAddress = String(formData.get("baseAddress") ?? "").trim();
+    const languages = String(formData.get("languages") ?? "fr").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+    const cancellationPolicy = String(formData.get("cancellationPolicy") ?? "").trim();
     if (!businessName || !city || !["salon", "mobile", "both"].includes(serviceMode)) {
       setFeedback("Le nom, la ville et le mode de prestation sont obligatoires.");
       return;
     }
-    const { error: updateError } = await supabase
-      .from("provider_profiles")
-      .update({ business_name: businessName, bio, city, service_mode: serviceMode })
-      .eq("profile_id", userId);
+    const { data: progress, error: updateError } = await supabase.rpc("save_professional_onboarding", {
+      target_business_name: businessName, target_bio: bio, target_city: city, target_service_mode: serviceMode,
+      target_activity_type: activityType, target_years_experience: yearsExperience, target_base_address: baseAddress,
+      target_languages: languages, target_cancellation_policy: cancellationPolicy,
+    });
     if (updateError) setFeedback(updateError.message);
     else {
-      setFeedback("Profil professionnel enregistré.");
+      setFeedback(`Brouillon enregistré · progression ${progress ?? 0} %.`);
       await load();
     }
+  }
+
+  async function saveClientProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const formData = new FormData(event.currentTarget);
+    const preferences = String(formData.get("preferences") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+    const { error: updateError } = await supabase.rpc("save_client_profile", {
+      target_first_name: String(formData.get("firstName") ?? ""), target_last_name: String(formData.get("lastName") ?? ""),
+      target_phone: String(formData.get("phone") ?? ""), target_city: String(formData.get("city") ?? ""),
+      target_address: String(formData.get("address") ?? ""), target_preferences: { categories: preferences },
+      target_marketing_consent: formData.get("marketingConsent") === "on",
+    });
+    if (updateError) setFeedback(updateError.message);
+    else { setFeedback("Votre profil client est enregistré."); await load(); }
   }
 
   async function submitProviderForReview() {
@@ -308,17 +356,36 @@ export function LiveDashboard({
           <div className="bar-chart" aria-label="Graphique d’activité">{[38, 58, 44, 72, 61, 86, 68].map((height, index) => <span key={index} style={{ height: `${height}%` }}><i>{["L", "M", "M", "J", "V", "S", "D"][index]}</i></span>)}</div>
         </article>
 
+        {role === "client" && clientProfile && <article className="panel onboarding-panel">
+          <div className="panel-heading"><div><h2>Mon profil beauté</h2><p>Ces informations personnalisent vos recommandations et vos rendez-vous.</p></div></div>
+          <form className="dashboard-form" onSubmit={(event) => void saveClientProfile(event)}>
+            <label>Prénom<input name="firstName" required minLength={2} defaultValue={clientProfile.first_name ?? ""} /></label>
+            <label>Nom<input name="lastName" required minLength={2} defaultValue={clientProfile.last_name ?? ""} /></label>
+            <label>Téléphone<input name="phone" type="tel" autoComplete="tel" defaultValue={clientProfile.phone ?? ""} placeholder="+221 77 000 00 00" /></label>
+            <label>Ville<input name="city" autoComplete="address-level2" defaultValue={clientProfile.city ?? ""} /></label>
+            <label className="wide">Adresse habituelle<input name="address" autoComplete="street-address" defaultValue={clientProfile.default_address ?? ""} /></label>
+            <label className="wide">Préférences beauté, séparées par des virgules<input name="preferences" defaultValue={Array.isArray(clientProfile.preferences.categories) ? clientProfile.preferences.categories.join(", ") : ""} placeholder="Tresses, soins du visage, maquillage" /></label>
+            <label className="wide legal-consent"><input name="marketingConsent" type="checkbox" defaultChecked={clientProfile.marketing_consent} /><span>Recevoir les nouveautés des professionnels suivis. Facultatif.</span></label>
+            <button className="primary-button" type="submit">Enregistrer mon profil</button>
+          </form>
+        </article>}
+
         {role === "provider" && providerProfile && (
           <article className="panel onboarding-panel">
             <div className="panel-heading">
-              <div><h2>Profil professionnel</h2><p className={`provider-state ${providerProfile.status}`}>{providerStatusLabels[providerProfile.status]}</p></div>
-              {["draft", "rejected"].includes(providerProfile.status) && <button className="outline-button" onClick={() => void submitProviderForReview()}>Envoyer pour validation</button>}
+              <div><h2>Profil professionnel</h2><p className={`provider-state ${providerProfile.status}`}>{providerStatusLabels[providerProfile.status]}</p><label>Progression {providerProfile.onboarding_progress} %<progress value={providerProfile.onboarding_progress} max="100" /></label></div>
+              {["draft", "rejected"].includes(providerProfile.status) && <button className="outline-button" disabled={providerProfile.onboarding_progress < 100} onClick={() => void submitProviderForReview()}>Envoyer pour validation</button>}
             </div>
             <form className="dashboard-form" onSubmit={(event) => void saveProviderProfile(event)}>
               <label>Nom commercial<input name="businessName" required defaultValue={providerProfile.business_name} /></label>
               <label>Ville<input name="city" required defaultValue={providerProfile.city} /></label>
               <label>Mode de prestation<select name="serviceMode" defaultValue={providerProfile.service_mode}><option value="salon">En salon</option><option value="mobile">À domicile</option><option value="both">Salon et domicile</option></select></label>
+              <label>Type d’activité<select name="activityType" defaultValue={providerProfile.activity_type}><option value="independent">Indépendant</option><option value="salon">Salon</option><option value="barber_shop">Barber shop</option><option value="makeup_artist">Maquilleur</option><option value="hairdresser">Coiffeur</option><option value="nail_artist">Prothésiste ongulaire</option><option value="esthetician">Esthéticienne</option><option value="care_specialist">Spécialiste soins</option><option value="other">Autre</option></select></label>
+              <label>Années d’expérience<input name="yearsExperience" type="number" min={0} max={80} defaultValue={providerProfile.years_experience} /></label>
+              <label className="wide">Adresse professionnelle<input name="baseAddress" defaultValue={providerProfile.base_address ?? ""} /></label>
+              <label className="wide">Langues, séparées par des virgules<input name="languages" defaultValue={providerProfile.languages.join(", ")} /></label>
               <label className="wide">Présentation (40 caractères minimum avant validation)<textarea name="bio" rows={4} defaultValue={providerProfile.bio ?? ""} /></label>
+              <label className="wide">Politique d’annulation (20 caractères minimum)<textarea name="cancellationPolicy" rows={3} defaultValue={providerProfile.cancellation_policy ?? ""} /></label>
               <button className="primary-button" type="submit">Enregistrer le profil</button>
             </form>
             <form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>

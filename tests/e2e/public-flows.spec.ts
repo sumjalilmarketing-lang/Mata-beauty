@@ -23,12 +23,23 @@ test("authentication has no fake preview mode", async ({ page }) => {
   await expect(page.getByRole("dialog")).not.toContainText("aperçu");
 });
 
+test("registration requires explicit legal consent", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Ouvrir mon compte" }).click();
+  await page.getByRole("button", { name: "Créer un compte", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Créer votre compte" })).toBeVisible();
+  const consent = page.getByRole("checkbox", { name: "Accepter les conditions générales et la politique de confidentialité" });
+  await expect(consent).not.toBeChecked();
+  await consent.check();
+  await expect(consent).toBeChecked();
+});
+
 test("mobile bottom navigation works without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/");
   const navigation = page.getByRole("navigation", { name: "Navigation de l’application" });
   await expect(navigation).toBeVisible();
-  await navigation.getByRole("button", { name: /Rechercher/ }).click();
+  await navigation.getByRole("button", { name: /Recherche/ }).click();
   await expect(page.getByRole("heading", { name: "Rechercher" })).toBeVisible();
   const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(hasOverflow).toBe(false);

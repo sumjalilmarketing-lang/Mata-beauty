@@ -10,6 +10,7 @@ const authSchema = z.object({
   displayName: z.string().trim().max(80).optional(),
   email: z.email("Adresse e-mail invalide."),
   password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères."),
+  acceptLegal: z.boolean().optional(),
 });
 
 type AuthValues = z.infer<typeof authSchema>;
@@ -40,7 +41,7 @@ export function AuthModal({
     formState: { errors, isSubmitting },
   } = useForm<AuthValues>({
     resolver: zodResolver(authSchema),
-    defaultValues: { displayName: "", email: "", password: "" },
+    defaultValues: { displayName: "", email: "", password: "", acceptLegal: false },
   });
 
   async function submit(values: AuthValues) {
@@ -62,6 +63,10 @@ export function AuthModal({
       }
 
       if (mode === "register") {
+        if (!values.acceptLegal) {
+          setFeedback("Vous devez accepter les conditions et la politique de confidentialité.");
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email: values.email,
           password: values.password,
@@ -69,6 +74,7 @@ export function AuthModal({
             data: {
               role: intendedRole,
               display_name: values.displayName?.trim() || values.email.split("@")[0],
+              legal_accepted: true,
             },
           },
         });
@@ -90,6 +96,7 @@ export function AuthModal({
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData.session?.user;
       if (!user) throw new Error("La session n’a pas pu être créée.");
+      await supabase.rpc("synchronize_account_status");
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
@@ -146,6 +153,7 @@ export function AuthModal({
               {errors.password && <small className="field-error">{errors.password.message}</small>}
             </label>
           )}
+          {mode === "register" && <label className="legal-consent"><input type="checkbox" aria-label="Accepter les conditions générales et la politique de confidentialité" {...register("acceptLegal")} /> <span>J’accepte les conditions générales et la politique de confidentialité de Mata Beauty.</span></label>}
           {feedback && <p className="auth-feedback" role="status">{feedback}</p>}
           <button className="primary-button full" type="submit" disabled={isSubmitting || !configuration.configured}>
             {isSubmitting ? "Veuillez patienter…" : mode === "login" ? "Se connecter" : mode === "register" ? "Créer le compte" : "Envoyer le lien"}
