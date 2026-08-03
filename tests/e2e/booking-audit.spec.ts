@@ -65,7 +65,20 @@ async function mockSupabase(page: Page, state: AuditState) {
       return json(route, { bio: "Spécialiste des tresses rapides à Dakar." });
     }
     if (path === "/rest/v1/provider_profiles" && url.searchParams.get("select")?.includes("business_name")) {
-      return json(route, { profile_id: providerId, business_name: "Mata Audit Tresses", bio: "Audit", city: "Dakar", service_mode: "both", status: "approved" });
+      return json(route, {
+        profile_id: providerId,
+        business_name: "Mata Audit Tresses",
+        bio: "Spécialiste des tresses rapides à Dakar.",
+        city: "Dakar",
+        service_mode: "both",
+        status: "approved",
+        activity_type: "hairdresser",
+        years_experience: 5,
+        base_address: "Dakar",
+        languages: ["fr"],
+        cancellation_policy: "Annulation gratuite jusqu’à vingt-quatre heures avant.",
+        onboarding_progress: 100,
+      });
     }
     if (path === "/rest/v1/provider_services") {
       return json(route, [{ id: serviceId, title: "Tresses express", duration_minutes: 60, price_amount: 10000 }]);
@@ -75,8 +88,16 @@ async function mockSupabase(page: Page, state: AuditState) {
       return json(route, state.bookingCreated ? [{ slot_start: `${date}T11:00:00Z` }] : [{ slot_start: state.selectedSlot }, { slot_start: `${date}T11:00:00Z` }]);
     }
     if (path === "/rest/v1/profiles") {
-      return json(route, { role: state.currentRole === "provider" ? "provider" : "client", is_suspended: false });
+      return json(route, {
+        role: state.currentRole === "provider" ? "provider" : "client",
+        is_suspended: false,
+        first_name: "Mata",
+        last_name: "Audit",
+        phone: null,
+        marketing_consent: false,
+      });
     }
+    if (path === "/rest/v1/client_profiles") return json(route, { city: "Dakar", default_address: null, preferences: {} });
     if (path === "/rest/v1/bookings" && request.method() === "POST") {
       if (state.bookingCreated) return json(route, { code: "23P01", message: "slot overlap" }, 409);
       state.bookingCreated = true;
@@ -158,13 +179,13 @@ test.describe("audit chronométré de réservation", () => {
     await expect(page.getByRole("button", { name: "10:00" })).toHaveCount(0);
     await page.getByRole("button", { name: "Fermer" }).click();
     await page.getByRole("button", { name: "Retour" }).click();
-    await page.getByRole("button", { name: /Mon compte/ }).click();
+    await page.getByRole("button", { name: "Profil" }).click();
     await signIn(page, "client-audit@example.test");
     await expect(page.getByText("Tresses express", { exact: true })).toBeVisible();
     await expect(page.getByText(/10.*000 XOF/)).toBeVisible();
 
     await page.getByRole("button", { name: "Se déconnecter" }).click();
-    await page.getByRole("button", { name: /Mon compte/ }).click();
+    await page.getByRole("button", { name: "Profil" }).click();
     await signIn(page, "provider-audit@example.test");
     await expect(page.getByText("Tresses express", { exact: true })).toBeVisible();
     await expect(page.getByText(/Chez le professionnel/)).toBeVisible();
