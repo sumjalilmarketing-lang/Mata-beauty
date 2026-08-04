@@ -5,6 +5,7 @@ import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { BookingMessages } from "./booking-messages";
 import { VideoPublisher } from "./video-publisher";
+import { SocialDashboard } from "./social-dashboard";
 
 type Role = "client" | "provider" | "admin";
 type ProviderStatus = "draft" | "pending_review" | "approved" | "rejected" | "suspended";
@@ -373,10 +374,12 @@ export function LiveDashboard({
             <button className="primary-button" type="submit">Enregistrer mon profil</button>
           </form>
         </article>}
+        {role === "client" && <SocialDashboard role="client" userId={userId} />}
 
         {role === "provider" && providerProfile && (
           <>
           <VideoPublisher userId={userId} providerApproved={providerProfile.status === "approved"} onPublished={load} />
+          <SocialDashboard role="provider" userId={userId} />
           <article className="panel onboarding-panel">
             <div className="panel-heading">
               <div><h2>Profil professionnel</h2><p className={`provider-state ${providerProfile.status}`}>{providerStatusLabels[providerProfile.status]}</p><label>Progression {providerProfile.onboarding_progress} %<progress value={providerProfile.onboarding_progress} max="100" /></label></div>

@@ -43,12 +43,15 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
   const [services, setServices] = useState<ProviderService[]>([]);
   const [phase, setPhase] = useState<"idle" | "analysing" | "uploading" | "publishing">("idle");
   const [feedback, setFeedback] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     void supabase.from("provider_services").select("id,title,duration_minutes,price_amount").eq("provider_id", userId).eq("is_active", true).order("title").then(({ data }) => setServices((data ?? []) as ProviderService[]));
   }, [userId]);
+
+  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
   async function publish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,12 +61,14 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
     const values = new FormData(form);
     const file = values.get("video");
     const status = String(values.get("status")) as PublishStatus;
+    const serviceId = String(values.get("serviceId") ?? "");
     const consent = values.get("consent") === "on";
     const scheduledValue = String(values.get("scheduledFor") ?? "");
     if (!(file instanceof File) || file.size === 0) { setFeedback("Choisissez une vidéo."); return; }
     if (!VIDEO_TYPES.has(file.type)) { setFeedback("Format accepté : MP4, WebM ou MOV."); return; }
     if (file.size > MAX_VIDEO_BYTES) { setFeedback("La vidéo dépasse 100 Mo."); return; }
     if (status === "published" && !consent) { setFeedback("Confirmez le consentement de la personne filmée."); return; }
+    if (status !== "draft" && !serviceId) { setFeedback("Associez une prestation avant de publier ou programmer."); return; }
     if (status === "scheduled" && !scheduledValue) { setFeedback("Choisissez une date de publication."); return; }
 
     let videoPath = "";
@@ -87,9 +92,11 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
       const { error } = await supabase.rpc("create_video_post", {
         target_caption: String(values.get("caption") ?? "").trim(), target_video_url: videoUrl, target_thumbnail_url: thumbnailUrl,
         target_duration_seconds: media.duration, target_aspect_ratio: media.aspectRatio,
-        target_provider_service_id: String(values.get("serviceId") ?? "") || null, target_status: status,
+        target_provider_service_id: serviceId || null, target_status: status,
         target_allow_comments: values.get("allowComments") === "on", target_client_consent: consent,
         target_scheduled_for: status === "scheduled" ? new Date(scheduledValue).toISOString() : null,
+        target_visibility: String(values.get("visibility") ?? "public"),
+        target_hashtags: String(values.get("hashtags") ?? "").split(/[\s,]+/).filter(Boolean).slice(0, 10),
       });
       if (error) throw error;
       form.reset();
@@ -106,9 +113,12 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
   return <article className="panel video-publisher-panel" id="video-publisher">
     <div className="panel-heading"><div><h2>Publier une réalisation</h2><p>Une vidéo verticale courte, liée à une prestation réservable.</p></div><span className="role-pill">Créateur</span></div>
     <form className="dashboard-form video-publisher-form" onSubmit={(event) => void publish(event)}>
-      <label className="wide video-drop">Vidéo MP4, WebM ou MOV · 90 s maximum · 100 Mo<input name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required /></label>
+      <label className="wide video-drop">Vidéo MP4, WebM ou MOV · 90 s maximum · 100 Mo<input name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required onChange={(event) => { if (previewUrl) URL.revokeObjectURL(previewUrl); setPreviewUrl(event.target.files?.[0] ? URL.createObjectURL(event.target.files[0]) : ""); }} /></label>
+      {previewUrl && <div className="wide publisher-preview"><video src={previewUrl} controls muted playsInline aria-label="Aperçu de la vidéo" /><span>Aperçu avant publication</span></div>}
       <label className="wide">Légende<textarea name="caption" required maxLength={2200} rows={3} placeholder="Expliquez la technique, le résultat ou le conseil beauté…" /></label>
-      <label>Prestation liée<select name="serviceId" defaultValue=""><option value="">Aucune</option>{services.map((service) => <option key={service.id} value={service.id}>{service.title} · {service.duration_minutes} min · {service.price_amount.toLocaleString("fr-FR")} F</option>)}</select></label>
+      <label className="wide">Hashtags<input name="hashtags" maxLength={300} placeholder="#tresses #dakar #soins" /></label>
+      <label>Prestation liée<select name="serviceId" defaultValue=""><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.title} · {service.duration_minutes} min · {service.price_amount.toLocaleString("fr-FR")} F</option>)}</select></label>
+      <label>Visibilité<select name="visibility" defaultValue="public"><option value="public">Tout le monde</option><option value="followers">Abonnés</option></select></label>
       <label>Publication<select name="status" defaultValue={providerApproved ? "published" : "draft"}><option value="draft">Brouillon</option><option value="scheduled" disabled={!providerApproved}>Programmer</option><option value="published" disabled={!providerApproved}>Publier maintenant</option></select></label>
       <label>Date programmée<input name="scheduledFor" type="datetime-local" /></label>
       <label className="wide legal-consent"><input name="allowComments" type="checkbox" defaultChecked /><span>Autoriser les commentaires.</span></label>

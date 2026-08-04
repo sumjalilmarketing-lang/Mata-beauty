@@ -643,7 +643,7 @@ function BookingSuccess({ provider, confirmation, onClose }: { provider: Provide
 }
 
 function BottomNav({ active, onFeed, onDiscover, onPublish, onAccount }: { active: "feed" | "discover"; onFeed: () => void; onDiscover: () => void; onPublish: () => void; onAccount: (section?: "client" | "provider" | "admin") => void }) {
-  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={active === "feed" ? "active" : ""} onClick={onFeed}><i>⌂</i>Accueil</button><button className={active === "discover" ? "active" : ""} onClick={onDiscover}><i>⌕</i>Découvrir</button><button className="publish-nav" onClick={onPublish}><i>＋</i>Publier</button><button onClick={() => onAccount()}><i>□</i>Messages</button><button onClick={() => onAccount()}><i>○</i>Profil</button></nav>;
+  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={active === "feed" ? "active" : ""} onClick={onFeed}><i>⌂</i>Accueil</button><button className={active === "discover" ? "active" : ""} onClick={onDiscover}><i>⌕</i>Découvrir</button><button className="publish-nav" onClick={onPublish}><i>＋</i>Publier</button><button onClick={() => onAccount()}><i>□</i>Réservations</button><button onClick={() => onAccount()}><i>○</i>Profil</button></nav>;
 }
 
 function formatDuration(minutes: number) {

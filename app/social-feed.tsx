@@ -11,9 +11,10 @@ type FeedPost = {
   durationSeconds: number; viewCount: number; likeCount: number; commentCount: number; saveCount: number; shareCount: number;
   publishedAt: string; businessName: string; slug: string; city: string; verified: boolean; avatarUrl: string | null; isSponsored: boolean;
   serviceId: string | null; serviceTitle: string | null; durationMinutes: number | null; priceAmount: number | null; currency: string | null;
+  averageRating: number; reviewCount: number; hashtags: string[];
 };
 
-type CommentRow = { id: string; body: string; created_at: string; profiles: { display_name: string | null; avatar_url: string | null } | null };
+type CommentRow = { id: string; author_id: string; parent_id: string | null; body: string; created_at: string; profiles: { display_name: string | null; avatar_url: string | null } | null };
 
 const compact = new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 });
 const price = (value: number) => `${new Intl.NumberFormat("fr-FR").format(value)} FCFA`;
@@ -38,9 +39,15 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [commentText, setCommentText] = useState("");
   const [videoErrors, setVideoErrors] = useState<Set<string>>(new Set());
+  const [videoLoading, setVideoLoading] = useState<Set<string>>(new Set());
+  const [progress, setProgress] = useState<Record<string, number>>({});
+  const [paused, setPaused] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [replyTo, setReplyTo] = useState<CommentRow | null>(null);
   const cards = useRef<Array<HTMLElement | null>>([]);
   const videos = useRef<Array<HTMLVideoElement | null>>([]);
   const restoredPosition = useRef(false);
+  const completedViews = useRef(new Set<string>());
 
   const visiblePosts = useMemo(
     () => feedMode === "following" ? posts.filter((post) => followed.has(post.authorId)) : posts,
@@ -68,8 +75,10 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
       verified: Boolean(row.verified_at), avatarUrl: row.avatar_url ?? row.cover_url, isSponsored: Boolean(row.is_sponsored),
       serviceId: row.provider_service_id, serviceTitle: row.service_title, durationMinutes: row.duration_minutes,
       priceAmount: row.price_amount, currency: row.currency,
+      averageRating: Number(row.average_rating), reviewCount: Number(row.review_count), hashtags: Array.isArray(row.hashtags) ? row.hashtags : [],
     })) as FeedPost[];
     setPosts(diversifyFeed(mapped));
+    setHasMore(mapped.length === 30);
     setState(mapped.length ? "ready" : "empty");
     if (authenticated) {
       const ids = mapped.map((item) => item.id);
@@ -84,6 +93,23 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
       setFollowed(new Set((follows ?? []).map((item) => item.followed_provider_id)));
     }
   }, [authenticated]);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).range(posts.length, posts.length + 29);
+    if (error) return;
+    const mapped = (data ?? []).map((row) => ({
+      id: row.id, authorId: row.author_id, caption: row.caption, videoUrl: row.video_url, thumbnailUrl: row.thumbnail_url,
+      durationSeconds: Number(row.duration_seconds), viewCount: Number(row.view_count), likeCount: Number(row.like_count), commentCount: Number(row.comment_count), saveCount: Number(row.save_count), shareCount: Number(row.share_count),
+      publishedAt: row.published_at, businessName: row.business_name, slug: row.slug, city: row.city, verified: Boolean(row.verified_at), avatarUrl: row.avatar_url ?? row.cover_url, isSponsored: Boolean(row.is_sponsored),
+      serviceId: row.provider_service_id, serviceTitle: row.service_title, durationMinutes: row.duration_minutes, priceAmount: row.price_amount, currency: row.currency,
+      averageRating: Number(row.average_rating), reviewCount: Number(row.review_count), hashtags: Array.isArray(row.hashtags) ? row.hashtags : [],
+    })) as FeedPost[];
+    setPosts((current) => diversifyFeed([...current, ...mapped]));
+    setHasMore(mapped.length === 30);
+  }, [hasMore, posts]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -117,7 +143,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   useEffect(() => {
     videos.current.forEach((video, index) => {
       if (!video) return;
-      if (index === activeIndex) void video.play().catch(() => undefined); else video.pause();
+      if (index === activeIndex && !paused) void video.play().catch(() => undefined); else video.pause();
     });
     const post = visiblePosts[activeIndex];
     if (!post) return;
@@ -129,7 +155,8 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
       await supabase.rpc("record_video_view", { target_post_id: post.id, target_session_hash: sessionHash, target_watched_ms: 2000, target_completed: false });
     }, 2000);
     return () => window.clearTimeout(timer);
-  }, [activeIndex, getSessionHash, visiblePosts]);
+    if (activeIndex >= visiblePosts.length - 3) void loadMore();
+  }, [activeIndex, getSessionHash, loadMore, paused, visiblePosts]);
 
   async function toggle(kind: "like" | "save", post: FeedPost) {
     if (!authenticated) { onRequireAuth(); return; }
@@ -153,7 +180,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   }
 
   async function share(post: FeedPost) {
-    const url = `${window.location.origin}/?post=${post.id}`;
+    const url = `${window.location.origin}/posts/${post.id}`;
     try {
       if (navigator.share) await navigator.share({ title: `${post.businessName} sur Mata Beauty`, text: post.caption, url });
       else await navigator.clipboard.writeText(url);
@@ -175,10 +202,10 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   }
 
   async function openComments(post: FeedPost) {
-    setCommentsPost(post); setComments([]);
+    setCommentsPost(post); setComments([]); setReplyTo(null);
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { data } = await supabase.from("post_comments").select("id,body,created_at,profiles!post_comments_author_id_fkey(display_name,avatar_url)").eq("post_id", post.id).eq("is_hidden", false).order("created_at", { ascending: false }).limit(50);
+    const { data } = await supabase.from("post_comments").select("id,author_id,parent_id,body,created_at,profiles!post_comments_author_id_fkey(display_name,avatar_url)").eq("post_id", post.id).eq("is_hidden", false).order("created_at", { ascending: false }).limit(50);
     setComments((data ?? []) as unknown as CommentRow[]);
   }
 
@@ -187,8 +214,27 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     if (!commentsPost || !commentText.trim()) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { error } = await supabase.from("post_comments").insert({ post_id: commentsPost.id, author_id: authenticated.userId, body: commentText.trim() });
-    if (!error) { setCommentText(""); await openComments(commentsPost); }
+    const { error } = await supabase.from("post_comments").insert({ post_id: commentsPost.id, author_id: authenticated.userId, parent_id: replyTo?.id ?? null, body: commentText.trim() });
+    if (!error) { setCommentText(""); setReplyTo(null); await openComments(commentsPost); }
+  }
+
+  async function deleteComment(comment: CommentRow) {
+    if (!authenticated || comment.author_id !== authenticated.userId || !commentsPost) return;
+    const supabase = getSupabaseBrowserClient();
+    if (supabase && !((await supabase.from("post_comments").delete().eq("id", comment.id)).error)) await openComments(commentsPost);
+  }
+
+  async function reportComment(comment: CommentRow) {
+    if (!authenticated) { onRequireAuth(); return; }
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) await supabase.rpc("report_post_comment", { target_comment_id: comment.id, target_reason: "contenu_inapproprie" });
+  }
+
+  async function book(post: FeedPost) {
+    if (!post.serviceId || !post.serviceTitle || post.durationMinutes === null || post.priceAmount === null) return;
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) await supabase.rpc("record_post_booking_click", { target_post_id: post.id, target_session_hash: await getSessionHash() });
+    onBook(post.authorId, { id: post.serviceId, title: post.serviceTitle, duration_minutes: post.durationMinutes, price_amount: post.priceAmount }, post.id);
   }
 
   const activePost = visiblePosts[activeIndex];
@@ -200,9 +246,11 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   return <section className="social-feed-shell">{header}<div className="social-feed" aria-label="Vidéos beauté">
     {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>Aucun abonnement pour le moment</h1><p>Suivez un professionnel depuis une vidéo pour retrouver ses prochaines publications ici.</p><button onClick={() => setFeedMode("for-you")}>Explorer le feed</button></div>}
     {visiblePosts.map((post, index) => <article className="social-video-card" key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`Vidéo de ${post.businessName}`}>
-      {videoErrors.has(post.id) ? <div className="video-fallback"><span>◇</span><p>Cette vidéo ne peut pas être lue.</p><button onClick={() => setVideoErrors((current) => { const next=new Set(current); next.delete(post.id); return next; })}>Réessayer</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={post.videoUrl} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={Math.abs(index-activeIndex)<=1 ? "metadata" : "none"} onError={() => setVideoErrors((current) => new Set(current).add(post.id))} />}
+      {videoErrors.has(post.id) ? <div className="video-fallback"><span>◇</span><p>Cette vidéo ne peut pas être lue.</p><button onClick={() => setVideoErrors((current) => { const next=new Set(current); next.delete(post.id); return next; })}>Réessayer</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={post.videoUrl} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={Math.abs(index-activeIndex)<=1 ? "metadata" : "none"} onLoadStart={() => setVideoLoading((current) => new Set(current).add(post.id))} onCanPlay={() => setVideoLoading((current) => { const next=new Set(current); next.delete(post.id); return next; })} onTimeUpdate={(event) => { const video=event.currentTarget; const ratio=video.duration ? video.currentTime/video.duration : 0; setProgress((current) => ({ ...current, [post.id]: ratio })); if (ratio>=.95 && !completedViews.current.has(post.id)) { completedViews.current.add(post.id); void getSessionHash().then((hash) => getSupabaseBrowserClient()?.rpc("record_video_view", { target_post_id: post.id, target_session_hash: hash, target_watched_ms: Math.round(video.currentTime*1000), target_completed: true })); } }} onError={() => setVideoErrors((current) => new Set(current).add(post.id))} />}
+      {videoLoading.has(post.id) && !videoErrors.has(post.id) && <span className="video-loading" role="status">Chargement…</span>}
       <div className="video-shade" />
-      <div className="video-progress"><i style={{ transform: `scaleX(${index === activeIndex ? 1 : 0})` }} /></div>
+      <div className="video-progress" role="progressbar" aria-label="Progression de la vidéo" aria-valuenow={Math.round((progress[post.id] ?? 0)*100)}><i style={{ transform: `scaleX(${progress[post.id] ?? 0})` }} /></div>
+      <button className="play-toggle" aria-label={paused ? "Lire la vidéo" : "Mettre la vidéo en pause"} onClick={() => setPaused((value) => !value)}>{paused && index===activeIndex ? "▶" : ""}</button>
       <button className="sound-toggle" aria-label={muted ? "Activer le son" : "Couper le son"} onClick={() => setMuted((value) => !value)}>{muted ? "♩×" : "♩"}</button>
       <aside className="social-actions">
         <button className="creator-orb" aria-label={`Profil de ${post.businessName}`} onClick={() => onOpenProvider(post.authorId)}>{post.avatarUrl ? <Image src={post.avatarUrl} alt="" width={50} height={50} unoptimized /> : post.businessName.slice(0,2).toUpperCase()}</button>
@@ -213,10 +261,10 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
         <button aria-label="Partager" onClick={() => void share(post)}>↗<small>{compact.format(post.shareCount)}</small></button>
         <button aria-label="Signaler" onClick={() => void report(post)}>⚑<small>Signaler</small></button>
       </aside>
-      <div className="social-caption"><button className="creator-name" onClick={() => onOpenProvider(post.authorId)}>@{post.slug} {post.verified && <b>✓</b>}</button><p>{post.caption}</p><span>#matabeauty · #{post.city.toLocaleLowerCase("fr").replaceAll(" ","")}</span>{post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service"><div><small>PRESTATION LIÉE</small><strong>{post.serviceTitle}</strong><span>{post.durationMinutes} min · {price(post.priceAmount)}</span></div><button onClick={() => onBook(post.authorId,{ id:post.serviceId!,title:post.serviceTitle!,duration_minutes:post.durationMinutes!,price_amount:post.priceAmount! },post.id)}>Réserver</button></div>}</div>
+      <div className="social-caption"><button className="creator-name" onClick={() => onOpenProvider(post.authorId)}>@{post.slug} {post.verified && <b>✓</b>}</button><span>{post.city} · ★ {post.averageRating.toFixed(1)} ({post.reviewCount}) · {compact.format(post.viewCount)} vues</span><p>{post.caption}</p><span>{(post.hashtags.length ? post.hashtags : ["matabeauty"]).map((tag) => `#${tag}`).join(" · ")}</span><button className="profile-link" onClick={() => onOpenProvider(post.authorId)}>Voir le profil</button>{post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service"><div><small>PRESTATION LIÉE</small><strong>{post.serviceTitle}</strong><span>{post.durationMinutes} min · à partir de {price(post.priceAmount)}</span></div><button onClick={() => void book(post)}>Réserver</button></div>}</div>
     </article>)}
   </div>{activePost?.isSponsored && <span className="sponsored-label">Contenu sponsorisé</span>}
-  {commentsPost && <div className="comments-backdrop" onMouseDown={(event) => event.target===event.currentTarget && setCommentsPost(null)}><section className="comments-sheet" role="dialog" aria-modal="true" aria-label="Commentaires"><header><strong>Commentaires</strong><button aria-label="Fermer" onClick={() => setCommentsPost(null)}>×</button></header><div>{comments.length ? comments.map((comment) => <article key={comment.id}><span>{comment.profiles?.display_name?.slice(0,1) ?? "M"}</span><p><strong>{comment.profiles?.display_name ?? "Membre Mata"}</strong>{comment.body}</p></article>) : <p className="no-comments">Soyez la première à commenter.</p>}</div><footer><input aria-label="Ajouter un commentaire" value={commentText} maxLength={1000} onChange={(event) => setCommentText(event.target.value)} placeholder="Ajouter un commentaire…" /><button disabled={!commentText.trim()} onClick={() => void addComment()}>Publier</button></footer></section></div>}
+  {commentsPost && <div className="comments-backdrop" onMouseDown={(event) => event.target===event.currentTarget && setCommentsPost(null)}><section className="comments-sheet" role="dialog" aria-modal="true" aria-label="Commentaires"><header><strong>Commentaires</strong><button aria-label="Fermer" onClick={() => setCommentsPost(null)}>×</button></header><div>{comments.length ? comments.map((comment) => <article className={comment.parent_id ? "comment-reply" : ""} key={comment.id}><span>{comment.profiles?.display_name?.slice(0,1) ?? "M"}</span><p><strong>{comment.profiles?.display_name ?? "Membre Mata"}</strong>{comment.body}<small><button onClick={() => setReplyTo(comment)}>Répondre</button>{authenticated?.userId===comment.author_id ? <button onClick={() => void deleteComment(comment)}>Supprimer</button> : <button onClick={() => void reportComment(comment)}>Signaler</button>}</small></p></article>) : <p className="no-comments">Soyez la première à commenter.</p>}</div><footer>{replyTo && <span className="reply-indicator">Réponse à {replyTo.profiles?.display_name ?? "un membre"} <button onClick={() => setReplyTo(null)}>×</button></span>}<input aria-label="Ajouter un commentaire" value={commentText} maxLength={1000} onChange={(event) => setCommentText(event.target.value)} placeholder={replyTo ? "Écrire une réponse…" : "Ajouter un commentaire…"} /><button disabled={!commentText.trim()} onClick={() => void addComment()}>Publier</button></footer></section></div>}
   <button className="feed-publish-fab" aria-label="Publier une vidéo" onClick={onPublish}>＋</button>
   </section>;
 }
