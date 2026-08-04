@@ -11,7 +11,13 @@ export async function POST(request: Request) {
   const auth = await authenticatedSupabase(request);
   if (!auth) return jsonError("Authentification requise.", 401, "UNAUTHENTICATED");
   const context = requestContext(request);
-  if (!await consumeRateLimit({ scope: "payment_create", key: `${auth.user.id}:${context.ipHash}`, limit: 8, windowSeconds: 60 })) {
+  let rateLimitAllowed = false;
+  try {
+    rateLimitAllowed = await consumeRateLimit({ scope: "payment_create", key: `${auth.user.id}:${context.ipHash}`, limit: 8, windowSeconds: 60 });
+  } catch {
+    return jsonError("Le contrôle de sécurité est indisponible.", 503, "SECURITY_CONTROL_UNAVAILABLE");
+  }
+  if (!rateLimitAllowed) {
     return jsonError("Trop de tentatives de paiement.", 429, "RATE_LIMITED");
   }
   const parsed = schema.safeParse(await request.json().catch(() => null));

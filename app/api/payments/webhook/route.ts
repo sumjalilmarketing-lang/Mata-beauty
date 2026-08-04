@@ -27,7 +27,13 @@ export async function POST(request: Request) {
   const context = requestContext(request);
   const payloadHash = createHash("sha256").update(rawBody).digest("hex");
   if (rawBody.length > 128_000) return jsonError("Événement trop volumineux.", 413, "PAYLOAD_TOO_LARGE");
-  if (!await consumeRateLimit({ scope: "payment_webhook", key: context.ipHash, limit: 120, windowSeconds: 60 })) {
+  let rateLimitAllowed = false;
+  try {
+    rateLimitAllowed = await consumeRateLimit({ scope: "payment_webhook", key: context.ipHash, limit: 120, windowSeconds: 60 });
+  } catch {
+    return jsonError("Le contrôle de sécurité est indisponible.", 503, "SECURITY_CONTROL_UNAVAILABLE");
+  }
+  if (!rateLimitAllowed) {
     await recordSuspicion({ requestId: context.requestId, type: "webhook.rate_limited", severity: "critical", ipHash: context.ipHash, payloadHash });
     return jsonError("Débit webhook dépassé.", 429, "RATE_LIMITED");
   }

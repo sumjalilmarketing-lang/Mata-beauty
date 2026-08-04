@@ -10,5 +10,5 @@ export async function GET(request: Request) {
     .select("id,booking_id,payment_status,payment_method,amount,currency,paid_at,refunded_amount,created_at")
     .eq("id", paymentId.data).maybeSingle();
   if (error || !data) return jsonError("Paiement introuvable.", 404, "PAYMENT_NOT_FOUND");
-  return Response.json({ ok: true, payment: data });
+  return Response.json({ ok: true, payment: data }, { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 }

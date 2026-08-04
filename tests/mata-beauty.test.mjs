@@ -139,3 +139,25 @@ test("the social video layer is server-counted, storage-isolated, and protected 
   assert.match(publisher, /100 \* 1024 \* 1024/);
   assert.doesNotMatch(feed + publisher, /SUPABASE_SERVICE_ROLE_KEY/);
 });
+
+test("the audit hardening keeps identity verification and booking prices server-owned", async () => {
+  const [migration, releaseRoute, createRoute, refundRoute, webhookRoute] = await Promise.all([
+    readFile(new URL("supabase/migrations/20260804160000_full_audit_security_fixes.sql", root), "utf8"),
+    readFile(new URL("app/api/payments/confirm-service/route.ts", root), "utf8"),
+    readFile(new URL("app/api/payments/create/route.ts", root), "utf8"),
+    readFile(new URL("app/api/payments/refund/route.ts", root), "utf8"),
+    readFile(new URL("app/api/payments/webhook/route.ts", root), "utf8"),
+  ]);
+  assert.match(migration, /email_confirmed_at is not null/);
+  assert.match(migration, /phone_confirmed_at is not null/);
+  assert.match(migration, /identite non verifiee/);
+  assert.match(migration, /create or replace function public\.enforce_booking_contract/);
+  assert.match(migration, /new\.total_amount := selected_service\.price_amount/);
+  assert.match(migration, /new\.ends_at := new\.starts_at \+ make_interval/);
+  assert.match(migration, /before insert on public\.bookings/);
+  assert.match(releaseRoute, /hasTrustedOrigin/);
+  assert.match(releaseRoute, /consumeRateLimit/);
+  for (const route of [releaseRoute, createRoute, refundRoute, webhookRoute]) {
+    assert.match(route, /SECURITY_CONTROL_UNAVAILABLE/);
+  }
+});

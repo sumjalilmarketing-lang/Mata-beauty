@@ -149,9 +149,11 @@ async function signIn(page: Page, email: string) {
 }
 
 test.describe("audit chronométré de réservation", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "mobile-320", "Mesure de référence exécutée sur le plus petit écran supporté.");
-    await page.setViewportSize({ width: 320, height: 740 });
+  test.beforeEach(async ({ page }) => {
+    page.on("pageerror", (error) => { throw error; });
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());
+    });
   });
 
   test("termine une réservation en 8 actions et conserve le choix après connexion", async ({ page }) => {

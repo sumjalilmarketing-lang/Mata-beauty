@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   page.on("pageerror", (error) => { throw error; });
+  page.on("console", (message) => {
+    if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());
+  });
 });
 
 test("premium home opens a real category results screen", async ({ page }) => {
@@ -44,4 +47,18 @@ test("mobile bottom navigation works without horizontal overflow", async ({ page
   await expect(page.getByPlaceholder("Que recherchez-vous ?")).toBeVisible();
   const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(hasOverflow).toBe(false);
+});
+
+test("primary mobile navigation keeps comfortable touch targets", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto("/");
+  const buttons = page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button");
+  await expect(buttons).toHaveCount(5);
+  for (const button of await buttons.all()) {
+    const box = await button.boundingBox();
+    expect(box, "Le bouton principal doit être visible").not.toBeNull();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await expect(button).toHaveAccessibleName(/\S/);
+  }
 });
