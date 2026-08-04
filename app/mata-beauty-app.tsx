@@ -102,6 +102,10 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
     return () => window.clearTimeout(splashTimer);
   }, []);
 
+  useEffect(() => {
+    if (profile) window.scrollTo(0, 0);
+  }, [profile]);
+
   function toggleTheme() {
     setTheme((current) => {
       const next = current === "light" ? "dark" : "light";
