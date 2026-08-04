@@ -138,10 +138,12 @@ Le dépôt contient déjà un feed vertical, des vidéos liées aux prestations,
 
 Le lot `20260804180000_social_booking_attribution.sql` ajoute la première mesure fiable du moteur business : une réservation lancée depuis le feed conserve sa vidéo source, vérifiée côté serveur, et le professionnel peut obtenir ses conversions sans accéder aux données d’un autre professionnel.
 
+Le lot `20260804190000_booking_conversations_realtime.sql` rend la conversation de rendez-vous utilisable par la cliente et le professionnel : création atomique limitée aux participants, messages paginés, nouveaux messages en temps réel et accusés de lecture individuels. Les pièces jointes restent hors périmètre tant que leur stockage privé et leur analyse de sécurité ne sont pas livrés.
+
 ## Roadmap par lots
 
 1. **Conversion sociale** — attribution vidéo → réservation, statistiques professionnelles et mesure des clics.
-2. **Conversation** — messagerie temps réel, accusés de lecture et lien avec le rendez-vous.
+2. **Conversation** — socle livré : messagerie temps réel, accusés de lecture et lien avec le rendez-vous ; prochaine extension : pièces jointes privées.
 3. **Création** — montage léger, brouillons, hashtags, miniature et publication réellement mesurée sous une minute.
 4. **Découverte** — tendances, proximité, recherche hashtags et personnalisation transparente.
 5. **Confiance** — avis post-prestation, vérification renforcée, modération et recours.

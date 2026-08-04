@@ -214,6 +214,19 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .notification-row { width: 100%; padding: 13px 4px; display: flex; justify-content: space-between; gap: 15px; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; }
 .notification-row span, .notification-row small { display: block; }.notification-row small { margin-top: 4px; color: var(--muted); }
 .notification-row i { color: var(--wine); font-size: 9px; }.notification-row.read { opacity: .68; }
+.conversation-panel { margin-top: 16px; }
+.message-list { min-height: 180px; max-height: 430px; padding: 14px; display: flex; flex-direction: column; gap: 9px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.45); }
+.message-bubble { max-width: min(78%, 560px); padding: 10px 12px; align-self: flex-start; border: 1px solid var(--line); border-radius: 4px 14px 14px; background: white; }
+.message-bubble.own { align-self: flex-end; border-color: transparent; border-radius: 14px 4px 14px 14px; background: var(--wine); color: white; }
+.message-bubble p { margin: 0; color: inherit; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; }
+.message-bubble time { display: block; margin-top: 5px; color: var(--muted); font-size: 8px; }
+.message-bubble.own time { color: rgba(255,255,255,.72); }
+.read-receipt { align-self: flex-end; margin-top: -5px; }
+.load-older { align-self: center; border: 0; background: transparent; color: var(--wine); font-size: 10px; }
+.message-composer { margin-top: 10px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.message-composer textarea { min-height: 48px; resize: vertical; padding: 11px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.message-composer .primary-button { min-height: 48px; }
+.conversation-error { padding: 10px; border-radius: 7px; color: #7f2633; background: #fff0f1; font-size: 11px; }
 
 @media (max-width: 1050px) {
   .desktop-nav { display: none; }
@@ -241,6 +254,7 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   .dashboard { grid-template-columns: 1fr; }.sidebar { min-height: auto; padding: 18px; }.sidebar nav { flex-direction: row; overflow-x: auto; }.sidebar nav button { flex: none; }.back-link { margin-top: 15px; }.dashboard-main { padding: 32px 18px; }.dashboard-top { flex-direction: column; }.dashboard-top h1 { font-size: 37px; }.metric-grid, .dashboard-grid { grid-template-columns: 1fr; }
   .auth-modal { padding: 28px 19px; }.live-appointment { grid-template-columns: 48px 1fr; }.live-appointment > .status, .live-appointment > .appointment-actions { grid-column: 2; }.appointment-actions { flex-wrap: wrap; }
   .dashboard-form { grid-template-columns: 1fr; }.dashboard-form .wide { grid-column: auto; }.moderation-row { align-items: flex-start; flex-direction: column; }
+  .message-composer { grid-template-columns: 1fr; }.message-composer .primary-button { width: 100%; }.message-bubble { max-width: 88%; }
 }
 
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }

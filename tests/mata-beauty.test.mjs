@@ -149,6 +149,26 @@ test("the social video layer is server-counted, attributable, storage-isolated, 
   assert.doesNotMatch(feed + publisher, /SUPABASE_SERVICE_ROLE_KEY/);
 });
 
+test("booking conversations are participant-only, realtime, paginated, and read-aware", async () => {
+  const [migration, messages, dashboard] = await Promise.all([
+    readFile(new URL("supabase/migrations/20260804190000_booking_conversations_realtime.sql", root), "utf8"),
+    readFile(new URL("app/booking-messages.tsx", root), "utf8"),
+    readFile(new URL("app/live-dashboard.tsx", root), "utf8"),
+  ]);
+  assert.match(migration, /create unique index if not exists conversations_booking_unique_idx/);
+  assert.match(migration, /function public\.ensure_booking_conversation/);
+  assert.match(migration, /auth\.uid\(\) not in \(selected_booking\.client_id, selected_booking\.provider_id\)/);
+  assert.match(migration, /function public\.mark_conversation_read/);
+  assert.match(migration, /profile_id = auth\.uid\(\)/);
+  assert.match(migration, /alter publication supabase_realtime add table public\.messages/);
+  assert.match(messages, /postgres_changes/);
+  assert.match(messages, /\.limit\(pageSize\)/);
+  assert.match(messages, /lastOwnMessageRead/);
+  assert.match(messages, /sender_id: userId/);
+  assert.match(dashboard, /<BookingMessages/);
+  assert.doesNotMatch(messages + dashboard, /SUPABASE_SERVICE_ROLE_KEY/);
+});
+
 test("the audit hardening keeps identity verification and booking prices server-owned", async () => {
   const [migration, releaseRoute, createRoute, refundRoute, webhookRoute, paymentServer] = await Promise.all([
     readFile(new URL("supabase/migrations/20260804160000_full_audit_security_fixes.sql", root), "utf8"),

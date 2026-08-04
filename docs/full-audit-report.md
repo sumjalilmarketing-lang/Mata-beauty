@@ -44,7 +44,7 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 | Persistance client/prestataire et isolation autre client | opérationnel en E2E simulé | Tests des deux dashboards et refus de modification d'un autre client. |
 | Paiement | mock | Idempotence, webhooks signés, rejeu, ledger, remboursement et rate-limit conçus ; aucun paiement sandbox réel exécuté. |
 | Wallet/ledger | opérationnel côté schéma/API | Solde dérivé du ledger, réponse privée non mise en cache. |
-| Messagerie texte | partiellement opérationnel | Tables, membres et RLS présents ; pièces jointes, pagination et E2E multi-comptes absents. |
+| Messagerie texte | opérationnel pour le socle | Conversation unique par rendez-vous, création serveur réservée aux participants, pagination, temps réel et accusés de lecture ; pièces jointes et recette réelle multi-comptes restent à livrer. |
 | Avis | partiellement opérationnel | Unicité par réservation, garde de champs et recalcul note ; photos/notes détaillées absentes. |
 | Dashboard professionnel | partiellement opérationnel | Données réelles chargées ; revenus explicitement indiqués « théoriques » tant que paiement mock. |
 | Super Admin / RBAC / audit | opérationnel pour le socle | Permissions séparées, RPC auditables et confirmations ; couverture UI exhaustive par rôle non automatisée. |
@@ -95,7 +95,7 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 4. **KYC — risque élevé.** Ajouter une API d'URL signée courte qui journalise chaque consultation administrative et des tests de téléchargement inter-compte.
 5. **OTP/téléphone et suppression de compte — fonctionnalités absentes.** Concevoir les parcours, la rétention légale et les jobs de purge/anonymisation avant activation UI.
 6. **Social — risque moyen.** Ajouter worker de publication programmée, transcodage/miniatures serveur, réponses/suppression de commentaires et blocage.
-7. **Messagerie/support — risque moyen.** Ajouter pièces jointes privées, pagination et tests multi-comptes complets.
+7. **Messagerie/support — risque moyen.** Ajouter pièces jointes privées analysées côté serveur et exécuter une recette réelle multi-comptes complète ; la pagination, le temps réel et les accusés de lecture sont désormais livrés.
 8. **SEO/a11y — risque moyen.** Ajouter sitemap/robots, pages publiques partageables et audit automatisé axe sur tous les écrans.
 
 La Preview peut servir à la recette fonctionnelle. Elle ne doit pas être promue en production tant que les points 1 et 2 ne sont pas clôturés.

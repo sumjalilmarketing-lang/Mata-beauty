@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { BookingMessages } from "./booking-messages";
 import { VideoPublisher } from "./video-publisher";
 
 type Role = "client" | "provider" | "admin";
@@ -94,6 +95,7 @@ export function LiveDashboard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [messageBooking, setMessageBooking] = useState<BookingRow | null>(null);
 
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
@@ -336,6 +338,7 @@ export function LiveDashboard({
         <nav>
           <button className="active" onClick={() => void load()}>⌂ Vue d’ensemble</button>
           {role !== "admin" && <button onClick={() => document.getElementById("live-bookings")?.scrollIntoView({ behavior: "smooth" })}>▣ Réservations</button>}
+          {role !== "admin" && <button onClick={() => document.getElementById(messageBooking ? "booking-conversation" : "live-bookings")?.scrollIntoView({ behavior: "smooth" })}>✉ Messages</button>}
           <button onClick={() => document.getElementById("live-notifications")?.scrollIntoView({ behavior: "smooth" })}>◌ Notifications <i>{notifications.filter((item) => !item.read_at).length}</i></button>
         </nav>
         <button className="back-link" onClick={() => void onSignOut()}>Se déconnecter</button>
@@ -440,10 +443,22 @@ export function LiveDashboard({
                   {role === "provider" && booking.status === "confirmed" && <button onClick={() => void updateStatus(booking, "in_progress")}>Démarrer</button>}
                   {role === "provider" && booking.status === "in_progress" && <button onClick={() => void updateStatus(booking, "completed")}>Terminer</button>}
                   {role === "client" && ["pending", "confirmed"].includes(booking.status) && <button onClick={() => void updateStatus(booking, "cancelled_by_client")}>Annuler</button>}
+                  <button onClick={() => {
+                    setMessageBooking(booking);
+                    window.setTimeout(() => document.getElementById("booking-conversation")?.scrollIntoView({ behavior: "smooth" }), 0);
+                  }}>Messages</button>
                 </div>
               </div>
             ))}
           </article>
+        )}
+        {role !== "admin" && messageBooking && (
+          <BookingMessages
+            bookingId={messageBooking.id}
+            serviceTitle={messageBooking.provider_services?.title ?? "Prestation beauté"}
+            userId={userId}
+            onClose={() => setMessageBooking(null)}
+          />
         )}
         <article className="panel notifications-panel" id="live-notifications">
           <div className="panel-heading"><h2>Notifications</h2></div>
