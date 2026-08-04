@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
-  await page.route("https://audit.supabase.co/auth/v1/settings", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ external: { google: true } }) }));
+  await page.route("http://localhost:3000/api/auth/providers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ google: true }) }));
   page.on("pageerror", (error) => { throw error; });
   page.on("console", (message) => {
     if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());

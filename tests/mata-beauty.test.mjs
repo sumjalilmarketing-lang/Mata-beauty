@@ -166,10 +166,11 @@ test("the audit hardening keeps identity verification and booking prices server-
 });
 
 test("Google OAuth uses PKCE, a server callback, and idempotent non-privileged profiles", async () => {
-  const [client, modal, callback, migration, app] = await Promise.all([
+  const [client, modal, callback, providersRoute, migration, app] = await Promise.all([
     readFile(new URL("lib/supabase/client.ts", root), "utf8"),
     readFile(new URL("app/auth-modal.tsx", root), "utf8"),
     readFile(new URL("app/auth/callback/route.ts", root), "utf8"),
+    readFile(new URL("app/api/auth/providers/route.ts", root), "utf8"),
     readFile(new URL("supabase/migrations/20260804170000_google_oauth_identity.sql", root), "utf8"),
     readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
   ]);
@@ -179,6 +180,8 @@ test("Google OAuth uses PKCE, a server callback, and idempotent non-privileged p
   assert.match(modal, /Continuer avec Google/);
   assert.match(callback, /exchangeCodeForSession/);
   assert.match(callback, /safeOAuthDestination/);
+  assert.match(providersRoute, /AbortSignal\.timeout\(5000\)/);
+  assert.match(providersRoute, /Cache-Control/);
   assert.doesNotMatch(callback, /console\.(log|error)/);
   assert.match(migration, /on conflict\(id\) do nothing/);
   assert.match(migration, /request_professional_profile/);

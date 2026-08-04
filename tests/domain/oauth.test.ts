@@ -23,9 +23,9 @@ describe("Google OAuth security", () => {
   });
 
   it("fails closed when Google is not enabled by Supabase", async () => {
-    const enabled = await isGoogleAuthEnabled({ url: "https://project.test", anonKey: "public" }, async () => new Response(JSON.stringify({ external: { google: true } })));
-    const disabled = await isGoogleAuthEnabled({ url: "https://project.test", anonKey: "public" }, async () => new Response(JSON.stringify({ external: { google: false } })));
-    const unavailable = await isGoogleAuthEnabled({ url: "https://project.test", anonKey: "public" }, async () => new Response("error", { status: 503 }));
+    const enabled = await isGoogleAuthEnabled(async () => new Response(JSON.stringify({ google: true })));
+    const disabled = await isGoogleAuthEnabled(async () => new Response(JSON.stringify({ google: false })));
+    const unavailable = await isGoogleAuthEnabled(async () => new Response("error", { status: 503 }));
     expect(enabled).toBe(true);
     expect(disabled).toBe(false);
     expect(unavailable).toBe(false);

@@ -51,7 +51,7 @@ export function AuthModal({
       setFeedback("Connexion Supabase indisponible : la clé publique n’est pas configurée.");
       return;
     }
-    if (!await isGoogleAuthEnabled(configuration)) {
+    if (!await isGoogleAuthEnabled()) {
       setFeedback("La connexion Google n’est pas encore activée pour Mata Beauty. Utilisez votre e-mail pour le moment.");
       setGoogleLoading(false);
       return;
