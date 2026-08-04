@@ -1,4 +1,5 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 let browserClient: SupabaseClient | null = null;
 let runtimeConfiguration: { url: string; anonKey: string } | null = null;
@@ -20,10 +21,11 @@ export function getSupabaseConfiguration() {
 export function getSupabaseBrowserClient() {
   const configuration = getSupabaseConfiguration();
   if (!configuration.configured) return null;
-  browserClient ??= createClient(configuration.url, configuration.anonKey, {
+  browserClient ??= createBrowserClient(configuration.url, configuration.anonKey, {
     auth: {
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      flowType: "pkce",
       persistSession: true,
     },
   });

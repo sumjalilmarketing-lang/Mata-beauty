@@ -1,13 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import { AuthModal, type AuthenticatedProfile } from "./auth-modal";
 import { LiveDashboard } from "./live-dashboard";
 import { SocialFeed } from "./social-feed";
 import { calculateBookingEnd, calculateBookingQuote } from "@/lib/domain/booking";
 import { fetchActivePromotions, fetchPublishedProviders, type CatalogPromotion } from "@/lib/supabase/catalog";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { loadAuthenticatedProfile } from "@/lib/auth/profile";
 
 type Provider = {
   id: string;
@@ -42,6 +44,28 @@ type ProviderDetail = { bio: string | null; services: ProviderService[]; portfol
 type BookingSelection = { provider: Provider; service: ProviderService };
 type AvailabilitySlot = { slot_start: string };
 
+const bookingDraftKey = "mata-booking-draft";
+const bookingDraftSchema = z.object({
+  selection: z.object({
+    provider: z.object({
+      id: z.string().min(1), profileId: z.string().min(1), serviceId: z.string().min(1), name: z.string(), specialty: z.string(),
+      category: z.string(), area: z.string(), price: z.number().int().nonnegative(), rating: z.number(), reviews: z.number().int().nonnegative(),
+      initials: z.string(), verified: z.boolean(), homeService: z.boolean(), durationMinutes: z.number().int(), coverUrl: z.string().optional(),
+    }),
+    service: z.object({ id: z.string().min(1), title: z.string(), duration_minutes: z.number().int(), price_amount: z.number().int().nonnegative() }),
+  }),
+  request: z.object({
+    date: z.string(), time: z.string(), locationMode: z.enum(["salon", "client_address"]), address: z.string(), note: z.string(),
+    paymentMethod: z.enum(["on_site", "wave", "orange_money", "card"]),
+  }),
+});
+
+function readBookingDraft() {
+  if (typeof window === "undefined") return null;
+  try { return bookingDraftSchema.safeParse(JSON.parse(window.sessionStorage.getItem(bookingDraftKey) ?? "null")).data ?? null; }
+  catch { return null; }
+}
+
 const categoryAtlas = "/images/categories/mata-category-atlas.webp";
 const categories = [
   { label: "Coiffure", icon: "✦", position: "0% 0%" },
@@ -68,6 +92,7 @@ const defaultBookingDate = new Date(Date.now() + 86400000).toISOString().slice(0
 
 export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: string; supabaseAnonKey: string }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
+  const oauthReturn = useRef({ intent: null as string | null, authenticated: false });
   const [showSplash, setShowSplash] = useState(true);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [query, setQuery] = useState("");
@@ -83,6 +108,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   const [upcomingBookings, setUpcomingBookings] = useState<Array<{ id: string; starts_at: string; status: string }>>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [booking, setBooking] = useState<BookingSelection | null>(null);
+  const [restoredBookingRequest, setRestoredBookingRequest] = useState<BookingRequest | null>(null);
   const [profile, setProfile] = useState<Provider | null>(null);
   const [view, setView] = useState<"home" | "client" | "provider" | "admin">("home");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -99,6 +125,29 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
     const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     void Promise.resolve().then(() => setTheme(savedTheme === "dark" || savedTheme === "light" ? savedTheme : preferredTheme));
     const splashTimer = window.setTimeout(() => setShowSplash(false), 1350);
+    const draft = readBookingDraft();
+    const parameters = new URLSearchParams(window.location.search);
+    oauthReturn.current = { intent: parameters.get("intent"), authenticated: parameters.get("auth") === "google" };
+    const authError = parameters.get("auth_error");
+    void Promise.resolve().then(() => {
+      if (draft) {
+        setBooking(draft.selection);
+        setProfile(draft.selection.provider);
+        setRestoredBookingRequest(draft.request);
+      }
+      if (authError) {
+        const messages: Record<string, string> = {
+          google_cancelled: "Connexion Google annulée.", google_provider_error: "Google n’a pas pu autoriser la connexion.",
+          invalid_callback: "Retour Google invalide.", oauth_exchange_failed: "La session Google a expiré. Recommencez.",
+          profile_creation_failed: "Le profil Mata Beauty n’a pas pu être créé.", professional_request_failed: "La demande professionnelle n’a pas pu être préparée.",
+          account_suspended: "Ce compte est suspendu.", oauth_unavailable: "La connexion Google est momentanément indisponible.",
+        };
+        setNotice(messages[authError] ?? "La connexion Google a échoué.");
+      } else if (parameters.get("auth") === "google") {
+        setNotice(parameters.get("profile") === "incomplete" ? "Connexion Google réussie. Complétez maintenant votre profil." : "Connexion Google réussie.");
+      }
+    });
+    if (authError || parameters.has("auth")) window.history.replaceState(null, "", window.location.pathname);
     return () => window.clearTimeout(splashTimer);
   }, []);
 
@@ -149,14 +198,17 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
       setCatalogState(providers.length ? "live" : "empty");
     }).catch(() => { if (active) setCatalogState("error"); });
     void fetchActivePromotions(supabase).then((items) => { if (active) setPromotions(items); }).catch(() => {});
+    const oauthIntent = oauthReturn.current.intent;
+    const oauthAuthenticated = oauthReturn.current.authenticated;
     void supabase.auth.getSession().then(async ({ data }) => {
       const user = data.session?.user;
       if (!active || !user) return;
-      const { data: account } = await supabase.from("profiles").select("role,is_suspended").eq("id", user.id).maybeSingle();
-      if (!active || !account || account.is_suspended) return;
-      const signedIn = { userId: user.id, role: account.role } as AuthenticatedProfile;
+      const signedIn = await loadAuthenticatedProfile(supabase, user.id).catch(() => null);
+      if (!active || !signedIn) return;
       setAuthenticated(signedIn);
-      if (signedIn.role === "client") {
+      if (!readBookingDraft() && oauthIntent === "professional" && signedIn.roles.includes("provider")) setView("provider");
+      else if (!readBookingDraft() && signedIn.profileIncomplete && oauthAuthenticated) setView("client");
+      if (signedIn.roles.includes("client")) {
         const [{ data: favoriteData }, { data: bookingData }] = await Promise.all([
           supabase.from("favorites").select("provider_id").eq("client_id", user.id),
           supabase.from("bookings").select("id,starts_at,status").eq("client_id", user.id).gte("starts_at", new Date().toISOString()).order("starts_at").limit(3),
@@ -166,6 +218,22 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
       }
     });
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_OUT") return;
+      setAuthenticated(null);
+      setFavorites([]);
+      setUpcomingBookings([]);
+      setBooking(null);
+      setProfile(null);
+      setView("home");
+      window.sessionStorage.removeItem(bookingDraftKey);
+    });
+    return () => data.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -187,8 +255,19 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   }, [catalog]);
 
   function openAccount(section: "client" | "provider" | "admin" = "client") {
-    if (authenticated?.role === section) setView(section);
+    if (authenticated?.roles.includes(section)) setView(section);
     else setAuthRequest({ role: section, mode: "login" });
+  }
+
+  function startBooking(selection: BookingSelection) {
+    setRestoredBookingRequest(null);
+    setBooking(selection);
+  }
+
+  function closeBooking() {
+    window.sessionStorage.removeItem(bookingDraftKey);
+    setRestoredBookingRequest(null);
+    setBooking(null);
   }
 
   function runSearch(event?: FormEvent) {
@@ -211,12 +290,12 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
 
   function bookSocialService(authorId: string, service: ProviderService) {
     const provider = catalog.find((item) => item.profileId === authorId);
-    if (provider) setBooking({ provider, service });
+    if (provider) startBooking({ provider, service });
     else setNotice("Cette prestation n’est pas disponible actuellement.");
   }
 
   async function toggleFavorite(provider: Provider) {
-    if (!authenticated || authenticated.role !== "client") {
+    if (!authenticated?.roles.includes("client")) {
       setAuthRequest({ role: "client", mode: "login" });
       return;
     }
@@ -237,7 +316,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   async function confirmBooking(request: BookingRequest): Promise<BookingConfirmation | null> {
     if (!booking) return null;
     const { provider, service } = booking;
-    if (!authenticated || authenticated.role !== "client") {
+    if (!authenticated?.roles.includes("client")) {
       setAuthRequest({ role: "client", mode: "login" });
       return null;
     }
@@ -263,6 +342,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
       setNotice(error?.code === "23P01" ? "Ce créneau vient d’être réservé." : "La réservation n’a pas pu être enregistrée.");
       return null;
     }
+    window.sessionStorage.removeItem(bookingDraftKey);
     if (request.paymentMethod !== "on_site") {
       const { data: sessionData } = await supabase.auth.getSession();
       const paymentResponse = await fetch("/api/payments/create", {
@@ -283,22 +363,20 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   async function signOut() {
     const supabase = getSupabaseBrowserClient();
     if (supabase) await supabase.auth.signOut();
-    setAuthenticated(null);
-    setView("home");
   }
 
   function handleAuthenticated(signedIn: AuthenticatedProfile) {
     setAuthenticated(signedIn);
     setAuthRequest(null);
-    if (!booking) setView(signedIn.role);
+    if (!booking) setView(signedIn.roles.includes(authRequest?.role ?? "client") ? (authRequest?.role ?? signedIn.role) : signedIn.role);
   }
 
-  if (view !== "home" && authenticated?.role === view) {
+  if (view !== "home" && authenticated?.roles.includes(view)) {
     return <LiveDashboard role={view} userId={authenticated.userId} displayName="votre espace" onBack={() => setView("home")} onSignOut={signOut} />;
   }
 
   if (profile) {
-    return <><ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.id)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service) => setBooking({ provider: profile, service })} />{booking && <BookingModal selection={booking} initialDate={date} authenticated={authenticated?.role === "client"} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}{authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}</>;
+    return <><ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.id)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service) => startBooking({ provider: profile, service })} />{booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}{authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}</>;
   }
 
   return (
@@ -332,7 +410,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
             onSearch={runSearch}
             onCategory={selectCategory}
             onViewProvider={setProfile}
-            onBook={(provider) => setBooking({ provider, service: defaultService(provider) })}
+            onBook={(provider) => startBooking({ provider, service: defaultService(provider) })}
             onFavorite={(provider) => void toggleFavorite(provider)}
             onAccount={() => openAccount()}
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
@@ -361,7 +439,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
             setMaxPrice={setMaxPrice}
             onBack={() => setScreen("home")}
             onViewProvider={setProfile}
-            onBook={(provider) => setBooking({ provider, service: defaultService(provider) })}
+            onBook={(provider) => startBooking({ provider, service: defaultService(provider) })}
             onFavorite={(provider) => void toggleFavorite(provider)}
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
           />
@@ -369,7 +447,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
         <BottomNav active={screen === "feed" ? "feed" : "discover"} onFeed={() => setScreen("feed")} onDiscover={() => setScreen("home")} onPublish={() => openAccount("provider")} onAccount={openAccount} />
       </div>
 
-      {booking && <BookingModal selection={booking} initialDate={date} authenticated={authenticated?.role === "client"} onClose={() => setBooking(null)} onSubmit={confirmBooking} />}
+      {booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}
       {authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}
     </main>
   );
@@ -488,15 +566,19 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
   </div></div></main>;
 }
 
-function BookingModal({ selection, initialDate, authenticated, onClose, onSubmit }: { selection: BookingSelection; initialDate: string; authenticated: boolean; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<BookingConfirmation | null> }) {
+function BookingModal({ selection, initialDate, initialRequest, authenticated, onClose, onSubmit }: { selection: BookingSelection; initialDate: string; initialRequest: BookingRequest | null; authenticated: boolean; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<BookingConfirmation | null> }) {
   const { provider, service } = selection;
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(initialRequest?.time ? 2 : 1);
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
   const [slots, setSlots] = useState<string[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [waitingForAuthentication, setWaitingForAuthentication] = useState(false);
-  const [form, setForm] = useState<BookingRequest>({ date: initialDate || defaultBookingDate, time: "", locationMode: "salon", address: "", note: "", paymentMethod: "on_site" });
+  const [form, setForm] = useState<BookingRequest>(initialRequest ?? { date: initialDate || defaultBookingDate, time: "", locationMode: "salon", address: "", note: "", paymentMethod: "on_site" });
+
+  useEffect(() => {
+    window.sessionStorage.setItem(bookingDraftKey, JSON.stringify({ selection, request: form }));
+  }, [form, selection]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();

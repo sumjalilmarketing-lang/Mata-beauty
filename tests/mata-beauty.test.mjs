@@ -164,3 +164,26 @@ test("the audit hardening keeps identity verification and booking prices server-
   assert.match(paymentServer, /VERCEL_ENV !== "production"/);
   assert.match(createRoute, /applicationOrigin\(request\)/);
 });
+
+test("Google OAuth uses PKCE, a server callback, and idempotent non-privileged profiles", async () => {
+  const [client, modal, callback, migration, app] = await Promise.all([
+    readFile(new URL("lib/supabase/client.ts", root), "utf8"),
+    readFile(new URL("app/auth-modal.tsx", root), "utf8"),
+    readFile(new URL("app/auth/callback/route.ts", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260804170000_google_oauth_identity.sql", root), "utf8"),
+    readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
+  ]);
+  assert.match(client, /createBrowserClient/);
+  assert.match(client, /flowType: "pkce"/);
+  assert.match(modal, /provider: "google"/);
+  assert.match(modal, /Continuer avec Google/);
+  assert.match(callback, /exchangeCodeForSession/);
+  assert.match(callback, /safeOAuthDestination/);
+  assert.doesNotMatch(callback, /console\.(log|error)/);
+  assert.match(migration, /on conflict\(id\) do nothing/);
+  assert.match(migration, /request_professional_profile/);
+  assert.match(migration, /values\(identity\.id, 'customer'\)/);
+  assert.doesNotMatch(migration, /raw_user_meta_data->>'role'/);
+  assert.match(app, /mata-booking-draft/);
+  assert.match(app, /onAuthStateChange/);
+});

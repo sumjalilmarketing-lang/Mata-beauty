@@ -28,6 +28,8 @@ async function mockSupabase(page: Page, state: AuditState) {
     const url = new URL(request.url());
     const path = url.pathname;
 
+    if (path === "/auth/v1/settings") return json(route, { external: { google: true } });
+
     if (path === "/auth/v1/token") {
       const payload = request.postDataJSON() as { email?: string };
       state.currentRole = payload.email?.startsWith("provider") ? "provider" : payload.email?.startsWith("other") ? "other" : "client";
@@ -244,5 +246,22 @@ test.describe("audit chronométré de réservation", () => {
       body: JSON.stringify({ status: "cancelled_by_client" }),
     }).then((result) => result.status), { id: bookingId, endpoint: api });
     expect(response).toBe(403);
+  });
+
+  test("restaure la prestation et le créneau après une interruption OAuth", async ({ page }) => {
+    const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
+    await mockSupabase(page, state);
+    await page.goto("/");
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
+    await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click();
+    await page.locator(".premium-provider-card").click();
+    await page.getByRole("button", { name: /Tresses express/ }).click();
+    await page.getByRole("button", { name: "10:00" }).click();
+    await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("dialog", { name: "Réserver" })).toBeVisible();
+    await expect(page.getByText("Tresses express", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/10:00/)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
   });
 });

@@ -4,6 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { loadAuthenticatedProfile, type AuthenticatedProfile } from "@/lib/auth/profile";
+import { isGoogleAuthEnabled } from "@/lib/auth/providers";
 import { getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
 
 const authSchema = z.object({
@@ -15,10 +17,7 @@ const authSchema = z.object({
 
 type AuthValues = z.infer<typeof authSchema>;
 type AuthMode = "login" | "register" | "reset";
-export type AuthenticatedProfile = {
-  userId: string;
-  role: "client" | "provider" | "admin";
-};
+export type { AuthenticatedProfile } from "@/lib/auth/profile";
 
 export function AuthModal({
   initialMode = "login",
@@ -33,6 +32,7 @@ export function AuthModal({
 }) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [feedback, setFeedback] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
   const configuration = getSupabaseConfiguration();
   const {
     register,
@@ -49,6 +49,11 @@ export function AuthModal({
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       setFeedback("Connexion Supabase indisponible : la clé publique n’est pas configurée.");
+      return;
+    }
+    if (!await isGoogleAuthEnabled(configuration)) {
+      setFeedback("La connexion Google n’est pas encore activée pour Mata Beauty. Utilisez votre e-mail pour le moment.");
+      setGoogleLoading(false);
       return;
     }
 
@@ -72,7 +77,7 @@ export function AuthModal({
           password: values.password,
           options: {
             data: {
-              role: intendedRole,
+              professional_intent: intendedRole === "provider",
               display_name: values.displayName?.trim() || values.email.split("@")[0],
               legal_accepted: true,
             },
@@ -97,20 +102,34 @@ export function AuthModal({
       const user = sessionData.session?.user;
       if (!user) throw new Error("La session n’a pas pu être créée.");
       await supabase.rpc("synchronize_account_status");
-
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role,is_suspended")
-        .eq("id", user.id)
-        .single();
-      if (profileError) throw profileError;
-      if (profile.is_suspended) {
-        await supabase.auth.signOut();
-        throw new Error("Ce compte est suspendu. Contactez l’assistance Mata Beauty.");
-      }
-      onAuthenticated({ userId: user.id, role: profile.role });
+      await supabase.rpc("ensure_authenticated_profile");
+      if (intendedRole === "provider") await supabase.rpc("request_professional_profile");
+      onAuthenticated(await loadAuthenticatedProfile(supabase, user.id));
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "L’opération a échoué. Réessayez.");
+    }
+  }
+
+  async function continueWithGoogle() {
+    setFeedback("");
+    setGoogleLoading(true);
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setFeedback("Connexion Supabase indisponible.");
+      setGoogleLoading(false);
+      return;
+    }
+    const intent = intendedRole === "provider" ? "professional" : "client";
+    const redirectTo = new URL("/auth/callback", window.location.origin);
+    redirectTo.searchParams.set("intent", intent);
+    redirectTo.searchParams.set("next", "/");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: redirectTo.toString(), scopes: "openid email profile" },
+    });
+    if (error) {
+      setFeedback("La connexion Google n’a pas pu démarrer. Réessayez.");
+      setGoogleLoading(false);
     }
   }
 
@@ -129,6 +148,12 @@ export function AuthModal({
             La connexion sécurisée est momentanément indisponible. Réessayez ultérieurement.
           </div>
         )}
+        {mode !== "reset" && <>
+          <button className="google-auth-button" type="button" onClick={() => void continueWithGoogle()} disabled={googleLoading || isSubmitting || !configuration.configured}>
+            <span aria-hidden="true">G</span>{googleLoading ? "Ouverture de Google…" : "Continuer avec Google"}
+          </button>
+          <div className="auth-divider"><span>ou avec votre e-mail</span></div>
+        </>}
         <form onSubmit={handleSubmit(submit)} noValidate>
           {mode === "register" && (
             <label>

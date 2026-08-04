@@ -23,6 +23,7 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 | Design premium, thème sombre/clair, navigation | opérationnel | Tokens globaux, composants uniformisés, tests navigation et débordement. |
 | Responsive 320/360/375/390/430/tablette/laptop/1920 | opérationnel | Matrice Playwright sur 9 projets ; navigation tactile ≥ 44 px. |
 | Auth email/mot de passe, déconnexion, reset | opérationnel | Interface Supabase réelle et route de mise à jour du mot de passe. |
+| Auth Google/Gmail | partiellement opérationnel | PKCE, callback serveur, profils/rôles et tests prêts ; fournisseur Google désactivé dans Supabase faute de Client ID/Secret accessible. |
 | Vérification email | partiellement opérationnel | Statut désormais adossé à `auth.users.email_confirmed_at`; parcours réel boîte mail non automatisé. |
 | Téléphone / OTP | absent | Aucun parcours téléphone complet. |
 | Suppression de compte | absent | Modèle de données partiel, aucune orchestration utilisateur vérifiée. |
@@ -89,11 +90,12 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 ## Risques résiduels et prochaines actions exactes
 
 1. **Paiement mock — bloquant production.** Obtenir les identifiants sandbox du PSP retenu, configurer uniquement Preview, exécuter paiement/échec/expiration/webhook/rejeu/remboursement réels, puis faire homologuer avant toute bascule.
-2. **RLS multi-comptes réel — bloquant production.** Créer un projet Supabase de test isolé et des comptes client A/B, provider A/B et rôles admin ; exécuter une matrice CRUD négative sur chaque table/bucket.
-3. **KYC — risque élevé.** Ajouter une API d'URL signée courte qui journalise chaque consultation administrative et des tests de téléchargement inter-compte.
-4. **OTP/téléphone et suppression de compte — fonctionnalités absentes.** Concevoir les parcours, la rétention légale et les jobs de purge/anonymisation avant activation UI.
-5. **Social — risque moyen.** Ajouter worker de publication programmée, transcodage/miniatures serveur, réponses/suppression de commentaires et blocage.
-6. **Messagerie/support — risque moyen.** Ajouter pièces jointes privées, pagination et tests multi-comptes complets.
-7. **SEO/a11y — risque moyen.** Ajouter sitemap/robots, pages publiques partageables et audit automatisé axe sur tous les écrans.
+2. **Google OAuth désactivé — bloquant la fonctionnalité.** Créer/récupérer un Client ID et un Client Secret Google, les saisir uniquement dans Supabase Auth, autoriser les callbacks documentées et relancer la recette Gmail réelle.
+3. **RLS multi-comptes réel — bloquant production.** Créer un projet Supabase de test isolé et des comptes client A/B, provider A/B et rôles admin ; exécuter une matrice CRUD négative sur chaque table/bucket.
+4. **KYC — risque élevé.** Ajouter une API d'URL signée courte qui journalise chaque consultation administrative et des tests de téléchargement inter-compte.
+5. **OTP/téléphone et suppression de compte — fonctionnalités absentes.** Concevoir les parcours, la rétention légale et les jobs de purge/anonymisation avant activation UI.
+6. **Social — risque moyen.** Ajouter worker de publication programmée, transcodage/miniatures serveur, réponses/suppression de commentaires et blocage.
+7. **Messagerie/support — risque moyen.** Ajouter pièces jointes privées, pagination et tests multi-comptes complets.
+8. **SEO/a11y — risque moyen.** Ajouter sitemap/robots, pages publiques partageables et audit automatisé axe sur tous les écrans.
 
 La Preview peut servir à la recette fonctionnelle. Elle ne doit pas être promue en production tant que les points 1 et 2 ne sont pas clôturés.

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
+  await page.route("https://audit.supabase.co/auth/v1/settings", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ external: { google: true } }) }));
   page.on("pageerror", (error) => { throw error; });
   page.on("console", (message) => {
     if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());
@@ -61,4 +62,36 @@ test("primary mobile navigation keeps comfortable touch targets", async ({ page 
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     await expect(button).toHaveAccessibleName(/\S/);
   }
+});
+
+test("Google login starts a real OAuth request with a fixed callback", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  const google = page.getByRole("button", { name: "Continuer avec Google", exact: true });
+  await expect(google).toBeEnabled();
+  const authorizeRequest = page.waitForRequest((request) => new URL(request.url()).pathname === "/auth/v1/authorize");
+  await google.click();
+  const oauthUrl = new URL((await authorizeRequest).url());
+  expect(oauthUrl.searchParams.get("provider")).toBe("google");
+  const redirect = new URL(oauthUrl.searchParams.get("redirect_to") ?? "https://invalid.test");
+  expect(redirect.pathname).toBe("/auth/callback");
+  expect(redirect.searchParams.get("intent")).toBe("client");
+  expect(redirect.searchParams.get("next")).toBe("/");
+});
+
+test("invalid OAuth callbacks fail closed without an open redirect", async ({ page }) => {
+  await page.goto("/auth/callback?next=https%3A%2F%2Fevil.example%2Fsteal");
+  await expect(page.getByText("Retour Google invalide.", { exact: true })).toBeVisible();
+  expect(new URL(page.url()).origin).toBe("http://localhost:3000");
+});
+
+test("professional Google registration keeps a non-administrative intent", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Publier" }).click();
+  const authorizeRequest = page.waitForRequest((request) => new URL(request.url()).pathname === "/auth/v1/authorize");
+  await page.getByRole("button", { name: "Continuer avec Google", exact: true }).click();
+  const oauthUrl = new URL((await authorizeRequest).url());
+  const redirect = new URL(oauthUrl.searchParams.get("redirect_to") ?? "https://invalid.test");
+  expect(redirect.searchParams.get("intent")).toBe("professional");
+  expect(redirect.searchParams.get("intent")).not.toBe("admin");
 });
