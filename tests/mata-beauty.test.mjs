@@ -115,13 +115,15 @@ test("the Super Admin control center is protected by RBAC and audited RPCs", asy
   assert.match(adminApp, /ConfirmationModal/);
 });
 
-test("the social video layer is server-counted, storage-isolated, and protected by RLS", async () => {
-  const [schema, actions, guard, feed, publisher] = await Promise.all([
+test("the social video layer is server-counted, attributable, storage-isolated, and protected by RLS", async () => {
+  const [schema, actions, guard, attribution, feed, publisher, app] = await Promise.all([
     readFile(new URL("supabase/migrations/20260804133000_social_video_feed.sql", root), "utf8"),
     readFile(new URL("supabase/migrations/20260804134500_social_actions_and_publish.sql", root), "utf8"),
     readFile(new URL("supabase/migrations/20260804143000_social_publication_guard.sql", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260804180000_social_booking_attribution.sql", root), "utf8"),
     readFile(new URL("app/social-feed.tsx", root), "utf8"),
     readFile(new URL("app/video-publisher.tsx", root), "utf8"),
+    readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
   ]);
   for (const table of ["posts", "post_services", "post_likes", "post_saves", "follows", "post_comments", "hashtags", "video_views"]) {
     assert.match(schema, new RegExp(`create table if not exists public\\.${table}`));
@@ -134,8 +136,15 @@ test("the social video layer is server-counted, storage-isolated, and protected 
   assert.match(actions, /create_video_post/);
   assert.match(guard, /provider\.status = 'approved'/);
   assert.match(guard, /client_consent_confirmed/);
+  assert.match(attribution, /add column if not exists source_post_id/);
+  assert.match(attribution, /validate_social_booking_source/);
+  assert.match(attribution, /provider_social_conversion_summary/);
+  assert.match(attribution, /post\.author_id = auth\.uid\(\)/);
+  assert.match(attribution, /old\.source_post_id is distinct from new\.source_post_id/);
   assert.match(feed, /IntersectionObserver/);
   assert.match(feed, /record_video_view/);
+  assert.match(feed, /onBook\(post\.authorId,.*post\.id\)/s);
+  assert.match(app, /source_post_id: booking\.sourcePostId \?\? null/);
   assert.match(publisher, /100 \* 1024 \* 1024/);
   assert.doesNotMatch(feed + publisher, /SUPABASE_SERVICE_ROLE_KEY/);
 });

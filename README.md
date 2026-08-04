@@ -1,13 +1,16 @@
 # Mata Beauty
 
-Mata Beauty est une marketplace de réservation de prestations beauté conçue
-pour le Sénégal et extensible à l’Afrique francophone. Cette version livre une
-expérience responsive, trois espaces par rôle et une fondation Supabase
-sécurisée reliée au projet hébergé.
+Mata Beauty est une plateforme sociale de découverte et de réservation de
+prestations beauté conçue pour le Sénégal et extensible à l’Afrique
+francophone. Le contenu inspire, renforce la confiance et mène directement à
+une prestation réservable. La vision produit de référence est décrite dans
+[`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).
 
 ## Ce qui fonctionne
 
 - catalogue de 12 prestataires avec recherche, zone et catégories ;
+- feed vidéo vertical avec prestations liées, actions sociales et réservation ;
+- attribution sécurisée des réservations générées par une vidéo ;
 - profils détaillés, favoris et états vides ;
 - parcours de réservation avec prestation, date, créneau, lieu et paiement sur
   place en mode test ;

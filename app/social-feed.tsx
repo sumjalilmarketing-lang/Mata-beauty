@@ -24,7 +24,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   onDiscover: () => void;
   onPublish: () => void;
   onOpenProvider: (authorId: string) => void;
-  onBook: (authorId: string, service: { id: string; title: string; duration_minutes: number; price_amount: number }) => void;
+  onBook: (authorId: string, service: { id: string; title: string; duration_minutes: number; price_amount: number }, sourcePostId: string) => void;
 }) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
@@ -213,7 +213,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
         <button aria-label="Partager" onClick={() => void share(post)}>↗<small>{compact.format(post.shareCount)}</small></button>
         <button aria-label="Signaler" onClick={() => void report(post)}>⚑<small>Signaler</small></button>
       </aside>
-      <div className="social-caption"><button className="creator-name" onClick={() => onOpenProvider(post.authorId)}>@{post.slug} {post.verified && <b>✓</b>}</button><p>{post.caption}</p><span>#matabeauty · #{post.city.toLocaleLowerCase("fr").replaceAll(" ","")}</span>{post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service"><div><small>PRESTATION LIÉE</small><strong>{post.serviceTitle}</strong><span>{post.durationMinutes} min · {price(post.priceAmount)}</span></div><button onClick={() => onBook(post.authorId,{ id:post.serviceId!,title:post.serviceTitle!,duration_minutes:post.durationMinutes!,price_amount:post.priceAmount! })}>Réserver</button></div>}</div>
+      <div className="social-caption"><button className="creator-name" onClick={() => onOpenProvider(post.authorId)}>@{post.slug} {post.verified && <b>✓</b>}</button><p>{post.caption}</p><span>#matabeauty · #{post.city.toLocaleLowerCase("fr").replaceAll(" ","")}</span>{post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service"><div><small>PRESTATION LIÉE</small><strong>{post.serviceTitle}</strong><span>{post.durationMinutes} min · {price(post.priceAmount)}</span></div><button onClick={() => onBook(post.authorId,{ id:post.serviceId!,title:post.serviceTitle!,duration_minutes:post.durationMinutes!,price_amount:post.priceAmount! },post.id)}>Réserver</button></div>}</div>
     </article>)}
   </div>{activePost?.isSponsored && <span className="sponsored-label">Contenu sponsorisé</span>}
   {commentsPost && <div className="comments-backdrop" onMouseDown={(event) => event.target===event.currentTarget && setCommentsPost(null)}><section className="comments-sheet" role="dialog" aria-modal="true" aria-label="Commentaires"><header><strong>Commentaires</strong><button aria-label="Fermer" onClick={() => setCommentsPost(null)}>×</button></header><div>{comments.length ? comments.map((comment) => <article key={comment.id}><span>{comment.profiles?.display_name?.slice(0,1) ?? "M"}</span><p><strong>{comment.profiles?.display_name ?? "Membre Mata"}</strong>{comment.body}</p></article>) : <p className="no-comments">Soyez la première à commenter.</p>}</div><footer><input aria-label="Ajouter un commentaire" value={commentText} maxLength={1000} onChange={(event) => setCommentText(event.target.value)} placeholder="Ajouter un commentaire…" /><button disabled={!commentText.trim()} onClick={() => void addComment()}>Publier</button></footer></section></div>}

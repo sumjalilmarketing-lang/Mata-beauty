@@ -41,7 +41,7 @@ type BookingRequest = {
 type BookingConfirmation = { id: string; date: string; time: string; location: string };
 type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number };
 type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[] };
-type BookingSelection = { provider: Provider; service: ProviderService };
+type BookingSelection = { provider: Provider; service: ProviderService; sourcePostId?: string };
 type AvailabilitySlot = { slot_start: string };
 
 const bookingDraftKey = "mata-booking-draft";
@@ -53,6 +53,7 @@ const bookingDraftSchema = z.object({
       initials: z.string(), verified: z.boolean(), homeService: z.boolean(), durationMinutes: z.number().int(), coverUrl: z.string().optional(),
     }),
     service: z.object({ id: z.string().min(1), title: z.string(), duration_minutes: z.number().int(), price_amount: z.number().int().nonnegative() }),
+    sourcePostId: z.string().uuid().optional(),
   }),
   request: z.object({
     date: z.string(), time: z.string(), locationMode: z.enum(["salon", "client_address"]), address: z.string(), note: z.string(),
@@ -288,9 +289,9 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
     else setNotice("Ce profil n’est pas encore disponible dans le catalogue.");
   }
 
-  function bookSocialService(authorId: string, service: ProviderService) {
+  function bookSocialService(authorId: string, service: ProviderService, sourcePostId: string) {
     const provider = catalog.find((item) => item.profileId === authorId);
-    if (provider) startBooking({ provider, service });
+    if (provider) startBooking({ provider, service, sourcePostId });
     else setNotice("Cette prestation n’est pas disponible actuellement.");
   }
 
@@ -337,6 +338,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
       total_amount: quote.totalAmount,
       currency: quote.currency,
       client_note: request.note.trim() || null,
+      source_post_id: booking.sourcePostId ?? null,
     }).select("id").single();
     if (error || !created) {
       setNotice(error?.code === "23P01" ? "Ce créneau vient d’être réservé." : "La réservation n’a pas pu être enregistrée.");

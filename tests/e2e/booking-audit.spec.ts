@@ -6,11 +6,13 @@ const serviceId = "22222222-2222-4222-8222-222222222222";
 const clientId = "33333333-3333-4333-8333-333333333333";
 const otherClientId = "44444444-4444-4444-8444-444444444444";
 const bookingId = "55555555-5555-4555-8555-555555555555";
+const socialPostId = "66666666-6666-4666-8666-666666666666";
 
 type AuditState = {
   bookingCreated: boolean;
   currentRole: "client" | "provider" | "other";
   selectedSlot: string;
+  lastBookingSource?: string | null;
 };
 
 function json(route: Route, body: unknown, status = 200) {
@@ -46,7 +48,7 @@ async function mockSupabase(page: Page, state: AuditState) {
     if (path === "/auth/v1/logout") return json(route, {});
     if (path === "/rest/v1/social_feed") {
       return json(route, [{
-        id: "66666666-6666-4666-8666-666666666666", author_id: providerId,
+        id: socialPostId, author_id: providerId,
         caption: "Tresses express réalisées à Dakar", video_url: `${api}/social-sample.mp4`, thumbnail_url: null,
         duration_seconds: 18, aspect_ratio: 0.562, allow_comments: true, is_sponsored: false,
         view_count: 120, like_count: 32, comment_count: 4, save_count: 7, share_count: 2,
@@ -114,6 +116,8 @@ async function mockSupabase(page: Page, state: AuditState) {
     if (path === "/rest/v1/client_profiles") return json(route, { city: "Dakar", default_address: null, preferences: {} });
     if (path === "/rest/v1/bookings" && request.method() === "POST") {
       if (state.bookingCreated) return json(route, { code: "23P01", message: "slot overlap" }, 409);
+      const payload = request.postDataJSON() as { source_post_id?: string | null };
+      state.lastBookingSource = payload.source_post_id ?? null;
       state.bookingCreated = true;
       return json(route, { id: bookingId }, 201);
     }
@@ -204,6 +208,7 @@ test.describe("audit chronométré de réservation", () => {
     await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
     expect(state.bookingCreated).toBe(true);
+    expect(state.lastBookingSource).toBe(socialPostId);
     const durationMs = Date.now() - startedAt;
     expect(actions).toBe(6);
     expect(durationMs).toBeLessThan(30_000);
