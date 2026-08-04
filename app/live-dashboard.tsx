@@ -6,6 +6,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { BookingMessages } from "./booking-messages";
 import { VideoPublisher } from "./video-publisher";
 import { SocialDashboard } from "./social-dashboard";
+import { ClientControlCenter } from "./client-control-center";
 
 type Role = "client" | "provider" | "admin";
 type ProviderStatus = "draft" | "pending_review" | "approved" | "rejected" | "suspended";
@@ -361,7 +362,8 @@ export function LiveDashboard({
           <div className="bar-chart" aria-label="Graphique d’activité">{[38, 58, 44, 72, 61, 86, 68].map((height, index) => <span key={index} style={{ height: `${height}%` }}><i>{["L", "M", "M", "J", "V", "S", "D"][index]}</i></span>)}</div>
         </article>
 
-        {role === "client" && clientProfile && <article className="panel onboarding-panel">
+        {role === "client" && <ClientControlCenter userId={userId} />}
+        {role === "client" && clientProfile && <details className="panel onboarding-panel legacy-profile-form"><summary>Informations rapides</summary><article>
           <div className="panel-heading"><div><h2>Mon profil beauté</h2><p>Ces informations personnalisent vos recommandations et vos rendez-vous.</p></div></div>
           <form className="dashboard-form" onSubmit={(event) => void saveClientProfile(event)}>
             <label>Prénom<input name="firstName" required minLength={2} defaultValue={clientProfile.first_name ?? ""} /></label>
@@ -373,7 +375,7 @@ export function LiveDashboard({
             <label className="wide legal-consent"><input name="marketingConsent" type="checkbox" defaultChecked={clientProfile.marketing_consent} /><span>Recevoir les nouveautés des professionnels suivis. Facultatif.</span></label>
             <button className="primary-button" type="submit">Enregistrer mon profil</button>
           </form>
-        </article>}
+        </article></details>}
         {role === "client" && <SocialDashboard role="client" userId={userId} />}
 
         {role === "provider" && providerProfile && (
