@@ -44,7 +44,7 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 | Persistance client/prestataire et isolation autre client | opérationnel en E2E simulé | Tests des deux dashboards et refus de modification d'un autre client. |
 | Paiement | mock | Idempotence, webhooks signés, rejeu, ledger, remboursement et rate-limit conçus ; aucun paiement sandbox réel exécuté. |
 | Wallet/ledger | opérationnel côté schéma/API | Solde dérivé du ledger, réponse privée non mise en cache. |
-| Messagerie texte | opérationnel pour le socle | Conversation unique par rendez-vous, création serveur réservée aux participants, pagination, temps réel et accusés de lecture ; pièces jointes et recette réelle multi-comptes restent à livrer. |
+| Messagerie texte | opérationnel de bout en bout | Conversation unique par rendez-vous, création serveur réservée aux participants, pagination, temps réel, accusés de lecture et notifications validés avec deux navigateurs et trois comptes Supabase réels ; pièces jointes hors périmètre. |
 | Avis | partiellement opérationnel | Unicité par réservation, garde de champs et recalcul note ; photos/notes détaillées absentes. |
 | Dashboard professionnel | partiellement opérationnel | Données réelles chargées ; revenus explicitement indiqués « théoriques » tant que paiement mock. |
 | Super Admin / RBAC / audit | opérationnel pour le socle | Permissions séparées, RPC auditables et confirmations ; couverture UI exhaustive par rôle non automatisée. |
@@ -75,14 +75,17 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 - `pnpm audit --prod --audit-level moderate` : aucune vulnérabilité connue.
 - `supabase db lint --linked --level warning` : aucune erreur de schéma.
 - Migration distante appliquée : `20260804160000_full_audit_security_fixes.sql`, sans suppression de données.
+- Migrations messagerie distantes appliquées et alignées : `20260804190000_booking_conversations_realtime.sql` et `20260804191000_repair_message_notifications.sql` ; lint SQL distant sans erreur.
 
 ## Résultats de validation
 
 - ESLint : réussi.
 - TypeScript strict : réussi.
-- Vitest : 38/38.
-- Tests structurels Node : 7/7.
-- Playwright : 81/81 sur 9 formats, zéro skip, dont 9 contrôles dédiés aux zones tactiles.
+- Vitest : 42/42.
+- Tests structurels Node : 9/9.
+- Playwright : 117/117 sur 9 formats, zéro skip, dont 9 contrôles dédiés aux zones tactiles.
+- Playwright distant messagerie : 1/1 avec deux sessions navigateur simultanées, échange bidirectionnel sans rechargement, notifications et accusés de lecture.
+- Recette Supabase multi-comptes : réservation et conversation réelles, deux messages Realtime, notification, lectures, refus RLS tiers et refus d’usurpation validés ; données temporaires nettoyées.
 - Build Next.js production : réussi, 13 routes.
 - Audit dépendances production : zéro vulnérabilité connue.
 - Supabase dry-run, migration distante et lint lié : réussis.
@@ -95,7 +98,7 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 4. **KYC — risque élevé.** Ajouter une API d'URL signée courte qui journalise chaque consultation administrative et des tests de téléchargement inter-compte.
 5. **OTP/téléphone et suppression de compte — fonctionnalités absentes.** Concevoir les parcours, la rétention légale et les jobs de purge/anonymisation avant activation UI.
 6. **Social — risque moyen.** Ajouter worker de publication programmée, transcodage/miniatures serveur, réponses/suppression de commentaires et blocage.
-7. **Messagerie/support — risque moyen.** Ajouter pièces jointes privées analysées côté serveur et exécuter une recette réelle multi-comptes complète ; la pagination, le temps réel et les accusés de lecture sont désormais livrés.
+7. **Messagerie/support — risque moyen.** Ajouter des pièces jointes privées analysées côté serveur ; le texte, la pagination, le temps réel, les notifications, les accusés de lecture et la recette réelle multi-comptes sont livrés.
 8. **SEO/a11y — risque moyen.** Ajouter sitemap/robots, pages publiques partageables et audit automatisé axe sur tous les écrans.
 
 La Preview peut servir à la recette fonctionnelle. Elle ne doit pas être promue en production tant que les points 1 et 2 ne sont pas clôturés.

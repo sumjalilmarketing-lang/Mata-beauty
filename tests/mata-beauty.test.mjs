@@ -150,8 +150,9 @@ test("the social video layer is server-counted, attributable, storage-isolated, 
 });
 
 test("booking conversations are participant-only, realtime, paginated, and read-aware", async () => {
-  const [migration, messages, dashboard] = await Promise.all([
+  const [migration, notificationRepair, messages, dashboard] = await Promise.all([
     readFile(new URL("supabase/migrations/20260804190000_booking_conversations_realtime.sql", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260804191000_repair_message_notifications.sql", root), "utf8"),
     readFile(new URL("app/booking-messages.tsx", root), "utf8"),
     readFile(new URL("app/live-dashboard.tsx", root), "utf8"),
   ]);
@@ -161,6 +162,9 @@ test("booking conversations are participant-only, realtime, paginated, and read-
   assert.match(migration, /function public\.mark_conversation_read/);
   assert.match(migration, /profile_id = auth\.uid\(\)/);
   assert.match(migration, /alter publication supabase_realtime add table public\.messages/);
+  assert.match(notificationRepair, /create trigger messages_notify_created/);
+  assert.match(notificationRepair, /insert into public\.notifications/);
+  assert.match(notificationRepair, /member\.profile_id <> new\.sender_id/);
   assert.match(messages, /postgres_changes/);
   assert.match(messages, /\.limit\(pageSize\)/);
   assert.match(messages, /lastOwnMessageRead/);

@@ -1,0 +1,30 @@
+import { defineConfig, devices } from "@playwright/test";
+
+const supabaseUrl = process.env.REMOTE_SUPABASE_URL ?? "";
+const supabaseAnonKey = process.env.REMOTE_SUPABASE_ANON_KEY ?? "";
+
+export default defineConfig({
+  testDir: "./tests/remote",
+  testMatch: "messaging-remote-ui.spec.ts",
+  workers: 1,
+  fullyParallel: false,
+  reporter: "list",
+  use: {
+    baseURL: "http://localhost:3100",
+    trace: "retain-on-failure",
+    video: "retain-on-failure",
+    screenshot: "only-on-failure",
+    ...devices["Desktop Chrome"],
+  },
+  webServer: {
+    command: "node node_modules/next/dist/bin/next dev --port 3100",
+    url: "http://localhost:3100",
+    reuseExistingServer: false,
+    timeout: 120_000,
+    env: {
+      NEXT_PUBLIC_APP_URL: "http://localhost:3100",
+      NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey,
+    },
+  },
+});
