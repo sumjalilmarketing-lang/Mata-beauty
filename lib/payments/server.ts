@@ -44,10 +44,18 @@ export function requestFingerprint(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+export function applicationOrigin(request: Request) {
+  const vercelUrl = process.env.VERCEL_URL;
+  if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production" && vercelUrl) {
+    return `https://${vercelUrl}`;
+  }
+  return process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+}
+
 export function hasTrustedOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) return true;
-  const expected = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+  const expected = applicationOrigin(request);
   try { return new URL(origin).origin === new URL(expected).origin; } catch { return false; }
 }
 

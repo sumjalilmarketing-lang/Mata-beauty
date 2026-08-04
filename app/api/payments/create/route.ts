@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { calculatePaymentQuote } from "@/lib/domain/payments";
 import { getPaymentGateway } from "@/lib/payments/gateway";
-import { authenticatedSupabase, consumeRateLimit, hasTrustedOrigin, jsonError, requestContext, requestFingerprint } from "@/lib/payments/server";
+import { applicationOrigin, authenticatedSupabase, consumeRateLimit, hasTrustedOrigin, jsonError, requestContext, requestFingerprint } from "@/lib/payments/server";
 
 const schema = z.object({ bookingId: z.uuid(), method: z.enum(["orange_money", "wave", "card"]), attempt: z.string().min(8).max(80) });
 
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, payment, checkoutUrl: null, idempotent: true }, { headers: { "Cache-Control": "no-store", "X-Request-Id": context.requestId } });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+  const appUrl = applicationOrigin(request);
   try {
     const gateway = getPaymentGateway();
     const session = await gateway.createCheckout({

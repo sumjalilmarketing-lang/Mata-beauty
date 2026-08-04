@@ -141,12 +141,13 @@ test("the social video layer is server-counted, storage-isolated, and protected 
 });
 
 test("the audit hardening keeps identity verification and booking prices server-owned", async () => {
-  const [migration, releaseRoute, createRoute, refundRoute, webhookRoute] = await Promise.all([
+  const [migration, releaseRoute, createRoute, refundRoute, webhookRoute, paymentServer] = await Promise.all([
     readFile(new URL("supabase/migrations/20260804160000_full_audit_security_fixes.sql", root), "utf8"),
     readFile(new URL("app/api/payments/confirm-service/route.ts", root), "utf8"),
     readFile(new URL("app/api/payments/create/route.ts", root), "utf8"),
     readFile(new URL("app/api/payments/refund/route.ts", root), "utf8"),
     readFile(new URL("app/api/payments/webhook/route.ts", root), "utf8"),
+    readFile(new URL("lib/payments/server.ts", root), "utf8"),
   ]);
   assert.match(migration, /email_confirmed_at is not null/);
   assert.match(migration, /phone_confirmed_at is not null/);
@@ -160,4 +161,6 @@ test("the audit hardening keeps identity verification and booking prices server-
   for (const route of [releaseRoute, createRoute, refundRoute, webhookRoute]) {
     assert.match(route, /SECURITY_CONTROL_UNAVAILABLE/);
   }
+  assert.match(paymentServer, /VERCEL_ENV !== "production"/);
+  assert.match(createRoute, /applicationOrigin\(request\)/);
 });

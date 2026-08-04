@@ -60,6 +60,7 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 | critique | Prix, prestataire, durée et devise d'une réservation provenaient du payload navigateur. | Trigger serveur immuable recalculant le contrat depuis `provider_services`. | Test structurel de migration ; exclusion anti-chevauchement conservée. |
 | élevé | Libération de fonds sans contrôle d'origine ni limitation de débit au niveau API. | Origine fiable, rate-limit par utilisateur/IP, request-id et no-store. | Test structurel de route. |
 | moyen | Réponses statut paiement et wallet potentiellement cachables. | `Cache-Control: no-store`. | TypeScript/build. |
+| moyen | L'URL applicative de production pouvait être réutilisée en Preview pour les contrôles d'origine et retours PSP. | Origine calculée depuis `VERCEL_URL` hors production ; URL configurée conservée en production. | Test structurel et build. |
 | moyen | Réservation E2E limitée artificiellement au projet 320 px par `skip`. | Suppression du skip et exécution sur les 9 formats requis. | 81/81 tests E2E de matrice réussis. |
 | moyen | Formats 360, laptop et grand écran absents. | Ajout des projets Playwright correspondants. | Matrice Playwright. |
 | moyen | Zones tactiles non vérifiées automatiquement. | Test ≥ 44 px et nom accessible sur les 5 boutons principaux. | 9/9 réussis. |
