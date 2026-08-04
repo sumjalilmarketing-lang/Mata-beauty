@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const supabaseUrl = process.env.REMOTE_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.REMOTE_SUPABASE_ANON_KEY ?? "";
+const remoteAppUrl = process.env.REMOTE_APP_URL;
 
 export default defineConfig({
   testDir: "./tests/remote",
@@ -10,13 +11,13 @@ export default defineConfig({
   fullyParallel: false,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3100",
+    baseURL: remoteAppUrl ?? "http://localhost:3100",
     trace: "retain-on-failure",
     video: "retain-on-failure",
     screenshot: "only-on-failure",
     ...devices["Desktop Chrome"],
   },
-  webServer: {
+  webServer: remoteAppUrl ? undefined : {
     command: "node node_modules/next/dist/bin/next dev --port 3100",
     url: "http://localhost:3100",
     reuseExistingServer: false,

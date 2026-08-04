@@ -5,6 +5,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.REMOTE_SUPABASE_URL ?? "";
 const anonKey = process.env.REMOTE_SUPABASE_ANON_KEY ?? "";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const remoteAppUrl = process.env.REMOTE_APP_URL;
+const vercelBypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const runId = `${Date.now()}-${randomUUID().slice(0, 8)}`;
 const password = `Mata-UI-${randomUUID()}!`;
 const clientEmail = `codex-ui-client-${runId}@example.test`;
@@ -36,6 +38,15 @@ async function createUser(email: string, professionalIntent = false) {
 }
 
 async function signIn(page: Page, email: string, entry: "Profil" | "Publier") {
+  if (remoteAppUrl && vercelBypass) {
+    await page.route(`${new URL(remoteAppUrl).origin}/**`, async (route) => {
+      await route.continue({ headers: {
+        ...route.request().headers(),
+        "x-vercel-protection-bypass": vercelBypass,
+        "x-vercel-set-bypass-cookie": "true",
+      } });
+    });
+  }
   await page.goto("/");
   const connectivity = await page.evaluate(async ({ endpoint, key }) => {
     try {
