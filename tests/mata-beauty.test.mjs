@@ -178,6 +178,10 @@ test("Google OAuth uses PKCE, a server callback, and idempotent non-privileged p
   assert.match(client, /flowType: "pkce"/);
   assert.match(modal, /provider: "google"/);
   assert.match(modal, /Continuer avec Google/);
+  const submitBlock = modal.slice(modal.indexOf("async function submit"), modal.indexOf("async function continueWithGoogle"));
+  const googleBlock = modal.slice(modal.indexOf("async function continueWithGoogle"), modal.indexOf("const title ="));
+  assert.doesNotMatch(submitBlock, /isGoogleAuthEnabled/);
+  assert.match(googleBlock, /isGoogleAuthEnabled/);
   assert.match(callback, /exchangeCodeForSession/);
   assert.match(callback, /safeOAuthDestination/);
   assert.match(providersRoute, /AbortSignal\.timeout\(5000\)/);

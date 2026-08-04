@@ -51,12 +51,6 @@ export function AuthModal({
       setFeedback("Connexion Supabase indisponible : la clé publique n’est pas configurée.");
       return;
     }
-    if (!await isGoogleAuthEnabled()) {
-      setFeedback("La connexion Google n’est pas encore activée pour Mata Beauty. Utilisez votre e-mail pour le moment.");
-      setGoogleLoading(false);
-      return;
-    }
-
     try {
       if (mode === "reset") {
         const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
@@ -113,6 +107,11 @@ export function AuthModal({
   async function continueWithGoogle() {
     setFeedback("");
     setGoogleLoading(true);
+    if (!await isGoogleAuthEnabled()) {
+      setFeedback("La connexion Google n’est pas encore activée pour Mata Beauty. Utilisez votre e-mail pour le moment.");
+      setGoogleLoading(false);
+      return;
+    }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       setFeedback("Connexion Supabase indisponible.");
