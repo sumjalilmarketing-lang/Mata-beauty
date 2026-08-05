@@ -123,7 +123,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("mata-theme");
-    const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const preferredTheme = "dark";
     void Promise.resolve().then(() => setTheme(savedTheme === "dark" || savedTheme === "light" ? savedTheme : preferredTheme));
     const splashTimer = window.setTimeout(() => setShowSplash(false), 1350);
     const draft = readBookingDraft();
