@@ -1,0 +1,9 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
+
+type PublicService = { id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; provider_profiles: { business_name: string; city: string } | null };
+async function loadService(id: string) { const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; if (!url || !key) return null; const client = createClient(url, key, { auth: { persistSession: false } }); const { data } = await client.from("provider_services").select("id,title,description,duration_minutes,price_amount,provider_profiles(business_name,city)").eq("id", id).eq("is_active", true).maybeSingle(); return data as unknown as PublicService | null; }
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> { const item = await loadService((await params).id); return item ? { title: item.title, description: item.description ?? `Réservez ${item.title} sur Mata Beauty.` } : { title: "Prestation introuvable" }; }
+export default async function ServicePage({ params }: { params: Promise<{ id: string }> }) { const item = await loadService((await params).id); if (!item) notFound(); return <main className="public-detail"><Link href="/discover">← Découvrir</Link><section><small>{item.provider_profiles?.city ?? "Dakar"}</small><h1>{item.title}</h1><h2>{item.provider_profiles?.business_name ?? "Professionnel Mata Beauty"}</h2><p>{item.description ?? "Cette prestation est disponible à la réservation."}</p><strong>{item.duration_minutes} min · {item.price_amount.toLocaleString("fr-FR")} FCFA</strong><Link className="public-primary" href={`/?service=${item.id}`}>Choisir un créneau</Link></section></main>; }

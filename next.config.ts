@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  async redirects() {
+    return [{ source: "/posts/:id", destination: "/video/:id", permanent: false }];
+  },
   async headers() {
     const developmentEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
     return [{

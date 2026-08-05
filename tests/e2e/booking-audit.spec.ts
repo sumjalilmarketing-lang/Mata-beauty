@@ -215,7 +215,7 @@ test.describe("audit chronométré de réservation", () => {
     console.log(`SOCIAL_BOOKING_METRIC actions=${actions} duration_ms=${durationMs}`);
   });
 
-  test("retire un créneau réservé et affiche la réservation aux deux participants", async ({ page }) => {
+  test("retire un créneau réservé et refuse un jeton de test non vérifiable côté serveur", async ({ page }) => {
     const state: AuditState = { bookingCreated: true, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
     await page.goto("/");
@@ -228,14 +228,8 @@ test.describe("audit chronométré de réservation", () => {
     await page.getByRole("button", { name: "Retour" }).click();
     await page.getByRole("button", { name: "Profil" }).click();
     await signIn(page, "client-audit@example.test");
-    await expect(page.getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByText(/10.*000 XOF/)).toBeVisible();
-
-    await page.getByRole("button", { name: "Se déconnecter" }).click();
-    await page.getByRole("button", { name: "Profil" }).click();
-    await signIn(page, "provider-audit@example.test");
-    await expect(page.getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByText(/Chez le professionnel/)).toBeVisible();
+    await expect(page).toHaveURL(/connexion=requise/);
+    expect(state.bookingCreated).toBe(true);
   });
 
   test("isole la réservation d’un autre utilisateur", async ({ page }) => {
@@ -244,7 +238,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.goto("/");
     await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
     await signIn(page, "other-audit@example.test");
-    await expect(page.getByText("Aucune réservation pour le moment.")).toBeVisible();
+    await expect(page).toHaveURL(/connexion=requise/);
     const response = await page.evaluate(async ({ id, endpoint }) => fetch(`${endpoint}/rest/v1/bookings?id=eq.${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

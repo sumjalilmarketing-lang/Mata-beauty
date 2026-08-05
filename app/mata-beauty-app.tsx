@@ -91,7 +91,7 @@ const formatPrice = (value: number) => `${new Intl.NumberFormat("fr-FR").format(
 const today = new Date().toISOString().slice(0, 10);
 const defaultBookingDate = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
-export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: string; supabaseAnonKey: string }) {
+export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "feed" }: { supabaseUrl: string; supabaseAnonKey: string; initialScreen?: "feed" | "home" | "results" }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const oauthReturn = useRef({ intent: null as string | null, authenticated: false });
   const [showSplash, setShowSplash] = useState(true);
@@ -101,7 +101,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   const [subcategory, setSubcategory] = useState("Tout");
   const [area, setArea] = useState("Dakar, Sénégal");
   const [date, setDate] = useState("");
-  const [screen, setScreen] = useState<"feed" | "home" | "results">("feed");
+  const [screen, setScreen] = useState<"feed" | "home" | "results">(initialScreen);
   const [catalog, setCatalog] = useState<Provider[]>([]);
   const [catalogState, setCatalogState] = useState<"loading" | "live" | "empty" | "error">("loading");
   const [promotions, setPromotions] = useState<CatalogPromotion[]>([]);
@@ -256,7 +256,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   }, [catalog]);
 
   function openAccount(section: "client" | "provider" | "admin" = "client") {
-    if (authenticated?.roles.includes(section)) setView(section);
+    if (authenticated?.roles.includes(section)) window.location.assign(section === "provider" ? "/pro" : section === "admin" ? "/admin" : "/app");
     else setAuthRequest({ role: section, mode: "login" });
   }
 
@@ -370,7 +370,10 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   function handleAuthenticated(signedIn: AuthenticatedProfile) {
     setAuthenticated(signedIn);
     setAuthRequest(null);
-    if (!booking) setView(signedIn.roles.includes(authRequest?.role ?? "client") ? (authRequest?.role ?? signedIn.role) : signedIn.role);
+    if (!booking) {
+      const destination = signedIn.roles.includes(authRequest?.role ?? "client") ? (authRequest?.role ?? signedIn.role) : signedIn.role;
+      window.location.assign(destination === "provider" ? "/pro" : destination === "admin" ? "/admin" : "/app");
+    }
   }
 
   if (view !== "home" && authenticated?.roles.includes(view)) {
