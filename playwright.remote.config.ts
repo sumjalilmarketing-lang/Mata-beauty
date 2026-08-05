@@ -6,7 +6,7 @@ const remoteAppUrl = process.env.REMOTE_APP_URL;
 
 export default defineConfig({
   testDir: "./tests/remote",
-  testMatch: ["messaging-remote-ui.spec.ts", "social-feed-remote-ui.spec.ts", "client-profile-remote-ui.spec.ts"],
+  testMatch: ["messaging-remote-ui.spec.ts", "social-feed-remote-ui.spec.ts", "client-profile-remote-ui.spec.ts", "admin-access-remote-ui.spec.ts"],
   workers: 1,
   fullyParallel: false,
   reporter: "list",

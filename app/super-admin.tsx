@@ -144,6 +144,32 @@ const navigation = [
 ] as const;
 type ModuleKey = typeof navigation[number]["key"];
 
+const adminRoleLabels: Record<string, string> = {
+  super_admin: "Super administrateur",
+  admin: "Administrateur",
+  support: "Agent support",
+  verification_agent: "Agent onboarding",
+  finance: "Responsable finance",
+  moderator: "Modérateur",
+  content_manager: "Responsable contenu",
+};
+
+function canAccessModule(context: AdminContext, key: ModuleKey, permission: string) {
+  if (context.is_super_admin) return true;
+  if ((key === "overview" || key === "statistics") && !context.roles.includes("admin")) return false;
+  return context.permissions.includes(permission);
+}
+
+function landingModule(context: AdminContext): ModuleKey {
+  if (context.is_super_admin || context.roles.includes("admin")) return "overview";
+  if (context.roles.includes("support")) return "support";
+  if (context.roles.includes("verification_agent")) return "verification";
+  if (context.roles.includes("finance")) return "payments";
+  if (context.roles.includes("moderator")) return "reports";
+  if (context.roles.includes("content_manager")) return "content";
+  return navigation.find((item) => canAccessModule(context, item.key, item.permission))?.key ?? "overview";
+}
+
 const metricDefinitions: Array<{ key: keyof Metrics; label: string; tone?: string; currency?: boolean }> = [
   { key: "users_total", label: "Utilisateurs" },
   { key: "users_today", label: "Nouveaux aujourd’hui", tone: "positive" },
@@ -255,6 +281,11 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
         return;
       }
       setContext(next);
+      setActiveModule((current) => {
+        const currentItem = navigation.find((item) => item.key === current);
+        return currentItem && canAccessModule(next, currentItem.key, currentItem.permission) ? current : landingModule(next);
+      });
+      await supabase.rpc("record_admin_session", { client_user_agent: window.navigator.userAgent });
       setSessionState("ready");
     } catch {
       setContext(null);
@@ -282,7 +313,9 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   }, [context, globalQuery]);
 
   async function signOut() {
-    await getSupabaseBrowserClient()?.auth.signOut();
+    const supabase = getSupabaseBrowserClient();
+    await supabase?.rpc("close_admin_session");
+    await supabase?.auth.signOut();
     setContext(null);
     setSessionState("anonymous");
   }
@@ -292,13 +325,16 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   if (sessionState === "unauthorized") return <AccessDenied onSignOut={signOut} />;
   if (!context) return null;
 
-  const visibleNavigation = navigation.filter((item) => context.is_super_admin || context.permissions.includes(item.permission));
-  const current = navigation.find((item) => item.key === activeModule) ?? navigation[0];
+  const visibleNavigation = navigation.filter((item) => canAccessModule(context, item.key, item.permission));
+  const effectiveModule = visibleNavigation.some((item) => item.key === activeModule) ? activeModule : landingModule(context);
+  const current = navigation.find((item) => item.key === effectiveModule) ?? visibleNavigation[0];
+  const roleLabel = context.is_super_admin ? adminRoleLabels.super_admin : context.roles.map((role) => adminRoleLabels[role] ?? role).join(", ");
+  const roleInitials = context.is_super_admin ? "SA" : context.roles.includes("verification_agent") ? "ON" : context.roles[0]?.slice(0, 2).toUpperCase() ?? "AD";
 
   return <main className={`super-admin-shell ${collapsed ? "collapsed" : ""}`}>
     <aside className={`admin-sidebar ${mobileNav ? "mobile-open" : ""}`}>
-      <button className="admin-brand" onClick={() => setActiveModule("overview")}><Image src="/brand/mata-app-icon.webp" alt="" width={42} height={42} unoptimized /><strong>MATA<small>CONTROL CENTER</small></strong></button>
-      <div className="admin-role-card"><i>SA</i><span><strong>{context.is_super_admin ? "Super Admin" : context.roles.join(", ")}</strong><small>Accès sécurisé</small></span></div>
+      <button className="admin-brand" onClick={() => setActiveModule(landingModule(context))}><Image src="/brand/mata-app-icon.webp" alt="" width={42} height={42} unoptimized /><strong>MATA<small>CONTROL CENTER</small></strong></button>
+      <div className="admin-role-card"><i>{roleInitials}</i><span><strong>{roleLabel}</strong><small>Accès sécurisé</small></span></div>
       <nav aria-label="Navigation Super Admin">{visibleNavigation.map((item) =>
         <button key={item.key} className={activeModule === item.key ? "active" : ""} onClick={() => { setActiveModule(item.key); setMobileNav(false); }} title={item.label}>
           <i>{item.icon}</i><span>{item.label}</span>
@@ -326,8 +362,8 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
       </header>
       <div className="admin-page">
         {notice && <div className="admin-toast" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
-        <div className="admin-page-heading"><div><p>Mata Beauty · Administration</p><h1>{current.label}</h1></div><div className="admin-page-actions"><button className="secondary">Exporter</button><button className="primary" onClick={() => setNotice("Données actualisées.")}>Actualiser</button></div></div>
-        <AdminModule module={activeModule} context={context} setModule={setActiveModule} notify={setNotice} />
+        <div className="admin-page-heading"><div><p>Mata Beauty · Administration</p><h1>{current.label}</h1></div><div className="admin-page-actions"><button className="primary" onClick={() => window.location.reload()}>Actualiser</button></div></div>
+        <AdminModule module={effectiveModule} context={context} setModule={setActiveModule} notify={setNotice} />
       </div>
     </section>
   </main>;
@@ -420,10 +456,10 @@ function Overview({ context, setModule }: { context: AdminContext; setModule: (m
         <dl className="admin-kpi-list"><div><dt>Taux d’annulation</dt><dd>{cancellationRate}%</dd></div><div><dt>Panier moyen</dt><dd>{formatCurrency(metrics.average_order)}</dd></div><div><dt>Nouveaux comptes semaine</dt><dd>{metrics.users_week}</dd></div></dl>
       </article>
       <article className="admin-panel urgent-panel"><div className="admin-panel-heading"><div><p>À traiter</p><h2>Alertes opérationnelles</h2></div></div>
-        <button onClick={() => setModule("verification")}><span>Validations prestataires</span><strong>{metrics.providers_pending}</strong></button>
-        <button onClick={() => setModule("reports")}><span>Signalements ouverts</span><strong>{metrics.reports_open}</strong></button>
-        <button onClick={() => setModule("disputes")}><span>Litiges ouverts</span><strong>{metrics.disputes_open}</strong></button>
-        <button onClick={() => setModule("support")}><span>Tickets support</span><strong>{metrics.tickets_open}</strong></button>
+        <PermissionGuard permission="documents.review" context={context}><button onClick={() => setModule("verification")}><span>Validations prestataires</span><strong>{metrics.providers_pending}</strong></button></PermissionGuard>
+        <PermissionGuard permission="reports.manage" context={context}><button onClick={() => setModule("reports")}><span>Signalements ouverts</span><strong>{metrics.reports_open}</strong></button></PermissionGuard>
+        <PermissionGuard permission="reports.manage" context={context}><button onClick={() => setModule("disputes")}><span>Litiges ouverts</span><strong>{metrics.disputes_open}</strong></button></PermissionGuard>
+        <PermissionGuard permission="support.manage" context={context}><button onClick={() => setModule("support")}><span>Tickets support</span><strong>{metrics.tickets_open}</strong></button></PermissionGuard>
       </article>
     </section>
     <PermissionGuard permission="settings.update" context={context}><div className="admin-security-banner"><span>⌾</span><div><strong>Contrôles sensibles actifs</strong><p>Les suspensions, validations, changements de rôle, réservations et paramètres exigent une justification et créent un journal d’audit.</p></div></div></PermissionGuard>
@@ -569,5 +605,5 @@ function OperationalModule({ module, context }: { module: ModuleKey; context: Ad
     roles: "Matrice des permissions granulaires et rôles système.",
     security: "Sessions, MFA, contrôles d’accès et alertes de sécurité.",
   };
-  return <section className="admin-dashboard-grid"><article className="admin-panel span-two"><p>Module opérationnel</p><h2>{navigation.find((item) => item.key === module)?.label}</h2><p>{descriptions[module] || "Gestion centralisée avec données Supabase et contrôles RLS."}</p><div className="module-capabilities"><StatusBadge value="RLS actif" /><StatusBadge value="Audit actif" /><StatusBadge value={context.is_super_admin ? "Super Admin" : "Permission limitée"} /></div><button className="primary">Nouvelle action</button></article><article className="admin-panel"><p>État</p><h2>Aucune tâche urgente</h2><EmptyState title="File à jour" description="Les prochains éléments apparaîtront ici automatiquement." /></article></section>;
+  return <section className="admin-dashboard-grid"><article className="admin-panel span-two"><p>Module opérationnel</p><h2>{navigation.find((item) => item.key === module)?.label}</h2><p>{descriptions[module] || "Gestion centralisée avec données Supabase et contrôles RLS."}</p><div className="module-capabilities"><StatusBadge value="RLS actif" /><StatusBadge value="Audit actif" /><StatusBadge value={context.is_super_admin ? "Super Admin" : "Permission limitée"} /></div></article><article className="admin-panel"><p>État</p><h2>Aucune tâche urgente</h2><EmptyState title="File à jour" description="Les prochains éléments apparaîtront ici automatiquement." /></article></section>;
 }

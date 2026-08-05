@@ -47,7 +47,7 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 | Messagerie texte | opérationnel de bout en bout | Conversation unique par rendez-vous, création serveur réservée aux participants, pagination, temps réel, accusés de lecture et notifications validés avec deux navigateurs et trois comptes Supabase réels ; pièces jointes hors périmètre. |
 | Avis | partiellement opérationnel | Unicité par réservation, garde de champs et recalcul note ; photos/notes détaillées absentes. |
 | Dashboard professionnel | partiellement opérationnel | Données réelles chargées ; revenus explicitement indiqués « théoriques » tant que paiement mock. |
-| Super Admin / RBAC / audit | opérationnel pour le socle | Permissions séparées, RPC auditables et confirmations ; couverture UI exhaustive par rôle non automatisée. |
+| Super Admin / RBAC / audit | opérationnel et validé sur Preview | Supabase Auth réel, permissions granulaires et RLS testées pour client, professionnel, support, onboarding, finance et super administrateur ; connexions, déconnexions et actions sensibles journalisées. |
 | Support | partiellement opérationnel | Tables, messages, permissions et file admin ; parcours utilisateur avec pièces jointes/réouverture non validé. |
 | Modération | partiellement opérationnel | Signalements et permissions présents ; scénario complet restauration/suppression non automatisé. |
 | SEO / PWA | partiellement opérationnel | Métadonnées, Open Graph, manifest, icônes, service worker/offline ; sitemap et robots dédiés absents. |
@@ -86,7 +86,8 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 - Playwright : 117/117 sur 9 formats, zéro skip, dont 9 contrôles dédiés aux zones tactiles.
 - Playwright distant messagerie : 1/1 avec deux sessions navigateur simultanées, échange bidirectionnel sans rechargement, notifications et accusés de lecture.
 - Recette Supabase multi-comptes : réservation et conversation réelles, deux messages Realtime, notification, lectures, refus RLS tiers et refus d’usurpation validés ; données temporaires nettoyées.
-- Build Next.js production : réussi, 13 routes.
+- Recette admin Supabase + Preview Vercel : 6/6 rôles validés, accès autorisés/refusés, navigation filtrée, sessions et action sensible auditées ; comptes temporaires nettoyés.
+- Build Next.js production : réussi, 15 routes.
 - Audit dépendances production : zéro vulnérabilité connue.
 - Supabase dry-run, migration distante et lint lié : réussis.
 
@@ -94,7 +95,7 @@ Les parcours publics, la réservation, les tableaux de bord, le feed social, le 
 
 1. **Paiement mock — bloquant production.** Obtenir les identifiants sandbox du PSP retenu, configurer uniquement Preview, exécuter paiement/échec/expiration/webhook/rejeu/remboursement réels, puis faire homologuer avant toute bascule.
 2. **Google OAuth désactivé — bloquant la fonctionnalité.** Créer/récupérer un Client ID et un Client Secret Google, les saisir uniquement dans Supabase Auth, autoriser les callbacks documentées et relancer la recette Gmail réelle.
-3. **RLS multi-comptes réel — bloquant production.** Créer un projet Supabase de test isolé et des comptes client A/B, provider A/B et rôles admin ; exécuter une matrice CRUD négative sur chaque table/bucket.
+3. **RLS multi-comptes complet — bloquant production.** La matrice des six rôles administratifs est validée sur le projet distant ; étendre maintenant la matrice CRUD négative à chaque table et bucket dans un projet Supabase de test isolé.
 4. **KYC — risque élevé.** Ajouter une API d'URL signée courte qui journalise chaque consultation administrative et des tests de téléchargement inter-compte.
 5. **OTP/téléphone et suppression de compte — fonctionnalités absentes.** Concevoir les parcours, la rétention légale et les jobs de purge/anonymisation avant activation UI.
 6. **Social — risque moyen.** Ajouter worker de publication programmée, transcodage/miniatures serveur, réponses/suppression de commentaires et blocage.
