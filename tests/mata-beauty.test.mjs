@@ -91,6 +91,28 @@ test("the official Mata identity drives the design system and installable assets
   for (const asset of [lightLogo, darkLogo, appIcon]) assert.ok(asset.byteLength > 10_000 && asset.byteLength < 120_000);
 });
 
+test("the admin login keeps readable colors on its white surface", async () => {
+  const styles = await readFile(new URL("app/admin/admin.css", root), "utf8");
+  const sharedTheme = styles.match(/\.super-admin-shell,\.admin-auth-shell\{([^}]+)\}/)?.[1] ?? "";
+  const hexToRgb = (hex) => {
+    const value = Number.parseInt(hex.slice(1), 16);
+    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  };
+  const luminance = (hex) => hexToRgb(hex)
+    .map((channel) => channel / 255)
+    .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+  const contrastOnWhite = (hex) => 1.05 / (luminance(hex) + 0.05);
+
+  assert.match(sharedTheme, /--p:#5b0b45/);
+  assert.match(sharedTheme, /--text:#24131f/);
+  for (const token of ["--p", "--g", "--text", "--muted"]) {
+    const color = sharedTheme.match(new RegExp(`${token}:(#[0-9a-f]{6})`, "i"))?.[1];
+    assert.ok(color && contrastOnWhite(color) >= 4.5, `${token} must meet WCAG AA on white`);
+  }
+  assert.match(styles, /\.admin-login-card \.admin-login-brand small\{color:#7c4f0c\}/);
+});
+
 test("the Super Admin control center is protected by RBAC and audited RPCs", async () => {
   const [migration, adminPage, adminApp] = await Promise.all([
     readFile(new URL("supabase/migrations/20260725233000_super_admin_control_center.sql", root), "utf8"),
