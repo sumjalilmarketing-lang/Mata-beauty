@@ -287,15 +287,17 @@ test("Google OAuth uses PKCE, a server callback, and idempotent non-privileged p
 });
 
 test("the provider Studio publishes validated and bookable media", async () => {
-  const [studio, publisher, route, migration, navigation] = await Promise.all([
+  const [studio, publisher, moduleView, workspaceRoute, migration, navigation] = await Promise.all([
     readFile(new URL("app/creator-studio.tsx", root), "utf8"),
     readFile(new URL("app/video-publisher.tsx", root), "utf8"),
     readFile(new URL("app/workspace-module.tsx", root), "utf8"),
+    readFile(new URL("app/workspace-route.tsx", root), "utf8"),
     readFile(new URL("supabase/migrations/20260815180000_video_studio_workflow.sql", root), "utf8"),
     readFile(new URL("lib/navigation/spaces.ts", root), "utf8"),
   ]);
   for (const label of ["Créer une publication", "Mes vidéos", "Mes photos", "Avant / Après", "Brouillons", "Publications programmées", "Statistiques"]) assert.match(studio, new RegExp(label.replace("/", "\\/")));
-  assert.match(route, /<CreatorStudio/);
+  assert.match(moduleView, /<CreatorStudio/);
+  assert.match(workspaceRoute, /moduleKey === "studio" \? "videos"/);
   assert.match(navigation, /module\("videos", "Studio"/);
   assert.match(publisher, /provider-social-media/);
   assert.match(publisher, /\/video\.\$\{extension\}/);
