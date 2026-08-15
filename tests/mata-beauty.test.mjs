@@ -337,9 +337,9 @@ test("private workspaces expose only functional controls and safe errors", async
 });
 
 test("release candidate automates scheduled posts and centralizes commissions", async () => {
-  const [migration, cron, vercel, admin] = await Promise.all([
+  const [migration, schedule, vercel, admin] = await Promise.all([
     readFile(new URL("supabase/migrations/20260815200000_release_candidate_integrations.sql", root), "utf8"),
-    readFile(new URL("app/api/cron/publish-scheduled/route.ts", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260815201000_schedule_social_posts_with_pg_cron.sql", root), "utf8"),
     readFile(new URL("vercel.json", root), "utf8"),
     readFile(new URL("app/super-admin.tsx", root), "utf8"),
   ]);
@@ -349,10 +349,10 @@ test("release candidate automates scheduled posts and centralizes commissions", 
   assert.match(migration, /payments_apply_commission/);
   assert.match(migration, /admin_manage_category/);
   assert.match(migration, /Suppression impossible : cette catégorie possède des dépendances/);
-  assert.match(cron, /timingSafeEqual/);
-  assert.match(cron, /CRON_SECRET/);
-  assert.doesNotMatch(cron + admin, /SUPABASE_SERVICE_ROLE_KEY/);
-  assert.match(vercel, /publish-scheduled/);
+  assert.match(schedule, /mata-publish-due-social-posts/);
+  assert.match(schedule, /\* \* \* \* \*/);
+  assert.doesNotMatch(schedule + admin, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.doesNotMatch(vercel, /"crons"/);
   assert.match(admin, /Catégorie parente/);
 });
 

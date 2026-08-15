@@ -8,7 +8,7 @@
 
 - CRUD sécurisé des catégories et sous-catégories dans le Super Admin : création, édition, image, ordre, parent, masquage, réactivation et suppression refusée en présence de dépendances.
 - Audit de chaque mutation de catégorie et contrôle par `categories.manage`.
-- Publication automatique des posts programmés via une route cron protégée et un RPC transactionnel utilisant `FOR UPDATE SKIP LOCKED`.
+- Publication automatique des posts programmés via `pg_cron` dans Supabase et un RPC transactionnel utilisant `FOR UPDATE SKIP LOCKED`.
 - Calcul centralisé brut / commission / net à partir des règles actives, appliqué côté base à chaque paiement, y compris en mode mock.
 - Enregistrement idempotent de la commission Mata lors des transitions financières réussies.
 - Affichage du brut, de la commission et du net dans les espaces professionnels et salons ; règles et écritures réelles visibles dans le Super Admin.
@@ -43,16 +43,15 @@ Ces mesures utilisent un backend Supabase intercepté par les tests UI. Elles me
 - Auth salon/staff : contrôle d’accès serveur présent ; données réelles inter-rôles non rejouées dans cette phase.
 - Auth Admin/Super Admin : RBAC/RLS et RPC audités présents ; connexion distante réelle non rejouée dans cette phase.
 - Supabase/RLS : migration appliquée, fonctions critiques présentes ; suite distante complète bloquée par la clé serveur.
-- Storage/Studio/feed : upload et publication couverts structurellement ; programmation désormais automatisable mais cron non activable sans secrets Vercel.
+- Storage/Studio/feed : upload et publication couverts structurellement ; programmation automatisée chaque minute par Supabase `pg_cron`.
 - Réservations/messagerie/notifications/avis/modération : schémas et parcours UI existants, matrice locale verte ; scénario distant complet non rejoué.
 - Catégories : CRUD désormais connecté ; validation réelle avec un compte Super Admin reste à exécuter.
 - Salons : tables, RLS, profils, collaborateurs et espaces existent, mais plusieurs écrans génériques restent principalement des listes et ne couvrent pas tout le CRUD demandé.
 - Paiements : infrastructure interne, idempotence, webhooks, remboursements, ledger et commissions présents ; fournisseur externe non configuré, mode mock conservé.
-- Vercel : variables publiques présentes en Production et Preview ; `SUPABASE_SERVICE_ROLE_KEY` seulement en Preview et techniquement invalide ; `CRON_SECRET` absent.
+- Vercel : variables publiques présentes en Production et Preview ; `SUPABASE_SERVICE_ROLE_KEY` seulement en Preview et techniquement invalide.
 
 ## Blocages externes
 
 1. Récupérer la vraie clé serveur du projet Supabase et la transmettre dans les champs sécurisés Vercel pour Preview, Production et Development, sans l’exposer.
-2. Créer `CRON_SECRET` dans Vercel pour Preview et Production afin d’autoriser la tâche planifiée.
-3. Redéployer puis exécuter les suites distantes avec comptes temporaires et nettoyage contrôlé.
-4. Valider un PSP réel avant toute sortie du mode mock.
+2. Redéployer puis exécuter les suites distantes avec comptes temporaires et nettoyage contrôlé.
+3. Valider un PSP réel avant toute sortie du mode mock.
