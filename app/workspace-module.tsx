@@ -13,7 +13,7 @@ type ResourceDefinition = { table: string; select: string; title: (row: Row) => 
 
 const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, ResourceDefinition>> = {
   bookings: { table: "bookings", select: "id,status,starts_at,total_amount", title: (row) => `Rendez-vous ${shortId(row.id)}`, meta: (row) => `${label(row.status)} · ${date(row.starts_at)}` },
-  payments: { table: "payments", select: "id,payment_status,amount,created_at", title: (row) => `${money(row.amount)}`, meta: (row) => `${label(row.payment_status)} · ${date(row.created_at)}` },
+  payments: { table: "payments", select: "id,payment_status,amount,gross_amount,platform_fee,professional_net_amount,created_at", title: (row) => `${money(row.gross_amount ?? row.amount)}`, meta: (row) => `${label(row.payment_status)} · Commission ${money(row.platform_fee)} · Net ${money(row.professional_net_amount)} · ${date(row.created_at)}` },
   notifications: { table: "notifications", select: "id,title,body,created_at,read_at", title: (row) => text(row.title, "Notification"), meta: (row) => `${text(row.body, "")} · ${date(row.created_at)}` },
   messages: { table: "messages", select: "id,content,created_at", title: (row) => text(row.content, "Message"), meta: (row) => date(row.created_at) },
   profiles: { table: "profiles", select: "id,first_name,last_name,role,city", title: (row) => `${text(row.first_name, "Compte")} ${text(row.last_name, "")}`.trim(), meta: (row) => `${label(row.role)} · ${text(row.city, "Ville non renseignée")}` },

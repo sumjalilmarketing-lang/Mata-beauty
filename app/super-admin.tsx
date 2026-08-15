@@ -75,6 +75,10 @@ type CatalogRow = {
   name?: string;
   title?: string;
   slug?: string;
+  description?: string | null;
+  icon?: string | null;
+  image_url?: string | null;
+  parent_id?: string | null;
   is_active: boolean;
   sort_order?: number;
   duration_minutes?: number;
@@ -91,6 +95,9 @@ type FinanceRow = {
   is_test: boolean;
   created_at: string;
 };
+
+type CommissionRuleRow = { id: string; name: string; rate: number | string; is_active: boolean; valid_from: string; valid_until: string | null };
+type CommissionEntryRow = { id: string; payment_id: string; rate: number | string; amount: number; currency: string; created_at: string };
 
 type AuditRow = {
   id: string;
@@ -461,7 +468,7 @@ function AdminModule({
   if (module === "users") return <UsersModule context={context} notify={notify} />;
   if (module === "providers" || module === "verification") return <ProvidersModule context={context} verificationOnly={module === "verification"} notify={notify} />;
   if (module === "bookings" || module === "calendar") return <BookingsModule context={context} calendar={module === "calendar"} notify={notify} />;
-  if (module === "categories" || module === "services") return <CatalogModule services={module === "services"} />;
+  if (module === "categories" || module === "services") return <CatalogModule services={module === "services"} notify={notify} />;
   if (module === "payments" || module === "commissions" || module === "payouts") return <FinanceModule section={module} />;
   if (module === "content") return <SocialContentModule context={context} notify={notify} />;
   if (module === "audit") return <AuditModule context={context} />;
@@ -571,15 +578,67 @@ function BookingsModule({ context, calendar, notify }: { context: AdminContext; 
   }} />}</>;
 }
 
-function CatalogModule({ services }: { services: boolean }) {
+function CatalogModule({ services, notify }: { services: boolean; notify: (message: string) => void }) {
   const [rows, setRows] = useState<CatalogRow[]>([]);
-  useEffect(() => {
+  const [editing, setEditing] = useState<CatalogRow | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
     const request = services
       ? getSupabaseBrowserClient()!.from("provider_services").select("id,title,is_active,duration_minutes,price_amount").order("created_at", { ascending: false }).limit(200)
-      : getSupabaseBrowserClient()!.from("categories").select("id,name,slug,is_active,sort_order").order("sort_order");
+      : getSupabaseBrowserClient()!.from("categories").select("id,name,slug,description,icon,image_url,parent_id,is_active,sort_order").order("sort_order");
     void request.then(({ data }) => setRows((data ?? []) as CatalogRow[]));
   }, [services]);
-  return <><div className="admin-filter-bar"><span>Lecture seule — workflow d’édition non connecté</span></div><div className="admin-table-wrap"><table className="admin-data-table"><thead><tr><th>{services ? "Prestation" : "Catégorie"}</th><th>{services ? "Durée" : "Slug"}</th><th>{services ? "Prix" : "Ordre"}</th><th>Statut</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.title || row.name}</strong></td><td>{services ? `${row.duration_minutes} min` : row.slug}</td><td>{services ? formatCurrency(row.price_amount || 0) : row.sort_order}</td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div></>;
+  useEffect(() => { load(); }, [load]);
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true);
+    const values = new FormData(event.currentTarget);
+    const name = String(values.get("name") ?? "").trim();
+    const slug = String(values.get("slug") ?? "").trim().toLowerCase();
+    const { error } = await getSupabaseBrowserClient()!.rpc("admin_manage_category", {
+      target_action: editing ? "update" : "create", target_category_id: editing?.id ?? null,
+      target_name: name, target_slug: slug, target_description: String(values.get("description") ?? ""),
+      target_icon: String(values.get("icon") ?? ""), target_image_url: String(values.get("imageUrl") ?? ""),
+      target_parent_id: String(values.get("parentId") ?? "") || null,
+      target_sort_order: Number(values.get("sortOrder") ?? 0), target_is_active: values.get("active") === "on",
+    });
+    setBusy(false);
+    if (error) { notify(publicErrorMessage(error, "La catégorie n’a pas pu être enregistrée.")); return; }
+    notify(editing ? "Catégorie modifiée et journalisée." : "Catégorie créée et disponible dans l’application.");
+    setEditing(null); event.currentTarget.reset(); load();
+  }
+
+  async function action(row: CatalogRow, kind: "set_active" | "delete") {
+    if (kind === "delete" && !window.confirm(`Supprimer « ${row.name} » ? Cette action sera refusée si des dépendances existent.`)) return;
+    setBusy(true);
+    const { error } = await getSupabaseBrowserClient()!.rpc("admin_manage_category", {
+      target_action: kind, target_category_id: row.id, target_name: null, target_slug: null,
+      target_description: null, target_icon: null, target_image_url: null, target_parent_id: null,
+      target_sort_order: row.sort_order ?? 0, target_is_active: kind === "set_active" ? !row.is_active : row.is_active,
+    });
+    setBusy(false);
+    notify(error ? publicErrorMessage(error, "L’action n’a pas pu être appliquée.") : kind === "delete" ? "Catégorie supprimée et action auditée." : "Visibilité mise à jour.");
+    if (!error) { setEditing(null); load(); }
+  }
+
+  if (services) return <><div className="admin-filter-bar"><span>{rows.length} prestations réelles · modification depuis l’espace prestataire</span></div><div className="admin-table-wrap"><table className="admin-data-table"><thead><tr><th>Prestation</th><th>Durée</th><th>Prix</th><th>Statut</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.title}</strong></td><td>{row.duration_minutes} min</td><td>{formatCurrency(row.price_amount || 0)}</td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div></>;
+
+  const topLevel = rows.filter((row) => !row.parent_id && row.id !== editing?.id);
+  return <>
+    <form className="admin-catalog-form" onSubmit={save} key={editing?.id ?? "new"}>
+      <header><div><p>Catalogue dynamique</p><h2>{editing ? "Modifier la catégorie" : "Créer une catégorie"}</h2></div>{editing && <button type="button" className="table-action" onClick={() => setEditing(null)}>Annuler</button>}</header>
+      <label>Nom<input name="name" required minLength={2} maxLength={80} defaultValue={editing?.name ?? ""} /></label>
+      <label>Slug<input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" defaultValue={editing?.slug ?? ""} /></label>
+      <label>Icône<input name="icon" maxLength={80} defaultValue={editing?.icon ?? ""} /></label>
+      <label>Ordre<input name="sortOrder" type="number" min={0} max={10000} defaultValue={editing?.sort_order ?? rows.length} /></label>
+      <label>Catégorie parente<select name="parentId" defaultValue={editing?.parent_id ?? ""}><option value="">Aucune</option>{topLevel.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+      <label>URL de l’image<input name="imageUrl" type="url" defaultValue={editing?.image_url ?? ""} /></label>
+      <label className="wide">Description<textarea name="description" maxLength={1000} defaultValue={editing?.description ?? ""} /></label>
+      <label className="catalog-checkbox"><input name="active" type="checkbox" defaultChecked={editing?.is_active ?? true} /> Visible dans l’application</label>
+      <button className="primary" disabled={busy}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : "Créer"}</button>
+    </form>
+    <div className="admin-table-wrap"><table className="admin-data-table"><thead><tr><th>Catégorie</th><th>Slug</th><th>Parent</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.icon} {row.name}</strong><small>{row.description || "Sans description"}</small></td><td>{row.slug}</td><td>{rows.find((parent) => parent.id === row.parent_id)?.name ?? "—"}</td><td>{row.sort_order}</td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td><td><button className="table-action" onClick={() => setEditing(row)}>Modifier</button><button className="table-action" disabled={busy} onClick={() => void action(row, "set_active")}>{row.is_active ? "Masquer" : "Réactiver"}</button><button className="table-action danger" disabled={busy} onClick={() => void action(row, "delete")}>Supprimer</button></td></tr>)}</tbody></table></div>
+  </>;
 }
 
 function FinanceModule({ section }: { section: "payments" | "commissions" | "payouts" }) {
@@ -592,7 +651,22 @@ function FinanceModule({ section }: { section: "payments" | "commissions" | "pay
 }
 
 function OperationalFinance({ section }: { section: "commissions" | "payouts" }) {
-  return <section className="admin-dashboard-grid"><article className="admin-panel"><p>Gestion financière</p><h2>{section === "commissions" ? "Règles de commission" : "Lots de reversement"}</h2><p>Lecture seule : le workflow d’écriture et sa validation à quatre yeux ne sont pas encore connectés dans cet écran.</p></article><article className="admin-panel"><p>Contrôle</p><h2>Validation à quatre yeux</h2><p>Les opérations financières sensibles exigent une permission dédiée, une justification et un audit.</p></article></section>;
+  const [rules, setRules] = useState<CommissionRuleRow[]>([]);
+  const [entries, setEntries] = useState<CommissionEntryRow[]>([]);
+  useEffect(() => {
+    if (section !== "commissions") return;
+    const client = getSupabaseBrowserClient()!;
+    void Promise.all([
+      client.from("commission_rules").select("id,name,rate,is_active,valid_from,valid_until").order("valid_from", { ascending: false }),
+      client.from("platform_commissions").select("id,payment_id,rate,amount,currency,created_at").order("created_at", { ascending: false }).limit(200),
+    ]).then(([ruleResult, entryResult]) => {
+      setRules((ruleResult.data ?? []) as CommissionRuleRow[]);
+      setEntries((entryResult.data ?? []) as CommissionEntryRow[]);
+    });
+  }, [section]);
+  if (section === "payouts") return <section className="admin-dashboard-grid"><article className="admin-panel"><p>Reversements</p><h2>Validation à quatre yeux</h2><p>La préparation du registre existe, mais aucun fournisseur de reversement réel n’est configuré. Aucune action financière fictive n’est exposée.</p></article></section>;
+  const total = entries.reduce((sum, row) => sum + row.amount, 0);
+  return <><section className="admin-metric-grid"><article><span>Commissions enregistrées</span><strong>{entries.length}</strong><small>Écritures réelles</small></article><article><span>Total Mata Beauty</span><strong>{formatCurrency(total)}</strong><small>Registre Supabase</small></article><article><span>Règles actives</span><strong>{rules.filter((row) => row.is_active).length}</strong><small>Calcul serveur</small></article></section><div className="admin-table-wrap"><table className="admin-data-table"><thead><tr><th>Règle</th><th>Taux</th><th>Validité</th><th>Statut</th></tr></thead><tbody>{rules.map((row) => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td>{formatDate(row.valid_from)}<small>{row.valid_until ? `jusqu’au ${formatDate(row.valid_until)}` : "Sans échéance"}</small></td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div><div className="admin-table-wrap commission-entries"><table className="admin-data-table"><thead><tr><th>Écriture</th><th>Paiement</th><th>Taux</th><th>Commission</th><th>Date</th></tr></thead><tbody>{entries.map((row) => <tr key={row.id}><td><code>{row.id.slice(0,8)}</code></td><td><code>{row.payment_id.slice(0,8)}</code></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td><strong>{formatCurrency(row.amount)}</strong></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div></>;
 }
 
 function AuditModule({ context }: { context: AdminContext }) {

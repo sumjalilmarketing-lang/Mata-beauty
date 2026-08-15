@@ -329,9 +329,31 @@ test("private workspaces expose only functional controls and safe errors", async
   assert.doesNotMatch(clientCenter, /setNotice\(error\?\.message/);
   assert.doesNotMatch(admin, /notify\(error\.message/);
   for (const decorativeAction of ["Filtres avancés", ">Dossier<", ">Détail<", ">Rembourser<"]) assert.doesNotMatch(admin, new RegExp(decorativeAction));
-  assert.match(admin, /Lecture seule — workflow d’édition non connecté/);
+  assert.match(admin, /admin_manage_category/);
+  assert.match(admin, /Catégorie créée et disponible dans l’application/);
+  assert.doesNotMatch(admin, /Lecture seule — workflow d’édition non connecté/);
   assert.doesNotMatch(admin, /\[42, 58, 34, 72, 88, 64/);
   assert.match(admin, /metrics\.bookings_week/);
+});
+
+test("release candidate automates scheduled posts and centralizes commissions", async () => {
+  const [migration, cron, vercel, admin] = await Promise.all([
+    readFile(new URL("supabase/migrations/20260815200000_release_candidate_integrations.sql", root), "utf8"),
+    readFile(new URL("app/api/cron/publish-scheduled/route.ts", root), "utf8"),
+    readFile(new URL("vercel.json", root), "utf8"),
+    readFile(new URL("app/super-admin.tsx", root), "utf8"),
+  ]);
+  assert.match(migration, /publish_due_social_posts/);
+  assert.match(migration, /for update of p skip locked/);
+  assert.match(migration, /resolve_commission_breakdown/);
+  assert.match(migration, /payments_apply_commission/);
+  assert.match(migration, /admin_manage_category/);
+  assert.match(migration, /Suppression impossible : cette catégorie possède des dépendances/);
+  assert.match(cron, /timingSafeEqual/);
+  assert.match(cron, /CRON_SECRET/);
+  assert.doesNotMatch(cron + admin, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(vercel, /publish-scheduled/);
+  assert.match(admin, /Catégorie parente/);
 });
 
 test("social engagement and completed-booking reviews create preference-aware notifications", async () => {
