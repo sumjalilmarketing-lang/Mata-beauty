@@ -43,7 +43,7 @@ export async function startFinalAcceptance({ url, anonKey, serviceKey, previewUr
   const runId = `${Date.now()}-${randomUUID().slice(0, 6)}`;
   const accounts = {};
   const results = [];
-  const created = { bookingIds: [], serviceIds: [], businessIds: [], categoryIds: [], availabilityIds: [], collaboratorIds: [], conversationIds: [] };
+  const created = { bookingIds: [], serviceIds: [], businessIds: [], categoryIds: [], availabilityIds: [], collaboratorIds: [], conversationIds: [], commissionRuleIds: [], paymentIds: [] };
   state = { admin, accounts, created, previewUrl, results };
 
   try {
@@ -137,6 +137,49 @@ export async function startFinalAcceptance({ url, anonKey, serviceKey, previewUr
     assert.ifError(collaborator.error); created.collaboratorIds.push(collaborator.data.id);
     record(results, "Salon : création, mise à jour et ajout d'équipe", businessUpdate.data.description.includes("premium") && Boolean(collaborator.data.id));
 
+    const salonService = await accounts.salon.supabase.from("provider_services").insert({
+      provider_id: accounts.salon.id,
+      business_id: business.data.id,
+      service_id: baseService.data.id,
+      title: `Prestation salon ${runId}`,
+      duration_minutes: 75,
+      price_amount: 18000,
+      currency: "XOF",
+      is_active: true,
+    }).select("id,price_amount,duration_minutes,business_id").single();
+    assert.ifError(salonService.error); created.serviceIds.push(salonService.data.id);
+    const salonHours = await accounts.salon.supabase.from("business_hours").insert({ business_id: business.data.id, weekday: 3, opens_at: "09:00", closes_at: "19:00", is_closed: false }).select("id").single();
+    assert.ifError(salonHours.error);
+    const invitation = await accounts.salon.supabase.from("business_invitations").insert({ business_id: business.data.id, email: `invite-${runId}@example.test`, internal_role: "member", invited_by: accounts.salon.id }).select("id").single();
+    assert.ifError(invitation.error);
+    const outsiderInvitations = await accounts.outsider.supabase.from("business_invitations").select("id").eq("business_id", business.data.id);
+    assert.ifError(outsiderInvitations.error);
+    record(results, "Salon : prestation, horaires et invitation privée", salonService.data.business_id === business.data.id && Boolean(salonHours.data.id) && outsiderInvitations.data.length === 0);
+
+    const currentRule = await accounts.super_admin.supabase.from("commission_rules").insert({ name: `Commission recette ${runId}`, rate: 12, provider_id: accounts.salon.id, valid_from: new Date(Date.now() - 3600000).toISOString(), valid_until: new Date(Date.now() + 86400000).toISOString(), is_active: true, created_by: accounts.super_admin.id }).select("id").single();
+    assert.ifError(currentRule.error); created.commissionRuleIds.push(currentRule.data.id);
+    const futureRule = await accounts.super_admin.supabase.from("commission_rules").insert({ name: `Commission future ${runId}`, rate: 22, provider_id: accounts.salon.id, valid_from: new Date(Date.now() + 2 * 86400000).toISOString(), is_active: true, created_by: accounts.super_admin.id }).select("id").single();
+    assert.ifError(futureRule.error); created.commissionRuleIds.push(futureRule.data.id);
+
+    const salonStarts = new Date(Date.now() + 42 * 86400000); salonStarts.setUTCHours(14, 0, 0, 0);
+    const salonBooking = await accounts.client.supabase.from("bookings").insert({ client_id: accounts.client.id, provider_id: accounts.outsider.id, provider_service_id: salonService.data.id, collaborator_id: collaborator.data.id, starts_at: salonStarts.toISOString(), ends_at: new Date(salonStarts.getTime() + 3600000).toISOString(), status: "pending", location_mode: "salon", total_amount: 1, currency: "EUR" }).select("id,business_id,collaborator_id,total_amount,currency").single();
+    assert.ifError(salonBooking.error); created.bookingIds.push(salonBooking.data.id);
+    const payment = await accounts.client.supabase.rpc("initialize_payment_v2", { target_booking_id: salonBooking.data.id, target_method: "wave", target_attempt: `salon-${runId}`, target_internal_reference: `MB-SALON-${runId}`, target_request_fingerprint: "a".repeat(64), target_source_ip_hash: "acceptance" });
+    assert.ifError(payment.error); created.paymentIds.push(payment.data.id);
+    const paymentSnapshot = await accounts.client.supabase.from("payments").select("id,gross_amount,platform_fee,professional_net_amount").eq("id", payment.data.id).single();
+    assert.ifError(paymentSnapshot.error);
+    assert.ifError((await accounts.salon.supabase.from("provider_services").update({ price_amount: 21000 }).eq("id", salonService.data.id)).error);
+    assert.ifError((await accounts.super_admin.supabase.from("commission_rules").update({ rate: 15 }).eq("id", currentRule.data.id)).error);
+    const immutableBooking = await accounts.client.supabase.from("bookings").select("total_amount").eq("id", salonBooking.data.id).single();
+    const immutablePayment = await accounts.client.supabase.from("payments").select("platform_fee,professional_net_amount").eq("id", payment.data.id).single();
+    assert.ifError(immutableBooking.error); assert.ifError(immutablePayment.error);
+    record(results, "Salon : prix et commission historiques immuables", salonBooking.data.business_id === business.data.id && salonBooking.data.collaborator_id === collaborator.data.id && salonBooking.data.total_amount === 18000 && immutableBooking.data.total_amount === 18000 && paymentSnapshot.data.platform_fee === 2160 && paymentSnapshot.data.professional_net_amount === 15840 && immutablePayment.data.platform_fee === 2160);
+    const salonBookingView = await accounts.salon.supabase.from("bookings").select("id,status").eq("id", salonBooking.data.id).single();
+    assert.ifError(salonBookingView.error);
+    const salonConfirm = await accounts.salon.supabase.from("bookings").update({ status: "confirmed" }).eq("id", salonBooking.data.id).select("status").single();
+    assert.ifError(salonConfirm.error);
+    record(results, "Salon : même réservation visible et confirmable", salonBookingView.data.id === salonBooking.data.id && salonConfirm.data.status === "confirmed");
+
     const starts = new Date(Date.now() + 35 * 86400000); starts.setUTCHours(10, 0, 0, 0);
     const bookingPayload = {
       client_id: accounts.client.id,
@@ -173,6 +216,24 @@ export async function startFinalAcceptance({ url, anonKey, serviceKey, previewUr
     const outsiderMessages = await accounts.outsider.supabase.from("messages").select("id").eq("conversation_id", conversation.data);
     assert.ifError(outsiderMessages.error);
     record(results, "Messagerie commune et privée", providerMessages.data.some((row) => row.id === message.data.id) && outsiderMessages.data.length === 0);
+    const providerReply = await accounts.provider.supabase.from("messages").insert({ conversation_id: conversation.data, sender_id: accounts.provider.id, body: "Réponse professionnelle de recette finale" }).select("id").single();
+    assert.ifError(providerReply.error);
+    const clientReplyView = await accounts.client.supabase.from("messages").select("id").eq("id", providerReply.data.id).single();
+    assert.ifError(clientReplyView.error);
+    record(results, "Réponse professionnelle visible par la cliente", clientReplyView.data.id === providerReply.data.id);
+
+    for (const status of ["confirmed", "in_progress", "completed"]) {
+      const transition = await accounts.provider.supabase.from("bookings").update({ status }).eq("id", booking.data.id).select("status").single();
+      assert.ifError(transition.error);
+    }
+    const review = await accounts.client.supabase.from("reviews").insert({ booking_id: booking.data.id, client_id: accounts.client.id, provider_id: accounts.provider.id, rating: 5, comment: "Recette finale validée" }).select("id,rating").single();
+    assert.ifError(review.error);
+    const rating = await accounts.provider.supabase.from("provider_profiles").select("average_rating,review_count").eq("profile_id", accounts.provider.id).single();
+    assert.ifError(rating.error);
+    const clientNotifications = await accounts.client.supabase.from("notifications").select("id,kind").limit(50);
+    const providerNotifications = await accounts.provider.supabase.from("notifications").select("id,kind").limit(50);
+    assert.ifError(clientNotifications.error); assert.ifError(providerNotifications.error);
+    record(results, "Cycle confirmé → en cours → terminé → avis et statistiques", review.data.rating === 5 && Number(rating.data.average_rating) === 5 && rating.data.review_count === 1 && clientNotifications.data.length > 0 && providerNotifications.data.length > 0);
 
     const favorite = await accounts.client.supabase.from("favorites").insert({ client_id: accounts.client.id, provider_id: accounts.provider.id }).select("provider_id").single();
     assert.ifError(favorite.error);
@@ -244,6 +305,15 @@ export async function finishFinalAcceptance() {
   const { admin, accounts, created } = state;
   const ids = Object.values(accounts).map((account) => account.id);
   for (const account of Object.values(accounts)) await account.supabase.auth.signOut().catch(() => undefined);
+  if (created.paymentIds.length) await admin.from("payments").delete().in("id", created.paymentIds);
+  if (created.conversationIds.length) await admin.from("conversations").delete().in("id", created.conversationIds);
+  if (created.bookingIds.length) await admin.from("reviews").delete().in("booking_id", created.bookingIds);
+  if (created.bookingIds.length) await admin.from("bookings").delete().in("id", created.bookingIds);
+  if (created.commissionRuleIds.length) await admin.from("commission_rules").delete().in("id", created.commissionRuleIds);
+  if (created.collaboratorIds.length) await admin.from("collaborators").delete().in("id", created.collaboratorIds);
+  if (created.serviceIds.length) await admin.from("provider_services").delete().in("id", created.serviceIds);
+  if (created.availabilityIds.length) await admin.from("availability_rules").delete().in("id", created.availabilityIds);
+  if (created.businessIds.length) await admin.from("businesses").delete().in("id", created.businessIds);
   if (created.categoryIds.length) await admin.from("categories").delete().in("id", created.categoryIds);
   for (const id of ids.reverse()) await admin.auth.admin.deleteUser(id);
   const count = ids.length;

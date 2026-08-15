@@ -321,7 +321,8 @@ test("private workspaces expose only functional controls and safe errors", async
   ]);
   assert.match(shell, /role="search" onSubmit=\{search\}/);
   assert.match(shell, /workspaceHref\(space, notificationsModule\.key\)/);
-  assert.match(moduleView, /Fonction non connectée/);
+  assert.doesNotMatch(moduleView, /Fonction non connectée/);
+  assert.match(moduleView, /Données momentanément indisponibles/);
   assert.match(moduleView, /visibleRows/);
   assert.match(clientCenter, /publicErrorMessage/);
   assert.match(admin, /publicErrorMessage/);
@@ -334,6 +335,27 @@ test("private workspaces expose only functional controls and safe errors", async
   assert.doesNotMatch(admin, /Lecture seule — workflow d’édition non connecté/);
   assert.doesNotMatch(admin, /\[42, 58, 34, 72, 88, 64/);
   assert.match(admin, /metrics\.bookings_week/);
+});
+
+test("salon workspace is connected, archived safely and protected by RLS", async () => {
+  const [center, route, migration, paymentUi] = await Promise.all([
+    readFile(new URL("app/salon-control-center.tsx", root), "utf8"),
+    readFile(new URL("app/workspace-route.tsx", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260815210000_salon_production_workflows.sql", root), "utf8"),
+    readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
+  ]);
+  for (const table of ["businesses", "business_hours", "business_closures", "business_invitations", "business_media", "collaborators", "provider_services", "bookings"]) assert.match(center, new RegExp(`from\\(\\"${table}\\"\\)`));
+  assert.match(center, /archive_owned_business/);
+  assert.match(center, /12 \* 1024 \* 1024/);
+  assert.match(center, /image\/jpeg/);
+  assert.match(route, /salonWorkflows/);
+  assert.match(migration, /alter table public\.business_media enable row level security/);
+  assert.match(migration, /owners upload business media/);
+  assert.match(migration, /archive_owned_business/);
+  assert.match(migration, /resolve_commission_breakdown_at/);
+  assert.match(migration, /target_effective_at/);
+  assert.doesNotMatch(center + migration, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(paymentUi, /Paiement de démonstration/);
 });
 
 test("release candidate automates scheduled posts and centralizes commissions", async () => {

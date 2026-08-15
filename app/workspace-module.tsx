@@ -7,6 +7,7 @@ import type { WorkspaceModule, WorkspaceSpaceKey } from "@/lib/navigation/spaces
 import { workspaceHref, workspaceSpaces } from "@/lib/navigation/spaces";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CreatorStudio } from "./creator-studio";
+import { SalonControlCenter } from "./salon-control-center";
 
 type Row = Record<string, unknown>;
 type ResourceDefinition = { table: string; select: string; title: (row: Row) => string; meta: (row: Row) => string };
@@ -28,13 +29,13 @@ const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, Resour
 };
 
 export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean }) {
-  const definition = module.resource ? resources[module.resource] : undefined;
+  configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
+  const definition = module.resource ? resources[module.resource] : module.key === "dashboard" ? resources.bookings : undefined;
   const searchParams = useSearchParams();
   const query = (searchParams.get("q") ?? "").trim().toLocaleLowerCase("fr");
   const [rows, setRows] = useState<Row[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "unavailable">(definition ? "loading" : "unavailable");
   useEffect(() => {
-    configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
     if (!definition) return;
     let active = true;
     const client = getSupabaseBrowserClient();
@@ -49,6 +50,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   }, [definition, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
+  if (space === "salon" && module.key !== "videos") return <SalonControlCenter module={module} userId={userId} />;
   if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;
   const shortcuts = workspaceSpaces[space].modules.filter((item) => item.key !== module.key && allowedModuleKeys.includes(item.key)).slice(0, 4);
   return <section className="workspace-content">
@@ -61,7 +63,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
     <div className="workspace-grid">
       <article className="workspace-panel"><header><div><span>Vue actuelle</span><h3>{module.label}</h3></div></header>
         {state === "loading" && <div className="workspace-empty">Chargement des données autorisées…</div>}
-        {state === "unavailable" && <div className="workspace-empty"><strong>Fonction non connectée</strong><p>Ce module est visible dans la navigation, mais aucun workflow de données n’est encore disponible pour ce rôle.</p></div>}
+        {state === "unavailable" && <div className="workspace-empty"><strong>Données momentanément indisponibles</strong><p>Réessayez dans quelques instants. Aucun changement n’a été appliqué.</p></div>}
         {state === "empty" && <div className="workspace-empty"><strong>Aucun élément à afficher</strong><p>Votre périmètre ne contient encore aucune donnée pour ce module.</p></div>}
         {state === "ready" && definition && visibleRows.length === 0 && <div className="workspace-empty"><strong>Aucun résultat</strong><p>Aucune donnée autorisée ne correspond à cette recherche.</p></div>}
         {state === "ready" && definition && visibleRows.length > 0 && <div className="workspace-list">{visibleRows.map((row, index) => <div key={String(row.id ?? index)}><span>{definition.title(row)}</span><small>{definition.meta(row)}</small></div>)}</div>}
