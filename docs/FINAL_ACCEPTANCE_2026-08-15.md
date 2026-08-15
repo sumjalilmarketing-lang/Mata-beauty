@@ -86,7 +86,8 @@ Le parcours historique « avant » n’était pas instrumenté ; aucune mesure a
 
 - `continuous-real-acceptance.spec.ts` : **1/1**, 41,2 s ;
 - vérification des espaces Client, Prestataire, Salon et tiers sur le même jeu Supabase ;
-- `preview-health.spec.ts` : **1/1**, routes `/`, `/discover`, `/manifest.webmanifest` et `/api/health/server` à 200 ;
+- `preview-health.spec.ts` : **1/1**, routes UI `/` et `/discover` à 200 ;
+- `/manifest.webmanifest` est généré par le build et `/api/health/server` est contrôlé séparément via `vercel curl` ;
 - aucune erreur JavaScript applicative ; l’injection externe de la barre Vercel, volontairement bloquée par la CSP, est exclue du signal applicatif ;
 - health : `configuration=true`, `database=true`, `serviceRole=true`.
 
