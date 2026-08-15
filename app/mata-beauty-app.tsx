@@ -7,6 +7,7 @@ import { AuthModal, type AuthenticatedProfile } from "./auth-modal";
 import { LiveDashboard } from "./live-dashboard";
 import { SocialFeed } from "./social-feed";
 import { calculateBookingEnd, calculateBookingQuote } from "@/lib/domain/booking";
+import { isTrustedSandboxCheckoutUrl, type PaymentMethod } from "@/lib/domain/payments";
 import { fetchActivePromotions, fetchPublishedProviders, type CatalogPromotion } from "@/lib/supabase/catalog";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { loadAuthenticatedProfile } from "@/lib/auth/profile";
@@ -38,6 +39,13 @@ type BookingRequest = {
   paymentMethod: "on_site" | "wave" | "orange_money" | "card";
 };
 
+type PaymentCapabilities = {
+  onlineCheckoutEnabled: boolean;
+  environment: "disabled" | "sandbox";
+  provider: "none" | "paydunya";
+  methods: PaymentMethod[];
+};
+
 type BookingConfirmation = { id: string; date: string; time: string; location: string };
 type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number };
 type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[] };
@@ -59,6 +67,21 @@ const bookingDraftSchema = z.object({
     date: z.string(), time: z.string(), locationMode: z.enum(["salon", "client_address"]), address: z.string(), note: z.string(),
     paymentMethod: z.enum(["on_site", "wave", "orange_money", "card"]),
   }),
+});
+const paymentCapabilitiesSchema = z.object({
+  onlineCheckoutEnabled: z.boolean(),
+  environment: z.enum(["disabled", "sandbox"]),
+  provider: z.enum(["none", "paydunya"]),
+  methods: z.array(z.enum(["orange_money", "wave", "card"])),
+});
+const paymentCheckoutSchema = z.object({
+  ok: z.literal(true),
+  checkoutUrl: z.string().nullable(),
+  payment: z.object({ id: z.string().uuid() }).passthrough(),
+});
+const paymentStatusSchema = z.object({
+  ok: z.literal(true),
+  payment: z.object({ payment_status: z.string() }),
 });
 
 function readBookingDraft() {
@@ -120,6 +143,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [notice, setNotice] = useState("");
   const [authenticated, setAuthenticated] = useState<AuthenticatedProfile | null>(null);
   const [authRequest, setAuthRequest] = useState<{ role: "client" | "provider" | "admin"; mode: "login" | "register" } | null>(null);
+  const [paymentReturn, setPaymentReturn] = useState<{ id: string; mode: "return" | "cancelled" } | null>(null);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("mata-theme");
@@ -130,6 +154,8 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     const parameters = new URLSearchParams(window.location.search);
     oauthReturn.current = { intent: parameters.get("intent"), authenticated: parameters.get("auth") === "google" };
     const authError = parameters.get("auth_error");
+    const returnedPaymentId = z.string().uuid().safeParse(parameters.get("paymentId"));
+    const paymentMode = parameters.get("payment");
     void Promise.resolve().then(() => {
       if (draft) {
         setBooking(draft.selection);
@@ -146,11 +172,38 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
         setNotice(messages[authError] ?? "La connexion Google a échoué.");
       } else if (parameters.get("auth") === "google") {
         setNotice(parameters.get("profile") === "incomplete" ? "Connexion Google réussie. Complétez maintenant votre profil." : "Connexion Google réussie.");
+      } else if (returnedPaymentId.success && paymentMode === "cancelled") {
+        setPaymentReturn({ id: returnedPaymentId.data, mode: "cancelled" });
+        setNotice("Paiement sandbox annulé. Aucun débit n’est confirmé et la réservation reste en attente.");
+      } else if (returnedPaymentId.success && paymentMode === "return") {
+        setPaymentReturn({ id: returnedPaymentId.data, mode: "return" });
+        setNotice("Vérification du paiement sandbox en cours…");
       }
     });
-    if (authError || parameters.has("auth")) window.history.replaceState(null, "", window.location.pathname);
+    if (authError || parameters.has("auth") || parameters.has("payment")) window.history.replaceState(null, "", window.location.pathname);
     return () => window.clearTimeout(splashTimer);
   }, []);
+
+  useEffect(() => {
+    if (!authenticated || paymentReturn?.mode !== "return") return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    let active = true;
+    void supabase.auth.getSession().then(async ({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) return;
+      const response = await fetch(`/api/payments/status?paymentId=${encodeURIComponent(paymentReturn.id)}`, {
+        headers: { Authorization: `Bearer ${token}` }, cache: "no-store",
+      });
+      const parsed = paymentStatusSchema.safeParse(await response.json().catch(() => null));
+      if (!active) return;
+      if (!response.ok || !parsed.success) setNotice("Le statut du paiement ne peut pas encore être vérifié. Consultez Mes paiements.");
+      else if (parsed.data.payment.payment_status === "paid") setNotice("Paiement confirmé. Votre rendez-vous est confirmé.");
+      else if (["failed", "cancelled"].includes(parsed.data.payment.payment_status)) setNotice("Paiement non confirmé. Aucun débit validé.");
+      else setNotice("Paiement reçu par la sandbox et en attente de confirmation du webhook.");
+    }).catch(() => { if (active) setNotice("Le statut du paiement ne peut pas encore être vérifié. Consultez Mes paiements."); });
+    return () => { active = false; };
+  }, [authenticated, paymentReturn]);
 
   useEffect(() => {
     if (profile) window.scrollTo(0, 0);
@@ -357,7 +410,16 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       });
       if (!paymentResponse.ok) {
         setNotice("La réservation est enregistrée, mais le paiement n’a pas pu être préparé. Aucun débit n’a eu lieu.");
+        return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? `Chez ${provider.name}` : request.address };
       }
+      const checkout = paymentCheckoutSchema.safeParse(await paymentResponse.json().catch(() => null));
+      if (!checkout.success || !checkout.data.checkoutUrl || !isTrustedSandboxCheckoutUrl(checkout.data.checkoutUrl)) {
+        setNotice("La réservation est enregistrée, mais aucun checkout sandbox fiable n’est disponible. Aucun débit n’a eu lieu.");
+        return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? `Chez ${provider.name}` : request.address };
+      }
+      setNotice("Redirection sécurisée vers PayDunya Sandbox…");
+      window.location.assign(checkout.data.checkoutUrl);
+      return null;
     }
     return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? `Chez ${provider.name}` : request.address };
   }
@@ -579,11 +641,28 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const [slots, setSlots] = useState<string[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [waitingForAuthentication, setWaitingForAuthentication] = useState(false);
+  const [paymentCapabilities, setPaymentCapabilities] = useState<PaymentCapabilities>({ onlineCheckoutEnabled: false, environment: "disabled", provider: "none", methods: [] });
+  const [paymentCapabilitiesLoading, setPaymentCapabilitiesLoading] = useState(true);
   const [form, setForm] = useState<BookingRequest>(initialRequest ?? { date: initialDate || defaultBookingDate, time: "", locationMode: "salon", address: "", note: "", paymentMethod: "on_site" });
 
   useEffect(() => {
     window.sessionStorage.setItem(bookingDraftKey, JSON.stringify({ selection, request: form }));
   }, [form, selection]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    void fetch("/api/payments/capabilities", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => paymentCapabilitiesSchema.safeParse(await response.json().catch(() => null)))
+      .then((parsed) => {
+        if (!active || !parsed.success) return;
+        setPaymentCapabilities(parsed.data);
+        if (!parsed.data.onlineCheckoutEnabled) setForm((current) => current.paymentMethod === "on_site" ? current : { ...current, paymentMethod: "on_site" });
+      })
+      .catch(() => undefined)
+      .finally(() => { if (active) setPaymentCapabilitiesLoading(false); });
+    return () => { active = false; controller.abort(); };
+  }, []);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -632,9 +711,24 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
         <div className="fast-booking-progress" aria-label={`Étape ${step} sur 2`}><span className={step >= 1 ? "active" : ""}>1 <small>Créneau</small></span><i /><span className={step >= 2 ? "active" : ""}>2 <small>Confirmation</small></span></div>
         <div className="premium-booking-content">
           {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount)}</b></div><h3>Quand êtes-vous disponible ?</h3><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>Autre</small><strong>＋</strong><input aria-label="Choisir une autre date" type="date" min={today} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "" })} /></label></div><div className="slot-section-title"><strong>Créneaux disponibles</strong><small>Mis à jour en direct</small></div>{availabilityLoading ? <div className="slot-loading">Recherche des meilleurs créneaux…</div> : slots.length ? <div className="premium-slot-grid">{slots.map((time) => <button className={form.time === time ? "active" : ""} key={time} onClick={() => { setForm({ ...form, time }); setStep(2); }}>{time}</button>)}</div> : <div className="no-slots">Aucun créneau publié ce jour. Essayez une autre date.</div>}</>}
-          {step === 2 && <><h3>Vérifiez et confirmez</h3><div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date)} à {form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name}</small></div><b>{formatPrice(service.price_amount)}</b></div><fieldset className="location-choice"><legend>Où ?</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>Chez le professionnel</strong><small>{provider.area}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>À mon domicile</strong><small>Le professionnel se déplace</small></span></label>}</fieldset>{form.locationMode === "client_address" && <label>Adresse<textarea autoFocus value={form.address} placeholder="Votre adresse complète" onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}<fieldset className="location-choice"><legend>Paiement</legend><label><input type="radio" name="payment" checked={form.paymentMethod === "on_site"} onChange={() => setForm({ ...form, paymentMethod: "on_site" })} /><span><strong>Sur place</strong><small>Aucun débit aujourd’hui</small></span></label><label><input type="radio" name="payment" disabled /><span><strong>Wave, Orange Money ou carte</strong><small>Ouverture après validation de la sandbox</small></span></label></fieldset><details className="booking-options"><summary>Ajouter une note (facultatif)</summary><label>Note<textarea maxLength={1000} value={form.note} placeholder="Précision utile pour le professionnel" onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></details><div className="payment-note">Paiement sur place · aucun débit aujourd’hui.</div></>}
+          {step === 2 && <>
+            <h3>Vérifiez et confirmez</h3>
+            <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date)} à {form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name}</small></div><b>{formatPrice(service.price_amount)}</b></div>
+            <fieldset className="location-choice"><legend>Où ?</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>Chez le professionnel</strong><small>{provider.area}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>À mon domicile</strong><small>Le professionnel se déplace</small></span></label>}</fieldset>
+            {form.locationMode === "client_address" && <label>Adresse<textarea autoFocus value={form.address} placeholder="Votre adresse complète" onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}
+            <fieldset className="location-choice"><legend>Paiement</legend>
+              <label><input type="radio" name="payment" checked={form.paymentMethod === "on_site"} onChange={() => setForm({ ...form, paymentMethod: "on_site" })} /><span><strong>Sur place</strong><small>Aucun débit aujourd’hui</small></span></label>
+              {paymentCapabilities.onlineCheckoutEnabled ? <>
+                {paymentCapabilities.methods.includes("wave") && <label><input type="radio" name="payment" checked={form.paymentMethod === "wave"} onChange={() => setForm({ ...form, paymentMethod: "wave" })} /><span><strong>Wave</strong><small>Test PayDunya Sandbox · aucun argent réel</small></span></label>}
+                {paymentCapabilities.methods.includes("orange_money") && <label><input type="radio" name="payment" checked={form.paymentMethod === "orange_money"} onChange={() => setForm({ ...form, paymentMethod: "orange_money" })} /><span><strong>Orange Money</strong><small>Test PayDunya Sandbox · aucun argent réel</small></span></label>}
+                {paymentCapabilities.methods.includes("card") && <label><input type="radio" name="payment" checked={form.paymentMethod === "card"} onChange={() => setForm({ ...form, paymentMethod: "card" })} /><span><strong>Carte bancaire</strong><small>Test PayDunya Sandbox · aucune carte réelle</small></span></label>}
+              </> : <label><input type="radio" name="payment" disabled /><span><strong>Wave, Orange Money ou carte</strong><small>{paymentCapabilitiesLoading ? "Vérification de la sandbox…" : "Sandbox non configurée · option indisponible"}</small></span></label>}
+            </fieldset>
+            <details className="booking-options"><summary>Politique d’annulation et note</summary><p>La réservation reste en attente tant que le professionnel ou le webhook de paiement ne l’a pas confirmée. Un paiement sandbox annulé ne confirme aucun débit.</p><label>Note<textarea maxLength={1000} value={form.note} placeholder="Précision utile pour le professionnel" onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></details>
+            <div className="payment-note">{form.paymentMethod === "on_site" ? "Paiement sur place · aucun débit aujourd’hui." : "Mode test PayDunya Sandbox · le webhook reste la seule source de confirmation."}</div>
+          </>}
         </div>
-        {step === 2 && <div className="premium-booking-nav"><button className="back-button" onClick={() => setStep(1)}>Modifier</button><button disabled={submitting || !canConfirm} onClick={() => void confirm()}>{submitting ? "Enregistrement…" : "Confirmer · " + formatPrice(service.price_amount)}</button></div>}
+        {step === 2 && <div className="premium-booking-nav"><button className="back-button" onClick={() => setStep(1)}>Modifier</button><button disabled={submitting || !canConfirm} onClick={() => void confirm()}>{submitting ? "Enregistrement…" : form.paymentMethod === "on_site" ? "Confirmer · " + formatPrice(service.price_amount) : "Continuer vers la sandbox · " + formatPrice(service.price_amount)}</button></div>}
       </>}
     </section>
   </div>;

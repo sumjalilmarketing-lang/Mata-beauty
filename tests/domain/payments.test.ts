@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePaymentQuote, canTransitionPayment, makeIdempotencyKey } from "../../lib/domain/payments";
+import { calculatePaymentQuote, canTransitionPayment, isTrustedSandboxCheckoutUrl, makeIdempotencyKey } from "../../lib/domain/payments";
 
 describe("payment amounts", () => {
   it("calculates a full payment in integer minor units", () => {
@@ -45,5 +45,14 @@ describe("payment integrity", () => {
     expect(canTransitionPayment("pending", "paid")).toBe(true);
     expect(canTransitionPayment("paid", "pending")).toBe(false);
     expect(canTransitionPayment("refunded", "paid")).toBe(false);
+  });
+});
+
+describe("sandbox checkout redirects", () => {
+  it("accepts only the exact HTTPS PayDunya sandbox invoice route", () => {
+    expect(isTrustedSandboxCheckoutUrl("https://app.paydunya.com/sandbox-checkout/invoice/token-1")).toBe(true);
+    expect(isTrustedSandboxCheckoutUrl("http://app.paydunya.com/sandbox-checkout/invoice/token-1")).toBe(false);
+    expect(isTrustedSandboxCheckoutUrl("https://evil.example/sandbox-checkout/invoice/token-1")).toBe(false);
+    expect(isTrustedSandboxCheckoutUrl("https://app.paydunya.com.evil.example/sandbox-checkout/invoice/token-1")).toBe(false);
   });
 });

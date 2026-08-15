@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import type { PaymentMethod, PaymentStatus } from "@/lib/domain/payments";
+import { isTrustedSandboxCheckoutUrl, type PaymentMethod, type PaymentStatus } from "../domain/payments";
 
 export type CheckoutRequest = Readonly<{
   reference: string;
@@ -32,8 +32,26 @@ export interface PaymentGateway {
   readonly provider: "mock" | "paydunya";
   readonly isTest: boolean;
   createCheckout(request: CheckoutRequest): Promise<CheckoutSession>;
+  checkoutUrlForReference(providerReference: string): string | null;
   verifyWebhook(rawBody: string, signature: string | null): boolean;
   confirmTransaction(providerReference: string): Promise<GatewayConfirmation | null>;
+}
+
+export type PublicPaymentCapabilities = Readonly<{
+  onlineCheckoutEnabled: boolean;
+  environment: "disabled" | "sandbox";
+  provider: "none" | "paydunya";
+  methods: readonly PaymentMethod[];
+}>;
+
+export function paymentCapabilities(environment: Readonly<Record<string, string | undefined>> = process.env): PublicPaymentCapabilities {
+  const configured = environment.PAYMENT_PROVIDER_MODE === "paydunya_sandbox"
+    && Boolean(environment.PAYDUNYA_MASTER_KEY)
+    && Boolean(environment.PAYDUNYA_PRIVATE_KEY)
+    && Boolean(environment.PAYDUNYA_TOKEN);
+  return configured
+    ? { onlineCheckoutEnabled: true, environment: "sandbox", provider: "paydunya", methods: ["orange_money", "wave", "card"] }
+    : { onlineCheckoutEnabled: false, environment: "disabled", provider: "none", methods: [] };
 }
 
 function constantTimeHexEqual(expected: string, received: string) {
@@ -49,6 +67,8 @@ export class MockPaymentGateway implements PaymentGateway {
     return { provider: "mock", providerReference: `mock_${request.reference}`, checkoutUrl: null, status: "pending", isTest: true };
   }
 
+  checkoutUrlForReference() { return null; }
+
   verifyWebhook(rawBody: string, signature: string | null) {
     if (!this.webhookSecret || !signature) return false;
     const expected = createHmac("sha256", this.webhookSecret).update(rawBody).digest("hex");
@@ -58,7 +78,7 @@ export class MockPaymentGateway implements PaymentGateway {
   async confirmTransaction() { return null; }
 }
 
-const createResponseSchema = z.object({ response_code: z.literal("00"), response_text: z.url(), token: z.string().min(8) });
+const createResponseSchema = z.object({ response_code: z.literal("00"), response_text: z.url().refine(isTrustedSandboxCheckoutUrl), token: z.string().min(8) });
 const confirmResponseSchema = z.object({
   hash: z.string().length(128),
   invoice: z.object({ token: z.string(), total_amount: z.coerce.number().int().nonnegative() }),
@@ -98,6 +118,10 @@ export class PayDunyaSandboxGateway implements PaymentGateway {
     const parsed = createResponseSchema.safeParse(await response.json());
     if (!parsed.success) throw new Error("Réponse PayDunya invalide.");
     return { provider: "paydunya", providerReference: parsed.data.token, checkoutUrl: parsed.data.response_text, status: "pending", isTest: true };
+  }
+
+  checkoutUrlForReference(providerReference: string) {
+    return `https://app.paydunya.com/sandbox-checkout/invoice/${encodeURIComponent(providerReference)}`;
   }
 
   verifyWebhook(_rawBody: string, signature: string | null) {

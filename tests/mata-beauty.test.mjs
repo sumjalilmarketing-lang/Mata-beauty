@@ -195,14 +195,17 @@ test("booking conversations are participant-only, realtime, paginated, and read-
   assert.doesNotMatch(messages + dashboard, /SUPABASE_SERVICE_ROLE_KEY/);
 });
 
-test("the audit hardening keeps identity verification and booking prices server-owned", async () => {
-  const [migration, releaseRoute, createRoute, refundRoute, webhookRoute, paymentServer] = await Promise.all([
+test("the audit hardening keeps identity verification, booking prices, and sandbox activation server-owned", async () => {
+  const [migration, releaseRoute, createRoute, refundRoute, webhookRoute, paymentServer, capabilitiesRoute, gateway, app] = await Promise.all([
     readFile(new URL("supabase/migrations/20260804160000_full_audit_security_fixes.sql", root), "utf8"),
     readFile(new URL("app/api/payments/confirm-service/route.ts", root), "utf8"),
     readFile(new URL("app/api/payments/create/route.ts", root), "utf8"),
     readFile(new URL("app/api/payments/refund/route.ts", root), "utf8"),
     readFile(new URL("app/api/payments/webhook/route.ts", root), "utf8"),
     readFile(new URL("lib/payments/server.ts", root), "utf8"),
+    readFile(new URL("app/api/payments/capabilities/route.ts", root), "utf8"),
+    readFile(new URL("lib/payments/gateway.ts", root), "utf8"),
+    readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
   ]);
   assert.match(migration, /email_confirmed_at is not null/);
   assert.match(migration, /phone_confirmed_at is not null/);
@@ -218,6 +221,13 @@ test("the audit hardening keeps identity verification and booking prices server-
   }
   assert.match(paymentServer, /VERCEL_ENV !== "production"/);
   assert.match(createRoute, /applicationOrigin\(request\)/);
+  assert.match(createRoute, /PAYMENT_SANDBOX_UNAVAILABLE/);
+  assert.match(createRoute, /checkoutUrlForReference/);
+  assert.match(capabilitiesRoute, /paymentCapabilities\(\)/);
+  assert.match(gateway, /PAYDUNYA_PRIVATE_KEY/);
+  assert.match(gateway, /onlineCheckoutEnabled: false/);
+  assert.match(app, /isTrustedSandboxCheckoutUrl/);
+  assert.match(app, /window\.location\.assign\(checkout\.data\.checkoutUrl\)/);
 });
 
 test("Google OAuth uses PKCE, a server callback, and idempotent non-privileged profiles", async () => {

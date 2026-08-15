@@ -7,6 +7,17 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type PaymentMode = "full" | "deposit" | "free";
 export type PaymentMethod = "orange_money" | "wave" | "card";
 
+export function isTrustedSandboxCheckoutUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:"
+      && url.hostname === "app.paydunya.com"
+      && url.pathname.startsWith("/sandbox-checkout/invoice/");
+  } catch {
+    return false;
+  }
+}
+
 export type CommissionRule = Readonly<{
   percentageBasisPoints: number;
   fixedAmount: number;

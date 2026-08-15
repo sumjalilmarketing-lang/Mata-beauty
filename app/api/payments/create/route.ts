@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { calculatePaymentQuote } from "@/lib/domain/payments";
-import { getPaymentGateway } from "@/lib/payments/gateway";
+import { getPaymentGateway, paymentCapabilities } from "@/lib/payments/gateway";
 import { applicationOrigin, authenticatedSupabase, consumeRateLimit, hasTrustedOrigin, jsonError, requestContext, requestFingerprint } from "@/lib/payments/server";
 
 const schema = z.object({ bookingId: z.uuid(), method: z.enum(["orange_money", "wave", "card"]), attempt: z.string().min(8).max(80) });
@@ -22,6 +22,10 @@ export async function POST(request: Request) {
   }
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError("Demande de paiement invalide.", 400, "INVALID_REQUEST");
+  const capabilities = paymentCapabilities();
+  if (!capabilities.onlineCheckoutEnabled || !capabilities.methods.includes(parsed.data.method)) {
+    return jsonError("Le paiement en ligne sandbox n’est pas configuré. Aucun débit n’a été initié.", 503, "PAYMENT_SANDBOX_UNAVAILABLE");
+  }
   const { data: booking } = await auth.client.from("bookings")
     .select("id,client_id,provider_id,total_amount,currency,provider_service_id,status")
     .eq("id", parsed.data.bookingId).eq("client_id", auth.user.id).maybeSingle();
@@ -38,7 +42,13 @@ export async function POST(request: Request) {
   if (error || !payment) return jsonError("Le paiement n’a pas pu être initialisé.", 409, "PAYMENT_CREATE_FAILED");
   const initialized = payment as { id: string; idempotent: boolean; provider_reference: string | null };
   if (initialized.idempotent) {
-    return Response.json({ ok: true, payment, checkoutUrl: null, idempotent: true }, { headers: { "Cache-Control": "no-store", "X-Request-Id": context.requestId } });
+    try {
+      const gateway = getPaymentGateway();
+      const checkoutUrl = initialized.provider_reference ? gateway.checkoutUrlForReference(initialized.provider_reference) : null;
+      return Response.json({ ok: true, payment, checkoutUrl, idempotent: true }, { headers: { "Cache-Control": "no-store", "X-Request-Id": context.requestId } });
+    } catch {
+      return jsonError("La reprise du paiement sandbox est indisponible. Aucun nouveau débit n’a été initié.", 503, "PSP_RESUME_UNAVAILABLE");
+    }
   }
 
   const appUrl = applicationOrigin(request);
@@ -46,7 +56,7 @@ export async function POST(request: Request) {
     const gateway = getPaymentGateway();
     const session = await gateway.createCheckout({
       reference, amount: quote.payableAmount, currency: "XOF", description: `Réservation ${booking.id}`,
-      method: parsed.data.method, successUrl: `${appUrl}/?payment=return`, cancelUrl: `${appUrl}/?payment=cancelled`,
+      method: parsed.data.method, successUrl: `${appUrl}/?payment=return&paymentId=${initialized.id}`, cancelUrl: `${appUrl}/?payment=cancelled&paymentId=${initialized.id}`,
       webhookUrl: `${appUrl}/api/payments/webhook`,
     });
     const { error: attachError } = await auth.client.rpc("attach_payment_provider", {

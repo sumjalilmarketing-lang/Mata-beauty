@@ -1,6 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MockPaymentGateway, PayDunyaSandboxGateway } from "../../lib/payments/gateway";
+import { MockPaymentGateway, PayDunyaSandboxGateway, paymentCapabilities } from "../../lib/payments/gateway";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -25,6 +25,23 @@ describe("mock gateway", () => {
   });
 });
 
+describe("public payment capabilities", () => {
+  it("fails closed when the PSP mode or one credential is missing", () => {
+    expect(paymentCapabilities({ PAYMENT_PROVIDER_MODE: "mock" }).onlineCheckoutEnabled).toBe(false);
+    expect(paymentCapabilities({ PAYMENT_PROVIDER_MODE: "paydunya_sandbox", PAYDUNYA_MASTER_KEY: "master", PAYDUNYA_PRIVATE_KEY: "private" }).onlineCheckoutEnabled).toBe(false);
+  });
+
+  it("exposes only sandbox methods when all server credentials exist", () => {
+    expect(paymentCapabilities({
+      PAYMENT_PROVIDER_MODE: "paydunya_sandbox", PAYDUNYA_MASTER_KEY: "master",
+      PAYDUNYA_PRIVATE_KEY: "private", PAYDUNYA_TOKEN: "token",
+    })).toEqual({
+      onlineCheckoutEnabled: true, environment: "sandbox", provider: "paydunya",
+      methods: ["orange_money", "wave", "card"],
+    });
+  });
+});
+
 describe("PayDunya sandbox gateway", () => {
   const credentials = { masterKey: "master-test", privateKey: "private-test", token: "token-test" };
   const request = {
@@ -42,6 +59,15 @@ describe("PayDunya sandbox gateway", () => {
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(init.headers).toMatchObject({ "PAYDUNYA-PRIVATE-KEY": "private-test" });
     expect(JSON.stringify(init.body)).not.toContain("private-test");
+    expect(new PayDunyaSandboxGateway(credentials).checkoutUrlForReference("test_invoice_1"))
+      .toBe("https://app.paydunya.com/sandbox-checkout/invoice/test_invoice_1");
+  });
+
+  it("rejects a checkout URL outside the PayDunya sandbox host", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      response_code: "00", response_text: "https://evil.example/checkout/test_invoice_1", token: "test_invoice_1",
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+    await expect(new PayDunyaSandboxGateway(credentials).createCheckout(request)).rejects.toThrow("Réponse PayDunya invalide");
   });
 
   it("authenticates and confirms status server-to-server", async () => {

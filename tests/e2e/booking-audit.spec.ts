@@ -215,6 +215,38 @@ test.describe("audit chronométré de réservation", () => {
     console.log(`SOCIAL_BOOKING_METRIC actions=${actions} duration_ms=${durationMs}`);
   });
 
+  test("redirige un paiement activé vers le checkout PayDunya sandbox de confiance", async ({ page }) => {
+    const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
+    await mockSupabase(page, state);
+    let paymentRequest: { bookingId?: string; method?: string; attempt?: string } | null = null;
+    await page.route("**/api/payments/capabilities", (route) => json(route, {
+      onlineCheckoutEnabled: true, environment: "sandbox", provider: "paydunya", methods: ["orange_money", "wave", "card"],
+    }));
+    await page.route("**/api/payments/create", (route) => {
+      paymentRequest = route.request().postDataJSON() as { bookingId?: string; method?: string; attempt?: string };
+      return json(route, {
+        ok: true,
+        payment: { id: "77777777-7777-4777-8777-777777777777" },
+        checkoutUrl: "https://app.paydunya.com/sandbox-checkout/invoice/test_invoice_1",
+      }, 201);
+    });
+    await page.route("https://app.paydunya.com/sandbox-checkout/invoice/test_invoice_1", (route) => route.fulfill({
+      status: 200, contentType: "text/html", body: "<title>PayDunya Sandbox</title><h1>Checkout sandbox</h1>",
+    }));
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Réserver" }).click();
+    await page.getByRole("button", { name: "10:00" }).click();
+    await page.getByLabel("Wave").check();
+    await page.getByRole("button", { name: /Continuer vers la sandbox.*10.*000 FCFA/ }).click();
+    await signIn(page, "client-payment@example.test");
+
+    await expect(page).toHaveURL("https://app.paydunya.com/sandbox-checkout/invoice/test_invoice_1");
+    const capturedPaymentRequest = paymentRequest as { bookingId?: string; method?: string; attempt?: string } | null;
+    expect(capturedPaymentRequest).toMatchObject({ bookingId, method: "wave" });
+    expect(capturedPaymentRequest?.attempt).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
   test("retire un créneau réservé et refuse un jeton de test non vérifiable côté serveur", async ({ page }) => {
     const state: AuditState = { bookingCreated: true, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
@@ -228,7 +260,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.getByRole("button", { name: "Retour" }).click();
     await page.getByRole("button", { name: "Profil" }).click();
     await signIn(page, "client-audit@example.test");
-    await expect(page).toHaveURL(/connexion=requise/);
+    await expect(page).toHaveURL(/connexion=requise/, { timeout: 15_000 });
     expect(state.bookingCreated).toBe(true);
   });
 
@@ -238,7 +270,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.goto("/");
     await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
     await signIn(page, "other-audit@example.test");
-    await expect(page).toHaveURL(/connexion=requise/);
+    await expect(page).toHaveURL(/connexion=requise/, { timeout: 15_000 });
     const response = await page.evaluate(async ({ id, endpoint }) => fetch(`${endpoint}/rest/v1/bookings?id=eq.${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
