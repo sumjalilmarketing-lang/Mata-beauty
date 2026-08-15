@@ -10,6 +10,7 @@ Le socle Auth, Supabase, RLS, réservation, catalogue, rôles administratifs et 
 
 - Projet Supabase : `qjdwxdbvrxedyfolnpol`.
 - Preview Vercel de départ : `https://mata-beauty-3bn126hnu-africrm.vercel.app/`.
+- Preview Vercel corrigée : `https://mata-beauty-diyt8zo0x-africrm.vercel.app/` (`READY`).
 - Production observée, non modifiée : `https://mata-beauty.vercel.app/`.
 - Dépôt : `sumjalilmarketing-lang/Mata-beauty`.
 - Branche : `codex/full-audit-and-fixes`.
@@ -145,6 +146,8 @@ Le parcours historique avant optimisation n’est pas instrumenté dans ce run ;
 3. `reviews` : utilisation de `is_visible` au lieu d’une colonne `status` inexistante.
 4. Supabase Auth : ajout du wildcard sécurisé des Preview Mata Beauty pour Google OAuth.
 5. Ajout d’un harness de recette réelle sans secret dans Git, avec nettoyage des données temporaires.
+
+Les trois requêtes corrigées ont été revalidées sur la Preview finale : Messages connecté avec données, Profils connecté avec données, Avis connecté avec état vide légitime. Le endpoint serveur final retourne `configuration=true`, `database=true` et `serviceRole=true`.
 
 ## Contrôles techniques
 
