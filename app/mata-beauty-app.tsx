@@ -11,6 +11,7 @@ import { isTrustedSandboxCheckoutUrl, type PaymentMethod } from "@/lib/domain/pa
 import { fetchActivePromotions, fetchPublishedProviders, type CatalogPromotion } from "@/lib/supabase/catalog";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { loadAuthenticatedProfile } from "@/lib/auth/profile";
+import { intendedRoleForDestination, safeOAuthDestination } from "@/lib/auth/redirect";
 
 type Provider = {
   id: string;
@@ -142,7 +143,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [maxPrice, setMaxPrice] = useState("50000");
   const [notice, setNotice] = useState("");
   const [authenticated, setAuthenticated] = useState<AuthenticatedProfile | null>(null);
-  const [authRequest, setAuthRequest] = useState<{ role: "client" | "provider" | "admin"; mode: "login" | "register" } | null>(null);
+  const [authRequest, setAuthRequest] = useState<{ role: "client" | "provider" | "admin"; mode: "login" | "register" | "reset"; returnTo?: string } | null>(null);
   const [paymentReturn, setPaymentReturn] = useState<{ id: string; mode: "return" | "cancelled" } | null>(null);
 
   useEffect(() => {
@@ -154,6 +155,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     const parameters = new URLSearchParams(window.location.search);
     oauthReturn.current = { intent: parameters.get("intent"), authenticated: parameters.get("auth") === "google" };
     const authError = parameters.get("auth_error");
+    const returnTo = safeOAuthDestination(parameters.get("returnTo"));
     const returnedPaymentId = z.string().uuid().safeParse(parameters.get("paymentId"));
     const paymentMode = parameters.get("payment");
     void Promise.resolve().then(() => {
@@ -161,6 +163,14 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
         setBooking(draft.selection);
         setProfile(draft.selection.provider);
         setRestoredBookingRequest(draft.request);
+      }
+      if (parameters.get("connexion") === "requise") {
+        setAuthRequest({ role: intendedRoleForDestination(returnTo), mode: "login", returnTo });
+        setNotice("Connectez-vous pour continuer vers votre espace.");
+      } else if (parameters.get("auth") === "reset") {
+        setAuthRequest({ role: "client", mode: "reset", returnTo: "/app" });
+      } else if (parameters.get("acces") === "refuse") {
+        setNotice("Votre compte ne possède pas l’autorisation requise pour cet espace.");
       }
       if (authError) {
         const messages: Record<string, string> = {
@@ -433,6 +443,11 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     setAuthenticated(signedIn);
     setAuthRequest(null);
     if (!booking) {
+      const requested = authRequest?.returnTo ? safeOAuthDestination(authRequest.returnTo) : null;
+      if (requested && requested !== "/") {
+        window.location.assign(requested);
+        return;
+      }
       const destination = signedIn.roles.includes(authRequest?.role ?? "client") ? (authRequest?.role ?? signedIn.role) : signedIn.role;
       window.location.assign(destination === "provider" ? "/pro" : destination === "admin" ? "/admin" : "/app");
     }
@@ -443,7 +458,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }
 
   if (profile) {
-    return <><ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.id)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service) => startBooking({ provider: profile, service })} />{booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}{authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}</>;
+    return <><ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.id)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service) => startBooking({ provider: profile, service })} />{booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}{authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} returnTo={authRequest.returnTo} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}</>;
   }
 
   return (
@@ -515,7 +530,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       </div>
 
       {booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}
-      {authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}
+      {authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} returnTo={authRequest.returnTo} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}
     </main>
   );
 }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { loadAuthenticatedProfile } from "@/lib/auth/profile";
+import { ensureAuthenticatedProfile } from "@/lib/auth/profile";
 import type { AdminRoleKey } from "@/lib/domain/admin";
 import { workspaceModule, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import { createSupabasePageClient } from "@/lib/supabase/server";
@@ -10,10 +10,12 @@ type AdminContext = { roles?: string[]; permissions?: string[] };
 export async function requireWorkspace(space: WorkspaceSpaceKey, moduleKey: string) {
   const supabase = await createSupabasePageClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/?connexion=requise");
+  const requestedPath = moduleKey === "dashboard" ? workspacePath(space) : `${workspacePath(space)}/${moduleKey}`;
+  if (!user) redirect(`/?connexion=requise&returnTo=${encodeURIComponent(requestedPath)}`);
 
-  const [profile, adminResult, ownedResult, collaboratorResult] = await Promise.all([
-    loadAuthenticatedProfile(supabase, user.id),
+  const profile = await ensureAuthenticatedProfile(supabase, user.id).catch(() => null);
+  if (!profile) redirect("/?auth_error=profile_creation_failed");
+  const [adminResult, ownedResult, collaboratorResult] = await Promise.all([
     supabase.rpc("get_admin_context"),
     supabase.from("businesses").select("id", { count: "exact", head: true }).eq("owner_id", user.id),
     supabase.from("collaborators").select("id", { count: "exact", head: true }).eq("profile_id", user.id).eq("is_active", true),
@@ -26,7 +28,7 @@ export async function requireWorkspace(space: WorkspaceSpaceKey, moduleKey: stri
     ownsBusiness: (ownedResult.count ?? 0) > 0,
     isCollaborator: (collaboratorResult.count ?? 0) > 0,
   };
-  if (!canAccessWorkspace(space, identity)) redirect("/?acces=refuse");
+  if (!canAccessWorkspace(space, identity)) redirect(`/?acces=refuse&returnTo=${encodeURIComponent(requestedPath)}`);
   const currentModule = workspaceModule(space, moduleKey);
   if (!canAccessWorkspaceModule(identity, currentModule.permission)) redirect(workspaceModule(space, "dashboard").key === currentModule.key ? "/" : workspacePath(space));
   return { identity, module: currentModule, availableSpaces: availableWorkspaces(identity), userEmail: user.email ?? "Compte Mata Beauty" };

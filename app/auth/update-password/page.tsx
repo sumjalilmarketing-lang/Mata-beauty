@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { authErrorMessage } from "@/lib/auth/errors";
 
 const schema = z.object({
   password: z.string().min(8, "Utilisez au moins 8 caractères."),
@@ -19,6 +20,7 @@ type Values = z.infer<typeof schema>;
 
 export default function UpdatePasswordPage() {
   const [feedback, setFeedback] = useState("");
+  const [complete, setComplete] = useState(false);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
   });
@@ -31,7 +33,13 @@ export default function UpdatePasswordPage() {
       return;
     }
     const { error } = await supabase.auth.updateUser({ password: values.password });
-    setFeedback(error ? error.message : "Mot de passe mis à jour. Vous pouvez vous connecter.");
+    if (error) {
+      setFeedback(authErrorMessage(error));
+      return;
+    }
+    await supabase.auth.signOut();
+    setComplete(true);
+    setFeedback("Mot de passe mis à jour. Reconnectez-vous avec votre nouveau mot de passe.");
   }
 
   return (
@@ -45,7 +53,7 @@ export default function UpdatePasswordPage() {
           <label>Confirmation<input type="password" autoComplete="new-password" {...register("confirmation")} /></label>
           {errors.confirmation && <small className="field-error">{errors.confirmation.message}</small>}
           {feedback && <p className="auth-feedback" role="status">{feedback}</p>}
-          <button className="primary-button full" disabled={isSubmitting}>Mettre à jour</button>
+          <button className="primary-button full" disabled={isSubmitting || complete}>{isSubmitting ? "Mise à jour…" : "Mettre à jour"}</button>
         </form>
         <Link className="outline-button return-home" href="/">Retour à Mata Beauty</Link>
       </section>

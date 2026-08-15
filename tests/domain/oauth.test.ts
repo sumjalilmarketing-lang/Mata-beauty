@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeOAuthIntent, oauthErrorCode, safeOAuthDestination } from "../../lib/auth/redirect";
+import { intendedRoleForDestination, normalizeOAuthIntent, oauthErrorCode, safeOAuthDestination } from "../../lib/auth/redirect";
 import { isGoogleAuthEnabled } from "../../lib/auth/providers";
 
 describe("Google OAuth security", () => {
@@ -8,6 +8,15 @@ describe("Google OAuth security", () => {
     expect(safeOAuthDestination("//evil.example/steal")).toBe("/");
     expect(safeOAuthDestination("/%2f%2fevil.example")).toBe("/");
     expect(safeOAuthDestination("/")).toBe("/");
+    expect(safeOAuthDestination("/pro/studio?draft=42")).toBe("/pro/studio?draft=42");
+    expect(safeOAuthDestination("/app/bookings#next")).toBe("/app/bookings#next");
+    expect(safeOAuthDestination("/auth/callback?code=secret")).toBe("/");
+  });
+
+  it("infers only a public application intent from the requested workspace", () => {
+    expect(intendedRoleForDestination("/pro/studio")).toBe("provider");
+    expect(intendedRoleForDestination("/salon/team")).toBe("provider");
+    expect(intendedRoleForDestination("/admin")).toBe("client");
   });
 
   it("never accepts an administrative intent", () => {

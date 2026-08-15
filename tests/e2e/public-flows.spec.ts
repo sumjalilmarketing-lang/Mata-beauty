@@ -79,6 +79,26 @@ test("Google login starts a real OAuth request with a fixed callback", async ({ 
   expect(redirect.searchParams.get("next")).toBe("/");
 });
 
+test("a protected destination survives the authentication handoff", async ({ page }) => {
+  await page.goto("/?connexion=requise&returnTo=%2Fpro%2Fstudio");
+  await expect(page.getByRole("heading", { name: "Bienvenue" })).toBeVisible();
+  const authorizeRequest = page.waitForRequest((request) => new URL(request.url()).pathname === "/auth/v1/authorize");
+  await page.getByRole("button", { name: "Continuer avec Google", exact: true }).click();
+  const oauthUrl = new URL((await authorizeRequest).url());
+  const redirect = new URL(oauthUrl.searchParams.get("redirect_to") ?? "https://invalid.test");
+  expect(redirect.searchParams.get("intent")).toBe("professional");
+  expect(redirect.searchParams.get("next")).toBe("/pro/studio");
+});
+
+test("password recovery does not require the old password", async ({ page }) => {
+  await page.goto("/?auth=reset");
+  await expect(page.getByRole("heading", { name: "Mot de passe oublié" })).toBeVisible();
+  await page.getByLabel("Adresse e-mail").fill("client@example.test");
+  const recoveryRequest = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith("/recover"));
+  await page.getByRole("button", { name: "Envoyer le lien" }).click();
+  await recoveryRequest;
+});
+
 test("invalid OAuth callbacks fail closed without an open redirect", async ({ page }) => {
   await page.goto("/auth/callback?next=https%3A%2F%2Fevil.example%2Fsteal");
   await expect(page.getByText("Retour Google invalide.", { exact: true })).toBeVisible();

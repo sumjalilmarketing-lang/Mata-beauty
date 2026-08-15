@@ -4,14 +4,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { loadAuthenticatedProfile, type AuthenticatedProfile } from "@/lib/auth/profile";
+import { authErrorMessage } from "@/lib/auth/errors";
+import { ensureAuthenticatedProfile, type AuthenticatedProfile } from "@/lib/auth/profile";
+import { safeOAuthDestination } from "@/lib/auth/redirect";
 import { isGoogleAuthEnabled } from "@/lib/auth/providers";
 import { getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
 
 const authSchema = z.object({
   displayName: z.string().trim().max(80).optional(),
   email: z.email("Adresse e-mail invalide."),
-  password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères."),
+  password: z.string().optional(),
   acceptLegal: z.boolean().optional(),
 });
 
@@ -22,11 +24,13 @@ export type { AuthenticatedProfile } from "@/lib/auth/profile";
 export function AuthModal({
   initialMode = "login",
   intendedRole = "client",
+  returnTo = "/",
   onClose,
   onAuthenticated,
 }: {
   initialMode?: AuthMode;
   intendedRole?: "client" | "provider";
+  returnTo?: string;
   onClose: () => void;
   onAuthenticated: (profile: AuthenticatedProfile) => void;
 }) {
@@ -62,6 +66,10 @@ export function AuthModal({
       }
 
       if (mode === "register") {
+        if (!values.password || values.password.length < 8) {
+          setFeedback("Le mot de passe doit contenir au moins 8 caractères.");
+          return;
+        }
         if (!values.acceptLegal) {
           setFeedback("Vous devez accepter les conditions et la politique de confidentialité.");
           return;
@@ -85,6 +93,10 @@ export function AuthModal({
           return;
         }
       } else {
+        if (!values.password) {
+          setFeedback("Saisissez votre mot de passe.");
+          return;
+        }
         const { error } = await supabase.auth.signInWithPassword({
           email: values.email,
           password: values.password,
@@ -92,15 +104,15 @@ export function AuthModal({
         if (error) throw error;
       }
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const user = sessionData.session?.user;
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const user = userData.user;
+      if (userError) throw userError;
       if (!user) throw new Error("La session n’a pas pu être créée.");
       await supabase.rpc("synchronize_account_status");
-      await supabase.rpc("ensure_authenticated_profile");
       if (intendedRole === "provider") await supabase.rpc("request_professional_profile");
-      onAuthenticated(await loadAuthenticatedProfile(supabase, user.id));
+      onAuthenticated(await ensureAuthenticatedProfile(supabase, user.id));
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "L’opération a échoué. Réessayez.");
+      setFeedback(authErrorMessage(error));
     }
   }
 
@@ -121,7 +133,7 @@ export function AuthModal({
     const intent = intendedRole === "provider" ? "professional" : "client";
     const redirectTo = new URL("/auth/callback", window.location.origin);
     redirectTo.searchParams.set("intent", intent);
-    redirectTo.searchParams.set("next", "/");
+    redirectTo.searchParams.set("next", safeOAuthDestination(returnTo));
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: redirectTo.toString(), scopes: "openid email profile" },

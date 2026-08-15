@@ -3,8 +3,9 @@ import { applicationOrigin } from "@/lib/payments/server";
 import { normalizeOAuthIntent, oauthErrorCode, safeOAuthDestination } from "@/lib/auth/redirect";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-function callbackRedirect(request: Request, parameters: Record<string, string>) {
-  const url = new URL(safeOAuthDestination(new URL(request.url).searchParams.get("next")), applicationOrigin(request));
+function callbackRedirect(request: Request, parameters: Record<string, string>, fallback = "/") {
+  const requested = new URL(request.url).searchParams.get("next");
+  const url = new URL(requested ? safeOAuthDestination(requested) : fallback, applicationOrigin(request));
   for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
   return NextResponse.redirect(url, { status: 303 });
 }
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
       auth: "google",
       intent,
       profile: profile?.profile_incomplete ? "incomplete" : "complete",
-    });
+    }, intent === "professional" ? "/pro" : "/app");
   } catch {
     return callbackRedirect(request, { auth_error: "oauth_unavailable" });
   }

@@ -12,6 +12,7 @@ export type AuthenticatedProfile = {
 type ProfileRow = {
   role: ApplicationRole;
   is_suspended: boolean;
+  account_status: string;
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
@@ -19,12 +20,13 @@ type ProfileRow = {
 
 export async function loadAuthenticatedProfile(supabase: SupabaseClient, userId: string): Promise<AuthenticatedProfile> {
   const [{ data: profile, error: profileError }, { data: accountRoles, error: rolesError }] = await Promise.all([
-    supabase.from("profiles").select("role,is_suspended,first_name,last_name,phone").eq("id", userId).single(),
+    supabase.from("profiles").select("role,is_suspended,account_status,first_name,last_name,phone").eq("id", userId).single(),
     supabase.from("account_roles").select("role").eq("profile_id", userId),
   ]);
   if (profileError || !profile) throw profileError ?? new Error("Profil introuvable.");
   const row = profile as ProfileRow;
   if (row.is_suspended) throw new Error("Ce compte est suspendu. Contactez l’assistance Mata Beauty.");
+  if (["disabled", "deleted", "suspended"].includes(row.account_status)) throw new Error("Ce compte est suspendu. Contactez l’assistance Mata Beauty.");
 
   const roles = new Set<ApplicationRole>();
   for (const item of accountRoles ?? []) {
@@ -42,4 +44,10 @@ export async function loadAuthenticatedProfile(supabase: SupabaseClient, userId:
     roles: orderedRoles,
     profileIncomplete: !row.first_name || !row.last_name || !row.phone,
   };
+}
+
+export async function ensureAuthenticatedProfile(supabase: SupabaseClient, userId: string) {
+  const { error } = await supabase.rpc("ensure_authenticated_profile");
+  if (error) throw error;
+  return loadAuthenticatedProfile(supabase, userId);
 }
