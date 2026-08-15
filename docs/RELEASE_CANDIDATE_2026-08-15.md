@@ -2,7 +2,7 @@
 
 ## Verdict actuel
 
-**NOT READY pour la production.** La Preview peut être générée, mais les tests distants authentifiés et la publication programmée restent bloqués par la configuration serveur Vercel. Le paiement reste volontairement en mode `mock` conformément à la politique du dépôt.
+**NOT READY pour la production.** La Preview et l’accès serveur Supabase sont opérationnels, mais les scénarios distants authentifiés multi-rôles n’ont pas tous été rejoués et le paiement reste volontairement en mode `mock` conformément à la politique du dépôt.
 
 ## Corrections de cette phase
 
@@ -40,19 +40,25 @@ Ces mesures utilisent un backend Supabase intercepté par les tests UI. Elles me
 
 ## État par domaine
 
-- Auth client/prestataire : architecture, callback, récupération, session et redirections testés localement ; création distante réelle bloquée par la clé serveur invalide.
+- Auth client/prestataire : architecture, callback, récupération, session et redirections testés localement ; création distante réelle multi-rôles à rejouer.
 - Auth salon/staff : contrôle d’accès serveur présent ; données réelles inter-rôles non rejouées dans cette phase.
 - Auth Admin/Super Admin : RBAC/RLS et RPC audités présents ; connexion distante réelle non rejouée dans cette phase.
-- Supabase/RLS : migration appliquée, fonctions critiques présentes ; suite distante complète bloquée par la clé serveur.
+- Supabase/RLS : migrations appliquées, fonctions critiques présentes et accès `service_role` validé depuis le runtime Vercel.
 - Storage/Studio/feed : upload et publication couverts structurellement ; programmation automatisée chaque minute par Supabase `pg_cron`.
 - Réservations/messagerie/notifications/avis/modération : schémas et parcours UI existants, matrice locale verte ; scénario distant complet non rejoué.
 - Catégories : CRUD désormais connecté ; validation réelle avec un compte Super Admin reste à exécuter.
 - Salons : tables, RLS, profils, collaborateurs et espaces existent, mais plusieurs écrans génériques restent principalement des listes et ne couvrent pas tout le CRUD demandé.
 - Paiements : infrastructure interne, idempotence, webhooks, remboursements, ledger et commissions présents ; fournisseur externe non configuré, mode mock conservé.
-- Vercel : variables publiques présentes en Production et Preview ; `SUPABASE_SERVICE_ROLE_KEY` seulement en Preview et techniquement invalide.
+- Vercel : variables publiques présentes en Production et Preview ; `SUPABASE_SERVICE_ROLE_KEY` corrigée pour Production et Preview. Le contrôle déployé confirme configuration, base et rôle serveur.
 
 ## Blocages externes
 
-1. Récupérer la vraie clé serveur du projet Supabase et la transmettre dans les champs sécurisés Vercel pour Preview, Production et Development, sans l’exposer.
-2. Redéployer puis exécuter les suites distantes avec comptes temporaires et nettoyage contrôlé.
+1. Exécuter les suites distantes multi-rôles avec comptes temporaires et nettoyage contrôlé depuis un runner ayant accès aux secrets Vercel sensibles.
+2. Finaliser les écrans salon encore génériques avant de considérer tout le périmètre fonctionnel complet.
 3. Valider un PSP réel avant toute sortie du mode mock.
+
+## Preview finale contrôlée
+
+- URL : `https://mata-beauty-l111oe75n-africrm.vercel.app`
+- Contrôle serveur : `ok=true`, configuration/base/service role au vert.
+- Les secrets Vercel sensibles restent non exportables ; le fichier temporaire de test a été supprimé.
