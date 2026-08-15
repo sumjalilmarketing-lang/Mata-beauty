@@ -285,3 +285,26 @@ test("Google OAuth uses PKCE, a server callback, and idempotent non-privileged p
   assert.match(app, /mata-booking-draft/);
   assert.match(app, /onAuthStateChange/);
 });
+
+test("the provider Studio publishes validated and bookable media", async () => {
+  const [studio, publisher, route, migration, navigation] = await Promise.all([
+    readFile(new URL("app/creator-studio.tsx", root), "utf8"),
+    readFile(new URL("app/video-publisher.tsx", root), "utf8"),
+    readFile(new URL("app/workspace-module.tsx", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260815180000_video_studio_workflow.sql", root), "utf8"),
+    readFile(new URL("lib/navigation/spaces.ts", root), "utf8"),
+  ]);
+  for (const label of ["Créer une publication", "Mes vidéos", "Mes photos", "Avant / Après", "Brouillons", "Publications programmées", "Statistiques"]) assert.match(studio, new RegExp(label.replace("/", "\\/")));
+  assert.match(route, /<CreatorStudio/);
+  assert.match(navigation, /module\("videos", "Studio"/);
+  assert.match(publisher, /provider-social-media/);
+  assert.match(publisher, /\/video\.\$\{extension\}/);
+  assert.match(publisher, /create_provider_video_post/);
+  assert.match(publisher, /Miniature personnalisée/);
+  assert.match(publisher, /Supprimer et recommencer/);
+  assert.match(migration, /storage\.objects/);
+  assert.match(migration, /owner_id=auth\.uid\(\)::text/);
+  assert.match(migration, /target_provider_service_id is null/);
+  assert.match(migration, /manage_own_social_post/);
+  assert.doesNotMatch(studio + publisher, /SUPABASE_SERVICE_ROLE_KEY/);
+});

@@ -68,7 +68,7 @@ const salonModules = [
   module("services", "Prestations", "≡", "Offre", "Catalogue commun et prestations par membre.", { primary: true, resource: "services" }),
   module("resources", "Postes et ressources", "⌑", "Organisation", "Fauteuils, cabines, équipements et capacité simultanée."),
   module("clients", "Clientes", "♙", "Relations", "Clientèle du salon et historique partagé.", { resource: "profiles" }),
-  module("videos", "Vidéos", "▶", "Contenu", "Publications du salon et de ses membres.", { resource: "videos" }),
+  module("videos", "Studio", "▶", "Contenu", "Création, publications, brouillons, programmation et statistiques du salon.", { resource: "videos" }),
   module("portfolio", "Portfolio", "◇", "Contenu", "Galerie du salon."),
   module("messages", "Messages", "✉", "Relations", "Conversations du salon.", { resource: "messages" }),
   module("revenue", "Revenus", "¤", "Finance", "Revenus consolidés du salon.", { resource: "payments" }),

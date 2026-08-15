@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { WorkspaceModule, WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import { workspaceHref, workspaceSpaces } from "@/lib/navigation/spaces";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { CreatorStudio } from "./creator-studio";
 
 type Row = Record<string, unknown>;
 type ResourceDefinition = { table: string; select: string; title: (row: Row) => string; meta: (row: Row) => string };
@@ -25,7 +26,7 @@ const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, Resour
   audit: { table: "admin_audit_logs", select: "id,action,created_at", title: (row) => label(row.action), meta: (row) => date(row.created_at) },
 };
 
-export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string }) {
+export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean }) {
   const definition = module.resource ? resources[module.resource] : undefined;
   const [rows, setRows] = useState<Row[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "unavailable">(definition ? "loading" : "empty");
@@ -44,9 +45,10 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
     return () => { active = false; };
   }, [definition, supabaseAnonKey, supabaseUrl]);
 
+  if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;
   const shortcuts = workspaceSpaces[space].modules.filter((item) => item.key !== module.key && allowedModuleKeys.includes(item.key)).slice(0, 4);
   return <section className="workspace-content">
-    <div className="workspace-intro"><div><span>Module sécurisé</span><h2>{module.label}</h2><p>{module.description}</p></div><div className="workspace-status"><i />Données limitées par vos droits</div></div>
+    <div className="workspace-intro"><div><span>Module sécurisé</span><h2>{module.label}</h2><p>{module.description}</p>{module.key === "dashboard" && (space === "pro" || space === "salon") && <Link className="workspace-quick-publish" href={workspaceHref(space, "videos")}>＋ Publier une vidéo</Link>}</div><div className="workspace-status"><i />Données limitées par vos droits</div></div>
     <div className="workspace-metrics">
       <article><span>Éléments visibles</span><strong>{state === "ready" ? rows.length : "—"}</strong><small>Périmètre autorisé</small></article>
       <article><span>État du module</span><strong>{state === "unavailable" ? "Limité" : "Actif"}</strong><small>Accès contrôlé côté serveur</small></article>

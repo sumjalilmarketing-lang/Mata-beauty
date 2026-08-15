@@ -15,7 +15,7 @@ let serviceId = null;
 let postId = null;
 let draftId = null;
 let bookingId = null;
-let mediaPath = null;
+const mediaPaths = [];
 
 async function user(label, professional = false) {
   const email = `codex-social-${label}-${run}@example.test`;
@@ -38,24 +38,41 @@ async function main() {
   const service = await admin.from("provider_services").insert({ provider_id: creator.id, service_id: base.data.id, title: `Social E2E ${run}`, duration_minutes: 60, price_amount: 15000, currency: "XOF", is_active: true }).select("id").single();
   assert.ifError(service.error); serviceId = service.data.id;
 
-  mediaPath = `${creator.id}/${randomUUID()}.mp4`;
-  const upload = await creator.client.storage.from("social-videos").upload(mediaPath, new Blob([new Uint8Array([0, 0, 0, 20])], { type: "video/mp4" }), { contentType: "video/mp4" });
+  postId = randomUUID();
+  const mediaPath = `${creator.id}/${postId}/video.mp4`;
+  const thumbnailPath = `${creator.id}/${postId}/thumbnail.jpg`;
+  mediaPaths.push(mediaPath, thumbnailPath);
+  const upload = await creator.client.storage.from("provider-social-media").upload(mediaPath, new Blob([new Uint8Array([0, 0, 0, 20])], { type: "video/mp4" }), { contentType: "video/mp4" });
   assert.ifError(upload.error);
-  const forbiddenUpload = await outsider.client.storage.from("social-videos").upload(`${creator.id}/${randomUUID()}.mp4`, new Blob(["x"], { type: "video/mp4" }), { contentType: "video/mp4" });
+  const thumbnailUpload = await creator.client.storage.from("provider-social-media").upload(thumbnailPath, new Blob([new Uint8Array([255, 216, 255, 217])], { type: "image/jpeg" }), { contentType: "image/jpeg" });
+  assert.ifError(thumbnailUpload.error);
+  const forbiddenUpload = await outsider.client.storage.from("provider-social-media").upload(`${creator.id}/${randomUUID()}/video.mp4`, new Blob(["x"], { type: "video/mp4" }), { contentType: "video/mp4" });
   assert.ok(forbiddenUpload.error, "RLS must reject upload into another creator folder");
-  const videoUrl = creator.client.storage.from("social-videos").getPublicUrl(mediaPath).data.publicUrl;
+  const videoUrl = creator.client.storage.from("provider-social-media").getPublicUrl(mediaPath).data.publicUrl;
+  const thumbnailUrl = creator.client.storage.from("provider-social-media").getPublicUrl(thumbnailPath).data.publicUrl;
 
-  const published = await creator.client.rpc("create_video_post", { target_caption: "Tresses premium E2E", target_video_url: videoUrl, target_thumbnail_url: null, target_duration_seconds: 30, target_aspect_ratio: 0.562, target_provider_service_id: serviceId, target_status: "published", target_allow_comments: true, target_client_consent: true, target_scheduled_for: null, target_visibility: "public", target_hashtags: ["Tresses", "Dakar"] });
-  assert.ifError(published.error); postId = published.data;
-  const noService = await creator.client.rpc("create_video_post", { target_caption: "Publication interdite", target_video_url: videoUrl, target_thumbnail_url: null, target_duration_seconds: 30, target_aspect_ratio: 0.562, target_provider_service_id: null, target_status: "published", target_allow_comments: true, target_client_consent: true, target_scheduled_for: null, target_visibility: "public", target_hashtags: [] });
+  const published = await creator.client.rpc("create_provider_video_post", { target_post_id: postId, target_title: "Tresses premium E2E", target_caption: "Tresses premium E2E", target_video_path: mediaPath, target_video_url: videoUrl, target_thumbnail_path: thumbnailPath, target_thumbnail_url: thumbnailUrl, target_duration_seconds: 30, target_aspect_ratio: 0.562, target_provider_service_id: serviceId, target_status: "published", target_allow_comments: true, target_client_consent: true, target_scheduled_for: null, target_visibility: "public", target_hashtags: ["Tresses", "Dakar"], target_location: "Dakar", target_available_at: null });
+  assert.ifError(published.error); assert.equal(published.data, postId);
+  const noService = await creator.client.rpc("create_provider_video_post", { target_post_id: randomUUID(), target_title: "Interdite", target_caption: "Publication interdite", target_video_path: mediaPath, target_video_url: videoUrl, target_thumbnail_path: thumbnailPath, target_thumbnail_url: thumbnailUrl, target_duration_seconds: 30, target_aspect_ratio: 0.562, target_provider_service_id: null, target_status: "published", target_allow_comments: true, target_client_consent: true, target_scheduled_for: null, target_visibility: "public", target_hashtags: [], target_location: null, target_available_at: null });
   assert.ok(noService.error, "Published videos must require a service");
-  const draft = await creator.client.rpc("create_video_post", { target_caption: "Brouillon privé", target_video_url: videoUrl, target_thumbnail_url: null, target_duration_seconds: 30, target_aspect_ratio: 0.562, target_provider_service_id: null, target_status: "draft", target_allow_comments: true, target_client_consent: false, target_scheduled_for: null, target_visibility: "public", target_hashtags: [] });
-  assert.ifError(draft.error); draftId = draft.data;
+  draftId = randomUUID();
+  const draftVideoPath = `${creator.id}/${draftId}/video.mp4`;
+  const draftThumbnailPath = `${creator.id}/${draftId}/thumbnail.jpg`;
+  mediaPaths.push(draftVideoPath, draftThumbnailPath);
+  assert.ifError((await creator.client.storage.from("provider-social-media").upload(draftVideoPath, new Blob([new Uint8Array([0, 0, 0, 20])], { type: "video/mp4" }), { contentType: "video/mp4" })).error);
+  assert.ifError((await creator.client.storage.from("provider-social-media").upload(draftThumbnailPath, new Blob([new Uint8Array([255, 216, 255, 217])], { type: "image/jpeg" }), { contentType: "image/jpeg" })).error);
+  const draftVideoUrl = creator.client.storage.from("provider-social-media").getPublicUrl(draftVideoPath).data.publicUrl;
+  const draftThumbnailUrl = creator.client.storage.from("provider-social-media").getPublicUrl(draftThumbnailPath).data.publicUrl;
+  const draft = await creator.client.rpc("create_provider_video_post", { target_post_id: draftId, target_title: "Brouillon", target_caption: "Brouillon privé", target_video_path: draftVideoPath, target_video_url: draftVideoUrl, target_thumbnail_path: draftThumbnailPath, target_thumbnail_url: draftThumbnailUrl, target_duration_seconds: 30, target_aspect_ratio: 0.562, target_provider_service_id: null, target_status: "draft", target_allow_comments: true, target_client_consent: false, target_scheduled_for: null, target_visibility: "public", target_hashtags: [], target_location: null, target_available_at: null });
+  assert.ifError(draft.error);
 
   const feed = await outsider.client.from("social_feed").select("id,hashtags,provider_service_id").eq("id", postId).single();
   assert.ifError(feed.error); assert.deepEqual(feed.data.hashtags, ["dakar", "tresses"]); assert.equal(feed.data.provider_service_id, serviceId);
   const hiddenDraft = await outsider.client.from("posts").select("id").eq("id", draftId);
   assert.ifError(hiddenDraft.error); assert.equal(hiddenDraft.data.length, 0);
+  assert.ok((await outsider.client.storage.from("provider-social-media").createSignedUrl(draftVideoPath, 60)).error, "Draft media must remain private");
+  assert.ifError((await creator.client.storage.from("provider-social-media").createSignedUrl(draftVideoPath, 60)).error);
+  assert.ifError((await outsider.client.storage.from("provider-social-media").createSignedUrl(mediaPath, 60)).error);
   const forgedCounter = await outsider.client.from("posts").update({ like_count: 999999 }).eq("id", postId).select("id");
   assert.ifError(forgedCounter.error); assert.equal(forgedCounter.data.length, 0, "RLS must prevent direct counter writes by outsiders");
   const foreignEdit = await outsider.client.from("posts").update({ caption: "hacked" }).eq("id", postId).select("id");
@@ -107,7 +124,7 @@ async function main() {
 try { await main(); } finally {
   if (bookingId) await admin.from("bookings").delete().eq("id", bookingId);
   if (postId || draftId) await admin.from("posts").delete().in("id", [postId, draftId].filter(Boolean));
-  if (mediaPath && users[0]) await admin.storage.from("social-videos").remove([mediaPath]);
+  if (mediaPaths.length && users[0]) await admin.storage.from("provider-social-media").remove(mediaPaths);
   if (serviceId) await admin.from("provider_services").delete().eq("id", serviceId);
   for (const id of users.reverse()) await admin.auth.admin.deleteUser(id);
 }

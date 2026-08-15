@@ -26,6 +26,7 @@ type SocialFeedRow = {
   currency: string | null; average_rating: number | string; review_count: number | string; hashtags?: string[]; post_type?: FeedPost["postType"];
   title?: string | null; location_label?: string | null; available_at?: string | null; promotion_discount_percent?: number | string | null;
   promotion_ends_at?: string | null; promotion_slots?: number | null; media_urls?: string[]; feature_type?: string | null;
+  media_items?: Array<{ media_type: string; bucket_id: string; storage_path: string; thumbnail_path: string | null }>;
 };
 
 type CommentRow = { id: string; author_id: string; parent_id: string | null; body: string; created_at: string; profiles: { display_name: string | null; avatar_url: string | null } | null };
@@ -48,6 +49,20 @@ function mapFeedPost(row: SocialFeedRow): FeedPost {
     promotionEndsAt: row.promotion_ends_at ?? null, promotionSlots: row.promotion_slots ?? null,
     mediaUrls: Array.isArray(row.media_urls) && row.media_urls.length ? row.media_urls : [row.video_url], featureType: row.feature_type ?? null,
   };
+}
+
+async function resolvePrivateMedia(row: SocialFeedRow) {
+  const privateItems = (row.media_items ?? []).filter((item) => item.bucket_id === "provider-social-media");
+  if (!privateItems.length) return row;
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return row;
+  const signedMedia = await Promise.all(privateItems.map(async (item) => {
+    const { data } = await supabase.storage.from(item.bucket_id).createSignedUrl(item.storage_path, 3600);
+    return data?.signedUrl ?? null;
+  }));
+  const primary = privateItems[0];
+  const { data: signedThumbnail } = primary?.thumbnail_path ? await supabase.storage.from(primary.bucket_id).createSignedUrl(primary.thumbnail_path, 3600) : { data: null };
+  return { ...row, video_url: signedMedia[0] ?? row.video_url, thumbnail_url: signedThumbnail?.signedUrl ?? row.thumbnail_url, media_urls: signedMedia.filter((url): url is string => Boolean(url)) };
 }
 
 export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish, onOpenProvider, onBook }: {
@@ -98,7 +113,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     setState("loading");
     const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).limit(30);
     if (error) { setState("error"); return; }
-    const mapped = (data ?? []).map((row: SocialFeedRow) => mapFeedPost(row));
+    const mapped = await Promise.all((data ?? []).map(async (row: SocialFeedRow) => mapFeedPost(await resolvePrivateMedia(row))));
     setPosts(diversifyFeed(mapped));
     setHasMore(mapped.length === 30);
     setState(mapped.length ? "ready" : "empty");
@@ -122,7 +137,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     if (!supabase) return;
     const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).range(posts.length, posts.length + 29);
     if (error) return;
-    const mapped = (data ?? []).map((row: SocialFeedRow) => mapFeedPost(row));
+    const mapped = await Promise.all((data ?? []).map(async (row: SocialFeedRow) => mapFeedPost(await resolvePrivateMedia(row))));
     setPosts((current) => diversifyFeed([...current, ...mapped]));
     setHasMore(mapped.length === 30);
   }, [hasMore, posts]);
