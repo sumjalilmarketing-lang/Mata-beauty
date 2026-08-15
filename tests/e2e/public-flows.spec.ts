@@ -2,6 +2,11 @@ import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.route("http://localhost:3000/api/auth/providers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ google: true }) }));
+  await page.route("https://audit.supabase.co/rest/v1/categories**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 }]) }));
+  await page.route("https://audit.supabase.co/rest/v1/provider_profiles**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
+    profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier Tresses", city: "Dakar", service_mode: "salon", average_rating: 4.8, review_count: 12, verified_at: "2026-01-01T00:00:00Z", cover_url: null,
+    provider_services: [{ id: "22222222-2222-4222-8222-222222222222", title: "Tresses collées", duration_minutes: 90, price_amount: 10000, services: { name: "Tresses collées", categories: { name: "Tresses" } } }],
+  }]) }));
   page.on("pageerror", (error) => { throw error; });
   page.on("console", (message) => {
     if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());
@@ -13,9 +18,10 @@ test("premium home opens a real category results screen", async ({ page }) => {
   await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
   await expect(page.getByRole("heading", { name: /Prenez soin de vous/ })).toBeVisible();
   await expect(page.getByPlaceholder("Que recherchez-vous ?")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Tresses" })).toBeVisible();
+  const tressesCategory = page.locator(".photo-category-grid button").filter({ hasText: "Tresses" });
+  await expect(tressesCategory).toBeVisible();
   await expect(page.getByText("Awa Signature", { exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Tresses" }).click();
+  await tressesCategory.click();
   await expect(page.getByRole("heading", { name: "Tresses", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Tresses collées" })).toBeVisible();
 });

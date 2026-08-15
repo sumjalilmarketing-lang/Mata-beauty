@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { FormEvent, type ReactNode } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { workspaceHref, workspaceSpaces, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import "./workspace.css";
@@ -24,6 +24,14 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
   const router = useRouter();
   const groups = [...new Set(modules.map((item) => item.group))];
   const mobileItems = modules.filter((item) => item.primary).slice(0, 4);
+  const notificationsModule = modules.find((item) => item.key === "notifications");
+
+  function search(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = String(new FormData(event.currentTarget).get("workspace-search") ?? "").trim();
+    const target = workspaceHref(space, activeModule.key);
+    router.push(query ? `${target}?q=${encodeURIComponent(query)}` : target);
+  }
 
   async function signOut() {
     await getSupabaseBrowserClient()?.auth.signOut();
@@ -57,7 +65,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
     <main className="workspace-main">
       <header className="workspace-topbar">
         <div><p>{definition.eyebrow}</p><h1>{activeModule.label}</h1></div>
-        <div className="workspace-tools"><label><span className="sr-only">Rechercher</span><input type="search" placeholder="Rechercher…" /></label><button type="button" aria-label="Notifications">◌</button><span className="workspace-account" title={userEmail}>{userEmail.slice(0, 1).toUpperCase()}</span></div>
+        <div className="workspace-tools"><form role="search" onSubmit={search}><label><span className="sr-only">Rechercher dans ce module</span><input name="workspace-search" type="search" placeholder="Rechercher…" /></label></form>{notificationsModule && <Link className="workspace-notifications" href={workspaceHref(space, notificationsModule.key)} aria-label="Notifications">◌</Link>}<span className="workspace-account" title={userEmail}>{userEmail.slice(0, 1).toUpperCase()}</span></div>
       </header>
       <div className="workspace-breadcrumb"><Link href={definition.prefix}>{definition.label}</Link><span>/</span><span>{activeModule.label}</span></div>
       {children}

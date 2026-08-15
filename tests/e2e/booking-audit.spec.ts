@@ -31,6 +31,7 @@ async function mockSupabase(page: Page, state: AuditState) {
     const path = url.pathname;
 
     if (path === "/auth/v1/settings") return json(route, { external: { google: true } });
+    if (path === "/rest/v1/categories") return json(route, [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 }]);
 
     if (path === "/auth/v1/token") {
       const payload = request.postDataJSON() as { email?: string };

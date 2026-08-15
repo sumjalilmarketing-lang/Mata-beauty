@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { publicErrorMessage } from "@/lib/ui/public-error";
 import { BookingMessages } from "./booking-messages";
 import { VideoPublisher } from "./video-publisher";
 import { SocialDashboard } from "./social-dashboard";
@@ -177,7 +178,7 @@ export function LiveDashboard({
       if (notificationError) throw notificationError;
       setNotifications((notificationData ?? []) as NotificationRow[]);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Impossible de charger le tableau de bord.");
+      setError(publicErrorMessage(caught, "Impossible de charger le tableau de bord."));
     } finally {
       setLoading(false);
     }

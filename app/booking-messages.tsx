@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { publicErrorMessage } from "@/lib/ui/public-error";
 
 type MessageRow = {
   id: string;
@@ -120,7 +121,7 @@ export function BookingMessages({
     }
 
     void initialize().catch((caught: unknown) => {
-      if (active) setError(caught instanceof Error ? caught.message : "Impossible d’ouvrir la conversation.");
+      if (active) setError(publicErrorMessage(caught, "Impossible d’ouvrir la conversation."));
     }).finally(() => {
       if (active) setLoading(false);
     });
@@ -148,7 +149,7 @@ export function BookingMessages({
       .order("created_at", { ascending: false })
       .limit(pageSize);
     if (olderError) {
-      setError(olderError.message);
+      setError(publicErrorMessage(olderError, "Impossible de charger les messages précédents."));
       return;
     }
     const older = ((data ?? []) as MessageRow[]).reverse();
@@ -173,7 +174,7 @@ export function BookingMessages({
       .single();
     setSending(false);
     if (sendError) {
-      setError(sendError.message);
+      setError(publicErrorMessage(sendError, "Le message n’a pas pu être envoyé."));
       return;
     }
     form.reset();

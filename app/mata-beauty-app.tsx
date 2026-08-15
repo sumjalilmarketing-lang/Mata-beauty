@@ -8,7 +8,7 @@ import { LiveDashboard } from "./live-dashboard";
 import { SocialFeed } from "./social-feed";
 import { calculateBookingEnd, calculateBookingQuote } from "@/lib/domain/booking";
 import { isTrustedSandboxCheckoutUrl, type PaymentMethod } from "@/lib/domain/payments";
-import { fetchActivePromotions, fetchPublishedProviders, type CatalogPromotion } from "@/lib/supabase/catalog";
+import { fetchActiveCategories, fetchActivePromotions, fetchPublishedProviders, type CatalogCategory, type CatalogPromotion } from "@/lib/supabase/catalog";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { loadAuthenticatedProfile } from "@/lib/auth/profile";
 import { intendedRoleForDestination, safeOAuthDestination } from "@/lib/auth/redirect";
@@ -92,24 +92,6 @@ function readBookingDraft() {
 }
 
 const categoryAtlas = "/images/categories/mata-category-atlas.webp";
-const categories = [
-  { label: "Coiffure", icon: "✦", position: "0% 0%" },
-  { label: "Tresses", icon: "≋", position: "25% 0%" },
-  { label: "Perruques", icon: "◒", position: "50% 0%" },
-  { label: "Maquillage", icon: "✧", position: "75% 0%" },
-  { label: "Ongles", icon: "◐", position: "100% 0%" },
-  { label: "Cils et sourcils", icon: "⌁", position: "0% 100%" },
-  { label: "Soins du visage", icon: "♡", position: "25% 100%" },
-  { label: "Barbier", icon: "◆", position: "50% 100%" },
-  { label: "Épilation", icon: "◇", position: "75% 100%" },
-  { label: "Massage et bien-être", icon: "☼", position: "100% 100%" },
-] as const;
-
-const subcategories: Record<string, string[]> = {
-  Tresses: ["Tout", "Tresses collées", "Vanilles", "Braids", "Knotless", "Cornrows", "Locks"],
-  Coiffure: ["Tout", "Brushing", "Lissage", "Coupe", "Coloration", "Cheveux naturels"],
-  Ongles: ["Tout", "Manucure", "Pédicure", "Gel", "Nail art"],
-};
 
 const formatPrice = (value: number) => `${new Intl.NumberFormat("fr-FR").format(value)} FCFA`;
 const today = new Date().toISOString().slice(0, 10);
@@ -127,6 +109,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [date, setDate] = useState("");
   const [screen, setScreen] = useState<"feed" | "home" | "results">(initialScreen);
   const [catalog, setCatalog] = useState<Provider[]>([]);
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [catalogState, setCatalogState] = useState<"loading" | "live" | "empty" | "error">("loading");
   const [promotions, setPromotions] = useState<CatalogPromotion[]>([]);
   const [nextAvailability, setNextAvailability] = useState<Record<string, string>>({});
@@ -228,8 +211,8 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }
 
   const suggestions = useMemo(
-    () => [...new Set([...categories.map((item) => item.label), ...catalog.flatMap((provider) => [provider.name, provider.specialty, provider.area])])],
-    [catalog],
+    () => [...new Set([...categories.map((item) => item.name), ...catalog.flatMap((provider) => [provider.name, provider.specialty, provider.area])])],
+    [catalog, categories],
   );
 
   const filteredProviders = useMemo(() => {
@@ -262,6 +245,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       setCatalogState(providers.length ? "live" : "empty");
     }).catch(() => { if (active) setCatalogState("error"); });
     void fetchActivePromotions(supabase).then((items) => { if (active) setPromotions(items); }).catch(() => {});
+    void fetchActiveCategories(supabase).then((items) => { if (active) setCategories(items); }).catch(() => {});
     const oauthIntent = oauthReturn.current.intent;
     const oauthAuthenticated = oauthReturn.current.authenticated;
     void supabase.auth.getSession().then(async ({ data }) => {
@@ -483,6 +467,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
             date={date}
             setDate={setDate}
             suggestions={suggestions}
+            categories={categories}
             catalog={catalog}
             catalogState={catalogState}
             nextAvailability={nextAvailability}
@@ -506,6 +491,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
             setSubcategory={setSubcategory}
             area={area}
             providers={filteredProviders}
+            categoryServices={[...new Set(catalog.filter((provider) => category === "Toutes" || provider.category === category).map((provider) => provider.specialty))]}
             nextAvailability={nextAvailability}
             catalogState={catalogState}
             favorites={favorites}
@@ -540,12 +526,12 @@ function Brand() {
 }
 
 function HomeScreen({
-  authenticated, query, setQuery, area, setArea, date, setDate, suggestions, catalog, catalogState, nextAvailability, promotions,
+  authenticated, query, setQuery, area, setArea, date, setDate, suggestions, categories, catalog, catalogState, nextAvailability, promotions,
   upcomingBookings, favorites, onSearch, onCategory, onViewProvider, onBook, onFavorite, onAccount, onProviderRegister, theme, onToggleTheme,
 }: {
   authenticated: AuthenticatedProfile | null;
   query: string; setQuery: (value: string) => void; area: string; setArea: (value: string) => void;
-  date: string; setDate: (value: string) => void; suggestions: string[]; catalog: Provider[];
+  date: string; setDate: (value: string) => void; suggestions: string[]; categories: CatalogCategory[]; catalog: Provider[];
   catalogState: "loading" | "live" | "empty" | "error"; nextAvailability: Record<string, string>; promotions: CatalogPromotion[];
   upcomingBookings: Array<{ id: string; starts_at: string; status: string }>; favorites: string[];
   onSearch: (event?: FormEvent) => void; onCategory: (label: string) => void;
@@ -559,7 +545,8 @@ function HomeScreen({
     <button className="location-card" onClick={() => setArea(area === "Dakar, Sénégal" ? "Tout Dakar" : "Dakar, Sénégal")}><span>⌖</span><span><strong>{area}</strong><small>Changer de localisation</small></span><b>›</b></button>
     <section className="mata-hero-card"><div><span>BEAUTÉ, SIMPLEMENT</span><h2>Trouvez votre prochain coup de cœur.</h2><p>Des professionnels vérifiés et des créneaux disponibles maintenant.</p><button onClick={() => onCategory("Toutes")}>Réserver maintenant</button></div><Image src="/brand/mata-app-icon.webp" alt="" width={180} height={180} unoptimized /></section>
     <div className="section-title"><h2>Catégories populaires</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
-    <div className="photo-category-grid">{categories.map((item) => <button key={item.label} onClick={() => onCategory(item.label)}><span className="category-photo" style={{ backgroundImage: `url(${categoryAtlas})`, backgroundPosition: item.position }} role="img" aria-label={`Photographie ${item.label}`} /><strong>{item.label}</strong></button>)}</div>
+    <div className="photo-category-grid">{categories.map((item, index) => { const image = item.icon && (/^https?:\/\//.test(item.icon) || item.icon.startsWith("/")) ? item.icon : categoryAtlas; return <button key={item.id} onClick={() => onCategory(item.name)}><span className="category-photo" style={{ backgroundImage: `url(${image})`, backgroundPosition: image === categoryAtlas ? `${(index % 5) * 25}% ${index < 5 ? 0 : 100}%` : "center" }} role="img" aria-label={`Illustration ${item.name}`}>{item.icon && image === categoryAtlas ? item.icon : ""}</span><strong>{item.name}</strong></button>; })}</div>
+    {categories.length === 0 && catalogState !== "loading" && <div className="premium-empty compact"><span>◇</span><h3>Aucune catégorie active</h3><p>Les catégories publiées par l’administration apparaîtront ici.</p></div>}
     <div className="section-title"><h2>Disponibles aujourd’hui</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
     <CatalogBlock providers={catalog.filter((provider) => isToday(nextAvailability[provider.id])).slice(0, 4)} fallbackProviders={catalog.slice(0, 4)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
     {catalog.length > 0 && <section className="mata-recommendations"><div className="section-title"><h2>Choisis pour vous</h2><span>✦ Sélection intelligente</span></div><button onClick={() => onViewProvider(catalog[0])}><strong>{catalog[0].name}</strong><small>{catalog[0].specialty} · {catalog[0].rating.toFixed(1)} ★</small><b>Découvrir</b></button></section>}
@@ -571,18 +558,18 @@ function HomeScreen({
 }
 
 function ResultsScreen({
-  category, subcategory, setSubcategory, area, providers, catalogState, nextAvailability, favorites, filtersOpen, setFiltersOpen,
+  category, subcategory, setSubcategory, area, providers, categoryServices, catalogState, nextAvailability, favorites, filtersOpen, setFiltersOpen,
   homeOnly, setHomeOnly, verifiedOnly, setVerifiedOnly, minRating, setMinRating, maxPrice, setMaxPrice,
   onBack, onViewProvider, onBook, onFavorite, onProviderRegister,
 }: {
-  category: string; subcategory: string; setSubcategory: (value: string) => void; area: string; providers: Provider[];
+  category: string; subcategory: string; setSubcategory: (value: string) => void; area: string; providers: Provider[]; categoryServices: string[];
   catalogState: "loading" | "live" | "empty" | "error"; nextAvailability: Record<string, string>; favorites: string[]; filtersOpen: boolean;
   setFiltersOpen: (open: boolean) => void; homeOnly: boolean; setHomeOnly: (value: boolean) => void;
   verifiedOnly: boolean; setVerifiedOnly: (value: boolean) => void; minRating: string; setMinRating: (value: string) => void;
   maxPrice: string; setMaxPrice: (value: string) => void; onBack: () => void;
   onViewProvider: (provider: Provider) => void; onBook: (provider: Provider) => void; onFavorite: (provider: Provider) => void; onProviderRegister: () => void;
 }) {
-  const chips = subcategories[category] || ["Tout", category, "À domicile", "Disponible aujourd’hui"];
+  const chips = ["Tout", ...categoryServices];
   return <div className="mobile-screen results-screen">
     <header className="screen-header"><button aria-label="Retour" onClick={onBack}>‹</button><div><h1>{category === "Toutes" ? "Rechercher" : category}</h1><p>{area}</p></div><button aria-label="Filtres" onClick={() => setFiltersOpen(!filtersOpen)}>⌘</button></header>
     <div className="subcategory-strip">{chips.map((item) => <button key={item} className={subcategory === item ? "active" : ""} onClick={() => setSubcategory(item)}>{item}</button>)}</div>

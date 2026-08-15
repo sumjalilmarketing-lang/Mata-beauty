@@ -310,3 +310,52 @@ test("the provider Studio publishes validated and bookable media", async () => {
   assert.match(migration, /manage_own_social_post/);
   assert.doesNotMatch(studio + publisher, /SUPABASE_SERVICE_ROLE_KEY/);
 });
+
+test("private workspaces expose only functional controls and safe errors", async () => {
+  const [shell, moduleView, clientCenter, admin, publicErrors] = await Promise.all([
+    readFile(new URL("app/workspace-shell.tsx", root), "utf8"),
+    readFile(new URL("app/workspace-module.tsx", root), "utf8"),
+    readFile(new URL("app/client-control-center.tsx", root), "utf8"),
+    readFile(new URL("app/super-admin.tsx", root), "utf8"),
+    readFile(new URL("lib/ui/public-error.ts", root), "utf8"),
+  ]);
+  assert.match(shell, /role="search" onSubmit=\{search\}/);
+  assert.match(shell, /workspaceHref\(space, notificationsModule\.key\)/);
+  assert.match(moduleView, /Fonction non connectée/);
+  assert.match(moduleView, /visibleRows/);
+  assert.match(clientCenter, /publicErrorMessage/);
+  assert.match(admin, /publicErrorMessage/);
+  assert.match(publicErrors, /row-level security/);
+  assert.doesNotMatch(clientCenter, /setNotice\(error\?\.message/);
+  assert.doesNotMatch(admin, /notify\(error\.message/);
+  for (const decorativeAction of ["Filtres avancés", ">Dossier<", ">Détail<", ">Rembourser<"]) assert.doesNotMatch(admin, new RegExp(decorativeAction));
+  assert.match(admin, /Lecture seule — workflow d’édition non connecté/);
+  assert.doesNotMatch(admin, /\[42, 58, 34, 72, 88, 64/);
+  assert.match(admin, /metrics\.bookings_week/);
+});
+
+test("social engagement and completed-booking reviews create preference-aware notifications", async () => {
+  const migration = await readFile(new URL("supabase/migrations/20260815190000_integration_social_notifications.sql", root), "utf8");
+  assert.match(migration, /notification_preferences/);
+  assert.match(migration, /social_in_app/);
+  assert.match(migration, /target_owner = actor/);
+  assert.match(migration, /interval '24 hours'/);
+  assert.match(migration, /post_likes_notify_owner/);
+  assert.match(migration, /post_comments_notify_owner/);
+  assert.match(migration, /reviews_notify_provider/);
+  assert.match(migration, /revoke all on function public\.notify_post_engagement/);
+});
+
+test("public categories and service filters come from Supabase data", async () => {
+  const [catalog, app] = await Promise.all([
+    readFile(new URL("lib/supabase/catalog.ts", root), "utf8"),
+    readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
+  ]);
+  assert.match(catalog, /from\("categories"\)/);
+  assert.match(catalog, /eq\("is_active", true\)/);
+  assert.match(catalog, /order\("sort_order"\)/);
+  assert.match(app, /fetchActiveCategories/);
+  assert.match(app, /categoryServices/);
+  assert.doesNotMatch(app, /const categories = \[/);
+  assert.doesNotMatch(app, /const subcategories:/);
+});

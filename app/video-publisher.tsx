@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { publicErrorMessage } from "@/lib/ui/public-error";
 
 type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number };
 type PublishStatus = "draft" | "scheduled" | "published";
@@ -153,7 +154,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
       if (videoPath) await supabase.storage.from("provider-social-media").remove([videoPath]);
       if (thumbnailPath) await supabase.storage.from("provider-social-media").remove([thumbnailPath]);
       if (mediaPaths.length) await supabase.storage.from("provider-social-media").remove(mediaPaths);
-      setFeedback(caught instanceof Error ? caught.message : "La publication a échoué.");
+      setFeedback(publicErrorMessage(caught, "La publication a échoué. Vérifiez le fichier et réessayez."));
     } finally { setPhase("idle"); }
   }
 

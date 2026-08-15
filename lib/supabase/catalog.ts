@@ -26,6 +26,14 @@ export type CatalogPromotion = {
   endsAt: string;
 };
 
+export type CatalogCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  sortOrder: number;
+};
+
 type ProviderRecord = {
   profile_id: string;
   business_name: string;
@@ -81,6 +89,24 @@ export async function fetchPublishedProviders(client: SupabaseClient): Promise<C
       coverUrl: provider.cover_url ?? undefined,
     }];
   });
+}
+
+export async function fetchActiveCategories(client: SupabaseClient): Promise<CatalogCategory[]> {
+  const { data, error } = await client
+    .from("categories")
+    .select("id,name,slug,icon,sort_order")
+    .eq("is_active", true)
+    .order("sort_order")
+    .order("name")
+    .limit(40);
+  if (error) throw error;
+  return (data ?? []).map((category) => ({
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    icon: category.icon,
+    sortOrder: category.sort_order,
+  }));
 }
 
 export async function fetchActivePromotions(client: SupabaseClient): Promise<CatalogPromotion[]> {
