@@ -80,6 +80,7 @@ async function main() {
 
   const firstLike = await client.client.rpc("toggle_post_like", { target_post_id: postId });
   const unlike = await client.client.rpc("toggle_post_like", { target_post_id: postId });
+  assert.ifError(firstLike.error); assert.ifError(unlike.error);
   assert.equal(firstLike.data.active, true); assert.equal(unlike.data.active, false);
   const saved = await client.client.rpc("toggle_post_save", { target_post_id: postId });
   assert.equal(saved.data.active, true);

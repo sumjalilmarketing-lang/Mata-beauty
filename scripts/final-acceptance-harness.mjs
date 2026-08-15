@@ -233,7 +233,8 @@ export async function startFinalAcceptance({ url, anonKey, serviceKey, previewUr
     const clientNotifications = await accounts.client.supabase.from("notifications").select("id,kind").limit(50);
     const providerNotifications = await accounts.provider.supabase.from("notifications").select("id,kind").limit(50);
     assert.ifError(clientNotifications.error); assert.ifError(providerNotifications.error);
-    record(results, "Cycle confirmé → en cours → terminé → avis et statistiques", review.data.rating === 5 && Number(rating.data.average_rating) === 5 && rating.data.review_count === 1 && clientNotifications.data.length > 0 && providerNotifications.data.length > 0);
+    const lifecyclePassed = review.data.rating === 5 && Number(rating.data.average_rating) === 5 && rating.data.review_count === 1 && clientNotifications.data.length > 0 && providerNotifications.data.length > 0;
+    record(results, "Cycle confirmé → en cours → terminé → avis et statistiques", lifecyclePassed, `rating=${rating.data.average_rating};reviews=${rating.data.review_count};client_notifications=${clientNotifications.data.length};provider_notifications=${providerNotifications.data.length}`);
 
     const favorite = await accounts.client.supabase.from("favorites").insert({ client_id: accounts.client.id, provider_id: accounts.provider.id }).select("provider_id").single();
     assert.ifError(favorite.error);
