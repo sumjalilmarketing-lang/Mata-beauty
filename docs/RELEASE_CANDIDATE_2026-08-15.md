@@ -13,6 +13,7 @@
 - Enregistrement idempotent de la commission Mata lors des transitions financières réussies.
 - Affichage du brut, de la commission et du net dans les espaces professionnels et salons ; règles et écritures réelles visibles dans le Super Admin.
 - Migration `20260815200000_release_candidate_integrations.sql` appliquée sur le projet Supabase `qjdwxdbvrxedyfolnpol` et objets vérifiés.
+- Contrôle `/api/health/server` sans données sensibles pour prouver l’accès serveur Supabase depuis le runtime déployé.
 
 ## Contrôles exécutés
 

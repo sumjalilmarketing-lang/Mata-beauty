@@ -356,6 +356,15 @@ test("release candidate automates scheduled posts and centralizes commissions", 
   assert.match(admin, /Catégorie parente/);
 });
 
+test("server health verifies Supabase service access without exposing secrets", async () => {
+  const route = await readFile(new URL("app/api/health/server/route.ts", root), "utf8");
+  assert.match(route, /serviceSupabase\(\)/);
+  assert.match(route, /serviceRole: true/);
+  assert.match(route, /Cache-Control/);
+  assert.doesNotMatch(route, /process\.env\.SUPABASE_SERVICE_ROLE_KEY/);
+  assert.doesNotMatch(route, /JSON\.stringify\(process\.env/);
+});
+
 test("social engagement and completed-booking reviews create preference-aware notifications", async () => {
   const migration = await readFile(new URL("supabase/migrations/20260815190000_integration_social_notifications.sql", root), "utf8");
   assert.match(migration, /notification_preferences/);
