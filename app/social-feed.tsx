@@ -12,12 +12,43 @@ type FeedPost = {
   publishedAt: string; businessName: string; slug: string; city: string; verified: boolean; avatarUrl: string | null; isSponsored: boolean;
   serviceId: string | null; serviceTitle: string | null; durationMinutes: number | null; priceAmount: number | null; currency: string | null;
   averageRating: number; reviewCount: number; hashtags: string[];
+  postType: "video" | "photo" | "before_after" | "promotion" | "availability";
+  title: string | null; locationLabel: string | null; availableAt: string | null;
+  promotionDiscount: number | null; promotionEndsAt: string | null; promotionSlots: number | null;
+  mediaUrls: string[]; featureType: string | null;
+};
+
+type SocialFeedRow = {
+  id: string; author_id: string; caption: string; video_url: string; thumbnail_url: string | null; duration_seconds: number | string;
+  view_count: number | string; like_count: number | string; comment_count: number | string; save_count: number | string; share_count: number | string;
+  published_at: string; business_name: string; slug: string; city: string; verified_at: string | null; avatar_url: string | null; cover_url: string | null;
+  is_sponsored: boolean; provider_service_id: string | null; service_title: string | null; duration_minutes: number | null; price_amount: number | null;
+  currency: string | null; average_rating: number | string; review_count: number | string; hashtags?: string[]; post_type?: FeedPost["postType"];
+  title?: string | null; location_label?: string | null; available_at?: string | null; promotion_discount_percent?: number | string | null;
+  promotion_ends_at?: string | null; promotion_slots?: number | null; media_urls?: string[]; feature_type?: string | null;
 };
 
 type CommentRow = { id: string; author_id: string; parent_id: string | null; body: string; created_at: string; profiles: { display_name: string | null; avatar_url: string | null } | null };
 
 const compact = new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 });
 const price = (value: number) => `${new Intl.NumberFormat("fr-FR").format(value)} FCFA`;
+
+function mapFeedPost(row: SocialFeedRow): FeedPost {
+  return {
+    id: row.id, authorId: row.author_id, caption: row.caption, videoUrl: row.video_url, thumbnailUrl: row.thumbnail_url,
+    durationSeconds: Number(row.duration_seconds), viewCount: Number(row.view_count), likeCount: Number(row.like_count),
+    commentCount: Number(row.comment_count), saveCount: Number(row.save_count), shareCount: Number(row.share_count),
+    publishedAt: row.published_at, businessName: row.business_name, slug: row.slug, city: row.city,
+    verified: Boolean(row.verified_at), avatarUrl: row.avatar_url ?? row.cover_url, isSponsored: Boolean(row.is_sponsored),
+    serviceId: row.provider_service_id, serviceTitle: row.service_title, durationMinutes: row.duration_minutes,
+    priceAmount: row.price_amount, currency: row.currency, averageRating: Number(row.average_rating), reviewCount: Number(row.review_count),
+    hashtags: Array.isArray(row.hashtags) ? row.hashtags : [], postType: row.post_type ?? "video", title: row.title ?? null,
+    locationLabel: row.location_label ?? null, availableAt: row.available_at ?? null,
+    promotionDiscount: row.promotion_discount_percent === null || row.promotion_discount_percent === undefined ? null : Number(row.promotion_discount_percent),
+    promotionEndsAt: row.promotion_ends_at ?? null, promotionSlots: row.promotion_slots ?? null,
+    mediaUrls: Array.isArray(row.media_urls) && row.media_urls.length ? row.media_urls : [row.video_url], featureType: row.feature_type ?? null,
+  };
+}
 
 export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish, onOpenProvider, onBook }: {
   authenticated: AuthenticatedProfile | null;
@@ -67,16 +98,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     setState("loading");
     const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).limit(30);
     if (error) { setState("error"); return; }
-    const mapped = (data ?? []).map((row) => ({
-      id: row.id, authorId: row.author_id, caption: row.caption, videoUrl: row.video_url, thumbnailUrl: row.thumbnail_url,
-      durationSeconds: Number(row.duration_seconds), viewCount: Number(row.view_count), likeCount: Number(row.like_count),
-      commentCount: Number(row.comment_count), saveCount: Number(row.save_count), shareCount: Number(row.share_count),
-      publishedAt: row.published_at, businessName: row.business_name, slug: row.slug, city: row.city,
-      verified: Boolean(row.verified_at), avatarUrl: row.avatar_url ?? row.cover_url, isSponsored: Boolean(row.is_sponsored),
-      serviceId: row.provider_service_id, serviceTitle: row.service_title, durationMinutes: row.duration_minutes,
-      priceAmount: row.price_amount, currency: row.currency,
-      averageRating: Number(row.average_rating), reviewCount: Number(row.review_count), hashtags: Array.isArray(row.hashtags) ? row.hashtags : [],
-    })) as FeedPost[];
+    const mapped = (data ?? []).map((row: SocialFeedRow) => mapFeedPost(row));
     setPosts(diversifyFeed(mapped));
     setHasMore(mapped.length === 30);
     setState(mapped.length ? "ready" : "empty");
@@ -100,13 +122,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     if (!supabase) return;
     const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).range(posts.length, posts.length + 29);
     if (error) return;
-    const mapped = (data ?? []).map((row) => ({
-      id: row.id, authorId: row.author_id, caption: row.caption, videoUrl: row.video_url, thumbnailUrl: row.thumbnail_url,
-      durationSeconds: Number(row.duration_seconds), viewCount: Number(row.view_count), likeCount: Number(row.like_count), commentCount: Number(row.comment_count), saveCount: Number(row.save_count), shareCount: Number(row.share_count),
-      publishedAt: row.published_at, businessName: row.business_name, slug: row.slug, city: row.city, verified: Boolean(row.verified_at), avatarUrl: row.avatar_url ?? row.cover_url, isSponsored: Boolean(row.is_sponsored),
-      serviceId: row.provider_service_id, serviceTitle: row.service_title, durationMinutes: row.duration_minutes, priceAmount: row.price_amount, currency: row.currency,
-      averageRating: Number(row.average_rating), reviewCount: Number(row.review_count), hashtags: Array.isArray(row.hashtags) ? row.hashtags : [],
-    })) as FeedPost[];
+    const mapped = (data ?? []).map((row: SocialFeedRow) => mapFeedPost(row));
     setPosts((current) => diversifyFeed([...current, ...mapped]));
     setHasMore(mapped.length === 30);
   }, [hasMore, posts]);
@@ -154,8 +170,8 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
       const sessionHash = await getSessionHash();
       await supabase.rpc("record_video_view", { target_post_id: post.id, target_session_hash: sessionHash, target_watched_ms: 2000, target_completed: false });
     }, 2000);
-    return () => window.clearTimeout(timer);
     if (activeIndex >= visiblePosts.length - 3) void loadMore();
+    return () => window.clearTimeout(timer);
   }, [activeIndex, getSessionHash, loadMore, paused, visiblePosts]);
 
   async function toggle(kind: "like" | "save", post: FeedPost) {
@@ -245,13 +261,12 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
 
   return <section className="social-feed-shell">{header}<div className="social-feed" aria-label="Vidéos beauté">
     {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>Aucun abonnement pour le moment</h1><p>Suivez un professionnel depuis une vidéo pour retrouver ses prochaines publications ici.</p><button onClick={() => setFeedMode("for-you")}>Explorer le feed</button></div>}
-    {visiblePosts.map((post, index) => <article className="social-video-card" key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`Vidéo de ${post.businessName}`}>
-      {videoErrors.has(post.id) ? <div className="video-fallback"><span>◇</span><p>Cette vidéo ne peut pas être lue.</p><button onClick={() => setVideoErrors((current) => { const next=new Set(current); next.delete(post.id); return next; })}>Réessayer</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={post.videoUrl} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={Math.abs(index-activeIndex)<=1 ? "metadata" : "none"} onLoadStart={() => setVideoLoading((current) => new Set(current).add(post.id))} onCanPlay={() => setVideoLoading((current) => { const next=new Set(current); next.delete(post.id); return next; })} onTimeUpdate={(event) => { const video=event.currentTarget; const ratio=video.duration ? video.currentTime/video.duration : 0; setProgress((current) => ({ ...current, [post.id]: ratio })); if (ratio>=.95 && !completedViews.current.has(post.id)) { completedViews.current.add(post.id); void getSessionHash().then((hash) => getSupabaseBrowserClient()?.rpc("record_video_view", { target_post_id: post.id, target_session_hash: hash, target_watched_ms: Math.round(video.currentTime*1000), target_completed: true })); } }} onError={() => setVideoErrors((current) => new Set(current).add(post.id))} />}
+    {visiblePosts.map((post, index) => <article className="social-video-card" key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`Publication de ${post.businessName}`}>
+      {post.postType === "video" ? videoErrors.has(post.id) ? <div className="video-fallback"><span>◇</span><p>Cette vidéo ne peut pas être lue.</p><button onClick={() => setVideoErrors((current) => { const next=new Set(current); next.delete(post.id); return next; })}>Réessayer</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={post.videoUrl} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={Math.abs(index-activeIndex)<=1 ? "metadata" : "none"} onLoadStart={() => setVideoLoading((current) => new Set(current).add(post.id))} onCanPlay={() => setVideoLoading((current) => { const next=new Set(current); next.delete(post.id); return next; })} onTimeUpdate={(event) => { const video=event.currentTarget; const ratio=video.duration ? video.currentTime/video.duration : 0; setProgress((current) => ({ ...current, [post.id]: ratio })); if (ratio>=.95 && !completedViews.current.has(post.id)) { completedViews.current.add(post.id); void getSessionHash().then((hash) => getSupabaseBrowserClient()?.rpc("record_video_view", { target_post_id: post.id, target_session_hash: hash, target_watched_ms: Math.round(video.currentTime*1000), target_completed: true })); } }} onError={() => setVideoErrors((current) => new Set(current).add(post.id))} /> : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt="Avant" width={540} height={760} unoptimized /><figcaption>Avant</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt="Après" width={540} height={760} unoptimized /><figcaption>Après</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
       {videoLoading.has(post.id) && !videoErrors.has(post.id) && <span className="video-loading" role="status">Chargement…</span>}
       <div className="video-shade" />
       <div className="video-progress" role="progressbar" aria-label="Progression de la vidéo" aria-valuenow={Math.round((progress[post.id] ?? 0)*100)}><i style={{ transform: `scaleX(${progress[post.id] ?? 0})` }} /></div>
-      <button className="play-toggle" aria-label={paused ? "Lire la vidéo" : "Mettre la vidéo en pause"} onClick={() => setPaused((value) => !value)}>{paused && index===activeIndex ? "▶" : ""}</button>
-      <button className="sound-toggle" aria-label={muted ? "Activer le son" : "Couper le son"} onClick={() => setMuted((value) => !value)}>{muted ? "♩×" : "♩"}</button>
+      {post.postType === "video" && <><button className="play-toggle" aria-label={paused ? "Lire la vidéo" : "Mettre la vidéo en pause"} onClick={() => setPaused((value) => !value)}>{paused && index===activeIndex ? "▶" : ""}</button><button className="sound-toggle" aria-label={muted ? "Activer le son" : "Couper le son"} onClick={() => setMuted((value) => !value)}>{muted ? "♩×" : "♩"}</button></>}
       <aside className="social-actions">
         <button className="creator-orb" aria-label={`Profil de ${post.businessName}`} onClick={() => onOpenProvider(post.authorId)}>{post.avatarUrl ? <Image src={post.avatarUrl} alt="" width={50} height={50} unoptimized /> : post.businessName.slice(0,2).toUpperCase()}</button>
         <button className={`follow-mini ${followed.has(post.authorId) ? "active" : ""}`} aria-label={followed.has(post.authorId) ? "Se désabonner" : "Suivre"} onClick={() => void follow(post)}>{followed.has(post.authorId) ? "✓" : "+"}</button>
@@ -261,7 +276,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
         <button aria-label="Partager" onClick={() => void share(post)}>↗<small>{compact.format(post.shareCount)}</small></button>
         <button aria-label="Signaler" onClick={() => void report(post)}>⚑<small>Signaler</small></button>
       </aside>
-      <div className="social-caption"><button className="creator-name" onClick={() => onOpenProvider(post.authorId)}>@{post.slug} {post.verified && <b>✓</b>}</button><span>{post.city} · ★ {post.averageRating.toFixed(1)} ({post.reviewCount}) · {compact.format(post.viewCount)} vues</span><p>{post.caption}</p><span>{(post.hashtags.length ? post.hashtags : ["matabeauty"]).map((tag) => `#${tag}`).join(" · ")}</span><button className="profile-link" onClick={() => onOpenProvider(post.authorId)}>Voir le profil</button>{post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service"><div><small>PRESTATION LIÉE</small><strong>{post.serviceTitle}</strong><span>{post.durationMinutes} min · à partir de {price(post.priceAmount)}</span></div><button onClick={() => void book(post)}>Réserver</button></div>}</div>
+      <div className="social-caption"><button className="creator-name" onClick={() => onOpenProvider(post.authorId)}>@{post.slug} {post.verified && <b>✓</b>}</button><span>{post.locationLabel ?? post.city} · ★ {post.averageRating.toFixed(1)} ({post.reviewCount}) · {compact.format(post.viewCount)} vues</span>{post.title && <strong>{post.title}</strong>}<p>{post.caption}</p>{post.postType === "promotion" && post.promotionDiscount !== null && <span className="social-offer">−{post.promotionDiscount}% · {post.promotionSlots ?? "Places limitées"} place(s)</span>}{post.postType === "availability" && post.availableAt && <span className="social-offer">Disponible {new Date(post.availableAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span>}<span>{(post.hashtags.length ? post.hashtags : ["matabeauty"]).map((tag) => `#${tag}`).join(" · ")}</span><button className="profile-link" onClick={() => onOpenProvider(post.authorId)}>Voir le profil</button>{post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service"><div><small>PRESTATION LIÉE</small><strong>{post.serviceTitle}</strong><span>{post.durationMinutes} min · à partir de {price(post.priceAmount)}</span></div><button onClick={() => void book(post)}>Réserver</button></div>}</div>
     </article>)}
   </div>{activePost?.isSponsored && <span className="sponsored-label">Contenu sponsorisé</span>}
   {commentsPost && <div className="comments-backdrop" onMouseDown={(event) => event.target===event.currentTarget && setCommentsPost(null)}><section className="comments-sheet" role="dialog" aria-modal="true" aria-label="Commentaires"><header><strong>Commentaires</strong><button aria-label="Fermer" onClick={() => setCommentsPost(null)}>×</button></header><div>{comments.length ? comments.map((comment) => <article className={comment.parent_id ? "comment-reply" : ""} key={comment.id}><span>{comment.profiles?.display_name?.slice(0,1) ?? "M"}</span><p><strong>{comment.profiles?.display_name ?? "Membre Mata"}</strong>{comment.body}<small><button onClick={() => setReplyTo(comment)}>Répondre</button>{authenticated?.userId===comment.author_id ? <button onClick={() => void deleteComment(comment)}>Supprimer</button> : <button onClick={() => void reportComment(comment)}>Signaler</button>}</small></p></article>) : <p className="no-comments">Soyez la première à commenter.</p>}</div><footer>{replyTo && <span className="reply-indicator">Réponse à {replyTo.profiles?.display_name ?? "un membre"} <button onClick={() => setReplyTo(null)}>×</button></span>}<input aria-label="Ajouter un commentaire" value={commentText} maxLength={1000} onChange={(event) => setCommentText(event.target.value)} placeholder={replyTo ? "Écrire une réponse…" : "Ajouter un commentaire…"} /><button disabled={!commentText.trim()} onClick={() => void addComment()}>Publier</button></footer></section></div>}

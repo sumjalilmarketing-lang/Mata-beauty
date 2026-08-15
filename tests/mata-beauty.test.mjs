@@ -171,6 +171,32 @@ test("the social video layer is server-counted, attributable, storage-isolated, 
   assert.doesNotMatch(feed + publisher, /SUPABASE_SERVICE_ROLE_KEY/);
 });
 
+test("the social content studio supports moderated formats and audited promotion", async () => {
+  const [migration, admin, workspaces, moduleView] = await Promise.all([
+    readFile(new URL("supabase/migrations/20260815170000_social_content_studio_and_moderation.sql", root), "utf8"),
+    readFile(new URL("app/super-admin.tsx", root), "utf8"),
+    readFile(new URL("lib/navigation/spaces.ts", root), "utf8"),
+    readFile(new URL("app/workspace-module.tsx", root), "utf8"),
+  ]);
+  for (const format of ["video", "photo", "before_after", "promotion", "availability"]) assert.match(migration, new RegExp(`'${format}'`));
+  for (const table of ["social_post_media", "social_post_features"]) assert.match(migration, new RegExp(`create table if not exists public\\.${table}`));
+  assert.match(migration, /provider-social-media/);
+  assert.match(migration, /providers upload own social media/);
+  assert.match(migration, /function public\.admin_moderate_social_post/);
+  assert.match(migration, /function public\.admin_feature_social_post/);
+  assert.match(migration, /function public\.create_social_media_post/);
+  assert.match(migration, /function public\.get_social_admin_dashboard/);
+  assert.match(migration, /write_admin_audit\('social\.post\.'/);
+  assert.match(migration, /Contenu volé|contenu_vole|faux_resultat/);
+  assert.match(admin, /SocialContentModule/);
+  assert.match(admin, /admin_moderate_social_post/);
+  assert.match(admin, /admin_feature_social_post/);
+  assert.match(admin, /Réservations générées/);
+  assert.match(workspaces, /"Studio"/);
+  assert.match(moduleView, /videos: \{ table: "posts"/);
+  assert.doesNotMatch(migration + admin, /SUPABASE_SERVICE_ROLE_KEY/);
+});
+
 test("booking conversations are participant-only, realtime, paginated, and read-aware", async () => {
   const [migration, notificationRepair, messages, dashboard] = await Promise.all([
     readFile(new URL("supabase/migrations/20260804190000_booking_conversations_realtime.sql", root), "utf8"),

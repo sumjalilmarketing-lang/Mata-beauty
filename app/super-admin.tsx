@@ -100,6 +100,37 @@ type AuditRow = {
   created_at: string;
 };
 
+type SocialMetrics = {
+  posts_today: number;
+  published: number;
+  pending: number;
+  reported: number;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  booking_clicks: number;
+  bookings: number;
+  gross_amount: number;
+};
+
+type SocialPostRow = {
+  id: string;
+  author_id: string;
+  caption: string;
+  status: string;
+  post_type: string;
+  thumbnail_url: string | null;
+  is_sponsored: boolean;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  share_count: number;
+  published_at: string | null;
+  created_at: string;
+  provider_profiles: { business_name: string; city: string } | Array<{ business_name: string; city: string }> | null;
+};
+
 type SearchResult = { entity_type: string; entity_id: string; title: string; subtitle: string };
 
 async function withTimeout<T>(operation: PromiseLike<T>, timeoutMs = 8000): Promise<T> {
@@ -133,7 +164,7 @@ const navigation = [
   { key: "promotions", label: "Promotions", icon: "◈", permission: "content.manage" },
   { key: "notifications", label: "Notifications", icon: "◌", permission: "notifications.send" },
   { key: "support", label: "Support", icon: "?", permission: "support.manage" },
-  { key: "content", label: "Contenus", icon: "¶", permission: "content.manage" },
+  { key: "content", label: "Contenu social", icon: "▶", permission: "content.manage" },
   { key: "administrators", label: "Administrateurs", icon: "♜", permission: "roles.manage" },
   { key: "roles", label: "Rôles et permissions", icon: "⌘", permission: "roles.manage" },
   { key: "statistics", label: "Statistiques", icon: "↗", permission: "users.read" },
@@ -431,6 +462,7 @@ function AdminModule({
   if (module === "bookings" || module === "calendar") return <BookingsModule context={context} calendar={module === "calendar"} notify={notify} />;
   if (module === "categories" || module === "services") return <CatalogModule context={context} services={module === "services"} />;
   if (module === "payments" || module === "commissions" || module === "payouts") return <FinanceModule context={context} section={module} />;
+  if (module === "content") return <SocialContentModule context={context} notify={notify} />;
   if (module === "audit") return <AuditModule context={context} />;
   if (module === "settings" || module === "maintenance") return <SettingsModule context={context} maintenance={module === "maintenance"} notify={notify} />;
   return <OperationalModule module={module} context={context} />;
@@ -568,6 +600,74 @@ function AuditModule({ context }: { context: AdminContext }) {
     if (context.is_super_admin || context.permissions.includes("audit.read")) void getSupabaseBrowserClient()!.from("audit_logs").select("id,action,entity_type,entity_id,after_data,created_at").order("created_at", { ascending: false }).limit(250).then(({ data }) => setRows((data ?? []) as AuditRow[]));
   }, [context]);
   return <><div className="admin-filter-bar"><input type="date" aria-label="Depuis" /><select><option>Toutes les actions</option><option>Suspensions</option><option>Rôles</option><option>Paramètres</option></select><span>Journal non modifiable</span></div><div className="audit-timeline">{rows.map((row) => <article key={row.id}><i /><div><strong>{row.action}</strong><small>{row.entity_type} · {row.entity_id?.slice(0, 8) || "global"}</small><p>{typeof row.after_data?.justification === "string" ? row.after_data.justification : "Action système"}</p></div><time>{formatDate(row.created_at)}</time></article>)}</div></>;
+}
+
+function SocialContentModule({ context, notify }: { context: AdminContext; notify: (message: string) => void }) {
+  const [rows, setRows] = useState<SocialPostRow[]>([]);
+  const [metrics, setMetrics] = useState<SocialMetrics | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [confirmation, setConfirmation] = useState<{ row: SocialPostRow; action: "approve" | "hide" | "remove" | "restore" | "warn" | "feature" } | null>(null);
+
+  const load = useCallback(async () => {
+    const supabase = getSupabaseBrowserClient()!;
+    const [{ data: postData }, { data: metricData }] = await Promise.all([
+      supabase.from("posts").select("id,author_id,caption,status,post_type,thumbnail_url,is_sponsored,view_count,like_count,comment_count,share_count,published_at,created_at,provider_profiles!posts_author_id_fkey(business_name,city)").order("created_at", { ascending: false }).limit(250),
+      supabase.rpc("get_social_admin_dashboard"),
+    ]);
+    setRows((postData ?? []) as unknown as SocialPostRow[]);
+    setMetrics((metricData ?? null) as SocialMetrics | null);
+    setLoading(false);
+  }, []);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+
+  const visible = useMemo(() => rows.filter((row) =>
+    (statusFilter === "all" || row.status === statusFilter) && (typeFilter === "all" || row.post_type === typeFilter),
+  ), [rows, statusFilter, typeFilter]);
+
+  if (loading) return <LoadingSkeleton />;
+  return <>
+    {metrics && <section className="admin-metric-grid">
+      {[
+        ["Publications aujourd’hui", metrics.posts_today], ["Publiées", metrics.published], ["À contrôler", metrics.pending],
+        ["Signalées", metrics.reported], ["Vues", metrics.views], ["Réservations générées", metrics.bookings],
+        ["Clics Réserver", metrics.booking_clicks], ["CA généré", formatCurrency(metrics.gross_amount)],
+      ].map(([labelValue, value]) => <article key={String(labelValue)}><span>{labelValue}</span><strong>{typeof value === "number" ? value.toLocaleString("fr-FR") : value}</strong><small>Données Supabase</small></article>)}
+    </section>}
+    <div className="admin-filter-bar">
+      <select aria-label="Filtrer par statut" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tous les statuts</option><option value="published">Publiées</option><option value="draft">Brouillons</option><option value="scheduled">Programmées</option><option value="hidden">Masquées</option><option value="deleted">Retirées</option></select>
+      <select aria-label="Filtrer par format" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Tous les formats</option><option value="video">Vidéos</option><option value="photo">Photos</option><option value="before_after">Avant / Après</option><option value="promotion">Promotions</option><option value="availability">Disponibilités</option></select>
+      <span>{visible.length} publication(s)</span>
+    </div>
+    {visible.length ? <div className="admin-table-wrap"><table className="admin-data-table"><thead><tr><th>Publication</th><th>Créateur</th><th>Format</th><th>Performance</th><th>Statut</th><th>Modération</th></tr></thead><tbody>{visible.map((row) => {
+      const provider = relationOne(row.provider_profiles);
+      return <tr key={row.id}><td>{row.thumbnail_url ? <Image src={row.thumbnail_url} alt="" width={54} height={72} unoptimized /> : <strong>▶</strong>}<small>{row.caption.slice(0, 90) || "Sans légende"}<br />{formatDate(row.published_at ?? row.created_at)}</small></td><td><strong>{provider?.business_name ?? "Créateur"}</strong><small>{provider?.city ?? "Ville non renseignée"}</small></td><td><StatusBadge value={row.post_type} />{row.is_sponsored && <small> Sponsorisé</small>}</td><td>{Number(row.view_count).toLocaleString("fr-FR")} vues<small>{row.like_count} likes · {row.comment_count} commentaires · {row.share_count} partages</small></td><td><StatusBadge value={row.status} /></td><td>
+        <PermissionGuard permission="content.manage" context={context}>
+          {row.status !== "published" && row.status !== "deleted" && <button className="table-action positive" onClick={() => setConfirmation({ row, action: "approve" })}>Approuver</button>}
+          {row.status === "published" && <><button className="table-action" onClick={() => setConfirmation({ row, action: "feature" })}>Mettre en avant</button><button className="table-action danger" onClick={() => setConfirmation({ row, action: "hide" })}>Masquer</button></>}
+          {row.status !== "deleted" && <button className="table-action danger" onClick={() => setConfirmation({ row, action: "remove" })}>Retirer</button>}
+          {row.status === "deleted" && <button className="table-action positive" onClick={() => setConfirmation({ row, action: "restore" })}>Restaurer</button>}
+          <button className="table-action" onClick={() => setConfirmation({ row, action: "warn" })}>Avertir</button>
+        </PermissionGuard>
+      </td></tr>;
+    })}</tbody></table></div> : <EmptyState title="Aucune publication" description="Aucun contenu ne correspond aux filtres sélectionnés." />}
+    {confirmation && <ConfirmationModal
+      title={`${confirmation.action === "feature" ? "Mettre en avant" : confirmation.action === "approve" ? "Approuver" : confirmation.action === "hide" ? "Masquer" : confirmation.action === "remove" ? "Retirer" : confirmation.action === "restore" ? "Restaurer" : "Avertir"} cette publication ?`}
+      description="La décision sera appliquée côté serveur, transmise au créateur et inscrite dans le journal d’audit."
+      dangerous={confirmation.action === "hide" || confirmation.action === "remove"}
+      onCancel={() => setConfirmation(null)}
+      onConfirm={async (reason) => {
+        const supabase = getSupabaseBrowserClient()!;
+        const result = confirmation.action === "feature"
+          ? await supabase.rpc("admin_feature_social_post", { target_post_id: confirmation.row.id, target_feature_type: "recommended", target_starts_at: new Date().toISOString(), target_ends_at: new Date(Date.now() + 7 * 86400000).toISOString(), target_position: null, target_audience: { type: "all" }, target_geographic_zone: null, reason })
+          : await supabase.rpc("admin_moderate_social_post", { target_post_id: confirmation.row.id, decision: confirmation.action, reason });
+        notify(result.error ? result.error.message : confirmation.action === "feature" ? "Publication mise en avant pendant 7 jours." : "Décision appliquée et auditée.");
+        setConfirmation(null);
+        if (!result.error) await load();
+      }}
+    />}
+  </>;
 }
 
 function SettingsModule({ context, maintenance, notify }: { context: AdminContext; maintenance: boolean; notify: (message: string) => void }) {
