@@ -61,17 +61,21 @@ where not exists (select 1 from public.social_post_media media where media.post_
 alter table public.social_post_media enable row level security;
 alter table public.social_post_features enable row level security;
 
+drop policy if exists "social media published or owner read" on public.social_post_media;
 create policy "social media published or owner read" on public.social_post_media for select using (
   exists(select 1 from public.posts p where p.id=post_id and (p.author_id=auth.uid() or p.status='published' or public.is_admin()))
 );
+drop policy if exists "social media owner manage" on public.social_post_media;
 create policy "social media owner manage" on public.social_post_media for all using (
   exists(select 1 from public.posts p where p.id=post_id and (p.author_id=auth.uid() or public.is_admin()))
 ) with check (
   exists(select 1 from public.posts p where p.id=post_id and (p.author_id=auth.uid() or public.is_admin()))
 );
+drop policy if exists "active social features public read" on public.social_post_features;
 create policy "active social features public read" on public.social_post_features for select using (
   (starts_at<=now() and ends_at>now()) or public.has_admin_permission('content.manage')
 );
+drop policy if exists "social features admin manage" on public.social_post_features;
 create policy "social features admin manage" on public.social_post_features for all using (
   public.has_admin_permission('content.manage')
 ) with check (public.has_admin_permission('content.manage'));
@@ -83,14 +87,18 @@ on conflict(id) do update set
   file_size_limit=excluded.file_size_limit,
   allowed_mime_types=excluded.allowed_mime_types;
 
+drop policy if exists "public provider social media reads" on storage.objects;
 create policy "public provider social media reads" on storage.objects for select
   using(bucket_id='provider-social-media');
+drop policy if exists "providers upload own social media" on storage.objects;
 create policy "providers upload own social media" on storage.objects for insert
   with check(bucket_id='provider-social-media' and (storage.foldername(name))[1]=auth.uid()::text
     and exists(select 1 from public.provider_profiles where profile_id=auth.uid()));
+drop policy if exists "providers update own social media" on storage.objects;
 create policy "providers update own social media" on storage.objects for update
   using(bucket_id='provider-social-media' and owner_id=auth.uid()::text)
   with check(bucket_id='provider-social-media' and owner_id=auth.uid()::text);
+drop policy if exists "providers delete own social media" on storage.objects;
 create policy "providers delete own social media" on storage.objects for delete
   using(bucket_id='provider-social-media' and owner_id=auth.uid()::text);
 
