@@ -20,9 +20,11 @@ const tabs: Array<{ key: StudioTab; label: string }> = [
 
 export function CreatorStudio({ userId, providerApproved }: { userId: string; providerApproved: boolean }) {
   const [active, setActive] = useState<StudioTab>("create");
+  const [createType, setCreateType] = useState<"video" | "photo" | "before_after">("video");
   const [posts, setPosts] = useState<CreatorPost[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [feedback, setFeedback] = useState("");
+  const [firstPublicationFeedback, setFirstPublicationFeedback] = useState(false);
 
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
@@ -52,6 +54,14 @@ export function CreatorStudio({ userId, providerApproved }: { userId: string; pr
     if (!error) await load();
   }
 
+  async function answerStudioFeedback(response: "yes" | "no") {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("micro_feedback").insert({ profile_id: userId, context: "first_publication", response });
+    setFeedback(error ? "Votre publication est enregistrée; le retour sera disponible après la mise à jour lancement." : "Merci pour votre retour sur le Studio.");
+    setFirstPublicationFeedback(false);
+  }
+
   const visible = posts.filter((post) => {
     if (active === "videos") return post.post_type === "video";
     if (active === "photos") return ["photo", "promotion", "availability"].includes(post.post_type);
@@ -62,11 +72,14 @@ export function CreatorStudio({ userId, providerApproved }: { userId: string; pr
   });
 
   return <section className="creator-studio">
-    <header className="studio-hero"><div><span>STUDIO MATA BEAUTY</span><h2>Transformez vos réalisations en réservations.</h2><p>Publiez une vidéo liée à une prestation, puis mesurez les rendez-vous qu’elle génère.</p></div><button onClick={() => setActive("create")}>＋ Publier</button></header>
+    <header className="studio-hero"><div><span>STUDIO MATA BEAUTY</span><h2>Montrez votre talent.</h2><p>Filmez, importez ou créez un avant/après puis reliez-le à une prestation réservable.</p></div><button onClick={() => setActive("create")}>＋ Publier</button></header>
+    <div className="studio-launch-actions"><button onClick={() => { setCreateType("video"); setActive("create"); }}><span>●</span><strong>Filmer</strong><small>Vidéo mobile</small></button><button onClick={() => { setCreateType("photo"); setActive("create"); }}><span>↑</span><strong>Importer</strong><small>Photo ou vidéo</small></button><button onClick={() => { setCreateType("before_after"); setActive("create"); }}><span>◇</span><strong>Avant / Après</strong><small>Deux images</small></button></div>
     <nav className="studio-tabs" aria-label="Navigation Studio">{tabs.map((tab) => <button className={active === tab.key ? "active" : ""} key={tab.key} onClick={() => setActive(tab.key)}>{tab.label}</button>)}</nav>
     {feedback && <p className="dashboard-feedback" role="status">{feedback}</p>}
-    {active === "create" && <VideoPublisher userId={userId} providerApproved={providerApproved} onPublished={async (postType) => {
+    {firstPublicationFeedback && <aside className="panel studio-feedback"><strong>Le Studio était-il facile à utiliser ?</strong><div><button onClick={() => void answerStudioFeedback("yes")}>👍 Oui</button><button onClick={() => void answerStudioFeedback("no")}>👎 Non</button></div></aside>}
+    {active === "create" && <VideoPublisher key={createType} userId={userId} providerApproved={providerApproved} initialContentType={createType} onPublished={async (postType) => {
       await load();
+      setFirstPublicationFeedback(true);
       setActive(postType === "video" ? "videos" : postType === "before_after" ? "before_after" : "photos");
     }} />}
     {active === "statistics" && <SocialDashboard role="provider" userId={userId} />}

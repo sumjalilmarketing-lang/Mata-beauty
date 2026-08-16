@@ -68,6 +68,39 @@ test("provider moderation and the PWA shell remain protected", async () => {
   assert.doesNotMatch(worker, /supabase|auth|api/);
 });
 
+test("the commercial launch layer is measurable, curated, RLS-protected, and honest", async () => {
+  const [migration, launchAdmin, checklist, referrals, studio, feed, legalPage] = await Promise.all([
+    readFile(new URL("supabase/migrations/20260816180000_launch_commercial_foundation.sql", root), "utf8"),
+    readFile(new URL("app/launch-admin.tsx", root), "utf8"),
+    readFile(new URL("app/provider-launch-checklist.tsx", root), "utf8"),
+    readFile(new URL("app/referral-card.tsx", root), "utf8"),
+    readFile(new URL("app/creator-studio.tsx", root), "utf8"),
+    readFile(new URL("app/social-feed.tsx", root), "utf8"),
+    readFile(new URL("app/legal/[slug]/page.tsx", root), "utf8"),
+  ]);
+  for (const table of ["launch_settings", "launch_provider_cohort", "launch_feed_selection", "referrals", "product_events", "micro_feedback", "fraud_alerts", "legal_documents", "appointment_reminder_jobs"]) {
+    assert.match(migration, new RegExp(`create table if not exists public\\.${table}`));
+    assert.match(migration, new RegExp(`alter table public\\.${table} enable row level security`));
+  }
+  for (const rpc of ["get_provider_launch_checklist", "get_or_create_referral_code", "record_product_event", "get_launch_dashboard", "sync_founder_badge"]) {
+    assert.match(migration, new RegExp(`function public\\.${rpc}`));
+  }
+  assert.match(migration, /referral_rewards_enabled boolean not null default false/);
+  assert.match(migration, /content_origin in \('provider','editorial','demo'\)/);
+  assert.match(migration, /content_origin = 'provider' or char_length/);
+  assert.match(migration, /Session anonyme invalide/);
+  assert.match(migration, /Limite analytique atteinte/);
+  assert.match(migration, /public\.is_super_admin\(\)/);
+  assert.match(launchAdmin, /100 utilisateurs et 20 professionnels/);
+  assert.match(checklist, /Votre profil en moins de 10 minutes/);
+  assert.match(referrals, /Aucune récompense financière n’est active/);
+  assert.match(studio, /Filmer/);
+  assert.match(studio, /Avant \/ Après/);
+  assert.match(feed, /launch_social_feed/);
+  assert.match(legalPage, /Validation juridique requise/);
+  assert.doesNotMatch(migration + launchAdmin + referrals, /SUPABASE_SERVICE_ROLE_KEY/);
+});
+
 test("the official Mata identity drives the design system and installable assets", async () => {
   const [styles, app, admin, manifest, lightLogo, darkLogo, appIcon] = await Promise.all([
     readFile(new URL("app/globals.css", root), "utf8"),

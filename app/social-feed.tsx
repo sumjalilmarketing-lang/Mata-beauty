@@ -150,7 +150,9 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     const cached = readFeedCache();
     if (cached.length) { setPosts(cached); setState("ready"); }
     else setState("loading");
-    const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).limit(FEED_BATCH_SIZE);
+    const launchFeed = await supabase.from("launch_social_feed").select("*").order("launch_sort", { ascending: true, nullsFirst: false }).order("published_at", { ascending: false }).limit(FEED_BATCH_SIZE);
+    const fallbackFeed = launchFeed.error ? await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).limit(FEED_BATCH_SIZE) : null;
+    const { data, error } = launchFeed.error ? fallbackFeed! : launchFeed;
     if (error) { if (!cached.length) setState("error"); else setFeedback("Réseau lent · inspirations enregistrées affichées."); return; }
     const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
     const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
@@ -181,7 +183,9 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     if (!hasMore) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).range(posts.length, posts.length + FEED_BATCH_SIZE - 1);
+    const launchFeed = await supabase.from("launch_social_feed").select("*").order("launch_sort", { ascending: true, nullsFirst: false }).order("published_at", { ascending: false }).range(posts.length, posts.length + FEED_BATCH_SIZE - 1);
+    const fallbackFeed = launchFeed.error ? await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).range(posts.length, posts.length + FEED_BATCH_SIZE - 1) : null;
+    const { data, error } = launchFeed.error ? fallbackFeed! : launchFeed;
     if (error) return;
     const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
     const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);

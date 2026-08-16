@@ -32,6 +32,8 @@ export type CatalogCategory = {
   name: string;
   slug: string;
   icon: string | null;
+  imageUrl: string | null;
+  imagePosition: string | null;
   sortOrder: number;
 };
 
@@ -93,19 +95,23 @@ export async function fetchPublishedProviders(client: SupabaseClient): Promise<C
 }
 
 export async function fetchActiveCategories(client: SupabaseClient): Promise<CatalogCategory[]> {
-  const { data, error } = await client
+  const enriched = await client
     .from("categories")
-    .select("id,name,slug,icon,sort_order")
+    .select("id,name,slug,icon,image_url,image_position,sort_order")
     .eq("is_active", true)
     .order("sort_order")
     .order("name")
     .limit(40);
-  if (error) throw error;
-  return (data ?? []).map((category) => ({
+  const fallback = enriched.error ? await client.from("categories").select("id,name,slug,icon,image_url,sort_order").eq("is_active", true).order("sort_order").order("name").limit(40) : null;
+  if (enriched.error && fallback?.error) throw fallback.error;
+  const data = (enriched.error ? fallback?.data : enriched.data) ?? [];
+  return data.map((category) => ({
     id: category.id,
     name: category.name,
     slug: category.slug,
     icon: category.icon,
+    imageUrl: category.image_url,
+    imagePosition: "image_position" in category && typeof category.image_position === "string" ? category.image_position : null,
     sortOrder: category.sort_order,
   }));
 }

@@ -8,6 +8,8 @@ import { BookingMessages } from "./booking-messages";
 import { VideoPublisher } from "./video-publisher";
 import { SocialDashboard } from "./social-dashboard";
 import { ClientControlCenter } from "./client-control-center";
+import { ProviderLaunchChecklist } from "./provider-launch-checklist";
+import { ReferralCard } from "./referral-card";
 
 type Role = "client" | "provider" | "admin";
 type ProviderStatus = "draft" | "pending_review" | "approved" | "rejected" | "suspended";
@@ -364,6 +366,7 @@ export function LiveDashboard({
         </article>
 
         {role === "client" && <ClientControlCenter userId={userId} />}
+        {role === "client" && <ReferralCard type="client" />}
         {role === "client" && clientProfile && <details className="panel onboarding-panel legacy-profile-form"><summary>Informations rapides</summary><article>
           <div className="panel-heading"><div><h2>Mon profil beauté</h2><p>Ces informations personnalisent vos recommandations et vos rendez-vous.</p></div></div>
           <form className="dashboard-form" onSubmit={(event) => void saveClientProfile(event)}>
@@ -381,6 +384,8 @@ export function LiveDashboard({
 
         {role === "provider" && providerProfile && (
           <>
+          <ProviderLaunchChecklist userId={userId} />
+          <ReferralCard type="provider" />
           <VideoPublisher userId={userId} providerApproved={providerProfile.status === "approved"} onPublished={load} />
           <SocialDashboard role="provider" userId={userId} />
           <article className="panel onboarding-panel">

@@ -75,11 +75,11 @@ async function inspectAndCreateThumbnail(file: File) {
   }
 }
 
-export function VideoPublisher({ userId, providerApproved, onPublished }: { userId: string; providerApproved: boolean; onPublished: (postType: ContentType) => Promise<void> }) {
+export function VideoPublisher({ userId, providerApproved, onPublished, initialContentType = "video" }: { userId: string; providerApproved: boolean; onPublished: (postType: ContentType) => Promise<void>; initialContentType?: ContentType }) {
   const [services, setServices] = useState<ProviderService[]>([]);
   const [phase, setPhase] = useState<"idle" | "analysing" | "uploading" | "publishing">("idle");
   const [feedback, setFeedback] = useState("");
-  const [contentType, setContentType] = useState<ContentType>("video");
+  const [contentType, setContentType] = useState<ContentType>(initialContentType);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const mediaInput = useRef<HTMLInputElement>(null);
 
@@ -90,7 +90,6 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
   }, [userId]);
 
   useEffect(() => () => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); }, [previewUrls]);
-
   async function publish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
@@ -193,7 +192,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
   const busyLabel = phase === "analysing" ? "Analyse de la vidéo…" : phase === "uploading" ? "Envoi sécurisé…" : phase === "publishing" ? "Publication…" : idleLabel;
   const progressValue = phase === "analysing" ? 20 : phase === "uploading" ? 60 : phase === "publishing" ? 90 : 0;
   return <article className="panel video-publisher-panel" id="video-publisher">
-    <div className="panel-heading"><div><h2>Studio de contenu</h2><p>Créez une inspiration réservable en quelques secondes.</p></div><span className="role-pill">Créateur</span></div>
+    <div className="panel-heading"><div><h2>Montrez votre talent</h2><p>Choisissez un média, associez une prestation et publiez depuis votre téléphone.</p></div><span className="role-pill">Créateur</span></div>
     <form className="dashboard-form video-publisher-form" onSubmit={(event) => void publish(event)}>
       <label>Format<select name="contentType" value={contentType} onChange={(event) => setContentType(event.target.value as ContentType)}><option value="video">Vidéo</option><option value="photo">Photo / carrousel</option><option value="before_after">Avant / Après</option><option value="promotion">Promotion</option><option value="availability">Disponibilité immédiate</option></select></label>
       <label>Titre<input name="title" maxLength={120} placeholder="Ex. Tresses Knotless" /></label>

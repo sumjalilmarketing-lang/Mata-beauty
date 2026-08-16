@@ -1,0 +1,6 @@
+.launch-rankings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.launch-rankings article{padding:16px;border:1px solid #3c303a;border-radius:14px;background:#151219}
+.launch-rankings h3{margin:0 0 10px}
+.launch-rankings p{display:flex;justify-content:space-between;gap:12px;margin:7px 0;color:#978f9a}
+.launch-rankings p strong{color:#fff}
+@media(max-width:800px){.launch-rankings{grid-template-columns:1fr}}

@@ -12,6 +12,9 @@ import { fetchActiveCategories, fetchActivePromotions, fetchPublishedProviders, 
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { loadAuthenticatedProfile } from "@/lib/auth/profile";
 import { intendedRoleForDestination, safeOAuthDestination } from "@/lib/auth/redirect";
+import { recordProductEvent } from "@/lib/analytics/product-events";
+import { legalDocuments } from "@/lib/legal-documents";
+import Link from "next/link";
 
 type Provider = {
   id: string;
@@ -132,12 +135,14 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [authenticated, setAuthenticated] = useState<AuthenticatedProfile | null>(null);
   const [authRequest, setAuthRequest] = useState<{ role: "client" | "provider" | "admin"; mode: "login" | "register" | "reset"; returnTo?: string } | null>(null);
   const [paymentReturn, setPaymentReturn] = useState<{ id: string; mode: "return" | "cancelled" } | null>(null);
+  const [showLaunchWelcome, setShowLaunchWelcome] = useState(false);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("mata-theme");
     const preferredTheme = "dark";
     void Promise.resolve().then(() => setTheme(savedTheme === "dark" || savedTheme === "light" ? savedTheme : preferredTheme));
     const splashTimer = window.setTimeout(() => setShowSplash(false), 1350);
+    void Promise.resolve().then(() => setShowLaunchWelcome(window.localStorage.getItem("mata-launch-welcome") !== "done"));
     const draft = readBookingDraft();
     const parameters = new URLSearchParams(window.location.search);
     oauthReturn.current = { intent: parameters.get("intent"), authenticated: parameters.get("auth") === "google" };
@@ -332,6 +337,8 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   function startBooking(selection: BookingSelection) {
     setRestoredBookingRequest(null);
     setBooking(selection);
+    const client = getSupabaseBrowserClient();
+    if (client) void recordProductEvent(client, "booking_started", { provider_id: selection.provider.profileId, service_id: selection.service.id, source: selection.sourcePostId ? "video" : "catalog" });
   }
 
   function closeBooking() {
@@ -343,6 +350,8 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   function runSearch(event?: FormEvent) {
     event?.preventDefault();
     setScreen("results");
+    const client = getSupabaseBrowserClient();
+    if (client) void recordProductEvent(client, "search", { query: query.trim().slice(0, 80), area });
   }
 
   function selectCategory(label: string) {
@@ -350,11 +359,19 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     setSubcategory("Tout");
     setQuery("");
     setScreen("results");
+    const client = getSupabaseBrowserClient();
+    if (client) void recordProductEvent(client, "category_viewed", { category: label, area });
+  }
+
+  function viewProvider(provider: Provider) {
+    setProfile(provider);
+    const client = getSupabaseBrowserClient();
+    if (client) void recordProductEvent(client, "provider_viewed", { provider_id: provider.profileId, category: provider.category });
   }
 
   function openSocialProvider(authorId: string) {
     const provider = catalog.find((item) => item.profileId === authorId);
-    if (provider) setProfile(provider);
+    if (provider) viewProvider(provider);
     else setNotice("Ce profil n’est pas encore disponible dans le catalogue.");
   }
 
@@ -417,6 +434,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       setNotice(error?.code === "23P01" ? "Ce créneau vient d’être réservé." : "La réservation n’a pas pu être enregistrée.");
       return null;
     }
+    void recordProductEvent(supabase, "booking_completed", { booking_id: created.id, provider_id: provider.profileId, source: booking.sourcePostId ? "video" : "catalog" });
     window.sessionStorage.removeItem(bookingDraftKey);
     if (request.paymentMethod !== "on_site") {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -502,11 +520,12 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
             favorites={favorites}
             onSearch={runSearch}
             onCategory={selectCategory}
-            onViewProvider={setProfile}
+            onViewProvider={viewProvider}
             onBook={(provider) => startBooking({ provider, service: defaultService(provider) })}
             onFavorite={(provider) => void toggleFavorite(provider)}
             onAccount={() => openAccount()}
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
+            onInspiration={() => setScreen("feed")}
             theme={theme}
             onToggleTheme={toggleTheme}
           />
@@ -532,7 +551,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
             maxPrice={maxPrice}
             setMaxPrice={setMaxPrice}
             onBack={() => setScreen("home")}
-            onViewProvider={setProfile}
+            onViewProvider={viewProvider}
             onBook={(provider) => startBooking({ provider, service: defaultService(provider) })}
             onFavorite={(provider) => void toggleFavorite(provider)}
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
@@ -540,6 +559,8 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
         )}
         <BottomNav active={screen === "feed" ? "inspiration" : screen === "home" ? "home" : "explore"} onHome={() => setScreen("home")} onExplore={() => setScreen("home")} onFeed={() => setScreen("feed")} onAccount={openAccount} />
       </div>
+
+      {showLaunchWelcome && <LaunchWelcome area={area} categories={categories} onArea={setArea} onCategory={(value) => { setCategory(value); }} onClose={() => { window.localStorage.setItem("mata-launch-welcome", "done"); setShowLaunchWelcome(false); }} />}
 
       {booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}
       {authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} returnTo={authRequest.returnTo} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}
@@ -551,9 +572,14 @@ function Brand() {
   return <div className="premium-brand"><Image src="/brand/mata-app-icon.webp" alt="Mata Beauty" width={48} height={48} priority unoptimized /><span><strong>MATA</strong><small>BEAUTY</small></span></div>;
 }
 
+function LaunchWelcome({ area, categories, onArea, onCategory, onClose }: { area: string; categories: CatalogCategory[]; onArea: (value: string) => void; onCategory: (value: string) => void; onClose: () => void }) {
+  const [step, setStep] = useState<"location" | "preferences">("location");
+  return <aside className="launch-welcome" aria-label="Personnaliser Mata Beauty"><div><button className="launch-welcome-close" aria-label="Explorer sans personnaliser" onClick={onClose}>×</button><span>BIENVENUE SUR MATA BEAUTY</span><h2>{step === "location" ? "Où cherchez-vous ?" : "Qu’est-ce qui vous inspire ?"}</h2><p>{step === "location" ? "Une localisation suffit pour afficher les talents et créneaux pertinents." : "Choisissez une catégorie ou explorez tout immédiatement. Le compte viendra au moment de réserver."}</p>{step === "location" ? <><div className="launch-location-options"><button className={area === "Dakar, Sénégal" ? "active" : ""} onClick={() => onArea("Dakar, Sénégal")}>Dakar</button><button className={area === "Tout Dakar" ? "active" : ""} onClick={() => onArea("Tout Dakar")}>Tout Dakar</button></div><button className="launch-next" onClick={() => setStep("preferences")}>Continuer</button></> : <><div className="launch-category-options">{categories.slice(0, 8).map((item) => <button key={item.id} onClick={() => onCategory(item.name)}>{item.name}</button>)}</div><button className="launch-next" onClick={onClose}>Explorer Inspiration</button></>}</div></aside>;
+}
+
 function HomeScreen({
   authenticated, query, setQuery, area, setArea, date, setDate, suggestions, categories, catalog, catalogState, nextAvailability, promotions,
-  upcomingBookings, favorites, onSearch, onCategory, onViewProvider, onBook, onFavorite, onAccount, onProviderRegister, theme, onToggleTheme,
+  upcomingBookings, favorites, onSearch, onCategory, onViewProvider, onBook, onFavorite, onAccount, onProviderRegister, onInspiration, theme, onToggleTheme,
 }: {
   authenticated: AuthenticatedProfile | null;
   query: string; setQuery: (value: string) => void; area: string; setArea: (value: string) => void;
@@ -562,7 +588,7 @@ function HomeScreen({
   upcomingBookings: Array<{ id: string; starts_at: string; status: string }>; favorites: string[];
   onSearch: (event?: FormEvent) => void; onCategory: (label: string) => void;
   onViewProvider: (provider: Provider) => void; onBook: (provider: Provider) => void; onFavorite: (provider: Provider) => void;
-  onAccount: () => void; onProviderRegister: () => void; theme: "light" | "dark"; onToggleTheme: () => void;
+  onAccount: () => void; onProviderRegister: () => void; onInspiration: () => void; theme: "light" | "dark"; onToggleTheme: () => void;
 }) {
   return <div className="mobile-screen home-screen">
     <header className="mobile-topbar"><Brand /><div><button aria-label={theme === "dark" ? "Activer le thème clair" : "Activer le thème sombre"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button><button aria-label="Notifications" onClick={onAccount}>◇<i>3</i></button><button className="user-orb" aria-label="Ouvrir mon compte" onClick={onAccount}>{authenticated ? "MB" : "○"}</button></div></header>
@@ -571,15 +597,19 @@ function HomeScreen({
     <button className="location-card" onClick={() => setArea(area === "Dakar, Sénégal" ? "Tout Dakar" : "Dakar, Sénégal")}><span>⌖</span><span><strong>{area}</strong><small>Changer de localisation</small></span><b>›</b></button>
     <section className="mata-hero-card"><div><span>BEAUTÉ, SIMPLEMENT</span><h2>Trouvez votre prochain coup de cœur.</h2><p>Des professionnels vérifiés et des créneaux disponibles maintenant.</p><button onClick={() => onCategory("Toutes")}>Réserver maintenant</button></div><Image src="/brand/mata-app-icon.webp" alt="" width={180} height={180} unoptimized /></section>
     <div className="section-title"><h2>Catégories populaires</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
-    <div className="photo-category-grid">{categories.map((item, index) => { const image = item.icon && (/^https?:\/\//.test(item.icon) || item.icon.startsWith("/")) ? item.icon : categoryAtlas; return <button key={item.id} onClick={() => onCategory(item.name)}><span className="category-photo" style={{ backgroundImage: `url(${image})`, backgroundPosition: image === categoryAtlas ? `${(index % 5) * 25}% ${index < 5 ? 0 : 100}%` : "center" }} role="img" aria-label={`Illustration ${item.name}`}>{item.icon && image === categoryAtlas ? item.icon : ""}</span><strong>{item.name}</strong></button>; })}</div>
+    <div className="photo-category-grid">{categories.map((item, index) => { const image = item.imageUrl ?? (item.icon && (/^https?:\/\//.test(item.icon) || item.icon.startsWith("/")) ? item.icon : categoryAtlas); return <button key={item.id} onClick={() => onCategory(item.name)}><span className="category-photo" style={{ backgroundImage: `url(${image})`, backgroundPosition: item.imagePosition ?? (image === categoryAtlas ? `${(index % 5) * 25}% ${index < 5 ? 0 : 100}%` : "center") }} role="img" aria-label={`Illustration ${item.name}`}>{item.icon && image === categoryAtlas ? item.icon : ""}</span><strong>{item.name}</strong></button>; })}</div>
     {categories.length === 0 && catalogState !== "loading" && <div className="premium-empty compact"><span>◇</span><h3>Aucune catégorie active</h3><p>Les catégories publiées par l’administration apparaîtront ici.</p></div>}
     <div className="section-title"><h2>Disponibles aujourd’hui</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
     <CatalogBlock providers={catalog.filter((provider) => isToday(nextAvailability[provider.id])).slice(0, 4)} fallbackProviders={catalog.slice(0, 4)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister} />
+    {catalog.some((provider) => isTomorrow(nextAvailability[provider.id])) && <><div className="section-title"><h2>Disponibles demain</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={catalog.filter((provider) => isTomorrow(nextAvailability[provider.id])).slice(0, 4)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/></>}
+    {catalog.some((provider) => isLaterThisWeek(nextAvailability[provider.id])) && <><div className="section-title"><h2>Cette semaine</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={catalog.filter((provider) => isLaterThisWeek(nextAvailability[provider.id])).slice(0, 4)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/></>}
+    {catalog.length > 0 && <><div className="section-title"><h2>Près de vous</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={catalog.filter((provider) => area === "Tout Dakar" || provider.area.toLocaleLowerCase("fr").includes("dakar")).slice(0, 3)} fallbackProviders={catalog.slice(0, 3)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/><div className="section-title"><h2>Meilleurs avis</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={[...catalog].sort((a,b) => b.rating-a.rating || b.reviews-a.reviews).slice(0, 3)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/><div className="section-title"><h2>Nouveaux talents</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={catalog.slice(-3).reverse()} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/><section className="launch-inspiration-cta"><span>▶ INSPIRATION</span><h2>Découvrez les dernières transformations.</h2><button onClick={onInspiration}>Ouvrir le feed</button></section></>}
     {catalog.length > 0 && <section className="mata-recommendations"><div className="section-title"><h2>Choisis pour vous</h2><span>✦ Sélection intelligente</span></div><button onClick={() => onViewProvider(catalog[0])}><strong>{catalog[0].name}</strong><small>{catalog[0].specialty} · {catalog[0].rating.toFixed(1)} ★</small><b>Découvrir</b></button></section>}
     {catalog.some((provider) => nextAvailability[provider.id]) && <section className="next-availability-strip"><strong>Prochaines disponibilités</strong>{catalog.filter((provider) => nextAvailability[provider.id]).slice(0, 5).map((provider) => <button key={provider.id} onClick={() => onBook(provider)}><span>{formatSlotLabel(nextAvailability[provider.id])}</span><small>{provider.name}</small></button>)}</section>}
     {promotions.length > 0 && <section className="premium-offers"><div className="section-title"><h2>Offres du moment</h2></div>{promotions.slice(0, 2).map((promotion) => <article key={promotion.id}><span>{promotion.discountType === "percentage" ? `−${promotion.discountValue}%` : `−${formatPrice(promotion.discountValue)}`}</span><div><strong>{promotion.title}</strong><small>{promotion.description}</small></div></article>)}</section>}
     {upcomingBookings.length > 0 && <section className="premium-upcoming"><div className="section-title"><h2>Vos rendez-vous</h2></div>{upcomingBookings.map((booking) => <button key={booking.id} onClick={onAccount}><span>▣</span><div><strong>{new Date(booking.starts_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}</strong><small>{booking.status}</small></div><b>›</b></button>)}</section>}
     <div className="mobile-date-helper"><label>Quand souhaitez-vous réserver ?<input type="date" min={today} value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
+    <footer className="launch-legal-links">{legalDocuments.map(([slug,label]) => <Link key={slug} href={`/legal/${slug}`}>{label}</Link>)}</footer>
   </div>;
 }
 
@@ -780,7 +810,13 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
 
 function BookingSuccess({ provider, confirmation, onClose }: { provider: Provider; confirmation: BookingConfirmation; onClose: () => void }) {
   const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${provider.specialty} · ${provider.name}`)}&dates=${confirmation.date.replaceAll("-", "")}T${confirmation.time.replace(":", "")}00/${confirmation.date.replaceAll("-", "")}T${confirmation.time.replace(":", "")}00`;
-  return <div className="premium-booking-success"><span>✓</span><p>Demande enregistrée</p><h2>Votre rendez-vous est créé</h2><code>{confirmation.id}</code><dl><div><dt>Prestation</dt><dd>{provider.specialty}</dd></div><div><dt>Date</dt><dd>{confirmation.date} à {confirmation.time}</dd></div><div><dt>Adresse</dt><dd>{confirmation.location}</dd></div><div><dt>Statut</dt><dd>En attente</dd></div></dl><a href={calendarUrl} target="_blank" rel="noreferrer">Ajouter au calendrier</a><button onClick={onClose}>Terminer</button></div>;
+  return <div className="premium-booking-success"><span>✓</span><p>Demande enregistrée</p><h2>Votre rendez-vous est créé</h2><code>{confirmation.id}</code><dl><div><dt>Prestation</dt><dd>{provider.specialty}</dd></div><div><dt>Date</dt><dd>{confirmation.date} à {confirmation.time}</dd></div><div><dt>Adresse</dt><dd>{confirmation.location}</dd></div><div><dt>Statut</dt><dd>En attente</dd></div></dl><BookingMicroFeedback bookingId={confirmation.id}/><a href={calendarUrl} target="_blank" rel="noreferrer">Ajouter au calendrier</a><button onClick={onClose}>Terminer</button></div>;
+}
+
+function BookingMicroFeedback({ bookingId }: { bookingId: string }) {
+  const [sent, setSent] = useState(false);
+  async function answer(response: "yes" | "no") { const client=getSupabaseBrowserClient(); if(!client)return; const user=await client.auth.getUser(); if(!user.data.user)return; const {error}=await client.from("micro_feedback").insert({profile_id:user.data.user.id,context:"booking",response,booking_id:bookingId}); if(!error)setSent(true); }
+  return <aside className="micro-feedback"><strong>Votre réservation a-t-elle été simple ?</strong>{sent ? <small>Merci pour votre retour.</small> : <div><button onClick={() => void answer("yes")}>👍 Oui</button><button onClick={() => void answer("no")}>👎 Non</button></div>}</aside>;
 }
 
 function BottomNav({ active, onHome, onExplore, onFeed, onAccount }: { active: "home" | "explore" | "inspiration"; onHome: () => void; onExplore: () => void; onFeed: () => void; onAccount: (section?: "client" | "provider" | "admin") => void }) {
@@ -820,6 +856,16 @@ function isToday(slot?: string) {
   if (!slot) return false;
   return new Date(slot).toLocaleDateString("fr-CA", { timeZone: "Africa/Dakar" }) === new Date().toLocaleDateString("fr-CA", { timeZone: "Africa/Dakar" });
 }
+
+function daysFromToday(slot?: string) {
+  if (!slot) return Number.POSITIVE_INFINITY;
+  const target = new Date(new Date(slot).toLocaleDateString("en-CA", { timeZone: "Africa/Dakar" }) + "T00:00:00Z");
+  const current = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Dakar" }) + "T00:00:00Z");
+  return Math.round((target.getTime() - current.getTime()) / 86_400_000);
+}
+
+function isTomorrow(slot?: string) { return daysFromToday(slot) === 1; }
+function isLaterThisWeek(slot?: string) { const days = daysFromToday(slot); return days >= 2 && days <= 7; }
 
 function formatSlotLabel(slot: string) {
   const date = new Date(slot);

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { LaunchAdmin } from "./launch-admin";
 
 type AdminContext = {
   is_super_admin: boolean;
@@ -155,6 +156,8 @@ async function withTimeout<T>(operation: PromiseLike<T>, timeoutMs = 8000): Prom
 
 const navigation = [
   { key: "overview", label: "Vue d’ensemble", icon: "⌂", permission: "users.read" },
+  { key: "launch", label: "Lancement", icon: "↗", permission: "users.read" },
+  { key: "cohort", label: "Cohorte lancement", icon: "★", permission: "providers.read" },
   { key: "users", label: "Utilisateurs", icon: "◎", permission: "users.read" },
   { key: "providers", label: "Prestataires", icon: "✦", permission: "providers.read" },
   { key: "salons", label: "Salons", icon: "⌑", permission: "providers.read" },
@@ -180,6 +183,7 @@ const navigation = [
   { key: "security", label: "Sécurité", icon: "⌾", permission: "roles.manage" },
   { key: "settings", label: "Paramètres", icon: "⚙", permission: "settings.read" },
   { key: "maintenance", label: "Maintenance", icon: "△", permission: "settings.update" },
+  { key: "platform-health", label: "Santé plateforme", icon: "●", permission: "settings.read" },
 ] as const;
 type ModuleKey = typeof navigation[number]["key"];
 
@@ -195,6 +199,7 @@ const adminRoleLabels: Record<string, string> = {
 
 function canAccessModule(context: AdminContext, key: ModuleKey, permission: string) {
   if (context.is_super_admin) return true;
+  if (["launch", "cohort", "platform-health"].includes(key)) return false;
   if ((key === "overview" || key === "statistics") && !context.roles.includes("admin")) return false;
   return context.permissions.includes(permission);
 }
@@ -465,6 +470,7 @@ function AdminModule({
   notify: (message: string) => void;
 }) {
   if (module === "overview" || module === "statistics") return <Overview context={context} setModule={setModule} />;
+  if (module === "launch" || module === "cohort" || module === "platform-health") return <LaunchAdmin mode={module} />;
   if (module === "users") return <UsersModule context={context} notify={notify} />;
   if (module === "providers" || module === "verification") return <ProvidersModule context={context} verificationOnly={module === "verification"} notify={notify} />;
   if (module === "bookings" || module === "calendar") return <BookingsModule context={context} calendar={module === "calendar"} notify={notify} />;
@@ -683,16 +689,19 @@ function SocialContentModule({ context, notify }: { context: AdminContext; notif
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [launchSelected, setLaunchSelected] = useState<Set<string>>(new Set());
   const [confirmation, setConfirmation] = useState<{ row: SocialPostRow; action: "approve" | "hide" | "remove" | "restore" | "warn" | "feature" } | null>(null);
 
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient()!;
-    const [{ data: postData }, { data: metricData }] = await Promise.all([
+    const [{ data: postData }, { data: metricData }, selection] = await Promise.all([
       supabase.from("posts").select("id,author_id,caption,status,post_type,thumbnail_url,is_sponsored,view_count,like_count,comment_count,share_count,published_at,created_at,provider_profiles!posts_author_id_fkey(business_name,city)").order("created_at", { ascending: false }).limit(250),
       supabase.rpc("get_social_admin_dashboard"),
+      supabase.from("launch_feed_selection").select("post_id").eq("is_active", true),
     ]);
     setRows((postData ?? []) as unknown as SocialPostRow[]);
     setMetrics((metricData ?? null) as SocialMetrics | null);
+    setLaunchSelected(new Set((selection.data ?? []).map((item) => item.post_id)));
     setLoading(false);
   }, []);
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
@@ -700,6 +709,15 @@ function SocialContentModule({ context, notify }: { context: AdminContext; notif
   const visible = useMemo(() => rows.filter((row) =>
     (statusFilter === "all" || row.status === statusFilter) && (typeFilter === "all" || row.post_type === typeFilter),
   ), [rows, statusFilter, typeFilter]);
+
+  async function toggleLaunchSelection(row: SocialPostRow) {
+    const supabase=getSupabaseBrowserClient()!;
+    const user=await supabase.auth.getUser();
+    const selected=launchSelected.has(row.id);
+    const result=selected ? await supabase.from("launch_feed_selection").delete().eq("post_id",row.id) : await supabase.from("launch_feed_selection").upsert({post_id:row.id,label:"Sélection lancement",content_origin:"provider",sort_order:launchSelected.size,is_active:true,selected_by:user.data.user?.id});
+    notify(result.error?publicErrorMessage(result.error,"La sélection lancement nécessite la migration Phase 2."):selected?"Contenu retiré de la sélection lancement.":"Contenu ajouté à la sélection lancement.");
+    if(!result.error)await load();
+  }
 
   if (loading) return <LoadingSkeleton />;
   return <>
@@ -721,6 +739,7 @@ function SocialContentModule({ context, notify }: { context: AdminContext; notif
         <PermissionGuard permission="content.manage" context={context}>
           {row.status !== "published" && row.status !== "deleted" && <button className="table-action positive" onClick={() => setConfirmation({ row, action: "approve" })}>Approuver</button>}
           {row.status === "published" && <><button className="table-action" onClick={() => setConfirmation({ row, action: "feature" })}>Mettre en avant</button><button className="table-action danger" onClick={() => setConfirmation({ row, action: "hide" })}>Masquer</button></>}
+          {row.status === "published" && <button className="table-action positive" onClick={() => void toggleLaunchSelection(row)}>{launchSelected.has(row.id)?"✓ Sélection lancement":"Ajouter au lancement"}</button>}
           {row.status !== "deleted" && <button className="table-action danger" onClick={() => setConfirmation({ row, action: "remove" })}>Retirer</button>}
           {row.status === "deleted" && <button className="table-action positive" onClick={() => setConfirmation({ row, action: "restore" })}>Restaurer</button>}
           <button className="table-action" onClick={() => setConfirmation({ row, action: "warn" })}>Avertir</button>

@@ -2,6 +2,7 @@
 
 import { SuperAdminApp } from "../super-admin";
 import "./admin.css";
+import "./launch.css";
 
 export default function AdminPage() {
   return (
