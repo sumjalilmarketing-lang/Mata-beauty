@@ -77,6 +77,9 @@ test("Inspiration swipes vertically with one active player, filters and an eight
     HTMLMediaElement.prototype.pause = function () { this.dataset.playing = "false"; };
   });
   let requestedBatch = "";
+  await page.route("https://audit.supabase.co/rest/v1/rpc/get_available_slots", (route) => route.fulfill({
+    status: 200, contentType: "application/json", body: JSON.stringify([{ slot_start: "2026-08-17T10:00:00+00:00" }]),
+  }));
   await page.route("https://audit.supabase.co/rest/v1/social_feed**", (route) => {
     requestedBatch = new URL(route.request().url()).searchParams.get("limit") ?? "";
     const base = {
@@ -97,18 +100,31 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await expect(page.locator(".social-video-card")).toHaveCount(2);
   expect(requestedBatch).toBe("8");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
+  await expect(page.getByText(/Prochain créneau/).first()).toBeVisible();
+  await page.getByRole("button", { name: "Réserver", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: "Réserver", exact: true })).toBeVisible();
+  await expect(page.getByText("Tresses collées", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Fermer" }).click();
+  await page.getByRole("button", { name: "Mettre la vidéo en pause" }).first().click();
+  await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(0);
+  await page.getByRole("button", { name: "Lire la vidéo" }).first().click();
+  await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await page.getByRole("button", { name: "Activer le son" }).first().click();
   await expect(page.getByRole("button", { name: "Couper le son" }).first()).toBeVisible();
   await feed.evaluate((node) => node.scrollTo({ top: node.clientHeight, behavior: "auto" }));
   await page.locator(".social-video-card video").nth(1).dispatchEvent("canplay");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
+  await expect(page.locator(".social-video-card video").first()).not.toHaveAttribute("src", /.+/);
+  await page.getByRole("button", { name: "Tendances", exact: true }).click();
+  await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
+  expect(await feed.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
   await feed.evaluate((node) => node.scrollTo({ top: 0, behavior: "auto" }));
   await page.locator(".social-video-card video").first().dispatchEvent("canplay");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await page.getByRole("button", { name: "Tresses", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(2);
   await page.getByRole("button", { name: "Make-up", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Aucune inspiration ici" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Aucune inspiration Make-up" })).toBeVisible();
 });
 
 test("Google login starts a real OAuth request with a fixed callback", async ({ page }) => {

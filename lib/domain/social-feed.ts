@@ -15,14 +15,14 @@ export type FeedSignals = Readonly<{
   followed?: boolean;
 }>;
 
-export const socialFeedFilters = ["Pour toi", "Abonnements", "Près de moi", "Tresses", "Make-up", "Barbier", "Ongles", "Perruques", "Coiffure", "Soins"] as const;
+export const socialFeedFilters = ["Pour toi", "Près de moi", "Tendances", "Make-up", "Barbier", "Tresses", "Perruques", "Ongles", "Coiffure", "Soins"] as const;
 export type SocialFeedFilter = (typeof socialFeedFilters)[number];
 
 export function matchesSocialFeedFilter(filter: SocialFeedFilter, post: { city: string; serviceTitle: string | null; hashtags: string[] }, nearbyCity = "Dakar") {
-  if (filter === "Pour toi" || filter === "Abonnements") return true;
+  if (filter === "Pour toi" || filter === "Tendances") return true;
   if (filter === "Près de moi") return post.city.toLocaleLowerCase("fr").includes(nearbyCity.toLocaleLowerCase("fr"));
   const haystack = `${post.serviceTitle ?? ""} ${post.hashtags.join(" ")}`.toLocaleLowerCase("fr");
-  const aliases: Record<Exclude<SocialFeedFilter, "Pour toi" | "Abonnements" | "Près de moi">, string[]> = {
+  const aliases: Record<Exclude<SocialFeedFilter, "Pour toi" | "Tendances" | "Près de moi">, string[]> = {
     Tresses: ["tresse", "braid", "knotless"], "Make-up": ["make-up", "makeup", "maquillage"], Barbier: ["barbier", "barber"],
     Ongles: ["ongle", "nail", "manucure"], Perruques: ["perruque", "wig", "lace"], Coiffure: ["coiffure", "cheveu", "hair"], Soins: ["soin", "spa", "visage", "massage"],
   };

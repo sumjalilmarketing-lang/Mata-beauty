@@ -116,6 +116,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [upcomingBookings, setUpcomingBookings] = useState<Array<{ id: string; starts_at: string; status: string }>>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [booking, setBooking] = useState<BookingSelection | null>(null);
+  const [pendingSocialBooking, setPendingSocialBooking] = useState<{ authorId: string; service: ProviderService; sourcePostId: string } | null>(null);
   const [restoredBookingRequest, setRestoredBookingRequest] = useState<BookingRequest | null>(null);
   const [profile, setProfile] = useState<Provider | null>(null);
   const [view, setView] = useState<"home" | "client" | "provider" | "admin">("home");
@@ -302,6 +303,24 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     return () => { active = false; };
   }, [catalog]);
 
+  useEffect(() => {
+    if (!pendingSocialBooking) return;
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      const provider = catalog.find((item) => item.profileId === pendingSocialBooking.authorId);
+      if (provider) {
+        setRestoredBookingRequest(null);
+        setBooking({ provider, service: pendingSocialBooking.service, sourcePostId: pendingSocialBooking.sourcePostId });
+        setPendingSocialBooking(null);
+      } else if (catalogState !== "loading") {
+        setNotice("Cette prestation n’est pas disponible actuellement.");
+        setPendingSocialBooking(null);
+      }
+    });
+    return () => { active = false; };
+  }, [catalog, catalogState, pendingSocialBooking]);
+
   function openAccount(section: "client" | "provider" | "admin" = "client") {
     if (authenticated?.roles.includes(section)) window.location.assign(section === "provider" ? "/pro" : section === "admin" ? "/admin" : "/app");
     else setAuthRequest({ role: section, mode: "login" });
@@ -339,7 +358,10 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   function bookSocialService(authorId: string, service: ProviderService, sourcePostId: string) {
     const provider = catalog.find((item) => item.profileId === authorId);
     if (provider) startBooking({ provider, service, sourcePostId });
-    else setNotice("Cette prestation n’est pas disponible actuellement.");
+    else if (catalogState === "loading") {
+      setPendingSocialBooking({ authorId, service, sourcePostId });
+      setNotice("Ouverture des créneaux…");
+    } else setNotice("Cette prestation n’est pas disponible actuellement.");
   }
 
   async function toggleFavorite(provider: Provider) {
