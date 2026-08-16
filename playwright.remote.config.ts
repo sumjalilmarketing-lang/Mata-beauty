@@ -29,7 +29,7 @@ export default defineConfig({
         NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey,
       },
     }],
-    {
+    ...(process.env.REMOTE_HEALTH_ONLY === "1" ? [] : [{
       command: "node scripts/final-acceptance-server.mjs",
       url: "http://127.0.0.1:4399/health",
       reuseExistingServer: false,
@@ -39,6 +39,6 @@ export default defineConfig({
         NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey,
         MATA_PREVIEW_URL: remoteAppUrl ?? "http://localhost:3100",
       },
-    },
+    }]),
   ],
 });
