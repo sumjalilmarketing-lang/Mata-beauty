@@ -14,6 +14,7 @@ test("le profil personnel gère réellement identité préférences support et c
   await page.goto("/");
   await page.getByRole("navigation",{name:"Navigation de l’application"}).getByRole("button",{name:"Profil"}).click();
   await page.getByLabel("Adresse e-mail").fill(email);await page.getByLabel("Mot de passe").fill(password);await page.getByRole("button",{name:"Se connecter",exact:true}).click();
+  await page.getByRole("navigation",{name:"Navigation Espace client"}).getByRole("link",{name:"Profil",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Identité"})).toBeVisible({timeout:20000});
   const identity=page.locator("#edit-client-profile");
   await identity.getByLabel("Prénom").fill("Aminata");await identity.getByLabel("Nom",{exact:true}).fill("Fall");await identity.getByLabel("Nom d’utilisateur").fill(`aminata_${run.replaceAll('-','_')}`.slice(0,30));await identity.getByLabel("Téléphone").fill("+221770000001");await identity.getByLabel("Ville").fill("Dakar");await identity.getByLabel("Quartier").fill("Mermoz");await identity.getByLabel("Bio").fill("Passionnée de coiffures protectrices.");await identity.getByRole("button",{name:"Enregistrer"}).click();
@@ -25,4 +26,3 @@ test("le profil personnel gère réellement identité préférences support et c
   const [profile,prefs,settings,tickets,deletion]=await Promise.all([admin.from("profiles").select("username,bio").eq("id",userId).single(),admin.from("profile_preferences").select("budget_min,budget_max").eq("profile_id",userId).single(),admin.from("profile_privacy_settings").select("show_collections").eq("profile_id",userId).single(),admin.from("support_tickets").select("id").eq("requester_id",userId),admin.from("account_deletion_requests").select("status").eq("profile_id",userId).single()]);
   expect(profile.data?.bio).toContain("coiffures");expect(prefs.data).toMatchObject({budget_min:10000,budget_max:30000});expect(settings.data?.show_collections).toBe(true);expect(tickets.data).toHaveLength(1);expect(deletion.data?.status).toBe("requested");
 });
-

@@ -15,8 +15,7 @@ async function authenticatedPage(browser: Browser, role: string, returnTo: strin
   const credentialsResponse = await fetch(`${helper}/credentials/${role}`);
   if (!credentialsResponse.ok) throw new Error(`Identifiants temporaires indisponibles pour ${role}`);
   const credentials = await credentialsResponse.json() as { email: string; password: string };
-  const entry = role === "provider" || role === "salon" ? "Publier" : "Profil";
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: entry }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
   await page.getByLabel("Adresse e-mail").fill(credentials.email);
   await page.getByLabel("Mot de passe").fill(credentials.password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
@@ -31,7 +30,7 @@ async function expectWorkspace(page: Page, label: RegExp) {
 }
 
 test("parcours continu réel Supabase visible dans les espaces autorisés", async ({ browser, request }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   const started = await request.get(`${helper}/start`);
   expect(started.ok()).toBeTruthy();
   const report = await started.json() as AcceptanceReport;

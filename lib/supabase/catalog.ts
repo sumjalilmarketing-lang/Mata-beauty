@@ -14,6 +14,7 @@ export type CatalogProvider = {
   verified: boolean;
   homeService: boolean;
   durationMinutes: number;
+  businessId?: string;
   coverUrl?: string;
 };
 
@@ -48,6 +49,7 @@ type ProviderRecord = {
     title: string;
     duration_minutes: number;
     price_amount: number;
+    business_id: string | null;
     services: { name: string; categories: { name: string } | null } | null;
   }>;
 };
@@ -58,7 +60,7 @@ export async function fetchPublishedProviders(client: SupabaseClient): Promise<C
     .select(`
       profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,cover_url,
       provider_services!inner(
-        id,title,duration_minutes,price_amount,
+        id,title,duration_minutes,price_amount,business_id,
         services(name,categories(name))
       )
     `)
@@ -69,11 +71,9 @@ export async function fetchPublishedProviders(client: SupabaseClient): Promise<C
 
   if (error) throw error;
 
-  return ((data ?? []) as unknown as ProviderRecord[]).flatMap((provider) => {
-    const service = provider.provider_services[0];
-    if (!service) return [];
-    return [{
-      id: provider.profile_id,
+  return ((data ?? []) as unknown as ProviderRecord[]).flatMap((provider) =>
+    provider.provider_services.map((service) => ({
+      id: service.id,
       profileId: provider.profile_id,
       serviceId: service.id,
       name: provider.business_name,
@@ -86,9 +86,10 @@ export async function fetchPublishedProviders(client: SupabaseClient): Promise<C
       verified: Boolean(provider.verified_at),
       homeService: provider.service_mode !== "salon",
       durationMinutes: service.duration_minutes,
+      businessId: service.business_id ?? undefined,
       coverUrl: provider.cover_url ?? undefined,
-    }];
-  });
+    })),
+  );
 }
 
 export async function fetchActiveCategories(client: SupabaseClient): Promise<CatalogCategory[]> {

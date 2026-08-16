@@ -65,7 +65,10 @@ export function CreatorStudio({ userId, providerApproved }: { userId: string; pr
     <header className="studio-hero"><div><span>STUDIO MATA BEAUTY</span><h2>Transformez vos réalisations en réservations.</h2><p>Publiez une vidéo liée à une prestation, puis mesurez les rendez-vous qu’elle génère.</p></div><button onClick={() => setActive("create")}>＋ Publier</button></header>
     <nav className="studio-tabs" aria-label="Navigation Studio">{tabs.map((tab) => <button className={active === tab.key ? "active" : ""} key={tab.key} onClick={() => setActive(tab.key)}>{tab.label}</button>)}</nav>
     {feedback && <p className="dashboard-feedback" role="status">{feedback}</p>}
-    {active === "create" && <VideoPublisher userId={userId} providerApproved={providerApproved} onPublished={async () => { await load(); setActive("videos"); }} />}
+    {active === "create" && <VideoPublisher userId={userId} providerApproved={providerApproved} onPublished={async (postType) => {
+      await load();
+      setActive(postType === "video" ? "videos" : postType === "before_after" ? "before_after" : "photos");
+    }} />}
     {active === "statistics" && <SocialDashboard role="provider" userId={userId} />}
     {!(["create", "statistics"] as StudioTab[]).includes(active) && <article className="panel studio-library"><div className="panel-heading"><div><h2>{tabs.find((tab) => tab.key === active)?.label}</h2><p>Vos contenus, leurs statuts et leurs performances réelles.</p></div><button onClick={() => void load()}>Actualiser</button></div>
       {state === "loading" && <div className="compact-empty">Chargement de vos publications…</div>}

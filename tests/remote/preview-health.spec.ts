@@ -13,7 +13,7 @@ test("le Preview ne produit aucune erreur console ni route critique en erreur", 
       || message.text().includes("Provider's accounts list is empty")
       || message.text().includes("Not signed in with the identity provider")
       || message.text().startsWith("Failed to load resource: the server responded with a status of 403");
-    if (message.type() === "error" && !externalPreviewNoise) consoleErrors.push(message.text());
+    if (message.type() === "error" && !externalPreviewNoise) consoleErrors.push(`${message.text()} ${message.location().url}`.trim());
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("response", (response) => {

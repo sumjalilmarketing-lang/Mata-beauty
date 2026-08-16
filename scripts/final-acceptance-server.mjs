@@ -31,6 +31,11 @@ async function ensureStarted() {
 const server = createServer(async (request, response) => {
   try {
     const target = new URL(request.url ?? "/", "http://127.0.0.1:4399");
+    if (target.pathname === "/health") {
+      response.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      response.end(JSON.stringify({ ok: true }));
+      return;
+    }
     if (target.pathname === "/status" || target.pathname === "/start") {
       const result = await ensureStarted();
       response.writeHead(result.ok ? 200 : 500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });

@@ -37,7 +37,7 @@ export function SalonControlCenter({ module, userId }: { module: WorkspaceModule
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    setState("loading"); setFeedback("");
+    setState("loading");
     const { data: businessData, error } = await supabase.from("businesses").select("id,name,slug,description,phone,address,city,area,latitude,longitude,logo_url,cover_url,status,is_active,archived_at").eq("owner_id", userId).is("archived_at", null).order("created_at").limit(1).maybeSingle();
     if (error) { setState("error"); setFeedback(publicErrorMessage(error, "Le salon n’a pas pu être chargé.")); return; }
     const nextBusiness = businessData as Business | null; setBusiness(nextBusiness);

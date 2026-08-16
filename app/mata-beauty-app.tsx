@@ -28,6 +28,7 @@ type Provider = {
   verified: boolean;
   homeService: boolean;
   durationMinutes: number;
+  businessId?: string;
   coverUrl?: string;
 };
 
@@ -37,6 +38,7 @@ type BookingRequest = {
   locationMode: "salon" | "client_address";
   address: string;
   note: string;
+  collaboratorId: string;
   paymentMethod: "on_site" | "wave" | "orange_money" | "card";
 };
 
@@ -48,10 +50,11 @@ type PaymentCapabilities = {
 };
 
 type BookingConfirmation = { id: string; date: string; time: string; location: string };
-type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number };
+type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; business_id?: string | null };
 type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[] };
 type BookingSelection = { provider: Provider; service: ProviderService; sourcePostId?: string };
 type AvailabilitySlot = { slot_start: string };
+type BookableCollaborator = { id: string; display_name: string; title: string | null };
 
 const bookingDraftKey = "mata-booking-draft";
 const bookingDraftSchema = z.object({
@@ -59,13 +62,13 @@ const bookingDraftSchema = z.object({
     provider: z.object({
       id: z.string().min(1), profileId: z.string().min(1), serviceId: z.string().min(1), name: z.string(), specialty: z.string(),
       category: z.string(), area: z.string(), price: z.number().int().nonnegative(), rating: z.number(), reviews: z.number().int().nonnegative(),
-      initials: z.string(), verified: z.boolean(), homeService: z.boolean(), durationMinutes: z.number().int(), coverUrl: z.string().optional(),
+      initials: z.string(), verified: z.boolean(), homeService: z.boolean(), durationMinutes: z.number().int(), businessId: z.string().uuid().optional(), coverUrl: z.string().optional(),
     }),
-    service: z.object({ id: z.string().min(1), title: z.string(), duration_minutes: z.number().int(), price_amount: z.number().int().nonnegative() }),
+    service: z.object({ id: z.string().min(1), title: z.string(), duration_minutes: z.number().int(), price_amount: z.number().int().nonnegative(), business_id: z.string().uuid().nullable().optional() }),
     sourcePostId: z.string().uuid().optional(),
   }),
   request: z.object({
-    date: z.string(), time: z.string(), locationMode: z.enum(["salon", "client_address"]), address: z.string(), note: z.string(),
+    date: z.string(), time: z.string(), locationMode: z.enum(["salon", "client_address"]), address: z.string(), note: z.string(), collaboratorId: z.string().default(""),
     paymentMethod: z.enum(["on_site", "wave", "orange_money", "card"]),
   }),
 });
@@ -371,7 +374,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const exists = favorites.includes(provider.id);
+    const exists = favorites.includes(provider.profileId);
     const request = exists
       ? supabase.from("favorites").delete().eq("client_id", authenticated.userId).eq("provider_id", provider.profileId)
       : supabase.from("favorites").insert({ client_id: authenticated.userId, provider_id: provider.profileId });
@@ -380,7 +383,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       setNotice("Le favori n’a pas pu être enregistré.");
       return;
     }
-    setFavorites((current) => exists ? current.filter((id) => id !== provider.id) : [...current, provider.id]);
+    setFavorites((current) => exists ? current.filter((id) => id !== provider.profileId) : [...current, provider.profileId]);
   }
 
   async function confirmBooking(request: BookingRequest): Promise<BookingConfirmation | null> {
@@ -404,6 +407,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       status: "pending",
       location_mode: request.locationMode,
       appointment_address: request.locationMode === "client_address" ? request.address.trim() : null,
+      collaborator_id: request.collaboratorId || null,
       total_amount: quote.totalAmount,
       currency: quote.currency,
       client_note: request.note.trim() || null,
@@ -464,7 +468,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }
 
   if (profile) {
-    return <><ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.id)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service) => startBooking({ provider: profile, service })} />{booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}{authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} returnTo={authRequest.returnTo} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}</>;
+    return <><ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.profileId)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service) => startBooking({ provider: profile, service })} />{booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}{authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} returnTo={authRequest.returnTo} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}</>;
   }
 
   return (
@@ -610,7 +614,7 @@ function CatalogBlock({ providers, fallbackProviders = [], catalogState, favorit
   if (catalogState === "empty" || catalogState === "error") return <div className="premium-empty"><span>✦</span><h3>{catalogState === "error" ? "Catalogue indisponible" : "Les premiers talents arrivent"}</h3><p>{catalogState === "error" ? "Vérifiez votre connexion puis réessayez." : "Aucun professionnel approuvé n’est encore publié dans cette zone."}</p><button onClick={onProviderRegister}>Devenir prestataire</button></div>;
   const displayedProviders = providers.length ? providers : fallbackProviders;
   if (!displayedProviders.length) return <div className="premium-empty compact"><span>⌕</span><h3>Aucun résultat</h3><p>Essayez une autre catégorie ou élargissez vos filtres.</p></div>;
-  return <div className="premium-provider-list">{displayedProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} nextSlot={nextAvailability[provider.id]} favorite={favorites.includes(provider.id)} onFavorite={() => onFavorite(provider)} onView={() => onView(provider)} onBook={() => onBook(provider)} />)}</div>;
+  return <div className="premium-provider-list">{displayedProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} nextSlot={nextAvailability[provider.id]} favorite={favorites.includes(provider.profileId)} onFavorite={() => onFavorite(provider)} onView={() => onView(provider)} onBook={() => onBook(provider)} />)}</div>;
 }
 
 function ProviderCard({ provider, nextSlot, favorite, onFavorite, onView, onBook }: { provider: Provider; nextSlot?: string; favorite: boolean; onFavorite: () => void; onView: () => void; onBook: () => void }) {
@@ -629,7 +633,7 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
     let active = true;
     void Promise.all([
       supabase.from("provider_profiles").select("bio").eq("profile_id", provider.profileId).maybeSingle(),
-      supabase.from("provider_services").select("id,title,duration_minutes,price_amount").eq("provider_id", provider.profileId).eq("is_active", true).order("price_amount"),
+      supabase.from("provider_services").select("id,title,duration_minutes,price_amount,business_id").eq("provider_id", provider.profileId).eq("is_active", true).order("price_amount"),
       supabase.from("portfolio_items").select("media_url").eq("provider_id", provider.profileId).order("position").limit(12),
     ]).then(([profileResult, servicesResult, portfolioResult]) => {
       if (!active) return;
@@ -667,11 +671,26 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const [waitingForAuthentication, setWaitingForAuthentication] = useState(false);
   const [paymentCapabilities, setPaymentCapabilities] = useState<PaymentCapabilities>({ onlineCheckoutEnabled: false, environment: "disabled", provider: "none", methods: [] });
   const [paymentCapabilitiesLoading, setPaymentCapabilitiesLoading] = useState(true);
-  const [form, setForm] = useState<BookingRequest>(initialRequest ?? { date: initialDate || defaultBookingDate, time: "", locationMode: "salon", address: "", note: "", paymentMethod: "on_site" });
+  const [collaborators, setCollaborators] = useState<BookableCollaborator[]>([]);
+  const [form, setForm] = useState<BookingRequest>(initialRequest ?? { date: initialDate || defaultBookingDate, time: "", locationMode: "salon", address: "", note: "", collaboratorId: "", paymentMethod: "on_site" });
 
   useEffect(() => {
     window.sessionStorage.setItem(bookingDraftKey, JSON.stringify({ selection, request: form }));
   }, [form, selection]);
+
+  useEffect(() => {
+    const businessId = service.business_id ?? provider.businessId;
+    const supabase = getSupabaseBrowserClient();
+    if (!businessId || !supabase) {
+      void Promise.resolve().then(() => setCollaborators([]));
+      return;
+    }
+    let active = true;
+    void supabase.from("collaborators").select("id,display_name,title").eq("business_id", businessId).eq("is_active", true).eq("is_bookable", true).is("archived_at", null).order("display_name").then(({ data }) => {
+      if (active) setCollaborators((data ?? []) as BookableCollaborator[]);
+    });
+    return () => { active = false; };
+  }, [provider.businessId, service.business_id]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -738,6 +757,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
           {step === 2 && <>
             <h3>Vérifiez et confirmez</h3>
             <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date)} à {form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name}</small></div><b>{formatPrice(service.price_amount)}</b></div>
+            {collaborators.length > 0 && <label>Collaboratrice<select aria-label="Choisir une collaboratrice" value={form.collaboratorId} onChange={(event) => setForm({ ...form, collaboratorId: event.target.value })}><option value="">Sans préférence</option>{collaborators.map((person) => <option key={person.id} value={person.id}>{person.display_name}{person.title ? ` · ${person.title}` : ""}</option>)}</select></label>}
             <fieldset className="location-choice"><legend>Où ?</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>Chez le professionnel</strong><small>{provider.area}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>À mon domicile</strong><small>Le professionnel se déplace</small></span></label>}</fieldset>
             {form.locationMode === "client_address" && <label>Adresse<textarea autoFocus value={form.address} placeholder="Votre adresse complète" onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}
             <fieldset className="location-choice"><legend>Paiement</legend>
@@ -775,7 +795,7 @@ function formatDuration(minutes: number) {
 }
 
 function defaultService(provider: Provider): ProviderService {
-  return { id: provider.serviceId, title: provider.specialty, duration_minutes: provider.durationMinutes, price_amount: provider.price };
+  return { id: provider.serviceId, title: provider.specialty, duration_minutes: provider.durationMinutes, price_amount: provider.price, business_id: provider.businessId ?? null };
 }
 
 function buildQuickDates() {

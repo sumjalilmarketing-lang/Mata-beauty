@@ -8,7 +8,8 @@ describe("workspace access matrix", () => {
   it("separates client, professional, salon owner and staff capabilities", () => {
     expect(canAccessWorkspace("client", { ...base, applicationRoles: ["client"] })).toBe(true);
     expect(canAccessWorkspace("pro", { ...base, applicationRoles: ["provider"] })).toBe(true);
-    expect(canAccessWorkspace("salon", { ...base, applicationRoles: ["provider"] })).toBe(false);
+    expect(canAccessWorkspace("salon", { ...base, applicationRoles: ["client"] })).toBe(false);
+    expect(canAccessWorkspace("salon", { ...base, applicationRoles: ["provider"] })).toBe(true);
     expect(canAccessWorkspace("salon", { ...base, applicationRoles: ["provider"], ownsBusiness: true })).toBe(true);
     expect(canAccessWorkspace("staff", { ...base, isCollaborator: true })).toBe(true);
   });

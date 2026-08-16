@@ -5,7 +5,7 @@ import Image from "next/image";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 
-type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number };
+type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; services: { categories: { name: string } | null } | null };
 type PublishStatus = "draft" | "scheduled" | "published";
 type ContentType = "video" | "photo" | "before_after" | "promotion" | "availability";
 
@@ -13,6 +13,36 @@ const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+
+async function resolveVideoDuration(video: HTMLVideoElement) {
+  if (Number.isFinite(video.duration) && video.duration > 0) return video.duration;
+
+  // MediaRecorder WebM files can omit the duration from their initial metadata.
+  // Chromium computes the real duration after a seek to the end of the blob.
+  return new Promise<number>((resolve, reject) => {
+    const events = ["durationchange", "timeupdate", "seeked", "progress"] as const;
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("La durée de la vidéo ne peut pas être déterminée."));
+    }, 10_000);
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      events.forEach((eventName) => video.removeEventListener(eventName, finish));
+    };
+    const finish = () => {
+      const duration = Number.isFinite(video.duration) && video.duration > 0
+        ? video.duration
+        : Number.isFinite(video.currentTime) && video.currentTime > 0 && video.currentTime < 1e100
+          ? video.currentTime
+          : null;
+      if (!duration) return;
+      cleanup();
+      resolve(duration);
+    };
+    events.forEach((eventName) => video.addEventListener(eventName, finish));
+    video.currentTime = 1e101;
+  });
+}
 
 async function inspectAndCreateThumbnail(file: File) {
   const url = URL.createObjectURL(file);
@@ -26,9 +56,10 @@ async function inspectAndCreateThumbnail(file: File) {
       video.onloadeddata = () => resolve();
       video.onerror = () => reject(new Error("La vidéo ne peut pas être analysée."));
     });
-    if (!Number.isFinite(video.duration) || video.duration < 1 || video.duration > 90) throw new Error("La vidéo doit durer entre 1 et 90 secondes.");
+    const duration = await resolveVideoDuration(video);
+    if (duration < 1 || duration > 90) throw new Error("La vidéo doit durer entre 1 et 90 secondes.");
     if (!video.videoWidth || !video.videoHeight) throw new Error("Dimensions vidéo invalides.");
-    const targetTime = Math.min(0.25, Math.max(0, video.duration / 4));
+    const targetTime = Math.min(0.25, Math.max(0, duration / 4));
     if (targetTime > 0) {
       video.currentTime = targetTime;
       await new Promise<void>((resolve) => { video.onseeked = () => resolve(); });
@@ -38,13 +69,13 @@ async function inspectAndCreateThumbnail(file: File) {
     canvas.height = Math.round(canvas.width * video.videoHeight / video.videoWidth);
     canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
     const thumbnail = await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Miniature impossible à créer.")), "image/jpeg", 0.84));
-    return { duration: video.duration, aspectRatio: video.videoWidth / video.videoHeight, thumbnail };
+    return { duration, aspectRatio: video.videoWidth / video.videoHeight, thumbnail };
   } finally {
     URL.revokeObjectURL(url);
   }
 }
 
-export function VideoPublisher({ userId, providerApproved, onPublished }: { userId: string; providerApproved: boolean; onPublished: () => Promise<void> }) {
+export function VideoPublisher({ userId, providerApproved, onPublished }: { userId: string; providerApproved: boolean; onPublished: (postType: ContentType) => Promise<void> }) {
   const [services, setServices] = useState<ProviderService[]>([]);
   const [phase, setPhase] = useState<"idle" | "analysing" | "uploading" | "publishing">("idle");
   const [feedback, setFeedback] = useState("");
@@ -55,7 +86,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount").eq("provider_id", userId).eq("is_active", true).order("title").then(({ data }) => setServices((data ?? []) as ProviderService[]));
+    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount,services(categories(name))").eq("provider_id", userId).eq("is_active", true).order("title").then(({ data }) => setServices((data ?? []) as unknown as ProviderService[]));
   }, [userId]);
 
   useEffect(() => () => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); }, [previewUrls]);
@@ -149,7 +180,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
       setPreviewUrls([]);
       setContentType("video");
       setFeedback(status === "published" ? "Publication visible dans Inspiration." : status === "scheduled" ? "Publication programmée." : "Brouillon enregistré.");
-      await onPublished();
+      await onPublished(selectedType);
     } catch (caught) {
       if (videoPath) await supabase.storage.from("provider-social-media").remove([videoPath]);
       if (thumbnailPath) await supabase.storage.from("provider-social-media").remove([thumbnailPath]);
@@ -158,7 +189,8 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
     } finally { setPhase("idle"); }
   }
 
-  const busyLabel = phase === "analysing" ? "Analyse de la vidéo…" : phase === "uploading" ? "Envoi sécurisé…" : phase === "publishing" ? "Publication…" : "Publier la vidéo";
+  const idleLabel = contentType === "video" ? "Publier la vidéo" : "Publier le contenu";
+  const busyLabel = phase === "analysing" ? "Analyse de la vidéo…" : phase === "uploading" ? "Envoi sécurisé…" : phase === "publishing" ? "Publication…" : idleLabel;
   const progressValue = phase === "analysing" ? 20 : phase === "uploading" ? 60 : phase === "publishing" ? 90 : 0;
   return <article className="panel video-publisher-panel" id="video-publisher">
     <div className="panel-heading"><div><h2>Studio de contenu</h2><p>Créez une inspiration réservable en quelques secondes.</p></div><span className="role-pill">Créateur</span></div>
@@ -172,7 +204,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
       <label>Localisation<input name="location" maxLength={160} placeholder="Dakar, Sénégal" /></label>
       {contentType === "availability" && <label>Créneau disponible<input name="availableAt" type="datetime-local" required /></label>}
       {contentType === "promotion" && <><label>Remise (%)<input name="discount" type="number" min="1" max="90" required /></label><label>Fin de l’offre<input name="promotionEndsAt" type="datetime-local" required /></label><label>Places disponibles<input name="promotionSlots" type="number" min="1" max="10000" required /></label></>}
-      <label>Prestation liée<select name="serviceId" defaultValue=""><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.title} · {service.duration_minutes} min · {service.price_amount.toLocaleString("fr-FR")} F</option>)}</select></label>
+      <label>Catégorie et prestation<select name="serviceId" defaultValue=""><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title} · {service.duration_minutes} min · {service.price_amount.toLocaleString("fr-FR")} F</option>)}</select></label>
       <label>Visibilité<select name="visibility" defaultValue="public"><option value="public">Tout le monde</option><option value="followers">Abonnés</option></select></label>
       <label>Publication<select name="status" defaultValue={providerApproved ? "published" : "draft"}><option value="draft">Brouillon</option><option value="scheduled" disabled={!providerApproved}>Programmer</option><option value="published" disabled={!providerApproved}>Publier maintenant</option></select></label>
       <label>Date programmée<input name="scheduledFor" type="datetime-local" /></label>

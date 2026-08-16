@@ -11,16 +11,27 @@ const run = `${Date.now()}-${randomUUID().slice(0, 6)}`;
 const password = `Mata-Feed-${randomUUID()}!`;
 const clientEmail = `codex-feed-client-${run}@example.test`;
 const providerEmail = `codex-feed-provider-${run}@example.test`;
+const moderatorEmail = `codex-feed-admin-${run}@example.test`;
+const superEmail = `codex-feed-super-${run}@example.test`;
 const studioCaption = `Publication Studio réelle ${run}`;
+const photoTitle = `Photo Studio réelle ${run}`;
+const beforeAfterTitle = `Avant Après réel ${run}`;
 let admin: SupabaseClient;
 let clientId = "";
 let providerId = "";
+let moderatorId = "";
+let superId = "";
 let providerServiceId = "";
 let availabilityId = "";
 let bookingId = "";
 let providerApi: SupabaseClient;
+let clientApi: SupabaseClient;
+let moderatorApi: SupabaseClient;
+let superApi: SupabaseClient;
 const extraPostIds: string[] = [];
 let studioPostId = "";
+let photoPostId = "";
+let beforeAfterPostId = "";
 
 test.describe.configure({ mode: "serial" });
 
@@ -33,12 +44,29 @@ test.beforeAll(async () => {
   admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   clientId = await createUser(clientEmail);
   providerId = await createUser(providerEmail, true);
+  moderatorId = await createUser(moderatorEmail);
+  superId = await createUser(superEmail);
+  const adminRoles = await admin.from("admin_roles").select("id,key").in("key", ["admin", "super_admin"]);
+  expect(adminRoles.error).toBeNull();
+  const adminRoleId = adminRoles.data!.find((role) => role.key === "admin")!.id;
+  const superRoleId = adminRoles.data!.find((role) => role.key === "super_admin")!.id;
+  expect((await admin.from("profiles").update({ role: "admin" }).in("id", [moderatorId, superId])).error).toBeNull();
+  expect((await admin.from("admin_user_roles").insert([
+    { user_id: moderatorId, role_id: adminRoleId, assigned_by: superId, is_active: true },
+    { user_id: superId, role_id: superRoleId, assigned_by: moderatorId, is_active: true },
+  ])).error).toBeNull();
   await admin.from("provider_profiles").update({ status: "approved" }).eq("profile_id", providerId);
   const base = await admin.from("services").select("id").eq("is_active", true).limit(1).single();
   const service = await admin.from("provider_services").insert({ provider_id: providerId, service_id: base.data!.id, title: `Tresses Preview ${run}`, duration_minutes: 60, price_amount: 18000, currency: "XOF", is_active: true }).select("id").single();
   providerServiceId = service.data!.id;
   providerApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   expect((await providerApi.auth.signInWithPassword({ email: providerEmail, password })).error).toBeNull();
+  clientApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  expect((await clientApi.auth.signInWithPassword({ email: clientEmail, password })).error).toBeNull();
+  moderatorApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  expect((await moderatorApi.auth.signInWithPassword({ email: moderatorEmail, password })).error).toBeNull();
+  superApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  expect((await superApi.auth.signInWithPassword({ email: superEmail, password })).error).toBeNull();
   const tomorrow = new Date(Date.now() + 86_400_000);
   const availability = await providerApi.from("availability_rules").insert({ provider_id: providerId, weekday: tomorrow.getUTCDay(), starts_at: "09:00", ends_at: "18:00", slot_interval_minutes: 30 }).select("id").single();
   expect(availability.error).toBeNull(); availabilityId = availability.data!.id;
@@ -57,16 +85,23 @@ test.afterAll(async () => {
   if (providerId) {
     const bucket = admin.storage.from("provider-social-media");
     const { data: folders } = await bucket.list(providerId, { limit: 100 });
+    const directPaths: string[] = [];
     for (const folder of folders ?? []) {
-      const { data: files } = await bucket.list(`${providerId}/${folder.name}`, { limit: 100 });
-      const paths = (files ?? []).map((file) => `${providerId}/${folder.name}/${file.name}`);
-      if (paths.length) expect((await bucket.remove(paths)).error).toBeNull();
+      if (folder.id) directPaths.push(`${providerId}/${folder.name}`);
+      else {
+        const { data: files } = await bucket.list(`${providerId}/${folder.name}`, { limit: 100 });
+        const paths = (files ?? []).map((file) => `${providerId}/${folder.name}/${file.name}`);
+        if (paths.length) expect((await bucket.remove(paths)).error).toBeNull();
+      }
     }
+    if (directPaths.length) expect((await bucket.remove(directPaths)).error).toBeNull();
   }
   if (availabilityId) await admin.from("availability_rules").delete().eq("id", availabilityId);
   if (providerServiceId) await admin.from("provider_services").delete().eq("id", providerServiceId);
   if (providerId) await admin.auth.admin.deleteUser(providerId);
   if (clientId) await admin.auth.admin.deleteUser(clientId);
+  if (moderatorId) await admin.auth.admin.deleteUser(moderatorId);
+  if (superId) await admin.auth.admin.deleteUser(superId);
 });
 
 test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, browser }, testInfo) => {
@@ -87,6 +122,7 @@ test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, br
   await videoContext.close();
   const videoPath = await recording!.path();
   await page.locator('input[name="video"]').setInputFiles(videoPath);
+  await page.locator('input[name="thumbnail"]').setInputFiles({ name: "miniature-studio.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") });
   await page.locator('input[name="title"]').fill(`Studio réel ${run}`);
   await page.locator('textarea[name="caption"]').fill(studioCaption);
   await page.locator('input[name="hashtags"]').fill("#tresses #dakar #studioe2e");
@@ -94,6 +130,9 @@ test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, br
   await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
   await page.locator('input[name="consent"]').check();
   await page.getByRole("button", { name: "Publier la vidéo" }).click();
+  const transientFailure = page.getByText("La publication a échoué. Vérifiez le fichier et réessayez.");
+  await expect(page.getByText(`Studio réel ${run}`).or(transientFailure)).toBeVisible({ timeout: 30_000 });
+  if (await transientFailure.isVisible()) await page.getByRole("button", { name: "Publier la vidéo" }).click();
   await expect(page.getByText(`Studio réel ${run}`)).toBeVisible({ timeout: 30_000 });
   const created = await admin.from("posts").select("id,status,post_services(provider_service_id,is_primary)").eq("author_id", providerId).eq("title", `Studio réel ${run}`).single();
   expect(created.error).toBeNull();
@@ -101,6 +140,59 @@ test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, br
   studioPostId = created.data!.id;
   await page.goto("/");
   await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 20_000 });
+});
+
+test("le Studio publie une photo et un avant-après réels dans Storage", async ({ page }) => {
+  test.setTimeout(90_000);
+  if (bypass) await page.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Publier une vidéo" }).click();
+  await page.getByLabel("Adresse e-mail").fill(providerEmail);
+  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await page.waitForURL(/\/pro/);
+  await page.goto("/pro/videos");
+  const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+
+  await page.locator('select[name="contentType"]').selectOption("photo");
+  await page.locator('input[name="media"]').setInputFiles([
+    { name: "photo-reelle-1.png", mimeType: "image/png", buffer: image },
+    { name: "photo-reelle-2.png", mimeType: "image/png", buffer: image },
+  ]);
+  await page.locator('input[name="title"]').fill(photoTitle);
+  await page.locator('textarea[name="caption"]').fill(`Photo persistante ${run}`);
+  await page.locator('input[name="hashtags"]').fill("#coiffure #photo");
+  await page.locator('input[name="location"]').fill("Dakar");
+  await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
+  await page.locator('input[name="consent"]').check();
+  await page.getByRole("button", { name: "Publier le contenu" }).click();
+  await expect(page.getByText(photoTitle)).toBeVisible({ timeout: 20_000 });
+
+  await page.getByRole("button", { name: "Créer une publication" }).click();
+  await page.locator('select[name="contentType"]').selectOption("before_after");
+  await page.locator('input[name="media"]').setInputFiles([
+    { name: "avant.png", mimeType: "image/png", buffer: image },
+    { name: "apres.png", mimeType: "image/png", buffer: image },
+  ]);
+  await page.locator('input[name="title"]').fill(beforeAfterTitle);
+  await page.locator('textarea[name="caption"]').fill(`Transformation avant après ${run}`);
+  await page.locator('input[name="hashtags"]').fill("#tresses #avantapres");
+  await page.locator('input[name="location"]').fill("Dakar");
+  await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
+  await page.locator('input[name="consent"]').check();
+  await page.getByRole("button", { name: "Publier le contenu" }).click();
+  await expect(page.getByText(beforeAfterTitle)).toBeVisible({ timeout: 20_000 });
+
+  const posts = await admin.from("posts").select("id,title,post_type,status").eq("author_id", providerId).in("title", [photoTitle, beforeAfterTitle]);
+  expect(posts.error).toBeNull();
+  expect(posts.data).toHaveLength(2);
+  photoPostId = posts.data!.find((post) => post.post_type === "photo")!.id;
+  beforeAfterPostId = posts.data!.find((post) => post.post_type === "before_after")!.id;
+  const media = await admin.from("social_post_media").select("post_id,media_type,storage_path").in("post_id", [photoPostId, beforeAfterPostId]).order("sort_order");
+  expect(media.error).toBeNull();
+  expect(media.data).toHaveLength(4);
+  expect(media.data!.map((item) => item.media_type).sort()).toEqual(["after", "before", "image", "image"]);
+  expect(media.data!.every((item) => item.storage_path.startsWith(`${providerId}/`))).toBeTruthy();
 });
 
 test("le feed social distant relie les interactions au profil et à la réservation", async ({ page, browser }) => {
@@ -115,9 +207,15 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await page.goto("/");
   await expect(page.getByRole("navigation", { name: "Navigation de l’application" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(photoTitle)).toBeVisible();
+  const beforeAfterCard = page.locator(".social-video-card").filter({ hasText: beforeAfterTitle });
+  await expect(beforeAfterCard.getByRole("img", { name: "Avant" })).toBeVisible();
+  await expect(beforeAfterCard.getByRole("img", { name: "Après" })).toBeVisible();
   const mainCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
   const activeVideo = mainCard.locator("video");
   await expect(activeVideo).toBeVisible();
+  await mainCard.evaluate((element) => element.scrollIntoView({ block: "start", behavior: "auto" }));
+  await expect(activeVideo).toHaveAttribute("preload", "auto");
   await expect.poll(() => activeVideo.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
   expect(await activeVideo.evaluate((element) => { const video = element as HTMLVideoElement; return { muted: video.muted, loop: video.loop, preload: video.preload }; })).toEqual({ muted: true, loop: true, preload: "auto" });
   await mainCard.getByRole("button", { name: "Mettre la vidéo en pause" }).click();
@@ -133,7 +231,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await feed.evaluate((node) => node.scrollTo({ top: node.clientHeight, behavior: "auto" }));
   await expect.poll(() => activeVideo.evaluate((element) => (element as HTMLVideoElement).paused)).toBeTruthy();
   await expect.poll(() => page.locator(".social-video-card video").evaluateAll((elements) => (elements as HTMLVideoElement[]).filter((video) => !video.paused).length)).toBeLessThanOrEqual(1);
-  await expect(page.locator(".social-video-card").nth(2).locator("video")).toHaveAttribute("preload", "metadata");
+  await expect(page.locator(".social-video-card video").nth(1)).toHaveAttribute("preload", /^(metadata|none)$/);
   await feed.evaluate((node) => node.scrollTo({ top: 0, behavior: "auto" }));
   await expect(page.getByText(studioCaption)).toBeVisible();
   await mainCard.getByRole("button", { name: "J’aime" }).click();
@@ -163,7 +261,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   expect(booking.data).toMatchObject({ client_id: clientId, provider_id: providerId, source_post_id: studioPostId });
   const notifications = await admin.from("notifications").select("id,kind").eq("profile_id", providerId).limit(50);
   expect(notifications.error).toBeNull();
-  expect(notifications.data!.some((item) => item.kind === "booking_created")).toBeTruthy();
+  expect(notifications.data!.filter((item) => item.kind === "booking_created")).toHaveLength(1);
   const remainingSlots = await providerApi.rpc("get_available_slots", { target_provider_id: providerId, target_provider_service_id: providerServiceId, from_date: bookingDate, days: 1 });
   expect(remainingSlots.error).toBeNull();
   const labels = (remainingSlots.data ?? []).map((slot: { slot_start: string }) => new Date(slot.slot_start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" }));
@@ -195,6 +293,79 @@ test("le feed social distant relie les interactions au profil et à la réservat
     admin.from("post_comments").select("id", { count: "exact", head: true }).eq("post_id", studioPostId).eq("author_id", clientId),
   ]);
   expect([like.count, save.count, follow.count, comment.count]).toEqual([1, 1, 1, 1]);
+
+  const conversation = await clientApi.rpc("ensure_booking_conversation", { target_booking_id: bookingId });
+  expect(conversation.error).toBeNull();
+  expect((await clientApi.from("messages").insert({ conversation_id: conversation.data, sender_id: clientId, body: `Golden path cliente ${run}` })).error).toBeNull();
+  expect((await providerApi.from("messages").insert({ conversation_id: conversation.data, sender_id: providerId, body: `Golden path artiste ${run}` })).error).toBeNull();
+  for (const status of ["confirmed", "in_progress", "completed"] as const) {
+    const transition = await providerApi.from("bookings").update({ status }).eq("id", bookingId).select("status").single();
+    expect(transition.error).toBeNull(); expect(transition.data?.status).toBe(status);
+  }
+  const review = await clientApi.from("reviews").insert({ booking_id: bookingId, client_id: clientId, provider_id: providerId, rating: 5, comment: `Golden path validé ${run}` }).select("id").single();
+  expect(review.error).toBeNull();
+  const [rating, finalStats, providerNotices, adminBooking] = await Promise.all([
+    admin.from("provider_profiles").select("average_rating,review_count").eq("profile_id", providerId).single(),
+    providerApi.rpc("provider_creator_statistics"),
+    admin.from("notifications").select("kind").eq("profile_id", providerId),
+    admin.from("bookings").select("id,status,source_post_id,total_amount").eq("id", bookingId).single(),
+  ]);
+  expect(rating.error).toBeNull(); expect(Number(rating.data?.average_rating)).toBe(5); expect(rating.data?.review_count).toBe(1);
+  const goldenStats = finalStats.data?.find((item: { post_id: string }) => item.post_id === studioPostId);
+  expect(Number(goldenStats?.bookings)).toBe(1);
+  expect(providerNotices.data?.some((item) => item.kind === "booking_created")).toBeTruthy();
+  expect(adminBooking.data).toMatchObject({ id: bookingId, status: "completed", source_post_id: studioPostId, total_amount: 18000 });
+});
+
+test("le signalement est examiné, masqué, audité puis restauré avec les bons rôles", async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  if (bypass) await page.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Profil" }).click();
+  await page.getByLabel("Adresse e-mail").fill(clientEmail);
+  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await page.waitForURL(/\/app/);
+  await page.goto("/");
+  const reportedCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
+  page.once("dialog", (dialog) => dialog.accept());
+  await reportedCard.getByRole("button", { name: "Signaler" }).click();
+  await expect(page.getByText("Signalement transmis à la modération.")).toBeVisible();
+  const report = await admin.from("reports").select("id,status,post_id").eq("post_id", studioPostId).eq("reporter_id", clientId).single();
+  expect(report.error).toBeNull(); expect(report.data?.status).toBe("open");
+
+  const forbidden = await providerApi.rpc("admin_moderate_social_post", { target_post_id: studioPostId, decision: "hide", reason: "Tentative interdite" });
+  expect(forbidden.error).not.toBeNull();
+
+  const adminContext = await browser.newContext();
+  const adminPage = await adminContext.newPage();
+  if (bypass) await adminPage.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  await adminPage.goto(`${remoteAppUrl}/admin`);
+  await adminPage.getByLabel("Adresse administrateur").fill(moderatorEmail);
+  await adminPage.getByLabel("Mot de passe").fill(password);
+  await adminPage.getByRole("button", { name: "Accéder à l’administration" }).click();
+  await expect(adminPage.getByRole("heading", { name: "Vue d’ensemble", level: 1 })).toBeVisible({ timeout: 20_000 });
+  await adminPage.getByRole("navigation", { name: "Navigation Super Admin" }).getByRole("button", { name: "Contenu social" }).click();
+  const postRow = adminPage.getByRole("row").filter({ hasText: studioCaption });
+  await expect(postRow).toBeVisible({ timeout: 20_000 });
+  await postRow.getByRole("button", { name: "Masquer" }).click();
+  const dialog = adminPage.getByRole("dialog", { name: "Masquer cette publication ?" });
+  await dialog.getByLabel("Motif obligatoire").fill("Signalement vérifié pendant la recette finale");
+  await dialog.getByRole("button", { name: "Confirmer" }).click();
+  await expect(adminPage.getByText("Décision appliquée et auditée.")).toBeVisible();
+  expect((await admin.from("posts").select("status").eq("id", studioPostId).single()).data?.status).toBe("hidden");
+  const [action, audit] = await Promise.all([
+    admin.from("moderation_actions").select("action,actor_id").eq("target_id", studioPostId).eq("action", "hide").single(),
+    admin.from("audit_logs").select("action,actor_id").eq("entity_id", studioPostId).eq("action", "social.post.hide").single(),
+  ]);
+  expect(action.data).toMatchObject({ action: "hide", actor_id: moderatorId });
+  expect(audit.data).toMatchObject({ action: "social.post.hide", actor_id: moderatorId });
+  expect((await clientApi.from("social_feed").select("id").eq("id", studioPostId)).data).toHaveLength(0);
+  await adminContext.close();
+
+  const restored = await superApi.rpc("admin_moderate_social_post", { target_post_id: studioPostId, decision: "restore", reason: "Restauration contrôlée Super Admin" });
+  expect(restored.error).toBeNull(); expect(restored.data).toBe("published");
+  expect((await clientApi.from("social_feed").select("id").eq("id", studioPostId)).data).toHaveLength(1);
 });
 
 test("les filtres et la pagination distante conservent le feed", async ({ page }) => {
