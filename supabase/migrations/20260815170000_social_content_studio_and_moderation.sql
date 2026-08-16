@@ -174,7 +174,11 @@ begin
   return result_id;
 end; $$;
 
-create or replace view public.social_feed with(security_invoker=true) as
+-- Recreate the view instead of replacing it because older remote revisions may
+-- contain additional columns. PostgreSQL refuses CREATE OR REPLACE VIEW when
+-- that would implicitly drop or reorder existing columns.
+drop view if exists public.social_feed;
+create view public.social_feed with(security_invoker=true) as
 select p.id,p.author_id,p.caption,p.video_url,p.thumbnail_url,p.duration_seconds,p.aspect_ratio,p.allow_comments,p.is_sponsored,
   p.view_count,p.like_count,p.comment_count,p.save_count,p.share_count,p.published_at,
   pp.business_name,pp.slug,pp.city,pp.average_rating,pp.review_count,pp.verified_at,pp.cover_url,pr.avatar_url,

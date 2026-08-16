@@ -66,6 +66,17 @@ alter table public.business_hours enable row level security;
 alter table public.business_closures enable row level security;
 alter table public.business_invitations enable row level security;
 
+drop policy if exists "business media public or owner read" on public.business_media;
+drop policy if exists "business owners manage media" on public.business_media;
+drop policy if exists "business hours public or owner read" on public.business_hours;
+drop policy if exists "business owners manage hours" on public.business_hours;
+drop policy if exists "business owners read closures" on public.business_closures;
+drop policy if exists "business owners manage closures" on public.business_closures;
+drop policy if exists "business owners read invitations" on public.business_invitations;
+drop policy if exists "business owners manage invitations" on public.business_invitations;
+drop policy if exists "salon owners read business bookings" on public.bookings;
+drop policy if exists "salon owners update business bookings" on public.bookings;
+
 create policy "business media public or owner read" on public.business_media for select using (
   exists(select 1 from public.businesses b where b.id=business_id and ((b.status='approved' and b.is_active and b.archived_at is null) or b.owner_id=auth.uid())) or public.is_admin()
 );
@@ -152,6 +163,11 @@ create trigger businesses_protect_moderation before insert or update on public.b
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values('business-media','business-media',true,12582912,array['image/jpeg','image/png','image/webp'])
 on conflict(id) do update set public=excluded.public,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
+
+drop policy if exists "business media public read" on storage.objects;
+drop policy if exists "owners upload business media" on storage.objects;
+drop policy if exists "owners update business media" on storage.objects;
+drop policy if exists "owners delete business media" on storage.objects;
 
 create policy "business media public read" on storage.objects for select using (bucket_id='business-media');
 create policy "owners upload business media" on storage.objects for insert to authenticated with check (

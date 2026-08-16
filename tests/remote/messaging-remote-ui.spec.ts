@@ -64,7 +64,7 @@ async function signIn(page: Page, email: string, entry: "Profil" | "Publier") {
   await page.getByLabel("Adresse e-mail").fill(email);
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
-  await expect(page.getByText("Données Supabase")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Données limitées par vos droits")).toBeVisible({ timeout: 20_000 });
 }
 
 test.beforeAll(async () => {
@@ -139,6 +139,7 @@ test("la cliente et le professionnel échangent réellement depuis l’interface
   const providerPage = await providerContext.newPage();
 
   await signIn(clientPage, clientEmail, "Profil");
+  await clientPage.getByRole("link", { name: "Messages" }).click();
   const clientBooking = clientPage.locator(".live-appointment").filter({ hasText: `Messagerie UI ${runId}` });
   await expect(clientBooking).toBeVisible();
   await clientBooking.getByRole("button", { name: "Messages" }).click();
@@ -155,8 +156,9 @@ test("la cliente et le professionnel échangent réellement depuis l’interface
   conversationId = conversation!.id;
 
   await signIn(providerPage, providerEmail, "Publier");
-  await providerPage.locator(".sidebar").getByRole("button", { name: /Notifications/ }).click();
-  await expect(providerPage.locator(".notification-row").filter({ hasText: "Nouveau message" })).toBeVisible();
+  await providerPage.getByRole("link", { name: "Notifications" }).click();
+  await expect(providerPage.getByText("Nouveau message")).toBeVisible();
+  await providerPage.getByRole("link", { name: "Messages" }).click();
   const providerBooking = providerPage.locator(".live-appointment").filter({ hasText: `Messagerie UI ${runId}` });
   await providerBooking.getByRole("button", { name: "Messages" }).click();
   await expect(providerPage.getByText(clientMessage)).toBeVisible();
