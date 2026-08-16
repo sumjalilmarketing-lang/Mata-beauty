@@ -1,0 +1,11 @@
+.env*
+.git
+.github
+docs
+tests
+test-results
+playwright-report
+supabase
+work
+outputs
+*.log
