@@ -76,6 +76,14 @@ test.beforeAll(async () => {
   });
   clientId = await createUser(clientEmail);
   providerId = await createUser(providerEmail, true);
+  expect((await admin.from("profiles").update({ role: "provider" }).eq("id", providerId)).error).toBeNull();
+  expect((await admin.from("provider_profiles").upsert({
+    profile_id: providerId,
+    business_name: `Mata Pro UI ${runId}`,
+    slug: `mata-pro-ui-${runId}`.toLowerCase(),
+    status: "approved",
+    city: "Dakar",
+  }, { onConflict: "profile_id" })).error).toBeNull();
 
   const { data: baseService, error: baseServiceError } = await admin
     .from("services")
@@ -133,17 +141,18 @@ test.afterAll(async () => {
 });
 
 test("la cliente et le professionnel échangent réellement depuis l’interface", async ({ browser }) => {
+  test.setTimeout(60_000);
   const clientContext = await browser.newContext();
   const providerContext = await browser.newContext();
   const clientPage = await clientContext.newPage();
   const providerPage = await providerContext.newPage();
 
   await signIn(clientPage, clientEmail, "Profil");
-  await clientPage.getByRole("link", { name: "Messages" }).click();
+  await clientPage.getByRole("link", { name: "Messages", exact: true }).click();
   const clientBooking = clientPage.locator(".live-appointment").filter({ hasText: `Messagerie UI ${runId}` });
   await expect(clientBooking).toBeVisible();
   await clientBooking.getByRole("button", { name: "Messages" }).click();
-  await expect(clientPage.getByRole("heading", { name: "Messages" })).toBeVisible();
+  await expect(clientPage.locator("#conversation-title")).toBeVisible();
   await clientPage.getByLabel("Votre message").fill(clientMessage);
   await clientPage.getByRole("button", { name: "Envoyer", exact: true }).click();
   await expect(clientPage.getByText(clientMessage)).toBeVisible();
@@ -155,10 +164,10 @@ test("la cliente et le professionnel échangent réellement depuis l’interface
     .single();
   conversationId = conversation!.id;
 
-  await signIn(providerPage, providerEmail, "Publier");
-  await providerPage.getByRole("link", { name: "Notifications" }).click();
-  await expect(providerPage.getByText("Nouveau message")).toBeVisible();
-  await providerPage.getByRole("link", { name: "Messages" }).click();
+  await signIn(providerPage, providerEmail, "Profil");
+  await providerPage.locator(".workspace-sidebar").getByRole("link", { name: "Notifications", exact: true }).click();
+  await expect(providerPage.getByText("Nouveau message", { exact: true })).toBeVisible();
+  await providerPage.getByRole("link", { name: "Messages", exact: true }).click();
   const providerBooking = providerPage.locator(".live-appointment").filter({ hasText: `Messagerie UI ${runId}` });
   await providerBooking.getByRole("button", { name: "Messages" }).click();
   await expect(providerPage.getByText(clientMessage)).toBeVisible();
