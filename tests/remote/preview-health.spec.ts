@@ -4,7 +4,7 @@ const appUrl = process.env.REMOTE_APP_URL ?? "";
 const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "";
 
 test("le Preview ne produit aucune erreur console ni route critique en erreur", async ({ page }) => {
-  test.skip(!appUrl || !bypass, "Preview Vercel protégé requis");
+  test.skip(!appUrl, "URL distante requise");
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   const applicationResponseErrors: string[] = [];
@@ -19,7 +19,9 @@ test("le Preview ne produit aucune erreur console ni route critique en erreur", 
   page.on("response", (response) => {
     if (response.status() >= 400 && new URL(response.url()).origin === new URL(appUrl).origin) applicationResponseErrors.push(`${response.status()} ${new URL(response.url()).pathname}`);
   });
-  await page.route(`${new URL(appUrl).origin}/**`, async (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  if (bypass) {
+    await page.route(`${new URL(appUrl).origin}/**`, async (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  }
   for (const path of ["/", "/discover"]) {
     const response = await page.goto(new URL(path, appUrl).toString(), { waitUntil: "networkidle" });
     expect(response?.status(), path).toBe(200);

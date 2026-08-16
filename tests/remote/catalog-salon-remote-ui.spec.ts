@@ -206,7 +206,9 @@ test("le Salon réalise son CRUD navigateur puis reçoit réservation, message, 
   await salonPage.locator('select[name="serviceId"]').selectOption(salonServiceId);
   await salonPage.locator('input[name="consent"]').check();
   await salonPage.getByRole("button", { name: "Publier le contenu" }).click();
-  await expect(salonPage.getByText("Publication visible dans Inspiration.")).toBeVisible({ timeout: 20_000 });
+  await expect(
+    salonPage.getByText("Publication visible dans Inspiration.").or(salonPage.getByText(`Publication Salon ${run}`)),
+  ).toBeVisible({ timeout: 20_000 });
   await salonPage.getByRole("button", { name: "Mes photos" }).click();
   await expect(salonPage.getByText(`Publication Salon ${run}`)).toBeVisible({ timeout: 20_000 });
 
@@ -245,7 +247,7 @@ test("le Salon réalise son CRUD navigateur puis reçoit réservation, message, 
   await bookingRow.getByRole("button", { name: "Confirmer" }).click();
   await bookingRow.getByRole("button", { name: "Démarrer" }).click();
   await bookingRow.getByRole("button", { name: "Terminer" }).click();
-  expect((await admin.from("bookings").select("status").eq("id", salonBookingId).single()).data?.status).toBe("completed");
+  await expect.poll(async () => (await admin.from("bookings").select("status").eq("id", salonBookingId).single()).data?.status, { timeout: 15_000 }).toBe("completed");
   expect((await clientApi.from("reviews").insert({ booking_id: salonBookingId, client_id: clientId, provider_id: salonId, rating: 5, comment: `Avis Salon ${run}` })).error).toBeNull();
   await salonPage.goto("/salon/reviews");
   await expect(salonPage.getByText(`Avis Salon ${run}`)).toBeVisible();

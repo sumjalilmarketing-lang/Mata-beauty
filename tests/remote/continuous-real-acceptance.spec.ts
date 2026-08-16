@@ -10,8 +10,8 @@ async function authenticatedPage(browser: Browser, role: string, returnTo: strin
   const page = await context.newPage();
   if (remoteAppUrl && vercelBypass) {
     await page.route(`${new URL(remoteAppUrl).origin}/**`, async (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": vercelBypass, "x-vercel-set-bypass-cookie": "true" } }));
-    await page.goto(remoteAppUrl, { waitUntil: "domcontentloaded" });
   }
+  await page.goto(remoteAppUrl, { waitUntil: "domcontentloaded" });
   const credentialsResponse = await fetch(`${helper}/credentials/${role}`);
   if (!credentialsResponse.ok) throw new Error(`Identifiants temporaires indisponibles pour ${role}`);
   const credentials = await credentialsResponse.json() as { email: string; password: string };
