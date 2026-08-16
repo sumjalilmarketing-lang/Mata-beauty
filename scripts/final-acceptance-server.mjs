@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createClient } from "@supabase/supabase-js";
 import { browserAccount, browserLoginLink, finishFinalAcceptance, startFinalAcceptance } from "./final-acceptance-harness.mjs";
@@ -9,6 +9,7 @@ const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 assert.ok(serviceKey, "SUPABASE_SERVICE_ROLE_KEY est requis");
 
 function localValue(name) {
+  if (!existsSync(".env.local")) return undefined;
   const source = readFileSync(".env.local", "utf8");
   const match = source.match(new RegExp(`^${name}=(.*)$`, "m"));
   return match?.[1]?.trim().replace(/^['"]|['"]$/g, "");

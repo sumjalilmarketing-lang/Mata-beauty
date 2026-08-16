@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -105,14 +107,14 @@ test.afterAll(async () => {
 });
 
 test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, browser }, testInfo) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   if (bypass) await page.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
   await page.goto("/");
   await page.getByRole("button", { name: "Publier une vidéo" }).click();
   await page.getByLabel("Adresse e-mail").fill(providerEmail);
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
-  await page.waitForURL(/\/pro/);
+  await expect(page).toHaveURL(/\/pro/, { timeout: 30_000 });
   await page.goto("/pro/videos");
   const videoContext = await browser.newContext({ viewport: { width: 360, height: 640 }, recordVideo: { dir: testInfo.outputPath("studio-media"), size: { width: 360, height: 640 } } });
   const recordedPage = await videoContext.newPage();
@@ -122,7 +124,6 @@ test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, br
   await videoContext.close();
   const videoPath = await recording!.path();
   await page.locator('input[name="video"]').setInputFiles(videoPath);
-  await page.locator('input[name="thumbnail"]').setInputFiles({ name: "miniature-studio.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") });
   await page.locator('input[name="title"]').fill(`Studio réel ${run}`);
   await page.locator('textarea[name="caption"]').fill(studioCaption);
   await page.locator('input[name="hashtags"]').fill("#tresses #dakar #studioe2e");
@@ -130,16 +131,65 @@ test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, br
   await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
   await page.locator('input[name="consent"]').check();
   await page.getByRole("button", { name: "Publier la vidéo" }).click();
-  const transientFailure = page.getByText("La publication a échoué. Vérifiez le fichier et réessayez.");
-  await expect(page.getByText(`Studio réel ${run}`).or(transientFailure)).toBeVisible({ timeout: 30_000 });
-  if (await transientFailure.isVisible()) await page.getByRole("button", { name: "Publier la vidéo" }).click();
+  await expect(page.getByText("100% · Terminé")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Publication visible dans Inspiration.")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(`Studio réel ${run}`)).toBeVisible({ timeout: 30_000 });
   const created = await admin.from("posts").select("id,status,post_services(provider_service_id,is_primary)").eq("author_id", providerId).eq("title", `Studio réel ${run}`).single();
   expect(created.error).toBeNull();
   expect(created.data).toMatchObject({ status: "published", post_services: [{ provider_service_id: providerServiceId, is_primary: true }] });
   studioPostId = created.data!.id;
+  await page.reload();
+  await page.getByRole("button", { name: "Mes vidéos" }).click();
+  await expect(page.getByText(`Studio réel ${run}`)).toBeVisible({ timeout: 20_000 });
   await page.goto("/");
   await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 20_000 });
+  const clientContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const clientPage = await clientContext.newPage();
+  if (bypass) await clientPage.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  await clientPage.goto("/");
+  await clientPage.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await clientPage.getByLabel("Adresse e-mail").fill(clientEmail);
+  await clientPage.getByLabel("Mot de passe").fill(password);
+  await clientPage.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await clientPage.goto("/");
+  const publishedCard = clientPage.locator(".social-video-card").filter({ hasText: studioCaption });
+  await expect(publishedCard).toBeVisible({ timeout: 20_000 });
+  await expect(publishedCard.locator("video")).toBeVisible();
+  await clientContext.close();
+});
+
+test("le Studio accepte de vrais conteneurs MP4 et MOV", async ({ page }) => {
+  test.setTimeout(120_000);
+  const fixtureDirectory = process.env.VIDEO_FORMAT_FIXTURE_DIR;
+  test.skip(!fixtureDirectory, "Fixtures MP4/MOV temporaires requises pour ce contrôle de codec.");
+  const fixtures = (["mp4", "mov"] as const).map((extension) => ({ extension, path: join(fixtureDirectory!, `mata-studio.${extension}`) }));
+  for (const fixture of fixtures) expect(existsSync(fixture.path), `Fixture ${fixture.extension.toUpperCase()} absente`).toBeTruthy();
+
+  if (bypass) await page.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Publier une vidéo" }).click();
+  await page.getByLabel("Adresse e-mail").fill(providerEmail);
+  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await expect(page).toHaveURL(/\/pro/, { timeout: 30_000 });
+  await page.goto("/pro/videos");
+
+  for (const fixture of fixtures) {
+    const title = `Studio ${fixture.extension.toUpperCase()} réel ${run}`;
+    await page.locator('input[name="video"]').setInputFiles(fixture.path);
+    await page.locator('input[name="title"]').fill(title);
+    await page.locator('textarea[name="caption"]').fill(`Conteneur ${fixture.extension.toUpperCase()} validé ${run}`);
+    await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
+    await page.locator('input[name="consent"]').check();
+    await page.getByRole("button", { name: "Publier la vidéo" }).click();
+    await expect(page.getByText("100% · Terminé")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(title)).toBeVisible({ timeout: 30_000 });
+    const stored = await admin.from("posts").select("id,status,social_post_media(storage_path)").eq("author_id", providerId).eq("title", title).single();
+    expect(stored.error).toBeNull();
+    expect(stored.data?.status).toBe("published");
+    expect(stored.data?.social_post_media?.[0]?.storage_path).toMatch(new RegExp(`video\\.${fixture.extension}$`));
+    if (fixture !== fixtures.at(-1)) await page.getByRole("button", { name: "Créer une publication" }).click();
+  }
 });
 
 test("le Studio publie une photo et un avant-après réels dans Storage", async ({ page }) => {

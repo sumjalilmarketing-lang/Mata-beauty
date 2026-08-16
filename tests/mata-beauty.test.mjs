@@ -138,7 +138,7 @@ test("the Super Admin control center is protected by RBAC and audited RPCs", asy
 });
 
 test("the social video layer is server-counted, attributable, storage-isolated, and protected by RLS", async () => {
-  const [schema, actions, guard, attribution, immersive, feed, publisher, app] = await Promise.all([
+  const [schema, actions, guard, attribution, immersive, feed, publisher, videoUpload, app] = await Promise.all([
     readFile(new URL("supabase/migrations/20260804133000_social_video_feed.sql", root), "utf8"),
     readFile(new URL("supabase/migrations/20260804134500_social_actions_and_publish.sql", root), "utf8"),
     readFile(new URL("supabase/migrations/20260804143000_social_publication_guard.sql", root), "utf8"),
@@ -146,6 +146,7 @@ test("the social video layer is server-counted, attributable, storage-isolated, 
     readFile(new URL("supabase/migrations/20260816120000_immersive_social_feed.sql", root), "utf8"),
     readFile(new URL("app/social-feed.tsx", root), "utf8"),
     readFile(new URL("app/video-publisher.tsx", root), "utf8"),
+    readFile(new URL("lib/social/video-upload.ts", root), "utf8"),
     readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
   ]);
   for (const table of ["posts", "post_services", "post_likes", "post_saves", "follows", "post_comments", "hashtags", "video_views"]) {
@@ -179,7 +180,8 @@ test("the social video layer is server-counted, attributable, storage-isolated, 
   assert.match(immersive, /provider_id = auth\.uid\(\) or public\.is_admin\(\)/);
   assert.match(app, /source_post_id: booking\.sourcePostId \?\? null/);
   assert.match(app, /Inspiration<\/button>/);
-  assert.match(publisher, /100 \* 1024 \* 1024/);
+  assert.match(videoUpload, /100 \* 1024 \* 1024/);
+  assert.match(publisher, /XMLHttpRequest/);
   assert.doesNotMatch(feed + publisher, /SUPABASE_SERVICE_ROLE_KEY/);
 });
 

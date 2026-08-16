@@ -67,6 +67,7 @@ export function CreatorStudio({ userId, providerApproved }: { userId: string; pr
     {feedback && <p className="dashboard-feedback" role="status">{feedback}</p>}
     {active === "create" && <VideoPublisher userId={userId} providerApproved={providerApproved} onPublished={async (postType) => {
       await load();
+      setFeedback(postType === "video" ? "Vidéo publiée et visible dans Inspiration." : "Publication enregistrée.");
       setActive(postType === "video" ? "videos" : postType === "before_after" ? "before_after" : "photos");
     }} />}
     {active === "statistics" && <SocialDashboard role="provider" userId={userId} />}
