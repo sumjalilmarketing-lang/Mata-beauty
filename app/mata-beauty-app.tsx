@@ -512,7 +512,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
           />
         )}
-        <BottomNav active={screen === "feed" ? "feed" : "discover"} onFeed={() => setScreen("feed")} onDiscover={() => setScreen("home")} onPublish={() => openAccount("provider")} onAccount={openAccount} />
+        <BottomNav active={screen === "feed" ? "inspiration" : screen === "home" ? "home" : "explore"} onHome={() => setScreen("home")} onExplore={() => setScreen("home")} onFeed={() => setScreen("feed")} onAccount={openAccount} />
       </div>
 
       {booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}
@@ -741,8 +741,8 @@ function BookingSuccess({ provider, confirmation, onClose }: { provider: Provide
   return <div className="premium-booking-success"><span>✓</span><p>Demande enregistrée</p><h2>Votre rendez-vous est créé</h2><code>{confirmation.id}</code><dl><div><dt>Prestation</dt><dd>{provider.specialty}</dd></div><div><dt>Date</dt><dd>{confirmation.date} à {confirmation.time}</dd></div><div><dt>Adresse</dt><dd>{confirmation.location}</dd></div><div><dt>Statut</dt><dd>En attente</dd></div></dl><a href={calendarUrl} target="_blank" rel="noreferrer">Ajouter au calendrier</a><button onClick={onClose}>Terminer</button></div>;
 }
 
-function BottomNav({ active, onFeed, onDiscover, onPublish, onAccount }: { active: "feed" | "discover"; onFeed: () => void; onDiscover: () => void; onPublish: () => void; onAccount: (section?: "client" | "provider" | "admin") => void }) {
-  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={active === "feed" ? "active" : ""} onClick={onFeed}><i>⌂</i>Accueil</button><button className={active === "discover" ? "active" : ""} onClick={onDiscover}><i>⌕</i>Découvrir</button><button className="publish-nav" onClick={onPublish}><i>＋</i>Publier</button><button onClick={() => onAccount()}><i>□</i>Réservations</button><button onClick={() => onAccount()}><i>○</i>Profil</button></nav>;
+function BottomNav({ active, onHome, onExplore, onFeed, onAccount }: { active: "home" | "explore" | "inspiration"; onHome: () => void; onExplore: () => void; onFeed: () => void; onAccount: (section?: "client" | "provider" | "admin") => void }) {
+  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={active === "home" ? "active" : ""} onClick={onHome}><i>⌂</i>Accueil</button><button aria-label="Découvrir" className={active === "explore" ? "active" : ""} onClick={onExplore}><i>⌕</i>Explorer</button><button className={`inspiration-nav ${active === "inspiration" ? "active" : ""}`} onClick={onFeed}><i>▶</i>Inspiration</button><button onClick={() => onAccount()}><i>□</i>Rendez-vous</button><button onClick={() => onAccount()}><i>○</i>Profil</button></nav>;
 }
 
 function formatDuration(minutes: number) {

@@ -138,11 +138,12 @@ test("the Super Admin control center is protected by RBAC and audited RPCs", asy
 });
 
 test("the social video layer is server-counted, attributable, storage-isolated, and protected by RLS", async () => {
-  const [schema, actions, guard, attribution, feed, publisher, app] = await Promise.all([
+  const [schema, actions, guard, attribution, immersive, feed, publisher, app] = await Promise.all([
     readFile(new URL("supabase/migrations/20260804133000_social_video_feed.sql", root), "utf8"),
     readFile(new URL("supabase/migrations/20260804134500_social_actions_and_publish.sql", root), "utf8"),
     readFile(new URL("supabase/migrations/20260804143000_social_publication_guard.sql", root), "utf8"),
     readFile(new URL("supabase/migrations/20260804180000_social_booking_attribution.sql", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260816120000_immersive_social_feed.sql", root), "utf8"),
     readFile(new URL("app/social-feed.tsx", root), "utf8"),
     readFile(new URL("app/video-publisher.tsx", root), "utf8"),
     readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
@@ -165,8 +166,18 @@ test("the social video layer is server-counted, attributable, storage-isolated, 
   assert.match(attribution, /old\.source_post_id is distinct from new\.source_post_id/);
   assert.match(feed, /IntersectionObserver/);
   assert.match(feed, /record_video_view/);
+  assert.match(feed, /FEED_BATCH_SIZE = 8/);
+  assert.match(feed, /Math\.abs\(index-activeIndex\)<=1/);
+  assert.match(feed, /socialFeedFilters/);
+  assert.match(feed, /Réserver maintenant/);
   assert.match(feed, /onBook\(post\.authorId,.*post\.id\)/s);
+  for (const model of ["social_post_views", "social_post_likes", "social_post_comments", "social_post_saves", "social_post_shares", "social_post_reports", "provider_follows"]) {
+    assert.match(immersive, new RegExp(`view public\\.${model}`));
+  }
+  assert.match(immersive, /social_profile_visits enable row level security/);
+  assert.match(immersive, /provider_id = auth\.uid\(\) or public\.is_admin\(\)/);
   assert.match(app, /source_post_id: booking\.sourcePostId \?\? null/);
+  assert.match(app, /Inspiration<\/button>/);
   assert.match(publisher, /100 \* 1024 \* 1024/);
   assert.doesNotMatch(feed + publisher, /SUPABASE_SERVICE_ROLE_KEY/);
 });

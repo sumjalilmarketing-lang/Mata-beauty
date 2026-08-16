@@ -70,6 +70,47 @@ test("primary mobile navigation keeps comfortable touch targets", async ({ page 
   }
 });
 
+test("Inspiration swipes vertically with one active player, filters and an eight-item batch", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.addEventListener("error", (event) => { if (event.target instanceof HTMLVideoElement) event.stopImmediatePropagation(); }, true);
+    HTMLMediaElement.prototype.play = function () { this.dataset.playing = "true"; return Promise.resolve(); };
+    HTMLMediaElement.prototype.pause = function () { this.dataset.playing = "false"; };
+  });
+  let requestedBatch = "";
+  await page.route("https://audit.supabase.co/rest/v1/social_feed**", (route) => {
+    requestedBatch = new URL(route.request().url()).searchParams.get("limit") ?? "";
+    const base = {
+      author_id: "11111111-1111-4111-8111-111111111111", thumbnail_url: null, duration_seconds: 18,
+      view_count: 120, like_count: 32, comment_count: 4, save_count: 7, share_count: 2,
+      published_at: new Date().toISOString(), business_name: "Atelier Tresses", slug: "atelier-tresses", city: "Dakar",
+      verified_at: "2026-01-01T00:00:00Z", avatar_url: null, cover_url: null, is_sponsored: false,
+      provider_service_id: "22222222-2222-4222-8222-222222222222", service_title: "Tresses collées",
+      duration_minutes: 90, price_amount: 10000, currency: "XOF", average_rating: 4.8, review_count: 12, hashtags: ["tresses", "dakar"],
+    };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+      { ...base, id: "66666666-6666-4666-8666-666666666666", caption: "Première transformation", video_url: "https://audit.supabase.co/one.mp4" },
+      { ...base, id: "77777777-7777-4777-8777-777777777777", caption: "Deuxième transformation", video_url: "https://audit.supabase.co/two.mp4", published_at: new Date(Date.now()-1000).toISOString() },
+    ]) });
+  });
+  await page.goto("/");
+  const feed = page.locator(".social-feed");
+  await expect(page.locator(".social-video-card")).toHaveCount(2);
+  expect(requestedBatch).toBe("8");
+  await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
+  await page.getByRole("button", { name: "Activer le son" }).first().click();
+  await expect(page.getByRole("button", { name: "Couper le son" }).first()).toBeVisible();
+  await feed.evaluate((node) => node.scrollTo({ top: node.clientHeight, behavior: "auto" }));
+  await page.locator(".social-video-card video").nth(1).dispatchEvent("canplay");
+  await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
+  await feed.evaluate((node) => node.scrollTo({ top: 0, behavior: "auto" }));
+  await page.locator(".social-video-card video").first().dispatchEvent("canplay");
+  await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
+  await page.getByRole("button", { name: "Tresses", exact: true }).click();
+  await expect(page.locator(".social-video-card")).toHaveCount(2);
+  await page.getByRole("button", { name: "Make-up", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Aucune inspiration ici" })).toBeVisible();
+});
+
 test("Google login starts a real OAuth request with a fixed callback", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
@@ -113,7 +154,7 @@ test("invalid OAuth callbacks fail closed without an open redirect", async ({ pa
 
 test("professional Google registration keeps a non-administrative intent", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Publier" }).click();
+  await page.getByRole("button", { name: "Publier une vidéo" }).click();
   const authorizeRequest = page.waitForRequest((request) => new URL(request.url()).pathname === "/auth/v1/authorize");
   await page.getByRole("button", { name: "Continuer avec Google", exact: true }).click();
   const oauthUrl = new URL((await authorizeRequest).url());
