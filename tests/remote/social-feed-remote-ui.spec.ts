@@ -118,7 +118,7 @@ test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, br
   await page.goto("/pro/videos");
   const videoContext = await browser.newContext({ viewport: { width: 360, height: 640 }, recordVideo: { dir: testInfo.outputPath("studio-media"), size: { width: 360, height: 640 } } });
   const recordedPage = await videoContext.newPage();
-  await recordedPage.setContent('<style>html,body{margin:0;height:100%;display:grid;place-items:center;color:white;background:linear-gradient(145deg,#5b0b45,#d83f8c);font:28px sans-serif}</style><strong>Mata Beauty E2E</strong>');
+  await recordedPage.setContent('<style>@keyframes pulse{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(180deg)}}html,body{margin:0;height:100%;display:grid;place-items:center;color:white;background:linear-gradient(145deg,#5b0b45,#d83f8c);font:28px sans-serif;animation:pulse 1s linear infinite}</style><strong>Mata Beauty E2E</strong>');
   const recording = recordedPage.video();
   // L’encodage Playwright démarre après l’initialisation de la page : conserver
   // une marge suffisante pour produire un média réellement supérieur à 1 s.
@@ -344,7 +344,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await providerPage.getByRole("button", { name: "Commentaires", exact: true }).click();
   await expect(providerPage.getByText(`Super résultat ${run}`)).toBeVisible();
   await providerPage.getByRole("button", { name: "Modération", exact: true }).click();
-  await expect(providerPage.getByText(/signalements sont traités par l’équipe Mata Beauty/i)).toBeVisible();
+  await expect(providerPage.getByText(/Les signalements restent privés/i)).toBeVisible();
   await providerContext.close();
   const [like, save, follow, comment] = await Promise.all([
     admin.from("post_likes").select("post_id", { count: "exact", head: true }).eq("post_id", studioPostId).eq("profile_id", clientId),
@@ -354,7 +354,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   ]);
   expect([like.count, save.count, follow.count, comment.count]).toEqual([1, 1, 1, 1]);
 
-  await page.goto("/app");
+  await page.goto("/app/inspirations");
   await expect(page.getByRole("heading", { name: "Mes inspirations" })).toBeVisible();
   const collectionName = `Mariage ${run}`;
   await page.getByLabel("Nom de la collection").fill(collectionName);

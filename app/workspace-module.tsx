@@ -9,6 +9,7 @@ import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/
 import { CreatorStudio } from "./creator-studio";
 import { ClientControlCenter } from "./client-control-center";
 import { SalonControlCenter } from "./salon-control-center";
+import { SocialDashboard } from "./social-dashboard";
 import { WorkspaceMessaging } from "./workspace-messaging";
 
 type Row = Record<string, unknown>;
@@ -57,6 +58,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;
   if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
   if (space === "client" && module.key === "profile") return <ClientControlCenter userId={userId} />;
+  if (space === "client" && module.key === "inspirations") return <SocialDashboard role="client" userId={userId} />;
   const shortcuts = workspaceSpaces[space].modules.filter((item) => item.key !== module.key && allowedModuleKeys.includes(item.key)).slice(0, 4);
   return <section className="workspace-content">
     <div className="workspace-intro"><div><span>Module sécurisé</span><h2>{module.label}</h2><p>{module.description}</p>{module.key === "dashboard" && (space === "pro" || space === "salon") && <Link className="workspace-quick-publish" href={workspaceHref(space, "videos")}>＋ Publier une vidéo</Link>}</div><div className="workspace-status"><i />Données limitées par vos droits</div></div>
