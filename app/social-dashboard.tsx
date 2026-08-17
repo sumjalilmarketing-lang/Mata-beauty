@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -15,12 +15,15 @@ export function SocialDashboard({ role, userId }: { role: "client" | "provider";
   const [saved, setSaved] = useState<SavedPost[]>([]);
   const [collectionPosts, setCollectionPosts] = useState<CollectionPost[]>([]);
   const [feedback, setFeedback] = useState("");
+  const latestLoad = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++latestLoad.current;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     if (role === "provider") {
       const { data } = await supabase.rpc("provider_creator_statistics");
+      if (requestId !== latestLoad.current) return;
       setStats((data ?? []) as CreatorStat[]);
       return;
     }
@@ -29,6 +32,7 @@ export function SocialDashboard({ role, userId }: { role: "client" | "provider";
       supabase.from("post_saves").select("post_id,posts(caption,thumbnail_url)").eq("profile_id", userId).order("created_at", { ascending: false }).limit(24),
       supabase.from("inspiration_collection_posts").select("collection_id,post_id"),
     ]);
+    if (requestId !== latestLoad.current) return;
     setCollections((collectionResult.data ?? []) as Collection[]);
     setSaved((savedResult.data ?? []) as unknown as SavedPost[]);
     setCollectionPosts((collectionPostsResult.data ?? []) as CollectionPost[]);

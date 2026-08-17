@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -34,6 +34,7 @@ const extraPostIds: string[] = [];
 let studioPostId = "";
 let photoPostId = "";
 let beforeAfterPostId = "";
+let feedSeedStoragePath = "";
 
 test.describe.configure({ mode: "serial" });
 
@@ -72,18 +73,27 @@ test.beforeAll(async () => {
   const tomorrow = new Date(Date.now() + 86_400_000);
   const availability = await providerApi.from("availability_rules").insert({ provider_id: providerId, weekday: tomorrow.getUTCDay(), starts_at: "09:00", ends_at: "18:00", slot_interval_minutes: 30 }).select("id").single();
   expect(availability.error).toBeNull(); availabilityId = availability.data!.id;
+  const fixtureDirectory = process.env.VIDEO_FORMAT_FIXTURE_DIR;
+  expect(fixtureDirectory, "Répertoire des fixtures vidéo absent").toBeTruthy();
+  const feedSeedFixture = join(fixtureDirectory!, "mata-studio.mp4");
+  expect(existsSync(feedSeedFixture), "Fixture MP4 du feed absente").toBeTruthy();
+  feedSeedStoragePath = `${providerId}/feed-seed-${run}.mp4`;
+  const seedUpload = await admin.storage.from("social-videos").upload(feedSeedStoragePath, readFileSync(feedSeedFixture), { contentType: "video/mp4", upsert: false });
+  expect(seedUpload.error).toBeNull();
+  const feedSeedUrl = `${supabaseUrl}/storage/v1/object/public/social-videos/${feedSeedStoragePath}`;
   const categories = ["makeup", "makeup", "barbier", "barbier", "tresses", "tresses", "ongles", "ongles", "coiffure"];
   for (const [index, category] of categories.entries()) {
-    const extra = await providerApi.rpc("create_video_post", { target_caption: `E2E ${category} ${index} ${run}`, target_video_url: `${supabaseUrl}/storage/v1/object/public/social-videos/${providerId}/${category}-${index}-${run}.mp4`, target_thumbnail_url: null, target_duration_seconds: 20, target_aspect_ratio: 0.562, target_provider_service_id: providerServiceId, target_status: "published", target_allow_comments: true, target_client_consent: true, target_scheduled_for: null, target_visibility: "public", target_hashtags: ["preview", category] });
+    const extra = await providerApi.rpc("create_video_post", { target_caption: `E2E ${category} ${index} ${run}`, target_video_url: feedSeedUrl, target_thumbnail_url: null, target_duration_seconds: 20, target_aspect_ratio: 0.562, target_provider_service_id: providerServiceId, target_status: "published", target_allow_comments: true, target_client_consent: true, target_scheduled_for: null, target_visibility: "public", target_hashtags: ["preview", category] });
     expect(extra.error).toBeNull(); extraPostIds.push(extra.data);
   }
-  const post = await providerApi.rpc("create_video_post", { target_caption: `Transformation Preview ${run}`, target_video_url: `${supabaseUrl}/storage/v1/object/public/social-videos/${providerId}/preview-${run}.mp4`, target_thumbnail_url: null, target_duration_seconds: 20, target_aspect_ratio: 0.562, target_provider_service_id: providerServiceId, target_status: "published", target_allow_comments: true, target_client_consent: true, target_scheduled_for: null, target_visibility: "public", target_hashtags: ["preview", "tresses"] });
+  const post = await providerApi.rpc("create_video_post", { target_caption: `Transformation Preview ${run}`, target_video_url: feedSeedUrl, target_thumbnail_url: null, target_duration_seconds: 20, target_aspect_ratio: 0.562, target_provider_service_id: providerServiceId, target_status: "published", target_allow_comments: true, target_client_consent: true, target_scheduled_for: null, target_visibility: "public", target_hashtags: ["preview", "tresses"] });
   expect(post.error).toBeNull();
 });
 
 test.afterAll(async () => {
   if (bookingId) await admin.from("bookings").delete().eq("id", bookingId);
   if (providerId) await admin.from("posts").delete().eq("author_id", providerId);
+  if (feedSeedStoragePath) expect((await admin.storage.from("social-videos").remove([feedSeedStoragePath])).error).toBeNull();
   if (providerId) {
     const bucket = admin.storage.from("provider-social-media");
     const { data: folders } = await bucket.list(providerId, { limit: 100 });
