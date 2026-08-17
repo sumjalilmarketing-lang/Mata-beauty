@@ -10,8 +10,12 @@ export type WorkspaceModule = {
   description: string;
   permission?: AdminPermissionKey;
   primary?: boolean;
+  targetKey?: string;
   resource?: "bookings" | "payments" | "notifications" | "messages" | "profiles" | "providers" | "businesses" | "collaborators" | "services" | "videos" | "reviews" | "reports" | "audit";
 };
+
+export type WorkspaceNavigationItem = { key: string; label: string; icon: string; targetKey?: string; primary?: boolean };
+export type WorkspaceNavigationGroup = { key: string; label: string; icon: string; direct?: boolean; items: readonly WorkspaceNavigationItem[] };
 
 export type WorkspaceSpace = {
   key: WorkspaceSpaceKey;
@@ -20,6 +24,7 @@ export type WorkspaceSpace = {
   eyebrow: string;
   allowedAdminRoles?: readonly AdminRoleKey[];
   modules: readonly WorkspaceModule[];
+  navigation: readonly WorkspaceNavigationGroup[];
 };
 
 // The short builder keeps the large navigation matrix readable.
@@ -215,22 +220,81 @@ const superAdminModules = [
   module("deletion-requests", "Demandes de suppression", "×", "Sécurité et audit", "Demandes RGPD et suivi.", { permission: "users.delete" }),
 ] as const;
 
+const n = (key: string, label: string, targetKey = key, icon = "·", primary = false): WorkspaceNavigationItem => ({ key, label, targetKey, icon, primary });
+const g = (key: string, label: string, icon: string, items: readonly WorkspaceNavigationItem[], direct = false): WorkspaceNavigationGroup => ({ key, label, icon, items, direct });
+const dashboard = (label = "Dashboard") => g("dashboard", label, "⌂", [n("dashboard", label, "dashboard", "⌂", true)], true);
+
+const clientNavigation = [dashboard(),
+  g("discover", "Découvrir", "⌕", [n("feed", "Pour toi", "feed", "▶", true), n("following", "Abonnements", "feed"), n("trending", "Tendances", "feed"), n("discover", "Catégories", "discover", "◇"), n("nearby", "Autour de moi", "discover", "⌖")]),
+  g("appointments", "Mes rendez-vous", "▣", [n("bookings", "À venir", "bookings", "▣", true), n("bookings-pending", "En attente", "bookings"), n("bookings-completed", "Terminés", "bookings"), n("bookings-cancelled", "Annulés", "bookings"), n("booking-history", "Historique", "bookings")]),
+  g("inspirations", "Mes inspirations", "✦", [n("inspirations", "Vidéos enregistrées", "inspirations"), n("liked-videos", "Vidéos aimées", "inspirations"), n("collections", "Collections", "inspirations"), n("favorites", "Prestations favorites", "favorites"), n("favorite-salons", "Salons favoris", "favorites"), n("followed-professionals", "Professionnels suivis", "favorites")]),
+  g("communication", "Communication", "✉", [n("messages", "Messages", "messages", "✉", true), n("notifications", "Notifications", "notifications", "◌"), n("reviews", "Avis", "reviews", "★")]),
+  g("payments", "Paiements", "¤", [n("payments", "Historique", "payments"), n("pending-payments", "Paiements en attente", "payments"), n("receipts", "Reçus", "payments"), n("refunds", "Remboursements", "payments")]),
+  g("support", "Support", "?", [n("new-ticket", "Nouveau ticket", "support"), n("support", "Mes demandes", "support"), n("claims", "Réclamations", "support"), n("help", "Aide", "support")]),
+  g("profile", "Mon profil", "○", [n("profile", "Informations personnelles", "profile"), n("profile-photo", "Photo", "profile"), n("beauty-preferences", "Préférences beauté", "profile"), n("profile-location", "Localisation", "profile"), n("privacy", "Confidentialité", "profile"), n("become-pro", "Devenir professionnel", "profile")]),
+  g("settings", "Paramètres", "⚙", [n("settings", "Compte", "settings"), n("security", "Sécurité", "settings"), n("google", "Connexion Google", "settings"), n("notification-settings", "Notifications", "settings"), n("language", "Langue", "settings"), n("appearance", "Apparence", "settings"), n("personal-data", "Données personnelles", "settings")]),
+] as const;
+
+const proNavigation = [dashboard(),
+  g("activity", "Activité", "□", [n("agenda", "Agenda", "agenda", "□", true), n("bookings", "Réservations", "bookings", "▣", true), n("availability", "Disponibilités", "agenda"), n("planning", "Planning", "agenda")]),
+  g("relations", "Relations", "◎", [n("messages", "Messages", "messages", "✉", true), n("clients", "Clients", "clients"), n("reviews", "Avis", "reviews", "★"), n("followers", "Abonnés", "clients"), n("notifications", "Notifications clients", "notifications")]),
+  g("offer", "Offre", "≡", [n("services", "Prestations", "services", "≡"), n("categories", "Catégories", "services"), n("pricing", "Tarifs", "services"), n("promotions", "Promotions", "services"), n("options", "Options", "services")]),
+  g("content", "Contenu", "▶", [n("videos", "Studio", "videos", "▶"), n("publish", "Publier", "videos"), n("my-videos", "Mes vidéos", "videos"), n("drafts", "Brouillons", "videos"), n("scheduled", "Publications programmées", "videos"), n("portfolio", "Portfolio", "portfolio"), n("photos", "Photos", "videos"), n("statistics", "Statistiques contenu", "videos")]),
+  g("finance", "Finance", "¤", [n("revenue", "Revenus", "revenue"), n("payments", "Paiements", "revenue"), n("wallet", "Wallet", "revenue"), n("payouts", "Versements", "revenue"), n("commissions", "Commissions", "revenue"), n("financial-history", "Historique", "revenue")]),
+  g("support", "Support", "?", [n("new-ticket", "Nouveau ticket", "support"), n("support", "Mes tickets", "support"), n("help", "Aide", "support"), n("disputes", "Litiges", "support")]),
+  g("professional-profile", "Profil professionnel", "○", [n("public-profile", "Profil public", "public-profile"), n("professional-info", "Informations professionnelles", "public-profile"), n("salon-link", "Salon", "public-profile"), n("location", "Localisation", "public-profile"), n("hours", "Horaires", "public-profile"), n("documents", "Documents", "public-profile"), n("verification", "Vérification", "public-profile"), n("public-preview", "Aperçu public", "public-profile")]),
+  g("settings", "Paramètres", "⚙", [n("settings", "Compte", "settings"), n("security", "Sécurité", "settings"), n("notification-settings", "Notifications", "settings"), n("google", "Connexion Google", "settings"), n("privacy", "Confidentialité", "settings"), n("payment-settings", "Paiements", "settings")]),
+] as const;
+
+const salonNavigation = [dashboard(),
+  g("activity", "Activité", "□", [n("agenda", "Agenda du salon", "agenda", "□", true), n("bookings", "Réservations", "bookings", "▣", true), n("availability", "Disponibilités", "agenda"), n("resources", "Ressources", "agenda")]),
+  g("team", "Équipe", "◎", [n("team", "Membres", "team", "◎", true), n("invitations", "Invitations", "team"), n("team-hours", "Horaires", "team"), n("permissions", "Permissions", "team"), n("team-performance", "Performances", "statistics")]),
+  g("offer", "Offre", "≡", [n("services", "Prestations", "services", "≡"), n("pricing", "Tarifs", "services"), n("promotions", "Promotions", "services"), n("categories", "Catégories", "services")]),
+  g("content", "Contenu", "▶", [n("videos", "Studio", "videos", "▶"), n("my-videos", "Vidéos", "videos"), n("portfolio", "Portfolio", "portfolio"), n("photos", "Photos", "portfolio"), n("statistics", "Statistiques", "statistics")]),
+  g("relations", "Relations", "♙", [n("clients", "Clients", "clients"), n("messages", "Messages", "messages"), n("reviews", "Avis", "reviews"), n("followers", "Abonnés", "clients")]),
+  g("finance", "Finance", "¤", [n("revenue", "Revenus", "revenue"), n("payments", "Paiements", "revenue"), n("wallet", "Wallet", "revenue"), n("payouts", "Versements", "payouts"), n("commissions", "Commissions", "revenue")]),
+  g("profile", "Profil du salon", "○", [n("profile", "Informations", "profile"), n("address", "Adresse", "profile"), n("hours", "Horaires", "agenda"), n("public-team", "Équipe publique", "team"), n("gallery", "Galerie", "portfolio"), n("public-preview", "Aperçu public", "profile")]),
+  g("support", "Support", "?", [n("support", "Assistance", "support")]), g("settings", "Paramètres", "⚙", [n("settings", "Compte et sécurité", "settings")]),
+] as const;
+
+const staffNavigation = [dashboard(), g("activity", "Activité", "□", [n("agenda", "Mon agenda", "agenda", "□", true), n("bookings", "Mes rendez-vous", "bookings", "▣", true), n("services", "Mes prestations", "services")]), g("relations", "Relations", "◎", [n("clients", "Mes clientes", "clients"), n("messages", "Mes messages", "messages", "✉", true)]), g("performance", "Performance", "↗", [n("statistics", "Mes statistiques", "statistics")]), g("profile", "Profil", "○", [n("profile", "Mon profil", "profile")]), g("settings", "Paramètres", "⚙", [n("settings", "Compte et notifications", "settings")])] as const;
+
+const onboardingNavigation = [dashboard(), g("cases", "Dossiers", "▣", [n("new", "Nouveaux", "new", "+", true), n("in-progress", "En cours", "in-progress", "▣", true), n("requests", "Compléments demandés", "requests", "✉", true), n("approved", "Validés", "approved"), n("rejected", "Refusés", "rejected")]), g("documents", "Documents", "◇", [n("documents", "Identité", "documents"), n("business-documents", "Entreprise", "documents"), n("contact-documents", "Coordonnées", "documents"), n("expiring-documents", "Documents expirants", "documents")]), g("assignments", "Affectations", "◎", [n("assignments", "Mes dossiers", "assignments"), n("unassigned", "Dossiers non assignés", "new")]), g("history", "Historique", "≣", [n("history", "Décisions", "history"), n("audit", "Audit", "history")]), g("notifications", "Notifications", "◌", [n("notifications", "Notifications", "notifications")]), g("profile", "Profil", "○", [n("profile", "Profil agent", "settings")]), g("settings", "Paramètres", "⚙", [n("settings", "Compte et sécurité", "settings")])] as const;
+
+const supportNavigation = [dashboard(), g("tickets", "Tickets", "▣", [n("tickets", "Nouveaux", "tickets", "▣", true), n("mine", "Mes tickets", "mine", "◎", true), n("unassigned", "Non assignés", "unassigned", "+", true), n("priority", "Prioritaires", "priority", "!", true), n("pending", "En attente", "tickets"), n("resolved", "Résolus", "tickets")]), g("users", "Utilisateurs", "♙", [n("users", "Clients", "users"), n("professionals", "Professionnels", "users"), n("salons", "Salons", "users")]), g("bookings", "Réservations", "□", [n("bookings", "Recherche", "bookings"), n("disputes", "Litiges", "escalations"), n("cancellations", "Annulations", "bookings")]), g("payments", "Paiements", "¤", [n("payments", "Consultation", "bookings"), n("refunds", "Remboursements", "escalations"), n("finance-escalations", "Escalades Finance", "escalations")]), g("knowledge", "Connaissances", "¶", [n("knowledge", "FAQ", "knowledge"), n("procedures", "Procédures", "knowledge"), n("templates", "Réponses modèles", "knowledge")]), g("reports", "Rapports", "%", [n("reports", "Rapports", "reports")]), g("profile", "Profil", "○", [n("profile", "Profil agent", "settings")]), g("settings", "Paramètres", "⚙", [n("settings", "Compte et sécurité", "settings")])] as const;
+
+const moderationNavigation = [dashboard(), g("reports", "Signalements", "!", [n("reports", "Nouveaux", "reports", "!", true), n("urgent", "Urgents", "reports"), n("in-progress", "En cours", "reports"), n("processed", "Traités", "history")]), g("content", "Contenus", "▶", [n("videos", "Vidéos", "videos", "▶", true), n("photos", "Photos", "videos"), n("comments", "Commentaires", "comments", "✉", true), n("profiles", "Profils", "profiles", "◎", true)]), g("sanctions", "Sanctions", "×", [n("warnings", "Avertissements", "sanctions"), n("suspensions", "Suspensions", "sanctions"), n("bans", "Bannissements", "sanctions")]), g("appeals", "Appels", "↺", [n("appeals", "Appels", "appeals")]), g("history", "Historique", "≣", [n("history", "Historique", "history")]), g("rules", "Règles", "¶", [n("rules", "Règles", "rules")]), g("profile", "Profil", "○", [n("profile", "Profil agent", "settings")]), g("settings", "Paramètres", "⚙", [n("settings", "Compte et sécurité", "settings")])] as const;
+
+const financeNavigation = [dashboard(), g("transactions", "Transactions", "¤", [n("transactions", "Toutes", "transactions", "¤", true), n("confirmed", "Confirmées", "transactions"), n("pending", "En attente", "pending", "…", true), n("failed", "Échouées", "failed", "×", true), n("anomalies", "Anomalies", "anomalies")]), g("refunds", "Remboursements", "↺", [n("refunds", "Demandés", "refunds", "↺", true), n("refunds-processing", "En traitement", "refunds"), n("refunds-completed", "Terminés", "refunds")]), g("payouts", "Versements", "↗", [n("payouts", "À traiter", "payouts"), n("payouts-processing", "En cours", "payouts"), n("payouts-completed", "Terminés", "payouts"), n("payouts-failed", "Échoués", "payouts")]), g("wallets", "Wallets", "▣", [n("wallets", "Wallets", "wallets")]), g("commissions", "Commissions", "%", [n("commissions", "Commissions", "commissions")]), g("reconciliation", "Rapprochement", "≋", [n("reconciliation", "Rapprochement", "reconciliation")]), g("reports", "Rapports", "¶", [n("reports", "Rapports", "reports")]), g("audit", "Audit financier", "≣", [n("audit", "Audit financier", "audit")]), g("profile", "Profil", "○", [n("profile", "Profil finance", "settings")]), g("settings", "Paramètres", "⚙", [n("settings", "Compte et sécurité", "settings")])] as const;
+
+const operationsNavigation = [dashboard(), g("marketplace", "Marketplace", "◇", [n("users", "Utilisateurs", "users", "◎", true), n("providers", "Professionnels", "providers", "✦", true), n("salons", "Salons", "salons", "⌑", true), n("bookings", "Réservations", "bookings", "▣", true), n("categories", "Catégories", "categories"), n("areas", "Villes et zones", "areas"), n("promotions", "Promotions", "promotions")]), g("relations", "Relation client", "?", [n("support", "Support", "support"), n("reports", "Rapports", "reports")]), g("onboarding", "Onboarding", "✓", [n("onboarding", "Dossiers", "onboarding")]), g("content", "Contenu", "▶", [n("content", "Publications", "content"), n("moderation", "Modération", "moderation")]), g("communication", "Communication", "◌", [n("notifications", "Notifications", "notifications")]), g("security", "Sécurité", "≣", [n("audit", "Audit", "audit")]), g("profile", "Profil", "○", [n("profile", "Profil administrateur", "settings")]), g("settings", "Paramètres", "⚙", [n("settings", "Paramètres opérationnels", "settings")])] as const;
+
+const adminNavigation = [dashboard("Dashboard"), g("users", "Utilisateurs", "◎", [n("clients", "Clients"), n("providers", "Professionnels"), n("salons", "Salons"), n("staff", "Employés"), n("agents", "Agents internes"), n("roles", "Administrateurs"), n("permissions", "Rôles et permissions"), n("suspended", "Comptes suspendus"), n("sessions", "Sessions")]), g("marketplace", "Marketplace", "◇", [n("services", "Prestations"), n("categories", "Catégories"), n("bookings", "Réservations"), n("availability", "Disponibilités"), n("promotions", "Promotions"), n("areas", "Villes et zones")]), g("content", "Contenu", "▶", [n("videos", "Vidéos"), n("comments", "Commentaires"), n("social-reports", "Signalements")]), g("relations", "Relation client", "?", [n("tickets", "Tickets"), n("escalations", "Réclamations"), n("disputes", "Litiges")]), g("onboarding", "Onboarding", "✓", [n("kyc", "Documents et KYC"), n("validations", "Validations")]), g("finance", "Finance", "¤", [n("transactions", "Transactions"), n("commissions", "Commissions"), n("refunds", "Remboursements"), n("payouts", "Versements"), n("financial-reports", "Rapports")]), g("communication", "Communication", "◌", [n("notifications", "Notifications"), n("campaigns", "Campagnes")]), g("security", "Sécurité", "⌾", [n("audit", "Audit"), n("security", "Événements sécurité"), n("deletion-requests", "Demandes de suppression")]), g("platform", "Plateforme", "⌘", [n("health", "Santé des services"), n("integrations", "Intégrations et webhooks"), n("system-logs", "Journaux techniques"), n("platform-settings", "Paramètres fonctionnels")])] as const;
+
 export const workspaceSpaces: Record<WorkspaceSpaceKey, WorkspaceSpace> = {
-  client: { key: "client", label: "Espace client", prefix: "/app", eyebrow: "Votre beauté", modules: clientModules },
-  pro: { key: "pro", label: "Espace professionnel", prefix: "/pro", eyebrow: "Votre activité", modules: proModules },
-  salon: { key: "salon", label: "Espace salon", prefix: "/salon", eyebrow: "Votre établissement", modules: salonModules },
-  staff: { key: "staff", label: "Espace employé", prefix: "/staff", eyebrow: "Votre activité au salon", modules: staffModules },
-  onboarding: { key: "onboarding", label: "Onboarding", prefix: "/onboarding", eyebrow: "Validation professionnelle", allowedAdminRoles: ["verification_agent", "super_admin"], modules: onboardingModules },
-  support: { key: "support", label: "Support", prefix: "/support-agent", eyebrow: "Relation client", allowedAdminRoles: ["support", "admin", "super_admin"], modules: supportModules },
-  moderation: { key: "moderation", label: "Modération", prefix: "/moderation", eyebrow: "Confiance et sécurité", allowedAdminRoles: ["moderator", "admin", "super_admin"], modules: moderationModules },
-  finance: { key: "finance", label: "Finance", prefix: "/finance", eyebrow: "Contrôle financier", allowedAdminRoles: ["finance", "super_admin"], modules: financeModules },
-  operations: { key: "operations", label: "Opérations", prefix: "/operations", eyebrow: "Administration opérationnelle", allowedAdminRoles: ["admin", "content_manager", "super_admin"], modules: operationsModules },
-  admin: { key: "admin", label: "Super administration", prefix: "/admin", eyebrow: "Contrôle de la plateforme", allowedAdminRoles: ["super_admin"], modules: superAdminModules },
+  client: { key: "client", label: "Espace client", prefix: "/app", eyebrow: "Votre beauté", modules: clientModules, navigation: clientNavigation },
+  pro: { key: "pro", label: "Espace professionnel", prefix: "/pro", eyebrow: "Votre activité", modules: proModules, navigation: proNavigation },
+  salon: { key: "salon", label: "Espace salon", prefix: "/salon", eyebrow: "Votre établissement", modules: salonModules, navigation: salonNavigation },
+  staff: { key: "staff", label: "Espace employé", prefix: "/staff", eyebrow: "Votre activité au salon", modules: staffModules, navigation: staffNavigation },
+  onboarding: { key: "onboarding", label: "Onboarding", prefix: "/onboarding", eyebrow: "Validation professionnelle", allowedAdminRoles: ["verification_agent", "super_admin"], modules: onboardingModules, navigation: onboardingNavigation },
+  support: { key: "support", label: "Support", prefix: "/support-agent", eyebrow: "Relation client", allowedAdminRoles: ["support", "admin", "super_admin"], modules: supportModules, navigation: supportNavigation },
+  moderation: { key: "moderation", label: "Modération", prefix: "/moderation", eyebrow: "Confiance et sécurité", allowedAdminRoles: ["moderator", "admin", "super_admin"], modules: moderationModules, navigation: moderationNavigation },
+  finance: { key: "finance", label: "Finance", prefix: "/finance", eyebrow: "Contrôle financier", allowedAdminRoles: ["finance", "super_admin"], modules: financeModules, navigation: financeNavigation },
+  operations: { key: "operations", label: "Opérations", prefix: "/operations", eyebrow: "Administration opérationnelle", allowedAdminRoles: ["admin", "content_manager", "super_admin"], modules: operationsModules, navigation: operationsNavigation },
+  admin: { key: "admin", label: "Super administration", prefix: "/admin", eyebrow: "Contrôle de la plateforme", allowedAdminRoles: ["super_admin"], modules: superAdminModules, navigation: adminNavigation },
 };
 
 export function workspaceModule(space: WorkspaceSpaceKey, key: string) {
   const definition = workspaceSpaces[space];
-  return definition.modules.find((item) => item.key === key) ?? definition.modules[0];
+  const navigationItem = definition.navigation.flatMap((group) => group.items).find((item) => item.key === key);
+  const targetKey = navigationItem?.targetKey ?? key;
+  const target = definition.modules.find((item) => item.key === targetKey) ?? definition.modules[0];
+  return navigationItem ? { ...target, key: navigationItem.key, label: navigationItem.label, icon: navigationItem.icon, targetKey } : target;
+}
+
+export function workspaceNavigationModules(space: WorkspaceSpaceKey) {
+  const definition = workspaceSpaces[space];
+  return definition.navigation.flatMap((group) => group.items.map((item) => workspaceModule(space, item.key)));
 }
 
 export function workspaceHref(space: WorkspaceSpaceKey, moduleKey = "dashboard") {

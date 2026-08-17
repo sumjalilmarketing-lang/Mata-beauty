@@ -362,7 +362,7 @@ test("salon workspace is connected, archived safely and protected by RLS", async
   assert.match(center, /archive_owned_business/);
   assert.match(center, /12 \* 1024 \* 1024/);
   assert.match(center, /image\/jpeg/);
-  assert.match(route, /salonWorkflows/);
+  assert.match(route, /workspaceNavigationModules/);
   assert.match(migration, /alter table public\.business_media enable row level security/);
   assert.match(migration, /owners upload business media/);
   assert.match(migration, /archive_owned_business/);
@@ -453,4 +453,23 @@ test("video discovery exposes a canonical feed and hardens legacy media access",
   assert.match(migration, /post\.visibility = 'public'/);
   assert.match(migration, /security definer/);
   assert.doesNotMatch(route + feed + studio + profile + dashboard + migration, /SUPABASE_SERVICE_ROLE_KEY/);
+});
+
+test("all secured workspaces use hierarchical accessible navigation and a real mobile drawer", async () => {
+  const [spaces, shell, sidebar, admin] = await Promise.all([
+    readFile(new URL("lib/navigation/spaces.ts", root), "utf8"),
+    readFile(new URL("app/workspace-shell.tsx", root), "utf8"),
+    readFile(new URL("app/sidebar-navigation.tsx", root), "utf8"),
+    readFile(new URL("app/super-admin.tsx", root), "utf8"),
+  ]);
+  for (const label of ["Activité", "Relations", "Offre", "Contenu", "Finance", "Support", "Profil professionnel", "Mes inspirations", "Signalements", "Audit financier", "Plateforme"]) assert.match(spaces, new RegExp(label));
+  assert.match(sidebar, /aria-expanded/);
+  assert.match(sidebar, /sessionStorage/);
+  assert.match(sidebar, /SidebarGroupTrigger/);
+  assert.match(shell, /workspace-drawer-backdrop/);
+  assert.match(shell, /Ouvrir toutes les rubriques/);
+  assert.match(shell, /Déconnexion/);
+  assert.doesNotMatch(shell, /\/menu/);
+  assert.match(admin, /SidebarNavigation/);
+  for (const label of ["Employés", "Comptes suspendus", "Disponibilités", "Base de connaissances", "Professionnels en attente", "Rapprochement", "Accès refusés", "Santé des services", "Journaux techniques"]) assert.match(admin, new RegExp(label));
 });

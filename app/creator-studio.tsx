@@ -6,7 +6,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { SocialDashboard } from "./social-dashboard";
 import { VideoPublisher } from "./video-publisher";
 
-type StudioTab = "create" | "videos" | "photos" | "before_after" | "drafts" | "scheduled" | "archived" | "comments" | "moderation" | "statistics";
+export type StudioTab = "create" | "videos" | "photos" | "before_after" | "drafts" | "scheduled" | "archived" | "comments" | "moderation" | "statistics";
 type CreatorPost = {
   id: string; post_type: string; title: string | null; caption: string; status: string;
   thumbnail_url: string | null; view_count: number; like_count: number; comment_count: number; save_count: number; share_count: number; published_at: string | null; created_at: string;
@@ -20,8 +20,8 @@ const tabs: Array<{ key: StudioTab; label: string }> = [
   { key: "comments", label: "Commentaires" }, { key: "moderation", label: "Modération" }, { key: "statistics", label: "Statistiques" },
 ];
 
-export function CreatorStudio({ userId, providerApproved }: { userId: string; providerApproved: boolean }) {
-  const [active, setActive] = useState<StudioTab>("create");
+export function CreatorStudio({ userId, providerApproved, initialTab = "create" }: { userId: string; providerApproved: boolean; initialTab?: StudioTab }) {
+  const [active, setActive] = useState<StudioTab>(initialTab);
   const [posts, setPosts] = useState<CreatorPost[]>([]);
   const [comments, setComments] = useState<CreatorComment[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
@@ -48,7 +48,6 @@ export function CreatorStudio({ userId, providerApproved }: { userId: string; pr
   }, [userId]);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
-
   async function manage(postId: string, action: "hide" | "archive" | "delete" | "republish") {
     if (action === "delete" && !window.confirm("Supprimer cette publication ? Cette action la retire du Studio et du feed.")) return;
     const supabase = getSupabaseBrowserClient();

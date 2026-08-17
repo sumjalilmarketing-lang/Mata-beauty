@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { SidebarNavigation, type SidebarNavigationGroup } from "./sidebar-navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
@@ -182,6 +183,25 @@ const navigation = [
   { key: "maintenance", label: "Maintenance", icon: "△", permission: "settings.update" },
 ] as const;
 type ModuleKey = typeof navigation[number]["key"];
+
+type AdminNavigationAlias = { key: string; label: string; target: ModuleKey };
+type AdminNavigationGroup = { key: string; label: string; icon: string; direct?: boolean; items: AdminNavigationAlias[] };
+const adminItem = (key: string, label: string, target: ModuleKey): AdminNavigationAlias => ({ key, label, target });
+
+const navigationGroups: AdminNavigationGroup[] = [
+  { key: "dashboard", label: "Dashboard", icon: "⌂", direct: true, items: [adminItem("dashboard", "Dashboard", "overview")] },
+  { key: "users", label: "Utilisateurs", icon: "◎", items: [adminItem("clients", "Clients", "users"), adminItem("professionals", "Professionnels", "providers"), adminItem("salons", "Salons", "salons"), adminItem("employees", "Employés", "users"), adminItem("agents", "Agents internes", "administrators"), adminItem("administrators", "Administrateurs", "administrators"), adminItem("roles", "Rôles", "roles"), adminItem("permissions", "Permissions", "roles"), adminItem("suspended", "Comptes suspendus", "users"), adminItem("sessions", "Sessions", "security")] },
+  { key: "marketplace", label: "Marketplace", icon: "◇", items: [adminItem("services", "Prestations", "services"), adminItem("categories", "Catégories", "categories"), adminItem("bookings", "Réservations", "bookings"), adminItem("availability", "Disponibilités", "calendar"), adminItem("promotions", "Promotions", "promotions"), adminItem("cities", "Villes", "settings"), adminItem("areas", "Zones", "settings")] },
+  { key: "content", label: "Contenu", icon: "▶", items: [adminItem("videos", "Vidéos", "content"), adminItem("publications", "Publications", "content"), adminItem("photos", "Photos", "content"), adminItem("hashtags", "Hashtags", "content"), adminItem("comments", "Commentaires", "content"), adminItem("content-reports", "Signalements", "reports"), adminItem("moderation", "Modération", "reports")] },
+  { key: "relations", label: "Relation client", icon: "?", items: [adminItem("tickets", "Tickets", "support"), adminItem("claims", "Réclamations", "support"), adminItem("disputes", "Litiges", "disputes"), adminItem("satisfaction", "Satisfaction", "reviews"), adminItem("knowledge", "Base de connaissances", "support")] },
+  { key: "onboarding", label: "Onboarding", icon: "✓", items: [adminItem("cases", "Dossiers", "verification"), adminItem("pending-professionals", "Professionnels en attente", "providers"), adminItem("documents", "Documents", "verification"), adminItem("kyc", "KYC", "verification"), adminItem("validations", "Validations", "verification"), adminItem("refusals", "Refus", "verification"), adminItem("onboarding-history", "Historique", "audit")] },
+  { key: "finance", label: "Finance", icon: "¤", items: [adminItem("transactions", "Transactions", "payments"), adminItem("payments", "Paiements", "payments"), adminItem("commissions", "Commissions", "commissions"), adminItem("wallets", "Wallets", "payments"), adminItem("payouts", "Versements", "payouts"), adminItem("refunds", "Remboursements", "payments"), adminItem("finance-disputes", "Litiges", "disputes"), adminItem("reconciliation", "Rapprochement", "payments"), adminItem("finance-reports", "Rapports", "statistics")] },
+  { key: "communication", label: "Communication", icon: "◌", items: [adminItem("notifications", "Notifications", "notifications"), adminItem("emails", "Emails", "notifications"), adminItem("templates", "Modèles", "notifications"), adminItem("campaigns", "Campagnes", "notifications"), adminItem("system-messages", "Messages système", "notifications")] },
+  { key: "security", label: "Sécurité", icon: "⌾", items: [adminItem("audit", "Audit", "audit"), adminItem("security-events", "Événements sécurité", "security"), adminItem("denied-access", "Accès refusés", "security"), adminItem("privileged-sessions", "Sessions privilégiées", "security"), adminItem("sensitive-roles", "Rôles sensibles", "roles"), adminItem("deletion-requests", "Demandes de suppression", "security")] },
+  { key: "platform", label: "Plateforme", icon: "⌘", items: [adminItem("health", "Santé des services", "maintenance"), adminItem("integrations", "Intégrations", "settings"), adminItem("webhooks", "Webhooks", "settings"), adminItem("jobs", "Jobs", "maintenance"), adminItem("functional-settings", "Paramètres fonctionnels", "settings"), adminItem("features", "Fonctionnalités", "settings"), adminItem("technical-logs", "Journaux techniques", "audit")] },
+  { key: "reports", label: "Rapports", icon: "↗", items: [adminItem("global-statistics", "Rapports et statistiques", "statistics")] },
+  { key: "settings", label: "Paramètres", icon: "⚙", items: [adminItem("settings", "Configuration", "settings"), adminItem("maintenance", "Maintenance", "maintenance")] },
+];
 
 const adminRoleLabels: Record<string, string> = {
   super_admin: "Super administrateur",
@@ -365,6 +385,16 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
   if (!context) return null;
 
   const visibleNavigation = navigation.filter((item) => canAccessModule(context, item.key, item.permission));
+  const groupedNavigation: SidebarNavigationGroup[] = navigationGroups.map((group) => ({
+    key: group.key,
+    label: group.label,
+    icon: group.icon,
+    direct: group.direct,
+    items: group.items.filter((alias) => visibleNavigation.some((item) => item.key === alias.target)).map((alias) => {
+      const target = navigation.find((item) => item.key === alias.target);
+      return { key: alias.key, label: alias.label, icon: target?.icon ?? "·", active: activeModule === alias.target, onSelect: () => { setActiveModule(alias.target); setMobileNav(false); } };
+    }),
+  })).filter((group) => group.items.length > 0);
   const effectiveModule = visibleNavigation.some((item) => item.key === activeModule) ? activeModule : landingModule(context);
   const current = navigation.find((item) => item.key === effectiveModule) ?? visibleNavigation[0];
   const roleLabel = context.is_super_admin ? adminRoleLabels.super_admin : context.roles.map((role) => adminRoleLabels[role] ?? role).join(", ");
@@ -374,11 +404,7 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
     <aside className={`admin-sidebar ${mobileNav ? "mobile-open" : ""}`}>
       <button className="admin-brand" onClick={() => setActiveModule(landingModule(context))}><Image src="/brand/mata-app-icon.webp" alt="" width={42} height={42} unoptimized /><strong>MATA<small>CONTROL CENTER</small></strong></button>
       <div className="admin-role-card"><i>{roleInitials}</i><span><strong>{roleLabel}</strong><small>Accès sécurisé</small></span></div>
-      <nav aria-label="Navigation Super Admin">{visibleNavigation.map((item) =>
-        <button key={item.key} className={activeModule === item.key ? "active" : ""} onClick={() => { setActiveModule(item.key); setMobileNav(false); }} title={item.label}>
-          <i>{item.icon}</i><span>{item.label}</span>
-        </button>,
-      )}</nav>
+      <nav aria-label="Navigation Super Admin"><SidebarNavigation groups={groupedNavigation} storageKey="mata-sidebar-super-admin" singleOpen={mobileNav} onNavigate={() => setMobileNav(false)} /></nav>
       <button className="admin-signout" onClick={() => void signOut()}><i>↪</i><span>Se déconnecter</span></button>
     </aside>
     <section className="admin-workspace">

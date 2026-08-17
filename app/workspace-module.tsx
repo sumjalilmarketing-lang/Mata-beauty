@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { WorkspaceModule, WorkspaceSpaceKey } from "@/lib/navigation/spaces";
-import { workspaceHref, workspaceSpaces } from "@/lib/navigation/spaces";
+import { workspaceHref, workspaceNavigationModules, workspaceSpaces } from "@/lib/navigation/spaces";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CreatorStudio } from "./creator-studio";
 import { ClientControlCenter } from "./client-control-center";
@@ -33,7 +33,8 @@ const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, Resour
 
 export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
-  const definition = module.resource ? resources[module.resource] : module.key === "dashboard" ? resources.bookings : undefined;
+  const functionalKey = module.targetKey ?? module.key;
+  const definition = module.resource ? resources[module.resource] : functionalKey === "dashboard" ? resources.bookings : undefined;
   const searchParams = useSearchParams();
   const query = (searchParams?.get("q") ?? "").trim().toLocaleLowerCase("fr");
   const [rows, setRows] = useState<Row[]>([]);
@@ -53,13 +54,14 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   }, [definition, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
-  if (space === "salon" && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
-  if (space === "salon" && module.key !== "videos") return <SalonControlCenter module={module} userId={userId} />;
-  if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;
-  if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
-  if (space === "client" && module.key === "profile") return <ClientControlCenter userId={userId} />;
-  if (space === "client" && module.key === "inspirations") return <SocialDashboard role="client" userId={userId} />;
-  const shortcuts = workspaceSpaces[space].modules.filter((item) => item.key !== module.key && allowedModuleKeys.includes(item.key)).slice(0, 4);
+  if (space === "salon" && functionalKey === "messages") return <WorkspaceMessaging userId={userId} />;
+  const salonSpecialized = new Set(["dashboard", "profile", "team", "services", "agenda", "bookings", "revenue", "statistics", "reviews", "portfolio", "settings"]);
+  if (space === "salon" && salonSpecialized.has(functionalKey)) return <SalonControlCenter module={{ ...module, key: functionalKey }} userId={userId} />;
+  if ((space === "pro" || space === "salon") && functionalKey === "videos") return <CreatorStudio key={module.key} userId={userId} providerApproved={providerApproved} initialTab={studioTab(module.key)} />;
+  if ((space === "client" || space === "pro") && functionalKey === "messages") return <WorkspaceMessaging userId={userId} />;
+  if (space === "client" && functionalKey === "profile") return <ClientControlCenter userId={userId} />;
+  if (space === "client" && functionalKey === "inspirations") return <SocialDashboard role="client" userId={userId} />;
+  const shortcuts = workspaceNavigationModules(space).filter((item) => item.key !== module.key && allowedModuleKeys.includes(item.key)).slice(0, 4);
   return <section className="workspace-content">
     <div className="workspace-intro"><div><span>Module sécurisé</span><h2>{module.label}</h2><p>{module.description}</p>{module.key === "dashboard" && (space === "pro" || space === "salon") && <Link className="workspace-quick-publish" href={workspaceHref(space, "videos")}>＋ Publier une vidéo</Link>}</div><div className="workspace-status"><i />Données limitées par vos droits</div></div>
     <div className="workspace-metrics">
@@ -78,6 +80,11 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
       <aside className="workspace-panel workspace-shortcuts"><header><div><span>Accès rapides</span><h3>Continuer</h3></div></header>{shortcuts.map((item) => <Link href={workspaceHref(space, item.key)} key={item.key}><span>{item.icon}</span><div><strong>{item.label}</strong><small>{item.description}</small></div><b>›</b></Link>)}</aside>
     </div>
   </section>;
+}
+
+function studioTab(key: string) {
+  const tabs = { publish: "create", "my-videos": "videos", drafts: "drafts", scheduled: "scheduled", photos: "photos", statistics: "statistics" } as const;
+  return tabs[key as keyof typeof tabs] ?? "create";
 }
 
 function text(value: unknown, fallback: string) { return typeof value === "string" && value.trim() ? value : fallback; }
