@@ -426,3 +426,31 @@ test("public categories and service filters come from Supabase data", async () =
   assert.doesNotMatch(app, /const categories = \[/);
   assert.doesNotMatch(app, /const subcategories:/);
 });
+
+test("video discovery exposes a canonical feed and hardens legacy media access", async () => {
+  const [route, feed, studio, profile, dashboard, migration] = await Promise.all([
+    readFile(new URL("app/feed/page.tsx", root), "utf8"),
+    readFile(new URL("app/social-feed.tsx", root), "utf8"),
+    readFile(new URL("app/creator-studio.tsx", root), "utf8"),
+    readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
+    readFile(new URL("app/social-dashboard.tsx", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260817100000_video_path_hardening.sql", root), "utf8"),
+  ]);
+  assert.match(route, /initialScreen="feed"/);
+  assert.match(feed, /Abonnements/);
+  assert.match(feed, /Rechercher vidéos, professionnels, prestations ou hashtags/);
+  assert.match(feed, /Afficher plus de commentaires/);
+  assert.match(feed, /get_provider_follower_counts/);
+  assert.match(feed, /\/feed\?hashtag=/);
+  for (const label of ["Archives", "Commentaires", "Modération"]) assert.match(studio, new RegExp(label));
+  assert.match(profile, /profile-video-grid/);
+  assert.match(profile, /\/feed\?post=/);
+  assert.match(dashboard, /inspiration_collection_posts/);
+  assert.match(dashboard, /assignCollection/);
+  assert.match(migration, /set public = false/);
+  assert.match(migration, /authorized legacy social media reads/);
+  assert.match(migration, /post\.status = 'published'/);
+  assert.match(migration, /post\.visibility = 'public'/);
+  assert.match(migration, /security definer/);
+  assert.doesNotMatch(route + feed + studio + profile + dashboard + migration, /SUPABASE_SERVICE_ROLE_KEY/);
+});

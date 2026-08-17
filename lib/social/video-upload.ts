@@ -1,4 +1,6 @@
 export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+export const MAX_VIDEO_DURATION_SECONDS = 90;
+export const MAX_VIDEO_HASHTAGS = 10;
 
 export type VideoUploadFormat = {
   extension: "mp4" | "mov" | "webm";
@@ -36,6 +38,20 @@ export function validateVideoUpload(file: FileDescriptor) {
   if (!format) return { ok: false as const, message: "Format vidéo non pris en charge." };
   if (file.size > MAX_VIDEO_BYTES) return { ok: false as const, message: "Vidéo trop volumineuse. Taille maximale : 100 Mo." };
   return { ok: true as const, format };
+}
+
+export function validateVideoDuration(durationSeconds: number) {
+  return Number.isFinite(durationSeconds) && durationSeconds >= 1 && durationSeconds <= MAX_VIDEO_DURATION_SECONDS
+    ? { ok: true as const }
+    : { ok: false as const, message: `La vidéo doit durer entre 1 et ${MAX_VIDEO_DURATION_SECONDS} secondes.` };
+}
+
+export function parseVideoHashtags(value: string) {
+  return [...new Set(value
+    .split(/[\s,]+/)
+    .map((tag) => tag.trim().toLocaleLowerCase("fr").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/^#/, "").replace(/[^a-z0-9_]/g, ""))
+    .filter((tag) => tag.length >= 2 && tag.length <= 50))]
+    .slice(0, MAX_VIDEO_HASHTAGS);
 }
 
 /** Traduit les erreurs Storage/RPC sans exposer les détails SQL au navigateur. */

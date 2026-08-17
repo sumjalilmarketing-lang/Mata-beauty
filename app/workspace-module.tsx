@@ -34,7 +34,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const definition = module.resource ? resources[module.resource] : module.key === "dashboard" ? resources.bookings : undefined;
   const searchParams = useSearchParams();
-  const query = (searchParams.get("q") ?? "").trim().toLocaleLowerCase("fr");
+  const query = (searchParams?.get("q") ?? "").trim().toLocaleLowerCase("fr");
   const [rows, setRows] = useState<Row[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "unavailable">(definition ? "loading" : "unavailable");
   useEffect(() => {

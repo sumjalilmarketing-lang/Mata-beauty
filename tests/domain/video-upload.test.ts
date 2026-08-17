@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_VIDEO_BYTES, resolveVideoUploadFormat, validateVideoUpload, videoPublishErrorMessage } from "../../lib/social/video-upload";
+import { MAX_VIDEO_BYTES, parseVideoHashtags, resolveVideoUploadFormat, validateVideoDuration, validateVideoUpload, videoPublishErrorMessage } from "../../lib/social/video-upload";
 
 describe("validation des vidéos Studio", () => {
   it.each([
@@ -24,6 +24,16 @@ describe("validation des vidéos Studio", () => {
   it("applique exactement la limite Storage de 100 Mo", () => {
     expect(validateVideoUpload({ name: "clip.mp4", type: "video/mp4", size: MAX_VIDEO_BYTES }).ok).toBe(true);
     expect(validateVideoUpload({ name: "clip.mp4", type: "video/mp4", size: MAX_VIDEO_BYTES + 1 })).toEqual({ ok: false, message: "Vidéo trop volumineuse. Taille maximale : 100 Mo." });
+  });
+
+  it("centralise la durée maximale à 90 secondes", () => {
+    expect(validateVideoDuration(90)).toEqual({ ok: true });
+    expect(validateVideoDuration(90.01)).toEqual({ ok: false, message: "La vidéo doit durer entre 1 et 90 secondes." });
+  });
+
+  it("normalise, déduplique et limite les hashtags", () => {
+    expect(parseVideoHashtags("#Braids, #Dakar #braids beauté! x")).toEqual(["braids", "dakar", "beaute"]);
+    expect(parseVideoHashtags(Array.from({ length: 12 }, (_, index) => `#tag_${index}`).join(" "))).toHaveLength(10);
   });
 });
 

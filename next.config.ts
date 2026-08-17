@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  turbopack: { root: process.cwd() },
   async redirects() {
     return [
       { source: "/posts/:id", destination: "/video/:id", permanent: false },

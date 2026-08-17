@@ -26,6 +26,7 @@ describe("transparent social feed ranking", () => {
     const item = { city: "Dakar — Almadies", serviceTitle: "Pose Lace Wig HD", hashtags: ["perruques", "dakar"] };
     expect(matchesSocialFeedFilter("Perruques", item)).toBe(true);
     expect(matchesSocialFeedFilter("Près de moi", item, "Dakar")).toBe(true);
+    expect(matchesSocialFeedFilter("Abonnements", item)).toBe(true);
     expect(matchesSocialFeedFilter("Tendances", item)).toBe(true);
     expect(matchesSocialFeedFilter("Ongles", item)).toBe(false);
   });

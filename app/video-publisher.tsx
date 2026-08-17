@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
-import { validateVideoUpload, videoPublishErrorMessage, type VideoUploadFormat } from "@/lib/social/video-upload";
+import { MAX_VIDEO_DURATION_SECONDS, parseVideoHashtags, validateVideoDuration, validateVideoUpload, videoPublishErrorMessage, type VideoUploadFormat } from "@/lib/social/video-upload";
 
 type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; services: { categories: { name: string } | null } | null };
 type PublishStatus = "draft" | "scheduled" | "published";
@@ -90,7 +90,8 @@ async function inspectVideo(file: File, createThumbnail: boolean) {
       video.onerror = () => { window.clearTimeout(timeout); reject(new Error("La vidéo ne peut pas être analysée.")); };
     });
     const duration = await resolveVideoDuration(video);
-    if (duration < 1 || duration > 90) throw new Error("La vidéo doit durer entre 1 et 90 secondes.");
+    const durationValidation = validateVideoDuration(duration);
+    if (!durationValidation.ok) throw new Error(durationValidation.message);
     if (!video.videoWidth || !video.videoHeight) throw new Error("Dimensions vidéo invalides.");
     const aspectRatio = video.videoWidth / video.videoHeight;
     if (!createThumbnail) return { duration, aspectRatio, thumbnail: null };
@@ -225,7 +226,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
           target_allow_comments: values.get("allowComments") === "on", target_client_consent: consent,
           target_scheduled_for: status === "scheduled" ? new Date(scheduledValue).toISOString() : null,
           target_visibility: String(values.get("visibility") ?? "public"),
-          target_hashtags: String(values.get("hashtags") ?? "").split(/[\s,]+/).filter(Boolean).slice(0, 10),
+          target_hashtags: parseVideoHashtags(String(values.get("hashtags") ?? "")),
           target_location: String(values.get("location") ?? "").trim() || null,
           target_available_at: values.get("availableAt") ? new Date(String(values.get("availableAt"))).toISOString() : null,
         }));
@@ -245,7 +246,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
           target_post_type: selectedType, target_title: String(values.get("title") ?? "").trim(), target_caption: String(values.get("caption") ?? "").trim(), target_media_urls: mediaUrls,
           target_provider_service_id: serviceId || null, target_status: status, target_allow_comments: values.get("allowComments") === "on", target_client_consent: consent,
           target_scheduled_for: status === "scheduled" ? new Date(scheduledValue).toISOString() : null, target_visibility: String(values.get("visibility") ?? "public"),
-          target_hashtags: String(values.get("hashtags") ?? "").split(/[\s,]+/).filter(Boolean).slice(0, 10), target_location: String(values.get("location") ?? "").trim() || null,
+          target_hashtags: parseVideoHashtags(String(values.get("hashtags") ?? "")), target_location: String(values.get("location") ?? "").trim() || null,
           target_available_at: values.get("availableAt") ? new Date(String(values.get("availableAt"))).toISOString() : null,
           target_discount: values.get("discount") ? Number(values.get("discount")) : null, target_promotion_ends_at: values.get("promotionEndsAt") ? new Date(String(values.get("promotionEndsAt"))).toISOString() : null,
           target_promotion_slots: values.get("promotionSlots") ? Number(values.get("promotionSlots")) : null,
@@ -281,7 +282,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
     <form className="dashboard-form video-publisher-form" onSubmit={(event) => void publish(event)}>
       <label>Format<select name="contentType" value={contentType} onChange={(event) => setContentType(event.target.value as ContentType)}><option value="video">Vidéo</option><option value="photo">Photo / carrousel</option><option value="before_after">Avant / Après</option><option value="promotion">Promotion</option><option value="availability">Disponibilité immédiate</option></select></label>
       <label>Titre<input name="title" maxLength={120} placeholder="Ex. Tresses Knotless" /></label>
-      {contentType === "video" ? <><label className="wide video-drop">Vidéo MP4, WebM ou MOV · 90 s maximum · 100 Mo<input ref={mediaInput} name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required onChange={(event) => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); setPreviewUrls(event.target.files?.[0] ? [URL.createObjectURL(event.target.files[0])] : []); }} /></label><label className="wide">Miniature personnalisée (facultatif)<input name="thumbnail" type="file" accept="image/jpeg,image/png,image/webp" /></label></> : <label className="wide video-drop">{contentType === "before_after" ? "Deux images : avant puis après" : "Images JPEG, PNG ou WebP · 10 maximum"}<input ref={mediaInput} name="media" type="file" accept="image/jpeg,image/png,image/webp" multiple={contentType !== "promotion" && contentType !== "availability"} required onChange={(event) => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); setPreviewUrls(Array.from(event.target.files ?? []).map((item) => URL.createObjectURL(item))); }} /></label>}
+      {contentType === "video" ? <><label className="wide video-drop">Vidéo MP4, WebM ou MOV · {MAX_VIDEO_DURATION_SECONDS} s maximum · 100 Mo<input ref={mediaInput} name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required onChange={(event) => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); setPreviewUrls(event.target.files?.[0] ? [URL.createObjectURL(event.target.files[0])] : []); }} /></label><label className="wide">Miniature personnalisée (facultatif)<input name="thumbnail" type="file" accept="image/jpeg,image/png,image/webp" /><small>Choisissez une image optimisée, ou laissez Mata Beauty extraire automatiquement une frame.</small></label></> : <label className="wide video-drop">{contentType === "before_after" ? "Deux images : avant puis après" : "Images JPEG, PNG ou WebP · 10 maximum"}<input ref={mediaInput} name="media" type="file" accept="image/jpeg,image/png,image/webp" multiple={contentType !== "promotion" && contentType !== "availability"} required onChange={(event) => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); setPreviewUrls(Array.from(event.target.files ?? []).map((item) => URL.createObjectURL(item))); }} /></label>}
       {previewUrls.length > 0 && <div className="wide publisher-preview">{contentType === "video" ? <video src={previewUrls[0]} controls muted playsInline aria-label="Aperçu de la vidéo" /> : previewUrls.map((url, index) => <Image key={url} src={url} alt={contentType === "before_after" ? index === 0 ? "Avant" : "Après" : `Aperçu ${index + 1}`} width={320} height={400} unoptimized />)}<span>Aperçu avant publication</span><button type="button" onClick={() => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); setPreviewUrls([]); if (mediaInput.current) mediaInput.current.value = ""; }}>Supprimer et recommencer</button></div>}
       <label className="wide">Légende<textarea name="caption" required maxLength={2200} rows={3} placeholder="Expliquez la technique, le résultat ou le conseil beauté…" /></label>
       <label className="wide">Hashtags<input name="hashtags" maxLength={300} placeholder="#tresses #dakar #soins" /></label>

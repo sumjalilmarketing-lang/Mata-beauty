@@ -294,6 +294,10 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await page.getByRole("button", { name: "Fermer" }).click();
   await mainCard.getByRole("button", { name: "Profil de Mata Feed Pro" }).click();
   await expect(page.getByText("Mata Feed Pro").first()).toBeVisible();
+  await page.getByRole("button", { name: "Vidéos", exact: true }).click();
+  await expect(page.getByText(studioCaption)).toBeVisible();
+  await page.getByRole("button", { name: "Prestations", exact: true }).click();
+  await expect(page.getByText(`Tresses Preview ${run}`).first()).toBeVisible();
   await page.getByRole("button", { name: "Retour" }).click();
   await expect(page.getByText(studioCaption)).toBeVisible();
   await mainCard.getByRole("button", { name: "Réserver" }).click();
@@ -335,6 +339,10 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await providerPage.getByRole("button", { name: "Statistiques" }).click();
   await expect(providerPage.getByRole("heading", { name: "Performances" })).toBeVisible();
   await expect(providerPage.getByText(/1 réservations/)).toBeVisible();
+  await providerPage.getByRole("button", { name: "Commentaires", exact: true }).click();
+  await expect(providerPage.getByText(`Super résultat ${run}`)).toBeVisible();
+  await providerPage.getByRole("button", { name: "Modération", exact: true }).click();
+  await expect(providerPage.getByText(/signalements sont traités par l’équipe Mata Beauty/i)).toBeVisible();
   await providerContext.close();
   const [like, save, follow, comment] = await Promise.all([
     admin.from("post_likes").select("post_id", { count: "exact", head: true }).eq("post_id", studioPostId).eq("profile_id", clientId),
@@ -343,6 +351,16 @@ test("le feed social distant relie les interactions au profil et à la réservat
     admin.from("post_comments").select("id", { count: "exact", head: true }).eq("post_id", studioPostId).eq("author_id", clientId),
   ]);
   expect([like.count, save.count, follow.count, comment.count]).toEqual([1, 1, 1, 1]);
+
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: "Mes inspirations" })).toBeVisible();
+  const collectionName = `Mariage ${run}`;
+  await page.getByLabel("Nom de la collection").fill(collectionName);
+  await page.getByRole("button", { name: "Créer", exact: true }).click();
+  await expect(page.getByText(new RegExp(`${collectionName} · 0`))).toBeVisible();
+  await page.getByLabel(`Collection pour ${studioCaption}`).selectOption({ label: collectionName });
+  await expect(page.getByText("Inspiration ajoutée à la collection.")).toBeVisible();
+  await expect(page.getByText(new RegExp(`${collectionName} · 1`))).toBeVisible();
 
   const conversation = await clientApi.rpc("ensure_booking_conversation", { target_booking_id: bookingId });
   expect(conversation.error).toBeNull();
@@ -427,7 +445,10 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/app/);
-  await page.goto("/");
+  const paginatedComments = Array.from({ length: 21 }, (_, index) => ({ post_id: studioPostId, author_id: clientId, body: `Commentaire paginé ${index + 1} ${run}` }));
+  expect((await clientApi.from("post_comments").insert(paginatedComments)).error).toBeNull();
+  await page.goto("/feed");
+  await expect(page).toHaveURL(/\/feed/);
   await expect(page.locator(".social-video-card")).toHaveCount(8);
   const feed = page.locator(".social-feed");
   await feed.evaluate((node) => node.scrollTo({ top: node.scrollHeight, behavior: "auto" }));
@@ -438,6 +459,24 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   }
   await page.getByRole("button", { name: "Tendances", exact: true }).click();
   await expect.poll(() => page.locator(".social-video-card").count()).toBeGreaterThanOrEqual(10);
+  await page.getByRole("button", { name: "Rechercher dans les vidéos" }).click();
+  await page.getByLabel("Rechercher vidéos, professionnels, prestations ou hashtags").fill(studioCaption);
+  await expect(page.locator(".social-video-card")).toHaveCount(1);
+  await page.getByLabel("Rechercher vidéos, professionnels, prestations ou hashtags").fill("");
+  await page.getByRole("button", { name: "#tresses", exact: true }).first().click();
+  await expect(page).toHaveURL(/hashtag=tresses/);
+  await expect(page.locator(".social-video-card")).not.toHaveCount(0);
+  await page.getByRole("button", { name: "Effacer le filtre hashtag" }).click();
+  await page.getByRole("button", { name: "Abonnements", exact: true }).click();
+  await expect(page.locator(".social-video-card")).not.toHaveCount(0);
+  await expect(page.locator(".social-video-card").first()).toHaveAttribute("aria-label", "Publication de Mata Feed Pro");
+  await expect(page.locator(".follower-count").first()).toContainText(/\d/);
+  await page.getByRole("button", { name: "Pour toi", exact: true }).click();
+  const studioCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
+  await studioCard.getByRole("button", { name: "Commentaires" }).click();
+  await expect(page.locator(".comments-sheet article")).toHaveCount(20);
+  await page.getByRole("button", { name: "Afficher plus de commentaires" }).click();
+  await expect.poll(() => page.locator(".comments-sheet article").count()).toBeGreaterThan(20);
 });
 
 test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async ({ browser }) => {

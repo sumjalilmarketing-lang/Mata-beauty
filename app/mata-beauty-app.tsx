@@ -51,7 +51,8 @@ type PaymentCapabilities = {
 
 type BookingConfirmation = { id: string; date: string; time: string; location: string };
 type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; business_id?: string | null };
-type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[] };
+type ProviderSocialVideo = { id: string; caption: string; thumbnailUrl: string | null };
+type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[]; socialVideos: ProviderSocialVideo[] };
 type BookingSelection = { provider: Provider; service: ProviderService; sourcePostId?: string };
 type AvailabilitySlot = { slot_start: string };
 type BookableCollaborator = { id: string; display_name: string; title: string | null };
@@ -625,8 +626,8 @@ function ProviderCard({ provider, nextSlot, favorite, onFavorite, onView, onBook
 }
 
 function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook }: { provider: Provider; favorite: boolean; onBack: () => void; onFavorite: () => void; onBook: (service: ProviderService) => void }) {
-  const [tab, setTab] = useState<"services" | "reviews" | "about">("services");
-  const [detail, setDetail] = useState<ProviderDetail>({ bio: null, services: [], portfolio: [] });
+  const [tab, setTab] = useState<"videos" | "services" | "reviews" | "about">("services");
+  const [detail, setDetail] = useState<ProviderDetail>({ bio: null, services: [], portfolio: [], socialVideos: [] });
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
@@ -635,12 +636,21 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
       supabase.from("provider_profiles").select("bio").eq("profile_id", provider.profileId).maybeSingle(),
       supabase.from("provider_services").select("id,title,duration_minutes,price_amount,business_id").eq("provider_id", provider.profileId).eq("is_active", true).order("price_amount"),
       supabase.from("portfolio_items").select("media_url").eq("provider_id", provider.profileId).order("position").limit(12),
-    ]).then(([profileResult, servicesResult, portfolioResult]) => {
+      supabase.from("posts").select("id,caption,thumbnail_url,social_post_media(bucket_id,thumbnail_path)").eq("author_id", provider.profileId).eq("post_type", "video").eq("status", "published").eq("visibility", "public").order("published_at", { ascending: false }).limit(12),
+    ]).then(async ([profileResult, servicesResult, portfolioResult, videosResult]) => {
+      if (!active) return;
+      const socialVideos = await Promise.all(((videosResult.data ?? []) as Array<{ id: string; caption: string; thumbnail_url: string | null; social_post_media: Array<{ bucket_id: string; thumbnail_path: string | null }> }>).map(async (video) => {
+        const media = video.social_post_media[0];
+        if (!media?.thumbnail_path) return { id: video.id, caption: video.caption, thumbnailUrl: video.thumbnail_url };
+        const { data: signed } = await supabase.storage.from(media.bucket_id).createSignedUrl(media.thumbnail_path, 3600);
+        return { id: video.id, caption: video.caption, thumbnailUrl: signed?.signedUrl ?? null };
+      }));
       if (!active) return;
       setDetail({
         bio: profileResult.data?.bio ?? null,
         services: (servicesResult.data ?? []) as ProviderService[],
         portfolio: (portfolioResult.data ?? []).map((item) => item.media_url),
+        socialVideos,
       });
     });
     return () => { active = false; };
@@ -651,8 +661,9 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
     <section className="premium-profile-info"><div className="profile-heading-row"><h1>{provider.name}</h1>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}</div><p className="profile-rating">★ {provider.rating.toFixed(1)} ({provider.reviews} avis) <i>•</i> {provider.area}</p><p>{detail.bio || `${provider.specialty}, avec une approche professionnelle et personnalisée.`}</p><div className="profile-facts"><span>◷<strong>Sur rendez-vous</strong><small>Horaires réels</small></span><span>⌂<strong>{provider.homeService ? "À domicile" : "En salon"}</strong><small>{provider.homeService ? "Disponible" : "Sur place"}</small></span><span>◫<strong>Clientèle</strong><small>Mixte</small></span></div>
       {detail.portfolio.length > 0 && <div className="portfolio-strip">{detail.portfolio.map((url, index) => <Image key={url} src={url} alt={`Réalisation ${index + 1} de ${provider.name}`} width={92} height={92} />)}</div>}
     </section>
-    <div className="profile-tabs"><button className={tab === "services" ? "active" : ""} onClick={() => setTab("services")}>Prestations</button><button className={tab === "reviews" ? "active" : ""} onClick={() => setTab("reviews")}>Avis</button><button className={tab === "about" ? "active" : ""} onClick={() => setTab("about")}>À propos</button></div>
+    <div className="profile-tabs"><button className={tab === "videos" ? "active" : ""} onClick={() => setTab("videos")}>Vidéos</button><button className={tab === "services" ? "active" : ""} onClick={() => setTab("services")}>Prestations</button><button className={tab === "reviews" ? "active" : ""} onClick={() => setTab("reviews")}>Avis</button><button className={tab === "about" ? "active" : ""} onClick={() => setTab("about")}>À propos</button></div>
     <section className="profile-tab-content">
+      {tab === "videos" && (detail.socialVideos.length ? <div className="profile-video-grid">{detail.socialVideos.map((video) => <a href={`/feed?post=${video.id}`} key={video.id}>{video.thumbnailUrl ? <Image src={video.thumbnailUrl} alt={video.caption} width={180} height={240} unoptimized /> : <span>▶</span>}<small>{video.caption}</small></a>)}</div> : <div className="profile-empty-tab"><strong>Aucune vidéo publiée</strong><p>Les prochaines réalisations apparaîtront ici.</p></div>)}
       {tab === "services" && services.map((service) => <button className="profile-service-row" key={service.id} onClick={() => onBook(service)}><span><strong>{service.title}</strong><small><em>{formatPrice(service.price_amount)}</em> · {formatDuration(service.duration_minutes)}</small></span><span>Choisir <b>›</b></span></button>)}
       {tab === "reviews" && <div className="profile-empty-tab"><strong>{provider.rating.toFixed(1)} / 5</strong><p>{provider.reviews ? `${provider.reviews} avis vérifiés sont associés à ce profil.` : "Aucun avis publié pour le moment."}</p></div>}
       {tab === "about" && <div className="profile-empty-tab"><strong>Informations pratiques</strong><p>{detail.bio || `Prestations disponibles à ${provider.area}. Les coordonnées complètes sont communiquées pendant la réservation.`}</p></div>}
