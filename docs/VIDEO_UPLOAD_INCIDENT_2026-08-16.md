@@ -7,7 +7,9 @@
 - Preview finale validée : `https://mata-beauty-r4c5y1r0g-africrm.vercel.app`
 - Déploiement Vercel : `dpl_pVENtGFiFo8uqzretxbTumWsQa1x`, état `READY`
 - Supabase distant : `qjdwxdbvrxedyfolnpol`, 40 migrations locales / 40 distantes alignées
-- Production : non modifiée au moment de ce rapport
+- Production finale : `https://mata-beauty.vercel.app`
+- Commit Production final : `5639a23cdb959be8e16a05ad0238c2e0e9a4b450`
+- Déploiement Production final : `dpl_7YjQZNJbQBFrLHULyKvrrwRrYDyD`, état `READY`
 
 ## 1. Reproduction et cause réelle
 
@@ -137,6 +139,10 @@ Les comptes, posts, médias, disponibilités et réservations temporaires sont s
 
 ## 7. État Production
 
-La Production n’a pas encore été modifiée. La promotion et le smoke test Production restent conditionnés à la rotation explicitement autorisée du secret Vercel d’automatisation identifié pendant l’audit de la Preview, puis à un dernier contrôle du commit et des secrets.
+Le correctif est déployé sur `https://mata-beauty.vercel.app`. Le smoke test final a publié une vraie WebM MediaRecorder depuis Studio, atteint `100% · Terminé`, vérifié le post et son média dans Supabase, rechargé « Mes vidéos », puis confirmé la lecture dans Inspiration depuis une session cliente mobile indépendante.
 
-VIDEO PUBLISHING: FAIL — correctif Preview validé, promotion Production bloquée uniquement par l’autorisation de rotation du secret Vercel d’automatisation.
+Un test Production étendu a révélé une fenêtre de course Realtime distincte entre la requête initiale des messages et l'abonnement au canal. Le commit final `5639a23` ajoute une resynchronisation à l'état `SUBSCRIBED`. Le parcours Salon complet, incluant la réponse temps réel sans rechargement, a ensuite réussi en 59,9 secondes. Le golden path multi-espaces a réussi en 42,4 secondes.
+
+Les logs Vercel du déploiement final ne contiennent aucune erreur ni réponse HTTP 500 ; l'endpoint santé confirme la configuration, la base et l'accès serveur.
+
+VIDEO PUBLISHING: PASS
