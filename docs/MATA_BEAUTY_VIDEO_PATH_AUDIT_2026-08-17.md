@@ -116,3 +116,91 @@ Le bucket KYC n'est jamais utilisé par le parcours vidéo.
 - Aucun upload reprenable TUS n'est annoncé : l'upload XHR actuel fournit une progression réelle et un nettoyage transactionnel.
 - Aucun algorithme opaque n'est revendiqué : le feed Pour toi reste une heuristique déterministe, testable et diversifiée.
 - Aucune proximité GPS exacte n'est simulée sans consentement et infrastructure géospatiale.
+
+## Résultat final après correction — 2026-08-18
+
+### Version livrée
+
+- Branche : `codex/video-upload-critical-fix`.
+- Commit applicatif déployé et testé : `ec8e604` (`fix(video): stabilize inspiration collections test path`).
+- Preview Vercel : `https://mata-beauty-4a9miu5ce-africrm.vercel.app`.
+- Déploiement Vercel : `dpl_BbpPtQMaNzfWwr4nJTgDffvmVo8B`, état `READY`, cible Preview uniquement.
+- Production : non modifiée.
+- Supabase : migration `20260817100000_video_path_hardening.sql` appliquée ; 41 migrations locales et 41 distantes alignées.
+
+### Matrice de clôture
+
+| Bloc audité | Correction | Test réel | Résultat |
+|---|---|---|---|
+| Route vidéo | `/feed` canonique relié au feed immersif existant | Navigation directe Preview | PASS |
+| Publication professionnelle | Upload, miniature, description, hashtags, prestation, visibilité et publication conservés dans un flux unique | WebM enregistré par Chromium + vrais MP4/MOV | PASS |
+| Durée WebM | Repli de métadonnées borné avec `Number.MAX_SAFE_INTEGER`, sans valeur non finie | Publication WebM réelle de plus d'une seconde | PASS |
+| Storage | `provider-social-media`, `social-videos` et `social-thumbnails` privés ; lecture signée uniquement si propriétaire, publication publique autorisée ou admin | Test Storage/RLS distant | PASS |
+| Brouillons et contenus masqués | Lecture étrangère refusée ; feed limité à `published/public` | Script distant et scénario de modération | PASS |
+| Feed vertical | Snap, autoplay muet, boucle, pause hors écran, une seule vidéo active et préchargement courant/suivant | Playwright lecteur et scroll | PASS |
+| MP4/WebM/MOV | Validation centralisée, 90 s et 100 Mo, messages publics sûrs | Vitest + trois conteneurs réels | PASS |
+| Photos et avant/après | Upload Storage privé, écriture Supabase et rendu dans le feed | Playwright Preview | PASS |
+| Likes/saves/follows | RPC atomiques, contraintes uniques et compteurs serveur | Double-toggle/RLS distant + Playwright | PASS |
+| Commentaires | Création, réponses, suppression propriétaire, signalement et pagination 20 par 20 | 22 commentaires réels et refus croisé | PASS |
+| Mes inspirations | Route `/app/inspirations`, sauvegardes, création et affectation de collection | Golden Path Preview | PASS |
+| Concurrence collections | Les réponses de chargement obsolètes ne peuvent plus écraser une création récente | Playwright réseau réel | PASS |
+| Hashtags/recherche | Hashtags normalisés et cliquables, URL filtrée et recherche vidéo/pro/prestation/ville | Playwright Preview | PASS |
+| Abonnements | Onglet alimenté par les professionnels suivis et compteur public serveur | Playwright + RPC | PASS |
+| Profil professionnel | Vidéos sociales publiées et prestations accessibles depuis le feed | Feed → profil → vidéos → prestation → retour | PASS |
+| Réservation | Prestation, prix et disponibilités rechargés côté serveur ; attribution au post source | Réservation réelle + suppression du créneau + notification | PASS |
+| Statistiques | Vues, watch time, complétion, interactions, follows, visites, clics, réservations et CA | RPC `provider_creator_statistics` | PASS |
+| Modération | Signalement privé, refus professionnel, masquage admin, disparition du feed, audit et restauration Super Admin | Playwright + assertions base | PASS |
+| Studio | Vidéos publiées, brouillons, programmées, archives, commentaires, état de modération et statistiques | Playwright professionnel | PASS |
+| Mobile | Aucun débordement et actions accessibles sur le parcours feed/profil/réservation | 320, 360, 375, 390 et 430 px | PASS |
+
+### Architecture finale
+
+- Routes cliente : `/feed`, `/app/feed`, `/app/inspirations`, `/professional/[username]`, `/service/[id]`.
+- Routes créateur : `/pro/videos` et `/salon/videos`.
+- Routes de partage : `/posts/[id]` et `/video/[id]`.
+- Modération : `/admin/content`, avec décision par RPC permissionnée et auditée.
+- Le navigateur envoie le média directement à Supabase Storage sous sa session Auth. La création métier passe ensuite par une RPC qui revalide l'auteur, le statut professionnel, la prestation, le chemin Storage, la durée, le type et la visibilité.
+- La réservation ne fait jamais confiance au prix envoyé par le navigateur : le montant provient de `provider_services` dans la transaction serveur.
+
+Tables et vues utilisées : `posts`, `social_post_media`, `post_services`, `post_likes`, `post_comments`, `post_saves`, `post_shares`, `follows`, `hashtags`, `post_hashtags`, `video_views`, `video_watch_events`, `post_booking_clicks`, `social_profile_visits`, `reports`, `moderation_actions`, `social_post_features`, `inspiration_collections`, `inspiration_collection_posts` et `social_feed`.
+
+Buckets finaux :
+
+| Bucket | Public | Limite | Règle finale |
+|---|---:|---:|---|
+| `provider-social-media` | non | 100 Mo | Écriture sous le dossier de l'auteur ; lecture propriétaire, média publié/public ou admin |
+| `social-videos` | non | 100 Mo | Compatibilité historique avec URL signée et même contrôle de publication |
+| `social-thumbnails` | non | 5 Mo | Compatibilité historique avec URL signée et même contrôle de publication |
+| `provider-documents` | non | 10 Mo | KYC séparé, jamais utilisé par le social |
+
+Composants modifiés : `SocialFeed`, `VideoPublisher`, `CreatorStudio`, `SocialDashboard`, le profil professionnel et le routeur d'espaces. Aucun composant métier validé n'a été supprimé.
+
+### Résultats exacts
+
+- `pnpm lint` : PASS, 0 erreur.
+- `pnpm typecheck` : PASS, TypeScript strict.
+- `pnpm test` : PASS, 14 fichiers et 78 tests.
+- `pnpm test:smoke` : PASS, 19/19 tests structurels.
+- `pnpm build` : PASS, build Next.js 16.2.11 et 17 pages statiques générées.
+- `pnpm test:social:remote` : PASS avec 14 preuves distantes : publication avec prestation obligatoire, brouillon privé, compteurs protégés, modification étrangère refusée, isolation upload, likes idempotents, save/follow, commentaires/RLS, vues, collections privées, attribution/prix serveur et statistiques.
+- `tests/remote/social-feed-remote-ui.spec.ts` : PASS, 7/7 scénarios en 2,8 minutes sur la Preview finale et Supabase réel.
+- Responsive Playwright final : PASS à 320, 360, 375, 390 et 430 px. Inspection navigateur complémentaire sans débordement à 768, 1024 et 1440 px.
+- Migrations : PASS, 41/41 alignées.
+- Nettoyage : PASS après purge ciblée des anciens résidus de recette ; 0 compte Auth `codex-feed-*`, 0 profil Mata Feed temporaire. Le `afterAll` supprime maintenant rapports, décisions et messages avant les comptes.
+- Protection Preview : les bypass temporaires étaient générés uniquement pour chaque exécution et révoqués dans un bloc `finally`. Aucun secret n'a été affiché ni commité.
+
+### Bugs réellement détectés et corrigés pendant la recette finale
+
+1. Le module `Inspirations` du nouvel espace client affichait encore un écran générique. Il rend désormais le tableau réel `SocialDashboard` et le raccourci profil cible `/app/inspirations`.
+2. Deux chargements concurrents pouvaient faire disparaître une collection juste créée. Un identifiant de requête empêche désormais toute réponse obsolète de remplacer l'état le plus récent.
+3. Le test de pagination utilisait des URLs de médias inexistants. Les fixtures chargent maintenant un vrai MP4 dans Storage et le suppriment au nettoyage.
+4. Les exécutions interrompues laissaient des comptes à cause des clés étrangères `RESTRICT` de la modération. Le nettoyage respecte maintenant l'ordre rapports/décisions/messages, puis Auth.
+
+### Limites connues, non simulées
+
+- Il n'existe pas de transcodage serveur : MP4, WebM et MOV sont acceptés seulement lorsque le navigateur peut réellement décoder leurs codecs.
+- Il n'existe pas encore de reprise TUS après fermeture complète du navigateur ; la progression XHR et le nettoyage sur erreur sont opérationnels.
+- La proximité exacte GPS et une mesure matérielle fiable des FPS ne sont pas revendiquées.
+- Le navigateur automatisé disponible était Chromium. Edge natif et Safari/WebKit natif n'étaient pas disponibles dans cet environnement ; aucun PASS n'est inventé pour eux.
+
+VERDICT PARCOURS VIDÉO: READY ON PREVIEW

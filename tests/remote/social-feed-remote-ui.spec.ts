@@ -91,6 +91,12 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  const temporaryUserIds = [clientId, providerId, moderatorId, superId].filter(Boolean);
+  if (temporaryUserIds.length) {
+    expect((await admin.from("moderation_actions").delete().in("actor_id", temporaryUserIds)).error).toBeNull();
+    expect((await admin.from("reports").delete().in("reporter_id", temporaryUserIds)).error).toBeNull();
+    expect((await admin.from("messages").delete().in("sender_id", temporaryUserIds)).error).toBeNull();
+  }
   if (bookingId) await admin.from("bookings").delete().eq("id", bookingId);
   if (providerId) await admin.from("posts").delete().eq("author_id", providerId);
   if (feedSeedStoragePath) expect((await admin.storage.from("social-videos").remove([feedSeedStoragePath])).error).toBeNull();
