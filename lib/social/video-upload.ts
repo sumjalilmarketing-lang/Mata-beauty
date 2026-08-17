@@ -67,7 +67,7 @@ export function videoPublishErrorMessage(error: unknown) {
   if (status === 413 || message.includes("too large") || message.includes("payload") || message.includes("taille maximale")) return "Vidéo trop volumineuse. Taille maximale : 100 Mo.";
   if (status === 409 || message.includes("duplicate") || message.includes("already exists")) return "Un envoi identique existe déjà. Réessayez.";
   if (message.includes("mime") || message.includes("format") || message.includes("codec") || message.includes("analys")) return "Format vidéo non pris en charge.";
-  if (message.includes("durée") || message.includes("duration") || message.includes("dimensions")) return "Impossible de lire la durée ou les dimensions de cette vidéo.";
+  if (message.includes("durée") || message.includes("duration") || message.includes("durer") || message.includes("dimensions")) return "Impossible de lire la durée ou les dimensions de cette vidéo.";
   if (code === "abort" || message.includes("abort") || message.includes("interromp") || message.includes("network") || message.includes("fetch")) return "L’envoi a été interrompu. Vérifiez votre connexion et réessayez.";
   if (message.includes("storage") || message.includes("object")) return "Impossible d’envoyer la vidéo. Réessayez.";
   return "Impossible d’enregistrer la publication. Réessayez.";

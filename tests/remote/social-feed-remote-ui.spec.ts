@@ -120,7 +120,9 @@ test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, br
   const recordedPage = await videoContext.newPage();
   await recordedPage.setContent('<style>html,body{margin:0;height:100%;display:grid;place-items:center;color:white;background:linear-gradient(145deg,#5b0b45,#d83f8c);font:28px sans-serif}</style><strong>Mata Beauty E2E</strong>');
   const recording = recordedPage.video();
-  await recordedPage.waitForTimeout(2200);
+  // L’encodage Playwright démarre après l’initialisation de la page : conserver
+  // une marge suffisante pour produire un média réellement supérieur à 1 s.
+  await recordedPage.waitForTimeout(5000);
   await videoContext.close();
   const videoPath = await recording!.path();
   await page.locator('input[name="video"]').setInputFiles(videoPath);
