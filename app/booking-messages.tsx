@@ -117,7 +117,32 @@ export function BookingMessages({
           table: "conversation_members",
           filter: `conversation_id=eq.${selectedConversationId}`,
         }, () => void loadMembers(selectedConversationId).catch(() => undefined))
-        .subscribe();
+        .subscribe((status) => {
+          if (status !== "SUBSCRIBED" || !active) return;
+
+          // Close the gap between the initial query and the Realtime subscription.
+          // A message committed during that handshake would otherwise remain hidden
+          // until the user reloads the conversation.
+          void (async () => {
+            try {
+              const { data, error: catchUpError } = await client
+                .from("messages")
+                .select("id,sender_id,body,created_at")
+                .eq("conversation_id", selectedConversationId)
+                .is("deleted_at", null)
+                .order("created_at", { ascending: false })
+                .limit(pageSize);
+              if (catchUpError) throw catchUpError;
+              if (!active) return;
+              const latestMessages = ((data ?? []) as MessageRow[]).reverse();
+              setMessages((current) => mergeMessages(current, latestMessages));
+              setHasOlder(latestMessages.length === pageSize);
+              await markRead(selectedConversationId);
+            } catch (caught: unknown) {
+              if (active) setError(publicErrorMessage(caught, "Impossible de synchroniser la conversation."));
+            }
+          })();
+        });
     }
 
     void initialize().catch((caught: unknown) => {
