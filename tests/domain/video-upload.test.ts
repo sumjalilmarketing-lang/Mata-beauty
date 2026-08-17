@@ -44,6 +44,7 @@ describe("messages publics de publication vidéo", () => {
     [{ status: 413 }, "Vidéo trop volumineuse. Taille maximale : 100 Mo."],
     [{ code: "ABORT" }, "L’envoi a été interrompu. Vérifiez votre connexion et réessayez."],
     [{ message: "invalid mime type" }, "Format vidéo non pris en charge."],
+    [{ message: "La durée de la vidéo ne peut pas être déterminée." }, "Impossible de lire la durée ou les dimensions de cette vidéo."],
     [{ message: "Fichier vidéo Storage invalide" }, "Impossible d’envoyer la vidéo. Réessayez."],
     [{ message: "duplicate key violates constraint" }, "Un envoi identique existe déjà. Réessayez."],
   ])("traduit une erreur technique sans détail SQL", (error, expected) => {

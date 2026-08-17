@@ -42,7 +42,9 @@ async function resolveVideoDuration(video: HTMLVideoElement) {
       resolve(duration);
     };
     events.forEach((eventName) => video.addEventListener(eventName, finish));
-    video.currentTime = 1e101;
+    // Une valeur finie évite le DOMException émis par certains Chromium/WebM
+    // quand un seek démesuré dépasse la plage temporelle du média.
+    video.currentTime = Number.MAX_SAFE_INTEGER;
   });
 }
 
