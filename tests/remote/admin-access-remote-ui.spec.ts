@@ -152,7 +152,7 @@ test.describe.serial("contrôle d’accès admin distant",()=>{
     const nav=page.getByRole("navigation",{name:"Navigation Super Admin"});
     for(const group of ["Marketplace","Finance","Sécurité","Plateforme"])await expect(nav.getByRole("button",{name:group,exact:true})).toBeVisible();
     for(const group of ["Utilisateurs","Contenu","Relation client","Onboarding","Communication","Paramètres"])await expect(nav.getByRole("button",{name:group,exact:true})).toHaveCount(0);
-    await openGroup(nav,"Finance");for(const name of ["Transactions","Paiements","Commissions","Wallets","Versements","Remboursements","Rapprochement"])await expect(nav.getByRole("button",{name,exact:true})).toBeVisible();
+    await openGroup(nav,"Finance");for(const name of ["Transactions","Paiements","Commissions","Wallets","Versements","Remboursements","Litiges","Rapprochement","Rapports"])await expect(nav.getByRole("button",{name,exact:true})).toBeVisible();
     await openGroup(nav,"Sécurité");await expect(nav.getByRole("button",{name:"Audit",exact:true})).toBeVisible();
   });
 
@@ -170,9 +170,10 @@ test.describe.serial("contrôle d’accès admin distant",()=>{
     await page.goto(`${remoteAppUrl}/admin`);await page.getByLabel("Adresse administrateur").fill(accounts.get("admin")!.email);await page.getByLabel("Mot de passe").fill(password);await page.getByRole("button",{name:"Accéder à l’administration"}).click();
     await expect(page.getByRole("heading",{name:"Vue d’ensemble",level:1})).toBeVisible({timeout:20000});
     const nav=page.getByRole("navigation",{name:"Navigation Super Admin"});
-    await expect(nav.getByRole("button",{name:"Sécurité",exact:true})).toHaveCount(0);
-    await expect(nav.getByRole("button",{name:"Paramètres",exact:true})).toHaveCount(0);
     await expect(nav.getByRole("button",{name:"Utilisateurs",exact:true})).toBeVisible();
+    await openGroup(nav,"Utilisateurs");for(const name of ["Agents internes","Administrateurs","Rôles","Permissions","Sessions"])await expect(nav.getByRole("button",{name,exact:true})).toHaveCount(0);
+    await openGroup(nav,"Sécurité");await expect(nav.getByRole("button",{name:"Audit",exact:true})).toBeVisible();for(const name of ["Événements sécurité","Accès refusés","Sessions privilégiées","Rôles sensibles","Demandes de suppression"])await expect(nav.getByRole("button",{name,exact:true})).toHaveCount(0);
+    await openGroup(nav,"Paramètres");await expect(nav.getByRole("button",{name:"Configuration",exact:true})).toBeVisible();await expect(nav.getByRole("button",{name:"Maintenance",exact:true})).toHaveCount(0);
   });
 
   test("le super administrateur voit tout et sa connexion est journalisée",async({page})=>{
