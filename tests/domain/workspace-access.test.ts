@@ -64,7 +64,7 @@ describe("workspace navigation", () => {
       expect(labels).toContain("Paramètres");
       expect(labels.some((label) => label.toLocaleLowerCase("fr").includes("profil"))).toBe(true);
     }
-    expect(workspaceSpaces.pro.navigation.map((group) => group.label)).toEqual(expect.arrayContaining(["Activité", "Relations", "Offre", "Contenu", "Finance", "Support"]));
+    expect(workspaceSpaces.pro.navigation.map((group) => group.label)).toEqual(expect.arrayContaining(["Activité", "Relations", "Offres & tarifs", "Contenu", "Finance", "Support"]));
   });
 
   it("inherits the permission of the functional target for navigation aliases", () => {

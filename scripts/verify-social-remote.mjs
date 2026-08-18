@@ -112,6 +112,9 @@ async function main() {
   assert.equal(foreignCollections.data.length, 0);
 
   const starts = new Date(Date.now() + 40 * 86400000); starts.setUTCHours(10, 0, 0, 0);
+  const availabilityDate = starts.toISOString().slice(0, 10);
+  const availability = await creator.client.from("availability_rules").insert({ provider_id: creator.id, weekday: starts.getUTCDay(), starts_at: "09:00", ends_at: "18:00", slot_interval_minutes: 30, valid_from: availabilityDate, valid_until: availabilityDate });
+  assert.ifError(availability.error);
   const booking = await client.client.from("bookings").insert({ client_id: client.id, provider_id: outsider.id, provider_service_id: serviceId, source_post_id: postId, starts_at: starts.toISOString(), ends_at: new Date(starts.getTime()+3600000).toISOString(), location_mode: "salon", total_amount: 1, currency: "EUR" }).select("id,provider_id,total_amount,currency,source_post_id").single();
   assert.ifError(booking.error); bookingId = booking.data.id;
   assert.equal(booking.data.provider_id, creator.id); assert.equal(booking.data.total_amount, 15000); assert.equal(booking.data.currency, "XOF"); assert.equal(booking.data.source_post_id, postId);

@@ -481,3 +481,26 @@ test("staff workspace membership is resolved by a least-privilege RLS policy", a
   assert.match(migration, /profile_id = auth\.uid\(\)/);
   assert.doesNotMatch(migration, /disable row level security/i);
 });
+
+test("commercial offers are centralized, server-priced, publishable and RLS protected", async () => {
+  const [spaces, manager, booking, studio, migration] = await Promise.all([
+    readFile(new URL("lib/navigation/spaces.ts", root), "utf8"),
+    readFile(new URL("app/commercial-offers.tsx", root), "utf8"),
+    readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
+    readFile(new URL("app/video-publisher.tsx", root), "utf8"),
+    readFile(new URL("supabase/migrations/20260818130000_commercial_offers.sql", root), "utf8"),
+  ]);
+  for (const label of ["Offres & tarifs", "Créer une prestation", "Options & suppléments", "Forfaits", "Prestations à domicile", "Offres publiées", "Archivées"]) assert.match(spaces, new RegExp(label));
+  for (const capability of ["saveService", "saveOption", "savePromotion", "savePackage", "set_owned_service_status", "commercial_permissions"]) assert.match(manager, new RegExp(capability));
+  assert.match(studio, /Créer une prestation/);
+  assert.match(studio, /eq\("status", "published"\)/);
+  assert.match(booking, /selected_option_ids/);
+  assert.match(booking, /promotion_id/);
+  assert.match(booking, /finalPrice/);
+  for (const table of ["service_options", "service_packages", "service_package_items"]) assert.match(migration, new RegExp(`alter table public\\.${table} enable row level security`));
+  for (const permission of ["service.create", "service.update", "service.publish", "pricing.update", "promotion.publish"]) assert.match(migration, new RegExp(permission.replace(".", "\\.")));
+  assert.match(migration, /calculate_service_quote/);
+  assert.match(migration, /new\.total_amount:=\(quote->>'total_amount'\)::integer/);
+  assert.doesNotMatch(manager + booking + studio, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.doesNotMatch(migration, /disable row level security/i);
+});

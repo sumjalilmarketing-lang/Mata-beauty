@@ -20,7 +20,7 @@ const tabs: Array<{ key: StudioTab; label: string }> = [
   { key: "comments", label: "Commentaires" }, { key: "moderation", label: "Modération" }, { key: "statistics", label: "Statistiques" },
 ];
 
-export function CreatorStudio({ userId, providerApproved, initialTab = "create" }: { userId: string; providerApproved: boolean; initialTab?: StudioTab }) {
+export function CreatorStudio({ userId, providerApproved, initialTab = "create", offersHref = "/pro/create-service" }: { userId: string; providerApproved: boolean; initialTab?: StudioTab; offersHref?: string }) {
   const [active, setActive] = useState<StudioTab>(initialTab);
   const [posts, setPosts] = useState<CreatorPost[]>([]);
   const [comments, setComments] = useState<CreatorComment[]>([]);
@@ -73,7 +73,7 @@ export function CreatorStudio({ userId, providerApproved, initialTab = "create" 
     <header className="studio-hero"><div><span>STUDIO MATA BEAUTY</span><h2>Transformez vos réalisations en réservations.</h2><p>Publiez une vidéo liée à une prestation, puis mesurez les rendez-vous qu’elle génère.</p></div><button onClick={() => setActive("create")}>＋ Publier</button></header>
     <nav className="studio-tabs" aria-label="Navigation Studio">{tabs.map((tab) => <button className={active === tab.key ? "active" : ""} key={tab.key} onClick={() => setActive(tab.key)}>{tab.label}</button>)}</nav>
     {feedback && <p className="dashboard-feedback" role="status">{feedback}</p>}
-    {active === "create" && <VideoPublisher userId={userId} providerApproved={providerApproved} onPublished={async (postType) => {
+    {active === "create" && <VideoPublisher userId={userId} providerApproved={providerApproved} offersHref={offersHref} onPublished={async (postType) => {
       await load();
       setFeedback(postType === "video" ? "Vidéo publiée et visible dans Inspiration." : "Publication enregistrée.");
       setActive(postType === "video" ? "videos" : postType === "before_after" ? "before_after" : "photos");

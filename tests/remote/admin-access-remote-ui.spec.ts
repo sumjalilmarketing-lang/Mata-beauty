@@ -75,8 +75,8 @@ test.describe.serial("contrôle d’accès admin distant",()=>{
 
   for(const [label,route,groups] of [
     ["client","/app",["Découvrir","Mes rendez-vous","Mes inspirations","Communication","Paiements","Support","Mon profil","Paramètres"]],
-    ["provider","/pro",["Activité","Relations","Offre","Contenu","Finance","Support","Profil professionnel","Paramètres"]],
-    ["salon","/salon",["Activité","Équipe","Offre","Contenu","Relations","Finance","Profil du salon","Support","Paramètres"]],
+    ["provider","/pro",["Activité","Relations","Offres & tarifs","Contenu","Finance","Support","Profil professionnel","Paramètres"]],
+    ["salon","/salon",["Activité","Équipe","Offres & tarifs","Contenu","Relations","Finance","Profil du salon","Support","Paramètres"]],
     ["staff","/staff",["Activité","Relations","Performance","Profil","Paramètres"]],
   ] as const){
     test(`la navigation ${label} ouvre chaque groupe et conserve ses routes`,async({page})=>{

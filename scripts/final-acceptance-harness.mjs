@@ -162,6 +162,7 @@ export async function startFinalAcceptance({ url, anonKey, serviceKey, previewUr
     assert.ifError(futureRule.error); created.commissionRuleIds.push(futureRule.data.id);
 
     const salonStarts = new Date(Date.now() + 42 * 86400000); salonStarts.setUTCHours(14, 0, 0, 0);
+    assert.ifError((await accounts.salon.supabase.from("business_hours").upsert({ business_id: business.data.id, weekday: salonStarts.getUTCDay(), opens_at: "09:00", closes_at: "19:00", is_closed: false }, { onConflict: "business_id,weekday" })).error);
     const salonBooking = await accounts.client.supabase.from("bookings").insert({ client_id: accounts.client.id, provider_id: accounts.outsider.id, provider_service_id: salonService.data.id, collaborator_id: collaborator.data.id, starts_at: salonStarts.toISOString(), ends_at: new Date(salonStarts.getTime() + 3600000).toISOString(), status: "pending", location_mode: "salon", total_amount: 1, currency: "EUR" }).select("id,business_id,collaborator_id,total_amount,currency").single();
     assert.ifError(salonBooking.error); created.bookingIds.push(salonBooking.data.id);
     const payment = await accounts.client.supabase.rpc("initialize_payment_v2", { target_booking_id: salonBooking.data.id, target_method: "wave", target_attempt: `salon-${runId}`, target_internal_reference: `MB-SALON-${runId}`, target_request_fingerprint: "a".repeat(64), target_source_ip_hash: "acceptance" });
@@ -181,6 +182,8 @@ export async function startFinalAcceptance({ url, anonKey, serviceKey, previewUr
     record(results, "Salon : même réservation visible et confirmable", salonBookingView.data.id === salonBooking.data.id && salonConfirm.data.status === "confirmed");
 
     const starts = new Date(Date.now() + 35 * 86400000); starts.setUTCHours(10, 0, 0, 0);
+    const providerBookingDate = starts.toISOString().slice(0, 10);
+    assert.ifError((await accounts.provider.supabase.from("availability_rules").insert({ provider_id: accounts.provider.id, weekday: starts.getUTCDay(), starts_at: "09:00", ends_at: "18:00", slot_interval_minutes: 30, valid_from: providerBookingDate, valid_until: providerBookingDate })).error);
     const bookingPayload = {
       client_id: accounts.client.id,
       provider_id: accounts.outsider.id,

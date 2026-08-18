@@ -65,6 +65,7 @@ export async function fetchPublishedProviders(client: SupabaseClient): Promise<C
       )
     `)
     .eq("status", "approved")
+    .eq("provider_services.status", "published")
     .eq("provider_services.is_active", true)
     .order("average_rating", { ascending: false })
     .limit(24);

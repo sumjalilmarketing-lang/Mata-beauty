@@ -111,6 +111,9 @@ test.beforeAll(async () => {
 
   const startsAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
   startsAt.setUTCHours(11, 0, 0, 0);
+  const availabilityDate = startsAt.toISOString().slice(0, 10);
+  const { error: availabilityError } = await admin.from("availability_rules").insert({ provider_id: providerId, weekday: startsAt.getUTCDay(), starts_at: "09:00", ends_at: "18:00", slot_interval_minutes: 30, valid_from: availabilityDate, valid_until: availabilityDate });
+  expect(availabilityError).toBeNull();
   const clientApi = createClient(supabaseUrl, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });

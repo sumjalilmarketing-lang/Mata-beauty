@@ -17,6 +17,7 @@
     "test:messaging:remote": "node scripts/verify-messaging-remote.mjs",
     "test:social:remote": "node scripts/verify-social-remote.mjs",
     "test:profile:remote": "node scripts/verify-client-profile-remote.mjs",
+    "test:commercial:remote": "node scripts/verify-commercial-offers-remote.mjs",
     "test:messaging:ui:remote": "playwright test --config playwright.remote.config.ts",
     "test:e2e": "playwright test",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern work --ignore-pattern outputs",

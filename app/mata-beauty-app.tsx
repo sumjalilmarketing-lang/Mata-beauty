@@ -40,6 +40,8 @@ type BookingRequest = {
   note: string;
   collaboratorId: string;
   paymentMethod: "on_site" | "wave" | "orange_money" | "card";
+  selectedOptionIds: string[];
+  promotionId: string;
 };
 
 type PaymentCapabilities = {
@@ -50,12 +52,15 @@ type PaymentCapabilities = {
 };
 
 type BookingConfirmation = { id: string; date: string; time: string; location: string };
-type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; business_id?: string | null };
+type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; business_id?: string | null; cover_url?:string|null; promotions?:Array<{discount_type:"percentage"|"fixed";discount_value:number;promotional_price_amount:number|null;title:string;ends_at:string}> };
 type ProviderSocialVideo = { id: string; caption: string; thumbnailUrl: string | null };
 type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[]; socialVideos: ProviderSocialVideo[] };
 type BookingSelection = { provider: Provider; service: ProviderService; sourcePostId?: string };
 type AvailabilitySlot = { slot_start: string };
 type BookableCollaborator = { id: string; display_name: string; title: string | null };
+type BookableOption = { id: string; name: string; description: string | null; price_amount: number; duration_minutes: number; is_required: boolean };
+type BookablePromotion = { id: string; discount_type: "percentage" | "fixed"; discount_value: number; promotional_price_amount: number | null; title: string; ends_at: string };
+type CommercialServiceDetails = { price_amount: number; home_price_amount: number | null; travel_fee_amount: number; deposit_amount: number; location_modes: string[]; cancellation_policy: string | null; client_instructions: string | null; cover_url: string | null };
 
 const bookingDraftKey = "mata-booking-draft";
 const bookingDraftSchema = z.object({
@@ -70,7 +75,7 @@ const bookingDraftSchema = z.object({
   }),
   request: z.object({
     date: z.string(), time: z.string(), locationMode: z.enum(["salon", "client_address"]), address: z.string(), note: z.string(), collaboratorId: z.string().default(""),
-    paymentMethod: z.enum(["on_site", "wave", "orange_money", "card"]),
+    paymentMethod: z.enum(["on_site", "wave", "orange_money", "card"]), selectedOptionIds: z.array(z.string().uuid()).default([]), promotionId: z.string().uuid().or(z.literal("")).default(""),
   }),
 });
 const paymentCapabilitiesSchema = z.object({
@@ -104,6 +109,7 @@ const defaultBookingDate = new Date(Date.now() + 86400000).toISOString().slice(0
 export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "feed" }: { supabaseUrl: string; supabaseAnonKey: string; initialScreen?: "feed" | "home" | "results" }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const oauthReturn = useRef({ intent: null as string | null, authenticated: false });
+  const serviceDeepLinkHandled = useRef(false);
   const [showSplash, setShowSplash] = useState(true);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [query, setQuery] = useState("");
@@ -325,6 +331,22 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     return () => { active = false; };
   }, [catalog, catalogState, pendingSocialBooking]);
 
+  useEffect(() => {
+    if (serviceDeepLinkHandled.current || catalogState === "loading") return;
+    serviceDeepLinkHandled.current = true;
+    const requestedServiceId = new URLSearchParams(window.location.search).get("service");
+    if (!requestedServiceId) return;
+    const provider = catalog.find((item) => item.serviceId === requestedServiceId);
+    void Promise.resolve().then(() => {
+      if (!provider) {
+        setNotice("Cette prestation n’est pas disponible actuellement.");
+        return;
+      }
+      setProfile(provider);
+      startBooking({ provider, service: defaultService(provider) });
+    });
+  }, [catalog, catalogState]);
+
   function openAccount(section: "client" | "provider" | "admin" = "client") {
     if (authenticated?.roles.includes(section)) window.location.assign(section === "provider" ? "/pro" : section === "admin" ? "/admin" : "/app");
     else setAuthRequest({ role: section, mode: "login" });
@@ -413,6 +435,8 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       currency: quote.currency,
       client_note: request.note.trim() || null,
       source_post_id: booking.sourcePostId ?? null,
+      selected_option_ids: request.selectedOptionIds,
+      promotion_id: request.promotionId || null,
     }).select("id").single();
     if (error || !created) {
       setNotice(error?.code === "23P01" ? "Ce créneau vient d’être réservé." : "La réservation n’a pas pu être enregistrée.");
@@ -634,7 +658,7 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
     let active = true;
     void Promise.all([
       supabase.from("provider_profiles").select("bio").eq("profile_id", provider.profileId).maybeSingle(),
-      supabase.from("provider_services").select("id,title,duration_minutes,price_amount,business_id").eq("provider_id", provider.profileId).eq("is_active", true).order("price_amount"),
+      supabase.from("provider_services").select("id,title,duration_minutes,price_amount,business_id,cover_url,promotions(discount_type,discount_value,promotional_price_amount,title,ends_at)").eq("provider_id", provider.profileId).eq("status", "published").eq("is_active", true).eq("promotions.status","published").eq("promotions.is_active",true).lte("promotions.starts_at",new Date().toISOString()).gt("promotions.ends_at",new Date().toISOString()).order("price_amount"),
       supabase.from("portfolio_items").select("media_url").eq("provider_id", provider.profileId).order("position").limit(12),
       supabase.from("posts").select("id,caption,thumbnail_url,social_post_media(bucket_id,thumbnail_path)").eq("author_id", provider.profileId).eq("post_type", "video").eq("status", "published").eq("visibility", "public").order("published_at", { ascending: false }).limit(12),
     ]).then(async ([profileResult, servicesResult, portfolioResult, videosResult]) => {
@@ -664,7 +688,7 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
     <div className="profile-tabs"><button className={tab === "videos" ? "active" : ""} onClick={() => setTab("videos")}>Vidéos</button><button className={tab === "services" ? "active" : ""} onClick={() => setTab("services")}>Prestations</button><button className={tab === "reviews" ? "active" : ""} onClick={() => setTab("reviews")}>Avis</button><button className={tab === "about" ? "active" : ""} onClick={() => setTab("about")}>À propos</button></div>
     <section className="profile-tab-content">
       {tab === "videos" && (detail.socialVideos.length ? <div className="profile-video-grid">{detail.socialVideos.map((video) => <a href={`/feed?post=${video.id}`} key={video.id}>{video.thumbnailUrl ? <Image src={video.thumbnailUrl} alt={video.caption} width={180} height={240} unoptimized /> : <span>▶</span>}<small>{video.caption}</small></a>)}</div> : <div className="profile-empty-tab"><strong>Aucune vidéo publiée</strong><p>Les prochaines réalisations apparaîtront ici.</p></div>)}
-      {tab === "services" && services.map((service) => <button className="profile-service-row" key={service.id} onClick={() => onBook(service)}><span><strong>{service.title}</strong><small><em>{formatPrice(service.price_amount)}</em> · {formatDuration(service.duration_minutes)}</small></span><span>Choisir <b>›</b></span></button>)}
+      {tab === "services" && services.map((service) => {const promo=service.promotions?.[0];const promoPrice=promo?(promo.promotional_price_amount??(promo.discount_type==="percentage"?Math.round(service.price_amount*(1-promo.discount_value/100)):Math.max(0,service.price_amount-promo.discount_value))):null;return <button className="profile-service-row" key={service.id} onClick={() => onBook(service)}>{service.cover_url&&<Image src={service.cover_url} alt="" width={62} height={62} unoptimized/>}<span><strong>{service.title}</strong><small>{promoPrice!==null&&<del>{formatPrice(service.price_amount)} </del>}<em>{formatPrice(promoPrice??service.price_amount)}</em> · {formatDuration(service.duration_minutes)}</small>{promo&&<small>{promo.title}</small>}</span><span>Réserver <b>›</b></span></button>})}
       {tab === "reviews" && <div className="profile-empty-tab"><strong>{provider.rating.toFixed(1)} / 5</strong><p>{provider.reviews ? `${provider.reviews} avis vérifiés sont associés à ce profil.` : "Aucun avis publié pour le moment."}</p></div>}
       {tab === "about" && <div className="profile-empty-tab"><strong>Informations pratiques</strong><p>{detail.bio || `Prestations disponibles à ${provider.area}. Les coordonnées complètes sont communiquées pendant la réservation.`}</p></div>}
     </section>
@@ -683,7 +707,16 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const [paymentCapabilities, setPaymentCapabilities] = useState<PaymentCapabilities>({ onlineCheckoutEnabled: false, environment: "disabled", provider: "none", methods: [] });
   const [paymentCapabilitiesLoading, setPaymentCapabilitiesLoading] = useState(true);
   const [collaborators, setCollaborators] = useState<BookableCollaborator[]>([]);
-  const [form, setForm] = useState<BookingRequest>(initialRequest ?? { date: initialDate || defaultBookingDate, time: "", locationMode: "salon", address: "", note: "", collaboratorId: "", paymentMethod: "on_site" });
+  const [commercial, setCommercial] = useState<CommercialServiceDetails>({price_amount:service.price_amount,home_price_amount:null,travel_fee_amount:0,deposit_amount:0,location_modes:["salon"],cancellation_policy:null,client_instructions:null,cover_url:null});
+  const [availableOptions,setAvailableOptions]=useState<BookableOption[]>([]);
+  const [activePromotion,setActivePromotion]=useState<BookablePromotion|null>(null);
+  const [form, setForm] = useState<BookingRequest>(initialRequest ?? { date: initialDate || defaultBookingDate, time: "", locationMode: "salon", address: "", note: "", collaboratorId: "", paymentMethod: "on_site", selectedOptionIds: [], promotionId: "" });
+
+  useEffect(()=>{const supabase=getSupabaseBrowserClient();if(!supabase)return;let active=true;const now=new Date().toISOString();void Promise.all([
+    supabase.from("provider_services").select("price_amount,home_price_amount,travel_fee_amount,deposit_amount,location_modes,cancellation_policy,client_instructions,cover_url").eq("id",service.id).eq("status","published").single(),
+    supabase.from("service_options").select("id,name,description,price_amount,duration_minutes,is_required").eq("provider_service_id",service.id).eq("is_active",true).order("sort_order"),
+    supabase.from("promotions").select("id,discount_type,discount_value,promotional_price_amount,title,ends_at").eq("provider_service_id",service.id).eq("status","published").eq("is_active",true).lte("starts_at",now).gt("ends_at",now).order("promotional_price_amount",{ascending:true}).limit(1).maybeSingle(),
+  ]).then(([serviceResult,optionResult,promotionResult])=>{if(!active)return;if(serviceResult.data)setCommercial(serviceResult.data as CommercialServiceDetails);const nextOptions=(optionResult.data??[]) as BookableOption[];setAvailableOptions(nextOptions);setForm(current=>({...current,selectedOptionIds:[...new Set([...current.selectedOptionIds,...nextOptions.filter(item=>item.is_required).map(item=>item.id)])],promotionId:promotionResult.data?.id??""}));setActivePromotion(promotionResult.data as BookablePromotion|null);});return()=>{active=false};},[service.id]);
 
   useEffect(() => {
     window.sessionStorage.setItem(bookingDraftKey, JSON.stringify({ selection, request: form }));
@@ -740,6 +773,12 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   }, [form.date, provider.profileId, service.id]);
 
   const quickDates = useMemo(() => buildQuickDates(), []);
+  const selectedOptions=availableOptions.filter(item=>form.selectedOptionIds.includes(item.id));
+  const basePrice=form.locationMode==="client_address"?(commercial.home_price_amount??commercial.price_amount)+commercial.travel_fee_amount:commercial.price_amount;
+  const optionPrice=selectedOptions.reduce((sum,item)=>sum+item.price_amount,0);
+  const grossPrice=basePrice+optionPrice;
+  const discount=activePromotion?(activePromotion.promotional_price_amount!==null?Math.max(0,grossPrice-activePromotion.promotional_price_amount):activePromotion.discount_type==="percentage"?Math.floor(grossPrice*activePromotion.discount_value/100):Math.min(grossPrice,activePromotion.discount_value)):0;
+  const finalPrice=Math.max(0,grossPrice-discount);
   async function confirm() {
     setSubmitting(true);
     const result = await onSubmit(form);
@@ -764,12 +803,12 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
       {confirmation ? <BookingSuccess provider={provider} confirmation={confirmation} onClose={onClose} /> : <>
         <div className="fast-booking-progress" aria-label={`Étape ${step} sur 2`}><span className={step >= 1 ? "active" : ""}>1 <small>Créneau</small></span><i /><span className={step >= 2 ? "active" : ""}>2 <small>Confirmation</small></span></div>
         <div className="premium-booking-content">
-          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount)}</b></div><h3>Quand êtes-vous disponible ?</h3><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>Autre</small><strong>＋</strong><input aria-label="Choisir une autre date" type="date" min={today} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "" })} /></label></div><div className="slot-section-title"><strong>Créneaux disponibles</strong><small>Mis à jour en direct</small></div>{availabilityLoading ? <div className="slot-loading">Recherche des meilleurs créneaux…</div> : slots.length ? <div className="premium-slot-grid">{slots.map((time) => <button className={form.time === time ? "active" : ""} key={time} onClick={() => { setForm({ ...form, time }); setStep(2); }}>{time}</button>)}</div> : <div className="no-slots">Aucun créneau publié ce jour. Essayez une autre date.</div>}</>}
+          {step === 1 && <><div className="fast-service-summary"><span>{commercial.cover_url||provider.coverUrl ? <Image src={commercial.cover_url??provider.coverUrl!} alt="" fill sizes="54px" unoptimized /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(finalPrice)}</b></div>{activePromotion&&<div className="booking-promotion"><strong>{activePromotion.title}</strong><span>Vous économisez {formatPrice(discount)} · jusqu’au {new Date(activePromotion.ends_at).toLocaleDateString("fr-FR")}</span></div>}{availableOptions.length>0&&<fieldset className="booking-option-picker"><legend>Options & suppléments</legend>{availableOptions.map(option=><label key={option.id}><input type="checkbox" checked={form.selectedOptionIds.includes(option.id)} disabled={option.is_required} onChange={event=>setForm({...form,selectedOptionIds:event.target.checked?[...form.selectedOptionIds,option.id]:form.selectedOptionIds.filter(id=>id!==option.id)})}/><span><strong>{option.name}{option.is_required?" · inclus obligatoire":""}</strong><small>+{formatPrice(option.price_amount)}{option.duration_minutes?` · +${option.duration_minutes} min`:""}</small></span></label>)}</fieldset>}<h3>Quand êtes-vous disponible ?</h3><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>Autre</small><strong>＋</strong><input aria-label="Choisir une autre date" type="date" min={today} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "" })} /></label></div><div className="slot-section-title"><strong>Créneaux disponibles</strong><small>Mis à jour en direct</small></div>{availabilityLoading ? <div className="slot-loading">Recherche des meilleurs créneaux…</div> : slots.length ? <div className="premium-slot-grid">{slots.map((time) => <button className={form.time === time ? "active" : ""} key={time} onClick={() => { setForm({ ...form, time }); setStep(2); }}>{time}</button>)}</div> : <div className="no-slots">Aucun créneau publié ce jour. Essayez une autre date.</div>}</>}
           {step === 2 && <>
             <h3>Vérifiez et confirmez</h3>
-            <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date)} à {form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name}</small></div><b>{formatPrice(service.price_amount)}</b></div>
+            <div className="booking-recap-card"><div className="recap-photo">{commercial.cover_url||provider.coverUrl ? <Image src={commercial.cover_url??provider.coverUrl!} alt="" fill sizes="70px" unoptimized /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date)} à {form.time} · {formatDuration(service.duration_minutes+selectedOptions.reduce((sum,item)=>sum+item.duration_minutes,0))}</small><small>{provider.name}{selectedOptions.length?` · ${selectedOptions.map(item=>item.name).join(", ")}`:""}</small></div><b>{formatPrice(finalPrice)}</b></div>
             {collaborators.length > 0 && <label>Collaboratrice<select aria-label="Choisir une collaboratrice" value={form.collaboratorId} onChange={(event) => setForm({ ...form, collaboratorId: event.target.value })}><option value="">Sans préférence</option>{collaborators.map((person) => <option key={person.id} value={person.id}>{person.display_name}{person.title ? ` · ${person.title}` : ""}</option>)}</select></label>}
-            <fieldset className="location-choice"><legend>Où ?</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>Chez le professionnel</strong><small>{provider.area}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>À mon domicile</strong><small>Le professionnel se déplace</small></span></label>}</fieldset>
+            <fieldset className="location-choice"><legend>Où ?</legend>{commercial.location_modes.includes("salon")&&<label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>Chez le professionnel</strong><small>{provider.area}</small></span></label>}{commercial.location_modes.includes("client_address")&&<label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>À mon domicile</strong><small>{commercial.travel_fee_amount?`${formatPrice(commercial.travel_fee_amount)} de déplacement`:"Déplacement inclus"}</small></span></label>}</fieldset>
             {form.locationMode === "client_address" && <label>Adresse<textarea autoFocus value={form.address} placeholder="Votre adresse complète" onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}
             <fieldset className="location-choice"><legend>Paiement</legend>
               <label><input type="radio" name="payment" checked={form.paymentMethod === "on_site"} onChange={() => setForm({ ...form, paymentMethod: "on_site" })} /><span><strong>Sur place</strong><small>Aucun débit aujourd’hui</small></span></label>
@@ -779,11 +818,11 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
                 {paymentCapabilities.methods.includes("card") && <label><input type="radio" name="payment" checked={form.paymentMethod === "card"} onChange={() => setForm({ ...form, paymentMethod: "card" })} /><span><strong>Carte · Paiement de démonstration</strong><small>PayDunya Sandbox · aucune carte réelle</small></span></label>}
               </> : <label><input type="radio" name="payment" disabled /><span><strong>Wave, Orange Money ou carte</strong><small>{paymentCapabilitiesLoading ? "Vérification de la sandbox…" : "Sandbox non configurée · option indisponible"}</small></span></label>}
             </fieldset>
-            <details className="booking-options"><summary>Politique d’annulation et note</summary><p>La réservation reste en attente tant que le professionnel ou le webhook de paiement ne l’a pas confirmée. Un paiement sandbox annulé ne confirme aucun débit.</p><label>Note<textarea maxLength={1000} value={form.note} placeholder="Précision utile pour le professionnel" onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></details>
+            <details className="booking-options"><summary>Conditions, instructions et note</summary><p>{commercial.cancellation_policy??"La réservation reste en attente jusqu’à sa confirmation."}</p>{commercial.client_instructions&&<p>{commercial.client_instructions}</p>}{commercial.deposit_amount>0&&<p>Acompte prévu : {formatPrice(Math.min(commercial.deposit_amount,finalPrice))}. Le paiement en ligne reste indisponible hors sandbox.</p>}<label>Note<textarea maxLength={1000} value={form.note} placeholder="Précision utile pour le professionnel" onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></details>
             <div className="payment-note">{form.paymentMethod === "on_site" ? "Paiement sur place · aucun débit aujourd’hui." : "Paiement de démonstration · PayDunya Sandbox · le webhook reste la seule source de confirmation."}</div>
           </>}
         </div>
-        {step === 2 && <div className="premium-booking-nav"><button className="back-button" onClick={() => setStep(1)}>Modifier</button><button disabled={submitting || !canConfirm} onClick={() => void confirm()}>{submitting ? "Enregistrement…" : form.paymentMethod === "on_site" ? "Confirmer · " + formatPrice(service.price_amount) : "Continuer vers la sandbox · " + formatPrice(service.price_amount)}</button></div>}
+        {step === 2 && <div className="premium-booking-nav"><button className="back-button" onClick={() => setStep(1)}>Modifier</button><button disabled={submitting || !canConfirm} onClick={() => void confirm()}>{submitting ? "Enregistrement…" : form.paymentMethod === "on_site" ? "Confirmer · " + formatPrice(finalPrice) : "Continuer vers la sandbox · " + formatPrice(finalPrice)}</button></div>}
       </>}
     </section>
   </div>;

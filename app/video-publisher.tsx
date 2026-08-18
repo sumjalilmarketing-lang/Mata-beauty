@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { MAX_VIDEO_DURATION_SECONDS, parseVideoHashtags, validateVideoDuration, validateVideoUpload, videoPublishErrorMessage, type VideoUploadFormat } from "@/lib/social/video-upload";
@@ -145,7 +146,7 @@ async function uploadVideoObject(file: Blob, path: string, contentType: string, 
   });
 }
 
-export function VideoPublisher({ userId, providerApproved, onPublished }: { userId: string; providerApproved: boolean; onPublished: (postType: ContentType) => Promise<void> }) {
+export function VideoPublisher({ userId, providerApproved, onPublished, offersHref = "/pro/create-service" }: { userId: string; providerApproved: boolean; onPublished: (postType: ContentType) => Promise<void>; offersHref?: string }) {
   const [services, setServices] = useState<ProviderService[]>([]);
   const [phase, setPhase] = useState<PublishPhase>("idle");
   const [progress, setProgress] = useState(0);
@@ -157,7 +158,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount,services(categories(name))").eq("provider_id", userId).eq("is_active", true).order("title").then(({ data }) => setServices((data ?? []) as unknown as ProviderService[]));
+    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount,services(categories(name))").eq("provider_id", userId).eq("status", "published").eq("is_active", true).order("title").then(({ data }) => setServices((data ?? []) as unknown as ProviderService[]));
   }, [userId]);
 
   useEffect(() => () => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); }, [previewUrls]);
@@ -292,6 +293,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished }: { user
       {contentType === "availability" && <label>Créneau disponible<input name="availableAt" type="datetime-local" required /></label>}
       {contentType === "promotion" && <><label>Remise (%)<input name="discount" type="number" min="1" max="90" required /></label><label>Fin de l’offre<input name="promotionEndsAt" type="datetime-local" required /></label><label>Places disponibles<input name="promotionSlots" type="number" min="1" max="10000" required /></label></>}
       <label>Catégorie et prestation<select name="serviceId" defaultValue=""><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title} · {service.duration_minutes} min · {service.price_amount.toLocaleString("fr-FR")} F</option>)}</select></label>
+      <div className="studio-service-shortcut"><span>{services.length ? "La prestation rend la publication réservable." : "Aucune prestation publiée."}</span><Link href={offersHref}>＋ Créer une prestation</Link></div>
       <label>Visibilité<select name="visibility" defaultValue="public"><option value="public">Tout le monde</option><option value="followers">Abonnés</option></select></label>
       <label>Publication<select name="status" defaultValue={providerApproved ? "published" : "draft"}><option value="draft">Brouillon</option><option value="scheduled" disabled={!providerApproved}>Programmer</option><option value="published" disabled={!providerApproved}>Publier maintenant</option></select></label>
       <label>Date programmée<input name="scheduledFor" type="datetime-local" /></label>

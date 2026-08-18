@@ -11,6 +11,7 @@ import { ClientControlCenter } from "./client-control-center";
 import { SalonControlCenter } from "./salon-control-center";
 import { SocialDashboard } from "./social-dashboard";
 import { WorkspaceMessaging } from "./workspace-messaging";
+import { CommercialDashboard, CommercialOffers } from "./commercial-offers";
 
 type Row = Record<string, unknown>;
 type ResourceDefinition = { table: string; select: string; title: (row: Row) => string; meta: (row: Row) => string };
@@ -55,9 +56,12 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
   if (space === "salon" && functionalKey === "messages") return <WorkspaceMessaging userId={userId} />;
+  if (space === "pro" && functionalKey === "dashboard") return <CommercialDashboard userId={userId} space="pro" />;
+  const commercialSections = new Set(["services", "create-service", "pricing", "options", "promotions", "packages", "home-services", "published-offers", "service-drafts", "archived-services", "service-staff", "service-availability"]);
+  if ((space === "pro" || space === "salon") && commercialSections.has(module.key)) return <CommercialOffers key={module.key} userId={userId} space={space} initialSection={module.key} />;
   const salonSpecialized = new Set(["dashboard", "profile", "team", "services", "agenda", "bookings", "revenue", "statistics", "reviews", "portfolio", "settings"]);
   if (space === "salon" && salonSpecialized.has(functionalKey)) return <SalonControlCenter module={{ ...module, key: functionalKey }} userId={userId} />;
-  if ((space === "pro" || space === "salon") && functionalKey === "videos") return <CreatorStudio key={module.key} userId={userId} providerApproved={providerApproved} initialTab={studioTab(module.key)} />;
+  if ((space === "pro" || space === "salon") && functionalKey === "videos") return <CreatorStudio key={module.key} userId={userId} providerApproved={providerApproved} offersHref={`/${space}/create-service`} initialTab={studioTab(module.key)} />;
   if ((space === "client" || space === "pro") && functionalKey === "messages") return <WorkspaceMessaging userId={userId} />;
   if (space === "client" && functionalKey === "profile") return <ClientControlCenter userId={userId} />;
   if (space === "client" && functionalKey === "inspirations") return <SocialDashboard role="client" userId={userId} />;
