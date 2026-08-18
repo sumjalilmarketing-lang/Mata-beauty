@@ -51,6 +51,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
   return <div className="workspace-layout">
     {mobileNavOpen && <button className="workspace-drawer-backdrop" aria-label="Fermer le menu" onClick={() => setMobileNavOpen(false)} />}
     <aside className={`workspace-sidebar ${mobileNavOpen ? "mobile-open" : ""}`}>
+      <button className="workspace-drawer-close" type="button" aria-label="Fermer la navigation" onClick={() => setMobileNavOpen(false)}>×</button>
       <Link className="workspace-brand" href="/"><span>M</span><strong>Mata Beauty</strong></Link>
       <label className="workspace-space-picker">
         <span>Espace actif</span>

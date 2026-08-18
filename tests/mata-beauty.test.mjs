@@ -473,3 +473,11 @@ test("all secured workspaces use hierarchical accessible navigation and a real m
   assert.match(admin, /SidebarNavigation/);
   for (const label of ["Employés", "Comptes suspendus", "Disponibilités", "Base de connaissances", "Professionnels en attente", "Rapprochement", "Accès refusés", "Santé des services", "Journaux techniques"]) assert.match(admin, new RegExp(label));
 });
+
+test("staff workspace membership is resolved by a least-privilege RLS policy", async () => {
+  const migration = await readFile(new URL("supabase/migrations/20260818100000_staff_membership_rls.sql", root), "utf8");
+  assert.match(migration, /alter table|public\.collaborators/);
+  assert.match(migration, /to authenticated/);
+  assert.match(migration, /profile_id = auth\.uid\(\)/);
+  assert.doesNotMatch(migration, /disable row level security/i);
+});
