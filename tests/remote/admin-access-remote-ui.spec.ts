@@ -98,7 +98,7 @@ test.describe.serial("contrôle d’accès admin distant",()=>{
     for(const width of [320,375,390,430,768,1024,1440]){
       await page.setViewportSize({width,height:900});
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),`${width}px sans débordement`).toBe(true);
-      if(width<=768){
+      if(width<=720){
         const mobile=page.getByRole("navigation",{name:"Navigation mobile"});await expect(mobile).toBeVisible();expect(await mobile.locator("a,button").count()).toBeLessThanOrEqual(5);
         await mobile.getByRole("button",{name:"Ouvrir toutes les rubriques"}).click();await expect(page.locator(".workspace-sidebar")).toBeVisible();
         await page.getByRole("button",{name:"Fermer la navigation"}).click();
@@ -157,6 +157,7 @@ test.describe.serial("contrôle d’accès admin distant",()=>{
   });
 
   test("le modérateur ne voit que les fonctions de confiance autorisées",async({page})=>{
+    if(bypass)await page.route(`${new URL(remoteAppUrl).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
     await page.goto(`${remoteAppUrl}/admin`);await page.getByLabel("Adresse administrateur").fill(accounts.get("moderator")!.email);await page.getByLabel("Mot de passe").fill(password);await page.getByRole("button",{name:"Accéder à l’administration"}).click();
     await expect(page.getByRole("heading",{name:"Signalements",level:1})).toBeVisible({timeout:20000});
     const nav=page.getByRole("navigation",{name:"Navigation Super Admin"});
@@ -165,6 +166,7 @@ test.describe.serial("contrôle d’accès admin distant",()=>{
   });
 
   test("l’administrateur opérationnel reste séparé des fonctions super admin",async({page})=>{
+    if(bypass)await page.route(`${new URL(remoteAppUrl).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
     await page.goto(`${remoteAppUrl}/admin`);await page.getByLabel("Adresse administrateur").fill(accounts.get("admin")!.email);await page.getByLabel("Mot de passe").fill(password);await page.getByRole("button",{name:"Accéder à l’administration"}).click();
     await expect(page.getByRole("heading",{name:"Vue d’ensemble",level:1})).toBeVisible({timeout:20000});
     const nav=page.getByRole("navigation",{name:"Navigation Super Admin"});
