@@ -8,13 +8,32 @@ Périmètre : Studio prestataire → Storage → persistance Supabase → RLS �
 
 Production : **non touchée**
 
-Statut global : **correctif validé localement, acceptation Preview distante en attente**
+Statut global : **FAIL / BLOCKED — Preview Vercel créée, backend Supabase QA isolé indisponible**
 
 ## Conclusion exécutable
 
 La chaîne a été durcie de bout en bout dans le code et dans une migration versionnée. La publication n'affiche désormais un succès qu'après vérification de la ligne persistée, de la prestation principale, du média, de la présence dans `social_feed` et de la création d'URLs signées. Le feed lit directement la source chronologique, utilise un curseur stable, invalide son cache après publication et ne dépend plus d'un `list()` Storage préalable.
 
-La validation distante réelle ne peut pas être déclarée terminée dans cet environnement : aucune URL Preview exploitable ni clé Supabase QA n'est disponible. Les variables publiques et d'administration locales nécessaires au test distant sont absentes ou vides. Aucun contournement par des données simulées n'est présenté comme une validation distante.
+Une Preview Vercel réelle a été créée et inspectée. Elle embarque les marqueurs compilés du correctif vidéo, mais sa configuration Preview pointe vers le même projet Supabase que la Production. La création d'une branche Supabase isolée a été refusée par la plateforme, car l'organisation n'a pas accès à la fonctionnalité Branching. Aucun compte, média ou enregistrement QA n'a donc été créé sur ce backend partagé. Aucun contournement par des données simulées n'est présenté comme une validation distante.
+
+## Validation distante du 31 août 2026
+
+- URL Preview exacte : `https://mata-beauty-83a0q7o2h-africrm.vercel.app`.
+- Déploiement Vercel : `dpl_7WLW42nn1RSMUhhAGDBJL6gxQfhj`.
+- Cible Vercel inspectée : `preview`, état `READY`; aucune promotion Production.
+- Commit source local déployé : `1171f9c053e8227865f64fb1ed8ad144621e7e67`.
+- Preuve du code livré : les bundles distants contiennent le message `Votre vidéo a été publiée.` et l'événement `mata:feed:invalidate`, tous deux introduits par ce commit.
+- Supabase configuré en Preview : `qjdwxdbvrxedyfolnpol.supabase.co`.
+- Supabase configuré en Production : `qjdwxdbvrxedyfolnpol.supabase.co`.
+- Isolation : **FAIL**, les deux cibles sont identiques.
+- Tentative de branche QA `video-feed-qa-1171f9c` : **FAIL**, réponse Supabase `402 entitlement_required`, Branching réservé au plan Pro ou supérieur.
+- Projets Supabase alternatifs : aucun projet Mata Beauty QA actif disponible.
+- Migration distante `20260831010000_harden_video_delivery_chain.sql` : **NON APPLIQUÉE**, afin de ne pas modifier la Production.
+- Comptes professionnel/client QA : **NON CRÉÉS**.
+- Données et objets QA créés : **0**.
+- Nettoyage QA : **PASS par absence de création**; aucun résidu QA public n'a été introduit.
+
+La Preview a été ouverte sur desktop et à `390 × 844`. La page, la navigation mobile et l'état vide du feed s'affichent sans débordement horizontal ni erreur console. La CSP distante est présente et contient `upgrade-insecure-requests`. Le contrôle serveur répond `ok` avec configuration, base et rôle serveur disponibles. Ces vérifications restent non mutantes et ne constituent pas la preuve du parcours vidéo demandé.
 
 ## Diagnostic et corrections
 
@@ -70,8 +89,30 @@ Le scénario Playwright ciblé vérifie deux cartes, une seule vidéo active, la
 | Playwright feed ciblé — WebKit / iPhone 13 | Réussi |
 | `pnpm build` | Réussi, Next.js 16.2.11 |
 | `pnpm build:sites` | Réussi |
-| Test distant réel Studio → client | Bloqué par configuration Preview absente |
-| Validation console/réseau sur Preview | Bloquée par URL Preview absente |
+| Preview Vercel nouvelle | PASS — cible `preview`, état `READY` |
+| Présence du correctif dans les bundles | PASS — confirmation et invalidation retrouvées |
+| Service role limité au serveur/QA | PASS statique — feed sur client Supabase + RLS; secret référencé côté serveur et scripts QA uniquement |
+| Migration Supabase Preview | FAIL / BLOCKED — aucun backend isolé |
+| Compte professionnel QA | NON CRÉÉ |
+| Compte client QA | NON CRÉÉ |
+| Upload réel Studio | FAIL / NON EXÉCUTÉ |
+| Objet Storage réel | FAIL / NON EXÉCUTÉ |
+| Ligne DB et relations réelles | FAIL / NON EXÉCUTÉ |
+| RLS positive et négative distante | FAIL / NON EXÉCUTÉ |
+| Feed réel | FAIL / NON EXÉCUTÉ; feed Preview actuellement vide |
+| Autoplay réel | FAIL / NON EXÉCUTÉ |
+| Scroll vertical multi-vidéo | FAIL / NON EXÉCUTÉ |
+| Pagination distante | FAIL / NON EXÉCUTÉ |
+| iPhone/WebKit réel | FAIL / NON EXÉCUTÉ; rendu 390 px seulement contrôlé |
+| Chromium distant | PARTIEL — ouverture et console sans erreur, aucune vidéo réelle |
+| Like persistant | FAIL / NON EXÉCUTÉ |
+| Save persistant | FAIL / NON EXÉCUTÉ |
+| Profil et prestation | FAIL / NON EXÉCUTÉ |
+| Réservation | FAIL / NON EXÉCUTÉ |
+| Console Preview | PASS sur état vide — aucune erreur ou alerte |
+| Network Preview | PARTIEL — page, CSP et santé serveur disponibles; aucun média à contrôler |
+| Nettoyage QA | PASS — aucune donnée QA créée |
+| Test distant réel Studio → client | **FAIL / BLOCKED** |
 
 ## Scénarios d'acceptation Preview restant à exécuter
 
@@ -84,12 +125,12 @@ Ces scénarios doivent être rejoués sur une Preview isolée après application
 5. Tester lecture, pause, reprise, défilement, filtres, réservation, desktop et mobile.
 6. Vérifier l'absence d'erreurs console, 401/403/404, requêtes répétées et médias bloqués.
 
-Configuration à fournir de manière sécurisée dans l'environnement de test, sans la coller dans un message ni la committer :
+Infrastructure à fournir avant reprise, sans coller de secret dans un message ni le committer :
 
-- une URL Preview autorisée;
-- `REMOTE_SUPABASE_ANON_KEY`;
-- `SUPABASE_SERVICE_ROLE_KEY` réservée au processus de test distant;
-- le cas échéant, le mécanisme d'accès à la Preview protégée.
+- soit activer Supabase Branching sur l'organisation et autoriser la création d'une branche isolée;
+- soit fournir un projet Supabase QA distinct, vide et dédié à cette recette;
+- relier les variables Vercel Preview à ce backend isolé;
+- rendre les clés QA disponibles exclusivement au runner sécurisé pour les preuves et le nettoyage.
 
 ## Traçabilité Git
 
@@ -97,4 +138,4 @@ Le correctif doit être committé sans inclure le fichier utilisateur non suivi 
 
 ## Décision
 
-**Go technique local. No-go d'acceptation Preview tant que les six scénarios distants ci-dessus n'ont pas été exécutés avec succès. Production inchangée.**
+**FAIL / BLOCKED. La Preview Vercel existe, mais le parcours Professionnel → Studio → upload → Client → lecture → swipe → like → save → profil → réservation n'a pas été exécuté. Une base Supabase QA isolée est obligatoire avant de poursuivre. Aucune mutation de Production n'a été effectuée.**
