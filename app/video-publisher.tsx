@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { validatePublishedVideoDelivery, type PublishedVideoRecord } from "@/lib/domain/video-delivery";
 
 type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; services: { categories: { name: string } | null } | null };
 type PublishStatus = "draft" | "scheduled" | "published";
@@ -13,6 +14,25 @@ const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const FEED_CACHE_KEY = "mata-social-feed-cache-v1";
+
+async function verifyPublishedVideo(postId: string, serviceId: string, videoPath: string, thumbnailPath: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Connexion au service vidéo indisponible.");
+  const { data: post, error: postError } = await supabase.from("posts")
+    .select("id,status,visibility,published_at,post_services(provider_service_id,is_primary),social_post_media(bucket_id,storage_path,thumbnail_path)")
+    .eq("id", postId).single();
+  if (postError) throw postError;
+  const deliveryError = validatePublishedVideoDelivery(post as unknown as PublishedVideoRecord, { postId, serviceId, videoPath, thumbnailPath });
+  if (deliveryError) throw new Error(deliveryError);
+  const { data: feedPost, error: feedError } = await supabase.from("social_feed").select("id").eq("id", postId).single();
+  if (feedError || feedPost?.id !== postId) throw new Error("La publication n’est pas encore lisible dans le feed client.");
+  const { data: signedVideo, error: signedVideoError } = await supabase.storage.from("provider-social-media").createSignedUrl(videoPath, 60);
+  const { data: signedThumbnail, error: signedThumbnailError } = await supabase.storage.from("provider-social-media").createSignedUrl(thumbnailPath, 60);
+  if (signedVideoError || !signedVideo?.signedUrl || signedThumbnailError || !signedThumbnail?.signedUrl) {
+    throw new Error("Le média publié n’est pas accessible au lecteur.");
+  }
+}
 
 async function resolveVideoDuration(video: HTMLVideoElement) {
   if (Number.isFinite(video.duration) && video.duration > 0) return video.duration;
@@ -118,6 +138,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
     let videoPath = "";
     let thumbnailPath = "";
     const mediaPaths: string[] = [];
+    let persisted = false;
     try {
       setFeedback("");
       let error: { message: string } | null = null;
@@ -139,7 +160,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
         const videoUrl = supabase.storage.from("provider-social-media").getPublicUrl(videoPath).data.publicUrl;
         const thumbnailUrl = supabase.storage.from("provider-social-media").getPublicUrl(thumbnailPath).data.publicUrl;
         setPhase("publishing");
-        ({ error } = await supabase.rpc("create_provider_video_post", {
+        const publication = await supabase.rpc("create_provider_video_post", {
           target_post_id: postId, target_title: String(values.get("title") ?? "").trim(), target_caption: String(values.get("caption") ?? "").trim(),
           target_video_path: videoPath, target_video_url: videoUrl, target_thumbnail_path: thumbnailPath, target_thumbnail_url: thumbnailUrl,
           target_duration_seconds: media.duration, target_aspect_ratio: media.aspectRatio,
@@ -150,7 +171,12 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
           target_hashtags: String(values.get("hashtags") ?? "").split(/[\s,]+/).filter(Boolean).slice(0, 10),
           target_location: String(values.get("location") ?? "").trim() || null,
           target_available_at: values.get("availableAt") ? new Date(String(values.get("availableAt"))).toISOString() : null,
-        }));
+        });
+        error = publication.error;
+        if (!error) {
+          persisted = true;
+          if (status === "published") await verifyPublishedVideo(postId, serviceId, videoPath, thumbnailPath);
+        }
       } else {
         setPhase("uploading");
         const mediaUrls: string[] = [];
@@ -174,17 +200,21 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
         }));
       }
       if (error) throw error;
+      window.sessionStorage.removeItem(FEED_CACHE_KEY);
+      window.dispatchEvent(new Event("mata:feed:invalidate"));
       form.reset();
       previewUrls.forEach((url) => URL.revokeObjectURL(url));
       setPreviewUrls([]);
       setContentType("video");
-      setFeedback(status === "published" ? "Publication visible dans Inspiration." : status === "scheduled" ? "Publication programmée." : "Brouillon enregistré.");
+      setFeedback(status === "published" ? "Votre vidéo a été publiée." : status === "scheduled" ? "Publication programmée." : "Brouillon enregistré.");
       await onPublished(selectedType);
     } catch (caught) {
-      if (videoPath) await supabase.storage.from("provider-social-media").remove([videoPath]);
-      if (thumbnailPath) await supabase.storage.from("provider-social-media").remove([thumbnailPath]);
-      if (mediaPaths.length) await supabase.storage.from("provider-social-media").remove(mediaPaths);
-      setFeedback(publicErrorMessage(caught, "La publication a échoué. Vérifiez le fichier et réessayez."));
+      if (!persisted) {
+        if (videoPath) await supabase.storage.from("provider-social-media").remove([videoPath]);
+        if (thumbnailPath) await supabase.storage.from("provider-social-media").remove([thumbnailPath]);
+        if (mediaPaths.length) await supabase.storage.from("provider-social-media").remove(mediaPaths);
+      }
+      setFeedback(publicErrorMessage(caught, persisted ? "La vidéo est enregistrée, mais sa visibilité n’a pas pu être confirmée. Actualisez le Studio avant de réessayer." : "La publication a échoué. Vérifiez le fichier et réessayez."));
     } finally { setPhase("idle"); }
   }
 

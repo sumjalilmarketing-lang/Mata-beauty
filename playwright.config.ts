@@ -15,6 +15,7 @@ export default defineConfig({
     { name: "mobile-375", use: { viewport: { width: 375, height: 812 } } },
     { name: "mobile-390", use: { viewport: { width: 390, height: 844 } } },
     { name: "mobile-430", use: { viewport: { width: 430, height: 932 } } },
+    { name: "mobile-webkit", use: { ...devices["iPhone 13"] } },
     { name: "tablet", use: { viewport: { width: 768, height: 1024 } } },
     { name: "tablet-1024", use: { viewport: { width: 1024, height: 1366 } } },
     { name: "laptop", use: { viewport: { width: 1366, height: 768 } } },

@@ -71,11 +71,6 @@ function mapFeedPost(row: SocialFeedRow): FeedPost {
 async function usableSignedUrl(bucketId: string, storagePath: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return null;
-  const segments = storagePath.split("/");
-  const fileName = segments.pop();
-  if (!fileName) return null;
-  const { data: files, error: listError } = await supabase.storage.from(bucketId).list(segments.join("/"), { limit: 1, search: fileName });
-  if (listError || !files?.some((file) => file.name === fileName)) return null;
   const { data, error } = await supabase.storage.from(bucketId).createSignedUrl(storagePath, 3600);
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
@@ -127,6 +122,8 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   const appliedFilter = useRef<SocialFeedFilter>("Pour toi");
   const restoredPosition = useRef(false);
   const completedViews = useRef(new Set<string>());
+  const loadingMore = useRef(false);
+  const feedCursor = useRef<{ publishedAt: string; id: string } | null>(null);
 
   const visiblePosts = useMemo(() => diversifyFeed(posts
     .filter((post) => matchesSocialFeedFilter(feedFilter, post))
@@ -150,9 +147,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     const cached = readFeedCache();
     if (cached.length) { setPosts(cached); setState("ready"); }
     else setState("loading");
-    const launchFeed = await supabase.from("launch_social_feed").select("*").order("launch_sort", { ascending: true, nullsFirst: false }).order("published_at", { ascending: false }).limit(FEED_BATCH_SIZE);
-    const fallbackFeed = launchFeed.error ? await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).limit(FEED_BATCH_SIZE) : null;
-    const { data, error } = launchFeed.error ? fallbackFeed! : launchFeed;
+    const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE);
     if (error) { if (!cached.length) setState("error"); else setFeedback("Réseau lent · inspirations enregistrées affichées."); return; }
     const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
     const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
@@ -160,6 +155,8 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     setPosts(ranked);
     writeFeedCache(ranked);
     setHasMore(mapped.length === FEED_BATCH_SIZE);
+    const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
+    feedCursor.current = last ? { publishedAt: last.published_at, id: last.id } : null;
     setState(mapped.length ? "ready" : "empty");
     if (authenticated) {
       const ids = mapped.map((item) => item.id);
@@ -180,20 +177,32 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   }, [authenticated]);
 
   const loadMore = useCallback(async () => {
-    if (!hasMore) return;
+    if (!hasMore || loadingMore.current) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const launchFeed = await supabase.from("launch_social_feed").select("*").order("launch_sort", { ascending: true, nullsFirst: false }).order("published_at", { ascending: false }).range(posts.length, posts.length + FEED_BATCH_SIZE - 1);
-    const fallbackFeed = launchFeed.error ? await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).range(posts.length, posts.length + FEED_BATCH_SIZE - 1) : null;
-    const { data, error } = launchFeed.error ? fallbackFeed! : launchFeed;
-    if (error) return;
-    const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
-    const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
-    setPosts((current) => { const next = diversifyFeed([...current, ...mapped.filter((item) => !current.some((existing) => existing.id === item.id))]); writeFeedCache(next); return next; });
-    setHasMore(mapped.length === FEED_BATCH_SIZE);
-  }, [hasMore, posts]);
+    loadingMore.current = true;
+    try {
+      let query = supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE);
+      const cursor = feedCursor.current;
+      if (cursor) query = query.or(`published_at.lt.${cursor.publishedAt},and(published_at.eq.${cursor.publishedAt},id.lt.${cursor.id})`);
+      const { data, error } = await query;
+      if (error) return;
+      const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
+      const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
+      setPosts((current) => { const next = diversifyFeed([...current, ...mapped.filter((item) => !current.some((existing) => existing.id === item.id))]); writeFeedCache(next); return next; });
+      const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
+      if (last) feedCursor.current = { publishedAt: last.published_at, id: last.id };
+      setHasMore((data ?? []).length === FEED_BATCH_SIZE);
+    } finally { loadingMore.current = false; }
+  }, [hasMore]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    const invalidate = () => { window.sessionStorage.removeItem(FEED_CACHE_KEY); void load(); };
+    window.addEventListener("mata:feed:invalidate", invalidate);
+    return () => window.removeEventListener("mata:feed:invalidate", invalidate);
+  }, [load]);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {

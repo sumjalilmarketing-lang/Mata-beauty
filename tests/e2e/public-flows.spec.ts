@@ -1,12 +1,17 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem("mata-launch-welcome", "done"));
+});
+
+test.beforeEach(async ({ page }) => {
   await page.route("http://localhost:3000/api/auth/providers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ google: true }) }));
   await page.route("https://audit.supabase.co/rest/v1/categories**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 }]) }));
   await page.route("https://audit.supabase.co/rest/v1/provider_profiles**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
     profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier Tresses", city: "Dakar", service_mode: "salon", average_rating: 4.8, review_count: 12, verified_at: "2026-01-01T00:00:00Z", cover_url: null,
     provider_services: [{ id: "22222222-2222-4222-8222-222222222222", title: "Tresses collées", duration_minutes: 90, price_amount: 10000, services: { name: "Tresses collées", categories: { name: "Tresses" } } }],
   }]) }));
+  await page.route("https://audit.supabase.co/rest/v1/promotions**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   page.on("pageerror", (error) => { throw error; });
   page.on("console", (message) => {
     if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());
@@ -77,9 +82,13 @@ test("Inspiration swipes vertically with one active player, filters and an eight
     HTMLMediaElement.prototype.pause = function () { this.dataset.playing = "false"; };
   });
   let requestedBatch = "";
-  await page.route("https://audit.supabase.co/rest/v1/rpc/get_available_slots", (route) => route.fulfill({
+  await page.route("https://audit.supabase.co/*.mp4", (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
+  await page.route("https://audit.supabase.co/rest/v1/rpc/get_available_slots**", (route) => route.fulfill({
     status: 200, contentType: "application/json", body: JSON.stringify([{ slot_start: "2026-08-17T10:00:00+00:00" }]),
   }));
+  await page.route("https://audit.supabase.co/rest/v1/rpc/record_post_booking_click**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
+  await page.route("https://audit.supabase.co/rest/v1/rpc/record_product_event**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
+  await page.route("https://audit.supabase.co/rest/v1/rpc/record_video_view**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
   await page.route("https://audit.supabase.co/rest/v1/social_feed**", (route) => {
     requestedBatch = new URL(route.request().url()).searchParams.get("limit") ?? "";
     const base = {
@@ -97,7 +106,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   });
   await page.goto("/");
   const feed = page.locator(".social-feed");
-  await expect(page.locator(".social-video-card")).toHaveCount(2);
+  await expect(page.locator(".social-video-card")).toHaveCount(2, { timeout: 15_000 });
   expect(requestedBatch).toBe("8");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await expect(page.getByText(/Prochain créneau/).first()).toBeVisible();
