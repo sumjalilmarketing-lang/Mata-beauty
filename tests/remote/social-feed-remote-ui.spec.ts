@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test, webkit, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.REMOTE_SUPABASE_URL ?? "";
@@ -14,6 +14,8 @@ const providerEmail = `codex-feed-provider-${run}@example.test`;
 const moderatorEmail = `codex-feed-admin-${run}@example.test`;
 const superEmail = `codex-feed-super-${run}@example.test`;
 const studioCaption = `Publication Studio réelle ${run}`;
+const liveSecondTitle = `Deuxième vidéo active ${run}`;
+const liveSecondCaption = `Nouvelle publication sans rebuild ${run}`;
 const photoTitle = `Photo Studio réelle ${run}`;
 const beforeAfterTitle = `Avant Après réel ${run}`;
 let admin: SupabaseClient;
@@ -21,6 +23,7 @@ let clientId = "";
 let providerId = "";
 let moderatorId = "";
 let superId = "";
+let otherProviderId = "";
 let providerServiceId = "";
 let availabilityId = "";
 let bookingId = "";
@@ -28,16 +31,70 @@ let providerApi: SupabaseClient;
 let clientApi: SupabaseClient;
 let moderatorApi: SupabaseClient;
 let superApi: SupabaseClient;
-const extraPostIds: string[] = [];
 let studioPostId = "";
 let photoPostId = "";
 let beforeAfterPostId = "";
+let qaVideoBuffer: Buffer;
+const extraVideoTitles: string[] = [];
+const extraVideoCategories = ["makeup", "makeup", "barbier", "barbier", "tresses", "ongles", "ongles", "coiffure"] as const;
+const browserConsoleErrors: string[] = [];
+const browserNetworkErrors: string[] = [];
 
 test.describe.configure({ mode: "serial" });
 
 async function createUser(email: string, professional = false) {
-  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: professional ? "Mata Feed Pro" : "Mata Feed Cliente", legal_accepted: "true", professional_intent: professional ? "true" : "false" } });
-  expect(error).toBeNull(); return data.user!.id;
+  let lastError = "Erreur Auth inconnue";
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: professional ? "Mata Feed Pro" : "Mata Feed Cliente", legal_accepted: "true", professional_intent: professional ? "true" : "false" } });
+    if (!error && data.user) return data.user.id;
+    lastError = error?.message ?? lastError;
+    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 750));
+  }
+  throw new Error(`Création du compte QA impossible après trois tentatives : ${lastError}`);
+}
+
+async function preparePage(page: Page) {
+  await page.addInitScript(() => window.localStorage.setItem("mata-launch-welcome", "done"));
+  page.on("console", (message) => {
+    if (message.type() === "error" && !message.text().includes("https://vercel.live/_next-live/feedback/feedback.js")) {
+      browserConsoleErrors.push(message.text());
+    }
+  });
+  page.on("pageerror", (error) => browserConsoleErrors.push(error.message));
+  page.on("response", (response) => {
+    if (response.status() >= 400 && !response.url().includes("vercel.live")) {
+      browserNetworkErrors.push(`${response.status()} ${response.request().method()} ${response.url().split("?")[0]}`);
+    }
+  });
+  if (remoteAppUrl && bypass) {
+    await page.route(`${new URL(remoteAppUrl).origin}/**`, (route) => route.continue({
+      headers: {
+        ...route.request().headers(),
+        "x-vercel-protection-bypass": bypass,
+        "x-vercel-set-bypass-cookie": "true",
+      },
+    }));
+  }
+}
+
+async function publishStudioVideo(page: Page, title: string, caption: string, hashtags: string) {
+  if (await page.locator('input[name="video"]').count() === 0) {
+    await page.getByRole("button", { name: "Créer une publication" }).click();
+  }
+  await page.locator('input[name="video"]').setInputFiles({
+    name: "mata-beauty-qa-reel-5s.mp4",
+    mimeType: "video/mp4",
+    buffer: qaVideoBuffer,
+  });
+  await page.locator('input[name="thumbnail"]').setInputFiles({ name: "miniature-studio.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") });
+  await page.locator('input[name="title"]').fill(title);
+  await page.locator('textarea[name="caption"]').fill(caption);
+  await page.locator('input[name="hashtags"]').fill(hashtags);
+  await page.locator('input[name="location"]').fill("Dakar");
+  await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
+  await page.locator('input[name="consent"]').check();
+  await page.getByRole("button", { name: "Publier la vidéo" }).click();
+  await expect(page.getByText(title)).toBeVisible({ timeout: 60_000 });
 }
 
 test.beforeAll(async () => {
@@ -55,28 +112,27 @@ test.beforeAll(async () => {
     { user_id: moderatorId, role_id: adminRoleId, assigned_by: superId, is_active: true },
     { user_id: superId, role_id: superRoleId, assigned_by: moderatorId, is_active: true },
   ])).error).toBeNull();
-  await admin.from("provider_profiles").update({ status: "approved" }).eq("profile_id", providerId);
-  const base = await admin.from("services").select("id").eq("is_active", true).limit(1).single();
-  const service = await admin.from("provider_services").insert({ provider_id: providerId, service_id: base.data!.id, title: `Tresses Preview ${run}`, duration_minutes: 60, price_amount: 18000, currency: "XOF", is_active: true }).select("id").single();
-  providerServiceId = service.data!.id;
   providerApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   expect((await providerApi.auth.signInWithPassword({ email: providerEmail, password })).error).toBeNull();
+  expect((await providerApi.rpc("request_professional_profile")).error).toBeNull();
   clientApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   expect((await clientApi.auth.signInWithPassword({ email: clientEmail, password })).error).toBeNull();
   moderatorApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   expect((await moderatorApi.auth.signInWithPassword({ email: moderatorEmail, password })).error).toBeNull();
   superApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   expect((await superApi.auth.signInWithPassword({ email: superEmail, password })).error).toBeNull();
+  const approval = await superApi.rpc("admin_set_provider_status", { target_provider_id: providerId, next_status: "approved", reason: "Validation réelle du compte professionnel QA vidéo" });
+  expect(approval.error).toBeNull();
+  expect(approval.data).toBe(true);
+  expect((await admin.from("provider_profiles").select("status").eq("profile_id", providerId).single()).data?.status).toBe("approved");
+  const base = await admin.from("services").select("id").eq("is_active", true).limit(1).single();
+  expect(base.error).toBeNull();
+  const service = await admin.from("provider_services").insert({ provider_id: providerId, service_id: base.data!.id, title: `Tresses Preview ${run}`, duration_minutes: 60, price_amount: 18000, currency: "XOF", is_active: true }).select("id").single();
+  expect(service.error).toBeNull();
+  providerServiceId = service.data!.id;
   const tomorrow = new Date(Date.now() + 86_400_000);
   const availability = await providerApi.from("availability_rules").insert({ provider_id: providerId, weekday: tomorrow.getUTCDay(), starts_at: "09:00", ends_at: "18:00", slot_interval_minutes: 30 }).select("id").single();
   expect(availability.error).toBeNull(); availabilityId = availability.data!.id;
-  const categories = ["makeup", "makeup", "barbier", "barbier", "tresses", "tresses", "ongles", "ongles", "coiffure"];
-  for (const [index, category] of categories.entries()) {
-    const extra = await providerApi.rpc("create_video_post", { target_caption: `E2E ${category} ${index} ${run}`, target_video_url: `${supabaseUrl}/storage/v1/object/public/social-videos/${providerId}/${category}-${index}-${run}.mp4`, target_thumbnail_url: null, target_duration_seconds: 20, target_aspect_ratio: 0.562, target_provider_service_id: providerServiceId, target_status: "published", target_allow_comments: true, target_client_consent: true, target_scheduled_for: null, target_visibility: "public", target_hashtags: ["preview", category] });
-    expect(extra.error).toBeNull(); extraPostIds.push(extra.data);
-  }
-  const post = await providerApi.rpc("create_video_post", { target_caption: `Transformation Preview ${run}`, target_video_url: `${supabaseUrl}/storage/v1/object/public/social-videos/${providerId}/preview-${run}.mp4`, target_thumbnail_url: null, target_duration_seconds: 20, target_aspect_ratio: 0.562, target_provider_service_id: providerServiceId, target_status: "published", target_allow_comments: true, target_client_consent: true, target_scheduled_for: null, target_visibility: "public", target_hashtags: ["preview", "tresses"] });
-  expect(post.error).toBeNull();
 });
 
 test.afterAll(async () => {
@@ -102,11 +158,14 @@ test.afterAll(async () => {
   if (clientId) await admin.auth.admin.deleteUser(clientId);
   if (moderatorId) await admin.auth.admin.deleteUser(moderatorId);
   if (superId) await admin.auth.admin.deleteUser(superId);
+  if (otherProviderId) await admin.auth.admin.deleteUser(otherProviderId);
+  expect(browserConsoleErrors, `Erreurs console: ${browserConsoleErrors.join(" | ")}`).toEqual([]);
+  expect(browserNetworkErrors, `Erreurs réseau: ${browserNetworkErrors.join(" | ")}`).toEqual([]);
 });
 
-test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, browser }, testInfo) => {
-  test.setTimeout(90_000);
-  if (bypass) await page.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page, request }) => {
+  test.setTimeout(300_000);
+  await preparePage(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Publier une vidéo" }).click();
   await page.getByLabel("Adresse e-mail").fill(providerEmail);
@@ -114,27 +173,16 @@ test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, br
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/pro/);
   await page.goto("/pro/videos");
-  const videoContext = await browser.newContext({ viewport: { width: 360, height: 640 }, recordVideo: { dir: testInfo.outputPath("studio-media"), size: { width: 360, height: 640 } } });
-  const recordedPage = await videoContext.newPage();
-  await recordedPage.setContent('<style>html,body{margin:0;height:100%;display:grid;place-items:center;color:white;background:linear-gradient(145deg,#5b0b45,#d83f8c);font:28px sans-serif}</style><strong>Mata Beauty E2E</strong>');
-  const recording = recordedPage.video();
-  await recordedPage.waitForTimeout(2200);
-  await videoContext.close();
-  const videoPath = await recording!.path();
-  await page.locator('input[name="video"]').setInputFiles(videoPath);
-  await page.locator('input[name="thumbnail"]').setInputFiles({ name: "miniature-studio.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") });
-  await page.locator('input[name="title"]').fill(`Studio réel ${run}`);
-  await page.locator('textarea[name="caption"]').fill(studioCaption);
-  await page.locator('input[name="hashtags"]').fill("#tresses #dakar #studioe2e");
-  await page.locator('input[name="location"]').fill("Dakar");
-  await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
-  await page.locator('input[name="consent"]').check();
-  await page.getByRole("button", { name: "Publier la vidéo" }).click();
-  const transientFailure = page.getByText("La publication a échoué. Vérifiez le fichier et réessayez.");
-  await expect(page.getByText("Votre vidéo a été publiée.").or(transientFailure)).toBeVisible({ timeout: 30_000 });
-  if (await transientFailure.isVisible()) await page.getByRole("button", { name: "Publier la vidéo" }).click();
-  await expect(page.getByText("Votre vidéo a été publiée.")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(`Studio réel ${run}`)).toBeVisible({ timeout: 30_000 });
+  const fixture = await request.get("https://samplelib.com/mp4/sample-5s-360p.mp4");
+  expect(fixture.ok()).toBeTruthy();
+  expect(fixture.headers()["content-type"]).toContain("video/mp4");
+  qaVideoBuffer = await fixture.body();
+  for (const [index, category] of extraVideoCategories.entries()) {
+    const title = `E2E ${category} ${index} ${run}`;
+    extraVideoTitles.push(title);
+    await publishStudioVideo(page, title, title, `#preview #${category}`);
+  }
+  await publishStudioVideo(page, `Studio réel ${run}`, studioCaption, "#tresses #dakar #studioe2e");
   const created = await admin.from("posts").select("id,status,visibility,published_at,post_services(provider_service_id,is_primary),social_post_media(bucket_id,storage_path,thumbnail_path)").eq("author_id", providerId).eq("title", `Studio réel ${run}`).single();
   expect(created.error).toBeNull();
   expect(created.data).toMatchObject({ status: "published", visibility: "public", post_services: [{ provider_service_id: providerServiceId, is_primary: true }] });
@@ -147,13 +195,18 @@ test("le prestataire publie une vidéo réelle depuis Studio", async ({ page, br
   expect((await clientApi.from("social_feed").select("id").eq("id", studioPostId).single()).error).toBeNull();
   expect((await clientApi.storage.from("provider-social-media").createSignedUrl(media.storage_path, 60)).error).toBeNull();
   expect((await clientApi.storage.from("provider-social-media").createSignedUrl(media.thumbnail_path!, 60)).error).toBeNull();
+
+  const allVideos = await admin.from("posts").select("id,title,social_post_media(storage_path)").eq("author_id", providerId).eq("post_type", "video").eq("status", "published");
+  expect(allVideos.error).toBeNull();
+  expect(allVideos.data).toHaveLength(9);
+  expect(allVideos.data!.every((post) => post.social_post_media.length === 1 && post.social_post_media[0].storage_path.startsWith(`${providerId}/`))).toBeTruthy();
   await page.goto("/");
   await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 20_000 });
 });
 
 test("le Studio publie une photo et un avant-après réels dans Storage", async ({ page }) => {
   test.setTimeout(90_000);
-  if (bypass) await page.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  await preparePage(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Publier une vidéo" }).click();
   await page.getByLabel("Adresse e-mail").fill(providerEmail);
@@ -204,9 +257,68 @@ test("le Studio publie une photo et un avant-après réels dans Storage", async 
   expect(media.data!.every((item) => item.storage_path.startsWith(`${providerId}/`))).toBeTruthy();
 });
 
+test("RLS masque les contenus non publiables et interdit les modifications étrangères", async ({ page }) => {
+  test.setTimeout(120_000);
+  await preparePage(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Publier une vidéo" }).click();
+  await page.getByLabel("Adresse e-mail").fill(providerEmail);
+  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await page.waitForURL(/\/pro/);
+  await page.goto("/pro/videos");
+  const draftTitle = `Brouillon RLS ${run}`;
+  await page.locator('input[name="video"]').setInputFiles({ name: "brouillon-rls.mp4", mimeType: "video/mp4", buffer: qaVideoBuffer });
+  await page.locator('input[name="title"]').fill(draftTitle);
+  await page.locator('textarea[name="caption"]').fill(draftTitle);
+  await page.locator('select[name="status"]').selectOption("draft");
+  await page.getByRole("button", { name: "Publier la vidéo" }).click();
+  await expect(page.getByText(draftTitle)).toBeVisible({ timeout: 60_000 });
+  const draft = await admin.from("posts").select("id,status").eq("author_id", providerId).eq("title", draftTitle).single();
+  expect(draft.error).toBeNull();
+  expect(draft.data?.status).toBe("draft");
+  expect((await clientApi.from("social_feed").select("id").eq("id", draft.data!.id)).data).toEqual([]);
+
+  const original = await admin.from("posts").select("caption").eq("id", studioPostId).single();
+  const clientMutation = await clientApi.from("posts").update({ caption: "Modification cliente interdite" }).eq("id", studioPostId).select("id");
+  expect(clientMutation.error).toBeNull();
+  expect(clientMutation.data).toEqual([]);
+
+  const otherEmail = `codex-feed-other-provider-${run}@example.test`;
+  otherProviderId = await createUser(otherEmail, true);
+  const otherApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  expect((await otherApi.auth.signInWithPassword({ email: otherEmail, password })).error).toBeNull();
+  expect((await otherApi.rpc("request_professional_profile")).error).toBeNull();
+  const otherMutation = await otherApi.from("posts").update({ caption: "Modification prestataire étrangère interdite" }).eq("id", studioPostId).select("id");
+  expect(otherMutation.error).toBeNull();
+  expect(otherMutation.data).toEqual([]);
+  expect((await admin.from("posts").select("caption").eq("id", studioPostId).single()).data?.caption).toBe(original.data?.caption);
+
+  expect((await superApi.rpc("admin_set_provider_status", { target_provider_id: providerId, next_status: "rejected", reason: "Test RLS prestataire non validé" })).error).toBeNull();
+  expect((await clientApi.from("social_feed").select("id").eq("id", studioPostId)).data).toEqual([]);
+  expect((await superApi.rpc("admin_set_provider_status", { target_provider_id: providerId, next_status: "approved", reason: "Restauration après test RLS" })).error).toBeNull();
+  expect((await clientApi.from("social_feed").select("id").eq("id", studioPostId).single()).error).toBeNull();
+  await admin.auth.admin.deleteUser(otherProviderId);
+  otherProviderId = "";
+});
+
+test("un lien signé expiré est remplacé depuis le chemin Storage stable", async ({ request }) => {
+  const media = await admin.from("social_post_media").select("storage_path").eq("post_id", studioPostId).single();
+  expect(media.error).toBeNull();
+  const expiredCandidate = await clientApi.storage.from("provider-social-media").createSignedUrl(media.data!.storage_path, 5);
+  expect(expiredCandidate.error).toBeNull();
+  expect((await request.get(expiredCandidate.data!.signedUrl)).status()).toBe(200);
+  await new Promise((resolve) => setTimeout(resolve, 6_500));
+  expect((await request.get(expiredCandidate.data!.signedUrl, { failOnStatusCode: false })).status()).toBeGreaterThanOrEqual(400);
+  const renewed = await clientApi.storage.from("provider-social-media").createSignedUrl(media.data!.storage_path, 60);
+  expect(renewed.error).toBeNull();
+  expect(renewed.data!.signedUrl).not.toBe(expiredCandidate.data!.signedUrl);
+  expect((await request.get(renewed.data!.signedUrl)).status()).toBe(200);
+});
+
 test("le feed social distant relie les interactions au profil et à la réservation", async ({ page, browser }) => {
-  test.setTimeout(90_000);
-  if (remoteAppUrl && bypass) await page.route(`${new URL(remoteAppUrl).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  test.setTimeout(180_000);
+  await preparePage(page);
   await page.goto("/");
   await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
   await page.getByLabel("Adresse e-mail").fill(clientEmail);
@@ -220,6 +332,26 @@ test("le feed social distant relie les interactions au profil et à la réservat
   const beforeAfterCard = page.locator(".social-video-card").filter({ hasText: beforeAfterTitle });
   await expect(beforeAfterCard.getByRole("img", { name: "Avant" })).toBeVisible();
   await expect(beforeAfterCard.getByRole("img", { name: "Après" })).toBeVisible();
+
+  const liveProviderContext = await browser.newContext();
+  const liveProviderPage = await liveProviderContext.newPage();
+  await preparePage(liveProviderPage);
+  await liveProviderPage.goto("/");
+  await liveProviderPage.getByRole("button", { name: "Publier une vidéo" }).click();
+  await liveProviderPage.getByLabel("Adresse e-mail").fill(providerEmail);
+  await liveProviderPage.getByLabel("Mot de passe").fill(password);
+  await liveProviderPage.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await liveProviderPage.waitForURL(/\/pro/);
+  await liveProviderPage.goto("/pro/videos");
+  await publishStudioVideo(liveProviderPage, liveSecondTitle, liveSecondCaption, "#tresses #cache #tempsreel");
+  await liveProviderContext.close();
+
+  const navigation = page.getByRole("navigation", { name: "Navigation de l’application" });
+  await navigation.getByRole("button", { name: "Accueil" }).click();
+  await navigation.getByRole("button", { name: "Inspiration" }).click();
+  await expect(page.getByText(liveSecondCaption)).toBeVisible({ timeout: 30_000 });
+  expect((await admin.from("posts").select("id").eq("author_id", providerId).eq("title", liveSecondTitle).single()).error).toBeNull();
+
   const mainCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
   const activeVideo = mainCard.locator("video");
   await expect(activeVideo).toBeVisible();
@@ -281,7 +413,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
 
   const providerContext = await browser.newContext();
   const providerPage = await providerContext.newPage();
-  if (bypass) await providerPage.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  await preparePage(providerPage);
   await providerPage.goto("/");
   await providerPage.getByRole("button", { name: "Publier une vidéo" }).click();
   await providerPage.getByLabel("Adresse e-mail").fill(providerEmail);
@@ -328,7 +460,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
 
 test("le signalement est examiné, masqué, audité puis restauré avec les bons rôles", async ({ page, browser }) => {
   test.setTimeout(120_000);
-  if (bypass) await page.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  await preparePage(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Profil" }).click();
   await page.getByLabel("Adresse e-mail").fill(clientEmail);
@@ -348,7 +480,7 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
 
   const adminContext = await browser.newContext();
   const adminPage = await adminContext.newPage();
-  if (bypass) await adminPage.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  await preparePage(adminPage);
   await adminPage.goto(`${remoteAppUrl}/admin`);
   await adminPage.getByLabel("Adresse administrateur").fill(moderatorEmail);
   await adminPage.getByLabel("Mot de passe").fill(password);
@@ -379,7 +511,11 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
 
 test("les filtres et la pagination distante conservent le feed", async ({ page }) => {
   test.setTimeout(90_000);
-  if (bypass) await page.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+  const feedRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/rest/v1/social_feed")) feedRequests.push(request.url());
+  });
+  await preparePage(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Profil" }).click();
   await page.getByLabel("Adresse e-mail").fill(clientEmail);
@@ -391,6 +527,10 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   const feed = page.locator(".social-feed");
   await feed.evaluate((node) => node.scrollTo({ top: node.scrollHeight, behavior: "auto" }));
   await expect.poll(() => page.locator(".social-video-card").count()).toBeGreaterThan(8);
+  expect(feedRequests.some((url) => new URL(url).searchParams.has("or"))).toBeTruthy();
+  expect(feedRequests.length).toBeLessThanOrEqual(5);
+  const cardTexts = await page.locator(".social-video-card").allTextContents();
+  expect(new Set(cardTexts).size).toBe(cardTexts.length);
   for (const [filter, marker] of [["Make-up", "makeup"], ["Barbier", "barbier"], ["Tresses", "tresses"], ["Ongles", "ongles"]] as const) {
     await page.getByRole("button", { name: filter, exact: true }).click();
     await expect(page.getByText(new RegExp(`E2E ${marker}`)).first()).toBeVisible();
@@ -404,7 +544,7 @@ test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async (
   for (const width of [320, 360, 375, 390, 430]) {
     const context = await browser.newContext({ viewport: { width, height: width <= 360 ? 740 : width <= 390 ? 844 : 932 } });
     const page = await context.newPage();
-    if (bypass) await page.route(`${new URL(remoteAppUrl!).origin}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
+    await preparePage(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Profil" }).click();
     await page.getByLabel("Adresse e-mail").fill(clientEmail);
@@ -412,15 +552,52 @@ test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async (
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
     await page.waitForURL(/\/app/);
     await page.goto("/");
-    await expect(page.getByText(`Transformation Preview ${run}`)).toBeVisible({ timeout: 20_000 });
-    const mobileCard = page.locator(".social-video-card").filter({ hasText: `Transformation Preview ${run}` });
+    await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 20_000 });
+    const mobileCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
     await mobileCard.getByRole("button", { name: "Profil de Mata Feed Pro" }).click();
     await expect(page.getByText("Mata Feed Pro").first()).toBeVisible();
     await page.getByRole("button", { name: "Retour" }).click();
-    await expect(page.getByText(`Transformation Preview ${run}`)).toBeVisible();
+    await expect(page.getByText(studioCaption)).toBeVisible();
     await mobileCard.getByRole("button", { name: "Réserver", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Réserver" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
     await context.close();
+  }
+});
+
+test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
+  test.setTimeout(120_000);
+  const webkitBrowser = await webkit.launch();
+  const context = await webkitBrowser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await preparePage(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Profil" }).click();
+    await page.getByLabel("Adresse e-mail").fill(clientEmail);
+    await page.getByLabel("Mot de passe").fill(password);
+    await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+    await page.waitForURL(/\/app/);
+    await page.goto("/");
+    const card = page.locator(".social-video-card").filter({ hasText: liveSecondCaption });
+    const video = card.locator("video");
+    await expect(video).toBeVisible({ timeout: 30_000 });
+    await card.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
+    await expect(card.getByRole("button", { name: "Réserver", exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Navigation de l’application" })).toBeVisible();
+    const layout = await page.evaluate(() => ({
+      noHorizontalOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      scrollSnap: getComputedStyle(document.querySelector(".social-feed")!).scrollSnapType,
+    }));
+    expect(layout.noHorizontalOverflow).toBeTruthy();
+    expect(layout.scrollSnap).toContain("y");
+    await page.goBack();
+    await expect(page).toHaveURL(/\/app/);
+    await page.goForward();
+    await expect(page.getByText(liveSecondCaption)).toBeVisible({ timeout: 30_000 });
+  } finally {
+    await context.close();
+    await webkitBrowser.close();
   }
 });

@@ -96,7 +96,7 @@ test("the commercial launch layer is measurable, curated, RLS-protected, and hon
   assert.match(referrals, /Aucune récompense financière n’est active/);
   assert.match(studio, /Filmer/);
   assert.match(studio, /Avant \/ Après/);
-  assert.match(feed, /launch_social_feed/);
+  assert.match(feed, /from\("social_feed"\)/);
   assert.match(legalPage, /Validation juridique requise/);
   assert.doesNotMatch(migration + launchAdmin + referrals, /SUPABASE_SERVICE_ROLE_KEY/);
 });
@@ -456,4 +456,32 @@ test("public categories and service filters come from Supabase data", async () =
   assert.match(app, /categoryServices/);
   assert.doesNotMatch(app, /const categories = \[/);
   assert.doesNotMatch(app, /const subcategories:/);
+});
+
+test("launch analytics reads phone only for profile rows", async () => {
+  const migration = await readFile(new URL("supabase/migrations/20260831020000_repair_launch_event_profile_phone.sql", root), "utf8");
+  assert.match(migration, /if tg_table_name = 'profiles' then[\s\S]*to_jsonb\(new\)->>'phone'/);
+  assert.doesNotMatch(migration, /if tg_table_name\s*=\s*'profiles'\s+and[\s\S]{0,120}new\.phone/);
+});
+
+test("sensitive audit resolves entity ids without cross-table record fields", async () => {
+  const migration = await readFile(new URL("supabase/migrations/20260831021000_repair_sensitive_audit_entity_id.sql", root), "utf8");
+  assert.match(migration, /to_jsonb\(new\)->>'profile_id'/);
+  assert.match(migration, /to_jsonb\(new\)->>'id'/);
+  assert.doesNotMatch(migration, /then new\.profile_id/);
+});
+
+test("provider approval accepts trusted server and authorized admin paths", async () => {
+  const migration = await readFile(new URL("supabase/migrations/20260831022000_repair_provider_admin_approval.sql", root), "utf8");
+  assert.match(migration, /auth\.jwt\(\)\s*->>\s*'role'/);
+  assert.match(migration, /request\.jwt\.claim\.role/);
+  assert.match(migration, /has_admin_permission\('providers\.verify'\)/);
+  assert.match(migration, /has_admin_permission\('providers\.suspend'\)/);
+  assert.match(migration, /mata\.rating_refresh/);
+});
+
+test("content security policy permits local blob previews in Studio", async () => {
+  const config = await readFile(new URL("next.config.ts", root), "utf8");
+  assert.match(config, /img-src 'self' data: blob: https:/);
+  assert.match(config, /media-src 'self' blob: https:\/\/\*\.supabase\.co/);
 });
