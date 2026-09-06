@@ -136,29 +136,36 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  if (bookingId) await admin.from("bookings").delete().eq("id", bookingId);
-  if (providerId) await admin.from("posts").delete().eq("author_id", providerId);
+  if (bookingId) expect.soft((await admin.from("bookings").delete().eq("id", bookingId)).error).toBeNull();
+  if (providerId) expect.soft((await admin.from("posts").delete().eq("author_id", providerId)).error).toBeNull();
   if (providerId) {
     const bucket = admin.storage.from("provider-social-media");
-    const { data: folders } = await bucket.list(providerId, { limit: 100 });
+    const { data: folders, error: foldersError } = await bucket.list(providerId, { limit: 100 });
+    expect.soft(foldersError).toBeNull();
     const directPaths: string[] = [];
     for (const folder of folders ?? []) {
       if (folder.id) directPaths.push(`${providerId}/${folder.name}`);
       else {
-        const { data: files } = await bucket.list(`${providerId}/${folder.name}`, { limit: 100 });
+        const { data: files, error: filesError } = await bucket.list(`${providerId}/${folder.name}`, { limit: 100 });
+        expect.soft(filesError).toBeNull();
         const paths = (files ?? []).map((file) => `${providerId}/${folder.name}/${file.name}`);
-        if (paths.length) expect((await bucket.remove(paths)).error).toBeNull();
+        if (paths.length) expect.soft((await bucket.remove(paths)).error).toBeNull();
       }
     }
-    if (directPaths.length) expect((await bucket.remove(directPaths)).error).toBeNull();
+    if (directPaths.length) expect.soft((await bucket.remove(directPaths)).error).toBeNull();
+    const remaining = await bucket.list(providerId, { limit: 100 });
+    expect.soft(remaining.error).toBeNull();
+    expect.soft(remaining.data).toEqual([]);
   }
-  if (availabilityId) await admin.from("availability_rules").delete().eq("id", availabilityId);
-  if (providerServiceId) await admin.from("provider_services").delete().eq("id", providerServiceId);
-  if (providerId) await admin.auth.admin.deleteUser(providerId);
-  if (clientId) await admin.auth.admin.deleteUser(clientId);
-  if (moderatorId) await admin.auth.admin.deleteUser(moderatorId);
-  if (superId) await admin.auth.admin.deleteUser(superId);
-  if (otherProviderId) await admin.auth.admin.deleteUser(otherProviderId);
+  if (availabilityId) expect.soft((await admin.from("availability_rules").delete().eq("id", availabilityId)).error).toBeNull();
+  if (providerServiceId) expect.soft((await admin.from("provider_services").delete().eq("id", providerServiceId)).error).toBeNull();
+  const userIds = [providerId, clientId, moderatorId, superId, otherProviderId].filter(Boolean);
+  for (const userId of userIds) expect.soft((await admin.auth.admin.deleteUser(userId)).error).toBeNull();
+  if (userIds.length) {
+    const profiles = await admin.from("profiles").select("id").in("id", userIds);
+    expect.soft(profiles.error).toBeNull();
+    expect.soft(profiles.data).toEqual([]);
+  }
   expect(browserConsoleErrors, `Erreurs console: ${browserConsoleErrors.join(" | ")}`).toEqual([]);
   expect(browserNetworkErrors, `Erreurs réseau: ${browserNetworkErrors.join(" | ")}`).toEqual([]);
 });

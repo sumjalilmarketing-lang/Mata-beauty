@@ -664,13 +664,13 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
     void Promise.all([
       supabase.from("provider_profiles").select("bio").eq("profile_id", provider.profileId).maybeSingle(),
       supabase.from("provider_services").select("id,title,duration_minutes,price_amount,business_id").eq("provider_id", provider.profileId).eq("is_active", true).order("price_amount"),
-      supabase.from("portfolio_items").select("media_url").eq("provider_id", provider.profileId).order("position").limit(12),
+      supabase.from("portfolio_items").select("storage_path").eq("provider_id", provider.profileId).order("sort_order").limit(12),
     ]).then(([profileResult, servicesResult, portfolioResult]) => {
       if (!active) return;
       setDetail({
         bio: profileResult.data?.bio ?? null,
         services: (servicesResult.data ?? []) as ProviderService[],
-        portfolio: (portfolioResult.data ?? []).map((item) => item.media_url),
+        portfolio: (portfolioResult.data ?? []).map((item) => supabase.storage.from("portfolios").getPublicUrl(item.storage_path).data.publicUrl),
       });
     });
     return () => { active = false; };
