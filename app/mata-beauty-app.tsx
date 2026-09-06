@@ -369,10 +369,20 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     if (client) void recordProductEvent(client, "provider_viewed", { provider_id: provider.profileId, category: provider.category });
   }
 
-  function openSocialProvider(authorId: string) {
+  async function openSocialProvider(authorId: string) {
     const provider = catalog.find((item) => item.profileId === authorId);
-    if (provider) viewProvider(provider);
-    else setNotice("Ce profil n’est pas encore disponible dans le catalogue.");
+    if (provider) { viewProvider(provider); return; }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setNotice("Ouverture du profil…");
+    try {
+      const [item] = await fetchPublishedProviders(supabase, authorId);
+      if (!item) { setNotice("Ce profil n’est pas disponible actuellement."); return; }
+      const resolved = { ...item, initials: item.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() };
+      setCatalog((current) => current.some((entry) => entry.id === resolved.id) ? current : [...current, resolved]);
+      setNotice("");
+      viewProvider(resolved);
+    } catch { setNotice("Le profil n’a pas pu être chargé. Réessayez."); }
   }
 
   function bookSocialService(authorId: string, service: ProviderService, sourcePostId: string) {

@@ -56,8 +56,8 @@ type ProviderRecord = {
   }>;
 };
 
-export async function fetchPublishedProviders(client: SupabaseClient): Promise<CatalogProvider[]> {
-  const { data, error } = await client
+export async function fetchPublishedProviders(client: SupabaseClient, providerId?: string): Promise<CatalogProvider[]> {
+  let query = client
     .from("provider_profiles")
     .select(`
       profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,cover_url,
@@ -70,6 +70,8 @@ export async function fetchPublishedProviders(client: SupabaseClient): Promise<C
     .eq("provider_services.is_active", true)
     .order("average_rating", { ascending: false })
     .limit(24);
+  if (providerId) query = query.eq("profile_id", providerId);
+  const { data, error } = await query;
 
   if (error) throw error;
 

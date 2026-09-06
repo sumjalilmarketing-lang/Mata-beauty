@@ -136,6 +136,15 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  const userIds = [providerId, clientId, moderatorId, superId, otherProviderId].filter(Boolean);
+  if (userIds.length) {
+    const memberships = await admin.from("conversation_members").select("conversation_id").in("profile_id", userIds);
+    expect.soft(memberships.error).toBeNull();
+    const conversationIds = [...new Set((memberships.data ?? []).map((item) => item.conversation_id))];
+    if (conversationIds.length) expect.soft((await admin.from("conversations").delete().in("id", conversationIds)).error).toBeNull();
+    expect.soft((await admin.from("reports").delete().in("reporter_id", userIds)).error).toBeNull();
+    expect.soft((await admin.from("moderation_actions").delete().in("actor_id", userIds)).error).toBeNull();
+  }
   if (bookingId) expect.soft((await admin.from("bookings").delete().eq("id", bookingId)).error).toBeNull();
   if (providerId) expect.soft((await admin.from("posts").delete().eq("author_id", providerId)).error).toBeNull();
   if (providerId) {
@@ -159,7 +168,6 @@ test.afterAll(async () => {
   }
   if (availabilityId) expect.soft((await admin.from("availability_rules").delete().eq("id", availabilityId)).error).toBeNull();
   if (providerServiceId) expect.soft((await admin.from("provider_services").delete().eq("id", providerServiceId)).error).toBeNull();
-  const userIds = [providerId, clientId, moderatorId, superId, otherProviderId].filter(Boolean);
   for (const userId of userIds) expect.soft((await admin.auth.admin.deleteUser(userId)).error).toBeNull();
   if (userIds.length) {
     const profiles = await admin.from("profiles").select("id").in("id", userIds);
@@ -531,11 +539,13 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   await page.waitForURL(/\/app/);
   await page.goto("/");
   await expect(page.locator(".social-video-card")).toHaveCount(8);
+  // Measure pagination separately from the anonymous/authenticated page loads.
+  feedRequests.length = 0;
   const feed = page.locator(".social-feed");
   await feed.evaluate((node) => node.scrollTo({ top: node.scrollHeight, behavior: "auto" }));
   await expect.poll(() => page.locator(".social-video-card").count()).toBeGreaterThan(8);
   expect(feedRequests.some((url) => new URL(url).searchParams.has("or"))).toBeTruthy();
-  expect(feedRequests.length).toBeLessThanOrEqual(5);
+  expect(feedRequests.length).toBeLessThanOrEqual(2);
   const cardTexts = await page.locator(".social-video-card").allTextContents();
   expect(new Set(cardTexts).size).toBe(cardTexts.length);
   for (const [filter, marker] of [["Make-up", "makeup"], ["Barbier", "barbier"], ["Tresses", "tresses"], ["Ongles", "ongles"]] as const) {
@@ -575,7 +585,7 @@ test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async (
 test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
   test.setTimeout(120_000);
   const webkitBrowser = await webkit.launch();
-  const context = await webkitBrowser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const context = await webkitBrowser.newContext({ baseURL: remoteAppUrl ?? "http://localhost:3100", viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
     await preparePage(page);
