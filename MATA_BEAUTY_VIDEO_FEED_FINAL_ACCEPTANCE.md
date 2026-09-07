@@ -1,141 +1,87 @@
-# Mata Beauty — audit de la chaîne vidéo et du feed
+# Mata Beauty — recette vidéo et feed
 
-Date : 31 août 2026
+Date : 7 septembre 2026. Branche : `codex/launch-phase-2`.
 
-Branche : `codex/launch-phase-2`
+## État de livraison
 
-Périmètre : Studio prestataire → Storage → persistance Supabase → RLS → `social_feed` → lecteur client
+**PASS — 9 scénarios distants réussis sur une seule exécution, en 3,9 minutes, nettoyage compris.** La publication Studio, la lecture cliente, les interactions, la réservation et les navigations mobiles ont été vérifiées sur le backend QA réel le 7 septembre 2026.
 
-Production : **non touchée**
+- Preview : https://mata-beauty-ik9zp4691-africrm.vercel.app
+- Déploiement : `dpl_ExjtHy9LE4vhefcckXEszBP7chpS`, état `READY`, cible Preview.
+- Code applicatif déployé : `9adce6c`.
+- Backend isolé : `kazlvtxkbsdhbfvtqqdp.supabase.co`.
+- Production : aucun déploiement, aucune migration ni donnée de test introduite pendant cette reprise.
+- Paiement réel : non activé ; aucun encaissement dans cette recette.
 
-Statut global : **FAIL / BLOCKED — Preview Vercel créée, backend Supabase QA isolé indisponible**
+Ce rapport remplace le constat bloqué du 31 août : le backend QA isolé est maintenant disponible et les publications réelles ont été exécutées.
 
-## Conclusion exécutable
+## Causes et corrections
 
-La chaîne a été durcie de bout en bout dans le code et dans une migration versionnée. La publication n'affiche désormais un succès qu'après vérification de la ligne persistée, de la prestation principale, du média, de la présence dans `social_feed` et de la création d'URLs signées. Le feed lit directement la source chronologique, utilise un curseur stable, invalide son cache après publication et ne dépend plus d'un `list()` Storage préalable.
+| Défaut | Correction | Fichiers principaux |
+|---|---|---|
+| Succès de publication non corrélé à la livraison réelle | Vérification de la ligne, des relations, du feed et de la signature Storage ; conservation des objets après persistance | `app/video-publisher.tsx`, `lib/domain/video-delivery.ts` |
+| Feed, visibilité et pagination incohérents | Lecture de `social_feed`, curseur composite, invalidation du cache après publication, signature directe des médias | `app/social-feed.tsx`, migration `20260831010000_harden_video_delivery_chain.sql` |
+| Création de compte, audit et approbation bloqués sur QA | Réparation des champs propres à chaque table et de l’approbation administrateur | Migrations `20260831020000`, `20260831021000`, `20260831022000` |
+| Aperçus photo Studio bloqués par la CSP | Autorisation de `blob:` dans `img-src` | `next.config.ts` |
+| Envoi de message impossible : `record new has no field status` | Conditions du déclencheur multi-table lisant le statut via JSONB, sans accès à un champ absent | `20260906010000_repair_launch_event_status_dispatch.sql` |
+| Profil : erreur 400 sur la galerie | Lecture de `storage_path` et tri `sort_order`, URL publique du bucket `portfolios` | `app/mata-beauty-app.tsx` |
+| Clic profil avant disponibilité du catalogue | Requête ciblée du prestataire approuvé, indépendante du chargement initial et de la limite du catalogue | `app/mata-beauty-app.tsx`, `lib/supabase/catalog.ts` |
+| Requêtes du feed et statistiques lancées pendant une navigation WebKit | Pas de changement d’état déclenchant un rechargement avant redirection ; annulation des requêtes à `pagehide` et au démontage ; réactivation à `pageshow` | `app/mata-beauty-app.tsx`, `app/social-feed.tsx` |
+| Recette instable aux changements de page | Pagination mesurée par les seules requêtes avec curseur ; connexion ciblant la navigation du compte ; chargements WebKit attendus avant retour/avance | `tests/remote/social-feed-remote-ui.spec.ts` |
+| Comptes QA non supprimables après messagerie/modération | Suppression préalable des conversations et références QA, suppression Storage groupée, vérification des résultats et délai dédié | `tests/remote/social-feed-remote-ui.spec.ts` |
 
-Une Preview Vercel réelle a été créée et inspectée. Elle embarque les marqueurs compilés du correctif vidéo, mais sa configuration Preview pointe vers le même projet Supabase que la Production. La création d'une branche Supabase isolée a été refusée par la plateforme, car l'organisation n'a pas accès à la fonctionnalité Branching. Aucun compte, média ou enregistrement QA n'a donc été créé sur ce backend partagé. Aucun contournement par des données simulées n'est présenté comme une validation distante.
+## Schéma, Storage et sécurité
 
-## Validation distante du 31 août 2026
+La publication relie `posts`, `post_services`, `provider_services`, `provider_profiles`, `profiles` et `social_post_media`. La vue `social_feed` utilise `security_invoker=true`. Le bucket `provider-social-media` est privé. Les chemins sont propres au prestataire et à la publication ; les vidéos et miniatures sont lues par URL signée.
 
-- URL Preview exacte : `https://mata-beauty-83a0q7o2h-africrm.vercel.app`.
-- Déploiement Vercel : `dpl_7WLW42nn1RSMUhhAGDBJL6gxQfhj`.
-- Cible Vercel inspectée : `preview`, état `READY`; aucune promotion Production.
-- Commit source local déployé : `1171f9c053e8227865f64fb1ed8ad144621e7e67`.
-- Preuve du code livré : les bundles distants contiennent le message `Votre vidéo a été publiée.` et l'événement `mata:feed:invalidate`, tous deux introduits par ce commit.
-- Supabase configuré en Preview : `qjdwxdbvrxedyfolnpol.supabase.co`.
-- Supabase configuré en Production : `qjdwxdbvrxedyfolnpol.supabase.co`.
-- Isolation : **FAIL**, les deux cibles sont identiques.
-- Tentative de branche QA `video-feed-qa-1171f9c` : **FAIL**, réponse Supabase `402 entitlement_required`, Branching réservé au plan Pro ou supérieur.
-- Projets Supabase alternatifs : aucun projet Mata Beauty QA actif disponible.
-- Migration distante `20260831010000_harden_video_delivery_chain.sql` : **NON APPLIQUÉE**, afin de ne pas modifier la Production.
-- Comptes professionnel/client QA : **NON CRÉÉS**.
-- Données et objets QA créés : **0**.
-- Nettoyage QA : **PASS par absence de création**; aucun résidu QA public n'a été introduit.
+La fonction `is_public_social_post` centralise les critères de publication publique : post publié, date de publication valide, prestataire approuvé et non suspendu, prestation principale active, absence de signalements bloquants. Les politiques de lecture des publications, médias et objets Storage s’appuient sur ces règles.
 
-La Preview a été ouverte sur desktop et à `390 × 844`. La page, la navigation mobile et l'état vide du feed s'affichent sans débordement horizontal ni erreur console. La CSP distante est présente et contient `upgrade-insecure-requests`. Le contrôle serveur répond `ok` avec configuration, base et rôle serveur disponibles. Ces vérifications restent non mutantes et ne constituent pas la preuve du parcours vidéo demandé.
+La recette vérifie qu’un brouillon et les contenus d’un prestataire rejeté sont invisibles au client, que le client et un autre prestataire ne peuvent pas modifier la publication, et qu’un prestataire ne peut pas exécuter la modération réservée aux administrateurs. Les migrations sont versionnées et appliquées uniquement à QA. La clé de service reste dans le processus du runner ; elle n’est pas injectée dans le navigateur ni committée.
 
-## Diagnostic et corrections
+## Parcours réellement exercés
 
-| Étape | État initial / erreur | Cause racine | Correction | Preuve disponible |
-|---|---|---|---|---|
-| Upload vidéo et miniature | Le RPC pouvait réussir puis les fichiers être supprimés | Le `catch` supprimait les objets même après persistance si une étape ultérieure échouait | Drapeau `persisted`; nettoyage uniquement avant persistance | Tests unitaires et build |
-| Retour de publication | Succès déclaré au seul retour du RPC | Absence de vérification DB, feed et Storage | Relecture de `posts`, relations, `social_feed` et URLs signées avant confirmation | Test du validateur + scénario distant renforcé |
-| Message Studio | Message ambigu sur la visibilité | Le succès n'était pas corrélé à une livraison complète | Message exact `Votre vidéo a été publiée.` seulement après vérification | Assertion E2E distante ajoutée |
-| Visibilité publique | Plusieurs politiques répétaient des critères incomplets | La cohérence entre `posts`, média et Storage pouvait diverger | Fonction centrale `is_public_social_post` et politiques RLS alignées | Migration versionnée |
-| Propriété Storage | Lecture propriétaire fondée sur `owner_id` | Ce champ peut différer selon le mode/version d'upload | Vérification du premier segment du chemin, déjà imposé à l'upload | Migration versionnée |
-| Résolution média | `list()` puis `createSignedUrl()` | Appel redondant, plus lent et source d'échecs RLS | Signature directe du chemin autorisé | E2E local Chromium/WebKit |
-| Ordre du feed | Les contenus de lancement pouvaient dominer les nouveaux posts | Lecture prioritaire de `launch_social_feed` | Lecture de `social_feed`, tri `published_at desc, id desc` | E2E local et build |
-| Pagination | Décalage calculé depuis le nombre de cartes affichées | Filtrage, diversification ou média invalide faussait l'offset | Curseur composite `published_at` + `id`, garde anti-concurrence | Inspection, typecheck, E2E |
-| Cache | Le feed pouvait conserver l'état précédent après publication | Pas d'invalidation inter-composants | Suppression du cache session et événement `mata:feed:invalidate` | E2E local |
-| WebKit local | Feed bloqué sur `https://localhost` | CSP `upgrade-insecure-requests` active en développement | Directive limitée à la production | Test Playwright iPhone 13/WebKit |
+La suite crée des comptes temporaires distincts : professionnel, cliente, administrateur et Super Admin. Le professionnel est approuvé par le RPC administrateur puis se connecte au vrai Studio.
 
-## Contrat de livraison vérifié par le client
+Neuf MP4 H.264 de cinq secondes sont téléversés depuis le sélecteur du formulaire, chacun avec un chemin Storage distinct et une miniature. Une dixième vidéo est publiée pendant que la cliente garde son feed ouvert. Deux photos et un avant/après sont également publiés via Studio. Aucune publication n’est injectée directement en base.
 
-Une vidéo annoncée comme publiée doit satisfaire simultanément les conditions suivantes :
+La cliente retrouve les vidéos, les lit, met en pause et reprend, active le son, défile avec une seule vidéo active, utilise les filtres et charge la page suivante par curseur. La nouvelle vidéo apparaît après navigation normale, sans rebuild. Les likes, sauvegardes, abonnements et commentaires sont vérifiés en base.
 
-1. `posts.id` correspond à l'identifiant demandé.
-2. `status = 'published'`, `visibility = 'public'` et `published_at` est renseigné.
-3. Le profil prestataire est approuvé et non suspendu.
-4. Une prestation active est reliée comme prestation principale.
-5. `social_post_media` relie le chemin vidéo et le chemin miniature attendus dans `provider-social-media`.
-6. La ligne est lisible dans `social_feed`.
-7. La vidéo et la miniature peuvent recevoir une URL signée.
+La réservation est créée depuis la vidéo avec `source_post_id`. Le créneau disparaît, le prestataire reçoit une notification et voit la réservation et ses statistiques. Les comptes échangent des messages ; le prestataire confirme, commence puis termine la prestation ; la cliente laisse un avis, qui met à jour la note. Un signalement est traité dans l’interface administrateur, la publication est masquée, les traces d’audit sont contrôlées puis le Super Admin la restaure.
 
-En cas d'échec après persistance, le Studio indique que la visibilité n'a pas pu être confirmée et conserve les objets Storage; il ne crée pas silencieusement un post dont les médias ont été supprimés.
-
-## Schéma, RLS et requête du feed
-
-- Migration : `supabase/migrations/20260831010000_harden_video_delivery_chain.sql`.
-- Tables concernées : `posts`, `post_services`, `provider_services`, `provider_profiles`, `profiles`, `social_post_media` et `storage.objects`.
-- Vue lue par le client : `public.social_feed` avec `security_invoker=true`.
-- Bucket : `provider-social-media`, privé; lecture via URLs signées.
-- Fonction de cohérence : `public.is_public_social_post(uuid)`, `security definer`, `search_path` vide.
-- Index de curseur : `(published_at desc, id desc)` limité aux publications publiques et publiées.
-- Aucun secret ni rôle de service n'est exposé au navigateur.
-
-## Lecteur, mobile et interactions
-
-Le scénario Playwright ciblé vérifie deux cartes, une seule vidéo active, la mise en pause lors du défilement, le chargement anticipé, les filtres et le démarrage du parcours de réservation. Il passe sous Chromium et sous WebKit avec un profil iPhone 13. Le test isole le front avec des réponses réseau déterministes; il prouve le comportement du lecteur et du feed, pas l'état d'une base distante.
-
-## Résultats des contrôles finaux
+## Validation
 
 | Contrôle | Résultat |
 |---|---|
-| `pnpm lint` | Réussi |
-| `pnpm typecheck` | Réussi |
-| `pnpm test` | 14 fichiers, 64 tests réussis |
-| Playwright feed ciblé — Chromium | Réussi |
-| Playwright feed ciblé — WebKit / iPhone 13 | Réussi |
-| `pnpm build` | Réussi, Next.js 16.2.11 |
-| `pnpm build:sites` | Réussi |
-| Preview Vercel nouvelle | PASS — cible `preview`, état `READY` |
-| Présence du correctif dans les bundles | PASS — confirmation et invalidation retrouvées |
-| Service role limité au serveur/QA | PASS statique — feed sur client Supabase + RLS; secret référencé côté serveur et scripts QA uniquement |
-| Migration Supabase Preview | FAIL / BLOCKED — aucun backend isolé |
-| Compte professionnel QA | NON CRÉÉ |
-| Compte client QA | NON CRÉÉ |
-| Upload réel Studio | FAIL / NON EXÉCUTÉ |
-| Objet Storage réel | FAIL / NON EXÉCUTÉ |
-| Ligne DB et relations réelles | FAIL / NON EXÉCUTÉ |
-| RLS positive et négative distante | FAIL / NON EXÉCUTÉ |
-| Feed réel | FAIL / NON EXÉCUTÉ; feed Preview actuellement vide |
-| Autoplay réel | FAIL / NON EXÉCUTÉ |
-| Scroll vertical multi-vidéo | FAIL / NON EXÉCUTÉ |
-| Pagination distante | FAIL / NON EXÉCUTÉ |
-| iPhone/WebKit réel | FAIL / NON EXÉCUTÉ; rendu 390 px seulement contrôlé |
-| Chromium distant | PARTIEL — ouverture et console sans erreur, aucune vidéo réelle |
-| Like persistant | FAIL / NON EXÉCUTÉ |
-| Save persistant | FAIL / NON EXÉCUTÉ |
-| Profil et prestation | FAIL / NON EXÉCUTÉ |
-| Réservation | FAIL / NON EXÉCUTÉ |
-| Console Preview | PASS sur état vide — aucune erreur ou alerte |
-| Network Preview | PARTIEL — page, CSP et santé serveur disponibles; aucun média à contrôler |
-| Nettoyage QA | PASS — aucune donnée QA créée |
-| Test distant réel Studio → client | **FAIL / BLOCKED** |
+| `pnpm lint` | PASS |
+| `pnpm typecheck` | PASS |
+| `pnpm test` | PASS — 14 fichiers, 64 tests |
+| `pnpm test:smoke` | PASS — 23 tests |
+| `pnpm build` local et Vercel | PASS |
+| Upload MP4, photo, avant/après et preuve DB/Storage | PASS |
+| RLS et expiration/régénération d’une URL signée | PASS |
+| Lecture, interactions, réservation, messagerie, avis | PASS |
+| Modération, filtres et pagination sans doublons | PASS — une requête avec curseur pour le chargement suivant |
+| Chromium aux largeurs 320, 360, 375, 390 et 430 px | PASS |
+| WebKit mobile 390 × 844, autoplay et retour/avance | PASS |
+| Console et réponses réseau de l’application | PASS — aucune erreur capturée pendant la suite finale |
+| Suite distante entière et nettoyage final | PASS — 9 tests, 3,9 minutes ; fichiers QA et profils supprimés avec assertions |
 
-## Scénarios d'acceptation Preview restant à exécuter
+## Performances et limites des preuves
 
-Ces scénarios doivent être rejoués sur une Preview isolée après application de la migration :
+Une mesure `EXPLAIN ANALYZE` sur le feed QA peuplé, sous rôle client, retourne huit lignes en **21,105 ms**, avec **25,24 ms** de planification. Cette mesure SQL ponctuelle n’inclut pas le réseau, la signature des médias ou le rendu, et ne constitue pas un test de charge.
 
-1. Se connecter comme prestataire approuvé, téléverser une vraie vidéo et une vraie miniature, associer une prestation active et publier.
-2. Vérifier directement en base les statuts, la relation principale et les chemins média.
-3. Vérifier la lecture anonyme/client de la ligne dans `social_feed` et la signature des deux objets Storage.
-4. Recharger le compte client, confirmer que la nouvelle publication apparaît en tête sans duplication.
-5. Tester lecture, pause, reprise, défilement, filtres, réservation, desktop et mobile.
-6. Vérifier l'absence d'erreurs console, 401/403/404, requêtes répétées et médias bloqués.
+Des expirations SQL intermittentes ont été observées pendant des passages antérieurs. Elles n’étaient pas reproduites par la mesure sur les données réelles et aucune erreur réseau n’a été capturée pendant la suite finale. Leur cause précise n’a pas été établie ; cette réussite ponctuelle ne constitue pas une garantie sous charge. Aucune hausse du timeout SQL ni suppression du contrôle réseau n’a été utilisée pour les masquer.
 
-Infrastructure à fournir avant reprise, sans coller de secret dans un message ni le committer :
+Les formats mobiles sont des contextes navigateur, pas des téléphones physiques. Le partage vérifie l’enregistrement applicatif avec une simulation de la boîte de partage système. Le contrôle console exclut uniquement le script de feedback Vercel Preview déjà identifié ; les erreurs de l’application restent bloquantes. Les navigations WebKit attendent les chargements pour ne pas interrompre les requêtes de la page précédente.
 
-- soit activer Supabase Branching sur l'organisation et autoriser la création d'une branche isolée;
-- soit fournir un projet Supabase QA distinct, vide et dédié à cette recette;
-- relier les variables Vercel Preview à ce backend isolé;
-- rendre les clés QA disponibles exclusivement au runner sécurisé pour les preuves et le nettoyage.
+Les comptes, publications, conversations et fichiers QA sont temporaires et supprimés après la suite. La Preview n’est donc pas destinée à conserver ces démonstrations dans son feed.
 
-## Traçabilité Git
+## Traçabilité
 
-Le correctif doit être committé sans inclure le fichier utilisateur non suivi `docs/PRODUCTION_READINESS_2026-08-16.md`. Le SHA du commit correctif est consigné dans le message de remise final; il ne peut pas être inscrit à l'intérieur du même commit sans créer une référence circulaire.
-
-## Décision
-
-**FAIL / BLOCKED. La Preview Vercel existe, mais le parcours Professionnel → Studio → upload → Client → lecture → swipe → like → save → profil → réservation n'a pas été exécuté. Une base Supabase QA isolée est obligatoire avant de poursuivre. Aucune mutation de Production n'a été effectuée.**
+- `1171f9c` : chaîne de publication et livraison vidéo.
+- `64a95e0` : corrections QA, CSP et recette étendue.
+- `aaefb24` : déclencheur de messages et galerie du profil.
+- `4ce3beb` : ouverture du profil indépendante du catalogue.
+- `9adce6c` : annulation des requêtes au départ de la page et recette stabilisée ; dernière version applicative déployée.
+- Les ajustements finaux de recette et ce rapport sont enregistrés dans un commit distinct.
+- Le document utilisateur non suivi `docs/PRODUCTION_READINESS_2026-08-16.md` reste exclu des commits.
