@@ -123,6 +123,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   const restoredPosition = useRef(false);
   const completedViews = useRef(new Set<string>());
   const loadingMore = useRef(false);
+  const pageRequests = useRef(new AbortController());
   const feedCursor = useRef<{ publishedAt: string; id: string } | null>(null);
 
   const visiblePosts = useMemo(() => diversifyFeed(posts
@@ -142,14 +143,18 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   }, []);
 
   const load = useCallback(async () => {
+    const signal = pageRequests.current.signal;
+    if (signal.aborted) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) { setState("error"); return; }
     const cached = readFeedCache();
     if (cached.length) { setPosts(cached); setState("ready"); }
     else setState("loading");
-    const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE);
+    const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE).abortSignal(signal);
+    if (signal.aborted) return;
     if (error) { if (!cached.length) setState("error"); else setFeedback("Réseau lent · inspirations enregistrées affichées."); return; }
     const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
+    if (signal.aborted) return;
     const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
     const ranked = diversifyFeed(mapped);
     setPosts(ranked);
@@ -177,7 +182,8 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   }, [authenticated]);
 
   const loadMore = useCallback(async () => {
-    if (!hasMore || loadingMore.current) return;
+    const signal = pageRequests.current.signal;
+    if (!hasMore || loadingMore.current || signal.aborted) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     loadingMore.current = true;
@@ -185,9 +191,11 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
       let query = supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE);
       const cursor = feedCursor.current;
       if (cursor) query = query.or(`published_at.lt.${cursor.publishedAt},and(published_at.eq.${cursor.publishedAt},id.lt.${cursor.id})`);
-      const { data, error } = await query;
+      const { data, error } = await query.abortSignal(signal);
+      if (signal.aborted) return;
       if (error) return;
       const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
+      if (signal.aborted) return;
       const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
       setPosts((current) => { const next = diversifyFeed([...current, ...mapped.filter((item) => !current.some((existing) => existing.id === item.id))]); writeFeedCache(next); return next; });
       const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
@@ -195,6 +203,19 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
       setHasMore((data ?? []).length === FEED_BATCH_SIZE);
     } finally { loadingMore.current = false; }
   }, [hasMore]);
+
+  useEffect(() => {
+    const leave = () => pageRequests.current.abort();
+    const resume = () => { if (pageRequests.current.signal.aborted) pageRequests.current = new AbortController(); };
+    resume();
+    window.addEventListener("pagehide", leave);
+    window.addEventListener("pageshow", resume);
+    return () => {
+      leave();
+      window.removeEventListener("pagehide", leave);
+      window.removeEventListener("pageshow", resume);
+    };
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -248,7 +269,8 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
       const supabase = getSupabaseBrowserClient();
       if (!supabase) return;
       const sessionHash = await getSessionHash();
-      await supabase.rpc("record_video_view", { target_post_id: post.id, target_session_hash: sessionHash, target_watched_ms: 2000, target_completed: false });
+      if (pageRequests.current.signal.aborted) return;
+      await supabase.rpc("record_video_view", { target_post_id: post.id, target_session_hash: sessionHash, target_watched_ms: 2000, target_completed: false }).abortSignal(pageRequests.current.signal);
     }, 2000);
     if (activeIndex >= visiblePosts.length - 3) void loadMore();
     return () => window.clearTimeout(timer);
@@ -387,7 +409,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   return <section className="social-feed-shell">{header}<div className="social-feed" aria-label="Vidéos beauté" onScroll={(event) => { const node=event.currentTarget; const index=Math.round(node.scrollTop/Math.max(1,node.clientHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>
     {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{feedFilter === "Près de moi" ? "Aucun créateur proche pour le moment" : feedFilter === "Tendances" ? "Les tendances arrivent" : `Aucune inspiration ${feedFilter}`}</h1><p>{feedFilter === "Près de moi" ? "Élargissez votre recherche ou revenez bientôt : les disponibilités locales sont actualisées en continu." : "Essayez une autre catégorie pour découvrir des prestations disponibles."}</p><button onClick={() => setFeedFilter("Pour toi")}>Explorer le feed</button></div>}
     {visiblePosts.map((post, index) => <article className="social-video-card" key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`Publication de ${post.businessName}`}>
-      {post.postType === "video" ? videoErrors.has(post.id) ? <div className="video-fallback"><span>◇</span><p>Cette vidéo ne peut pas être lue.</p><button onClick={() => setVideoErrors((current) => { const next=new Set(current); next.delete(post.id); return next; })}>Réessayer</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={index===activeIndex || index===activeIndex+1 ? post.videoUrl : undefined} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={index===activeIndex ? "auto" : index===activeIndex+1 ? "metadata" : "none"} onLoadStart={() => setVideoLoading((current) => new Set(current).add(post.id))} onCanPlay={() => setVideoLoading((current) => { const next=new Set(current); next.delete(post.id); return next; })} onTimeUpdate={(event) => { const video=event.currentTarget; const ratio=video.duration ? video.currentTime/video.duration : 0; setProgress((current) => ({ ...current, [post.id]: ratio })); if (ratio>=.95 && !completedViews.current.has(post.id)) { completedViews.current.add(post.id); void getSessionHash().then((hash) => getSupabaseBrowserClient()?.rpc("record_video_view", { target_post_id: post.id, target_session_hash: hash, target_watched_ms: Math.round(video.currentTime*1000), target_completed: true })); } }} onError={() => setVideoErrors((current) => new Set(current).add(post.id))} /> : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt="Avant" width={540} height={760} unoptimized /><figcaption>Avant</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt="Après" width={540} height={760} unoptimized /><figcaption>Après</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
+      {post.postType === "video" ? videoErrors.has(post.id) ? <div className="video-fallback"><span>◇</span><p>Cette vidéo ne peut pas être lue.</p><button onClick={() => setVideoErrors((current) => { const next=new Set(current); next.delete(post.id); return next; })}>Réessayer</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={index===activeIndex || index===activeIndex+1 ? post.videoUrl : undefined} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={index===activeIndex ? "auto" : index===activeIndex+1 ? "metadata" : "none"} onLoadStart={() => setVideoLoading((current) => new Set(current).add(post.id))} onCanPlay={() => setVideoLoading((current) => { const next=new Set(current); next.delete(post.id); return next; })} onTimeUpdate={(event) => { const video=event.currentTarget; const ratio=video.duration ? video.currentTime/video.duration : 0; setProgress((current) => ({ ...current, [post.id]: ratio })); if (ratio>=.95 && !completedViews.current.has(post.id)) { completedViews.current.add(post.id); void getSessionHash().then((hash) => { if (pageRequests.current.signal.aborted) return; return getSupabaseBrowserClient()?.rpc("record_video_view", { target_post_id: post.id, target_session_hash: hash, target_watched_ms: Math.round(video.currentTime*1000), target_completed: true }).abortSignal(pageRequests.current.signal); }); } }} onError={() => setVideoErrors((current) => new Set(current).add(post.id))} /> : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt="Avant" width={540} height={760} unoptimized /><figcaption>Avant</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt="Après" width={540} height={760} unoptimized /><figcaption>Après</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
       {videoLoading.has(post.id) && !videoErrors.has(post.id) && <span className="video-loading" role="status">Chargement…</span>}
       <div className="video-shade" />
       <div className="video-progress" role="progressbar" aria-label="Progression de la vidéo" aria-valuenow={Math.round((progress[post.id] ?? 0)*100)}><i style={{ transform: `scaleX(${progress[post.id] ?? 0})` }} /></div>

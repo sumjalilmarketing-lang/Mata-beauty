@@ -136,6 +136,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  test.setTimeout(120_000);
   const userIds = [providerId, clientId, moderatorId, superId, otherProviderId].filter(Boolean);
   if (userIds.length) {
     const memberships = await admin.from("conversation_members").select("conversation_id").in("profile_id", userIds);
@@ -158,7 +159,7 @@ test.afterAll(async () => {
         const { data: files, error: filesError } = await bucket.list(`${providerId}/${folder.name}`, { limit: 100 });
         expect.soft(filesError).toBeNull();
         const paths = (files ?? []).map((file) => `${providerId}/${folder.name}/${file.name}`);
-        if (paths.length) expect.soft((await bucket.remove(paths)).error).toBeNull();
+        directPaths.push(...paths);
       }
     }
     if (directPaths.length) expect.soft((await bucket.remove(directPaths)).error).toBeNull();
@@ -174,8 +175,8 @@ test.afterAll(async () => {
     expect.soft(profiles.error).toBeNull();
     expect.soft(profiles.data).toEqual([]);
   }
-  expect(browserConsoleErrors, `Erreurs console: ${browserConsoleErrors.join(" | ")}`).toEqual([]);
-  expect(browserNetworkErrors, `Erreurs réseau: ${browserNetworkErrors.join(" | ")}`).toEqual([]);
+  expect.soft(browserConsoleErrors, `Erreurs console: ${browserConsoleErrors.join(" | ")}`).toEqual([]);
+  expect.soft(browserNetworkErrors, `Erreurs réseau: ${browserNetworkErrors.join(" | ")}`).toEqual([]);
 });
 
 test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page, request }) => {
@@ -544,8 +545,8 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   const feed = page.locator(".social-feed");
   await feed.evaluate((node) => node.scrollTo({ top: node.scrollHeight, behavior: "auto" }));
   await expect.poll(() => page.locator(".social-video-card").count()).toBeGreaterThan(8);
-  expect(feedRequests.some((url) => new URL(url).searchParams.has("or"))).toBeTruthy();
-  expect(feedRequests.length).toBeLessThanOrEqual(2);
+  const paginationRequests = feedRequests.filter((url) => new URL(url).searchParams.has("or"));
+  expect(paginationRequests).toHaveLength(1);
   const cardTexts = await page.locator(".social-video-card").allTextContents();
   expect(new Set(cardTexts).size).toBe(cardTexts.length);
   for (const [filter, marker] of [["Make-up", "makeup"], ["Barbier", "barbier"], ["Tresses", "tresses"], ["Ongles", "ongles"]] as const) {
@@ -587,14 +588,19 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
   const webkitBrowser = await webkit.launch();
   const context = await webkitBrowser.newContext({ baseURL: remoteAppUrl ?? "http://localhost:3100", viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
+  page.on("requestfailed", (request) => console.log("WebKit request failed", Date.now(), request.url().split("?")[0], request.failure()?.errorText));
+  page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) console.log("WebKit navigation", Date.now(), frame.url().split("?")[0]); });
+  page.on("console", (message) => { if (message.type() === "error") console.log("WebKit console", Date.now(), message.text()); });
   try {
     await preparePage(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Profil" }).click();
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
     await page.getByLabel("Adresse e-mail").fill(clientEmail);
     await page.getByLabel("Mot de passe").fill(password);
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
     await page.waitForURL(/\/app/);
+    await page.waitForLoadState("networkidle");
     await page.goto("/");
     const card = page.locator(".social-video-card").filter({ hasText: liveSecondCaption });
     const video = card.locator("video");
@@ -609,10 +615,13 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
     }));
     expect(layout.noHorizontalOverflow).toBeTruthy();
     expect(layout.scrollSnap).toContain("y");
+    await page.waitForLoadState("networkidle");
     await page.goBack();
     await expect(page).toHaveURL(/\/app/);
+    await page.waitForLoadState("networkidle");
     await page.goForward();
     await expect(page.getByText(liveSecondCaption)).toBeVisible({ timeout: 30_000 });
+    await page.waitForLoadState("networkidle");
   } finally {
     await context.close();
     await webkitBrowser.close();

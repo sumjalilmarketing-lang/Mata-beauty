@@ -478,8 +478,6 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }
 
   function handleAuthenticated(signedIn: AuthenticatedProfile) {
-    setAuthenticated(signedIn);
-    setAuthRequest(null);
     if (!booking) {
       const requested = authRequest?.returnTo ? safeOAuthDestination(authRequest.returnTo) : null;
       if (requested && requested !== "/") {
@@ -488,7 +486,10 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       }
       const destination = signedIn.roles.includes(authRequest?.role ?? "client") ? (authRequest?.role ?? signedIn.role) : signedIn.role;
       window.location.assign(destination === "provider" ? "/pro" : destination === "admin" ? "/admin" : "/app");
+      return;
     }
+    setAuthenticated(signedIn);
+    setAuthRequest(null);
   }
 
   if (view !== "home" && authenticated?.roles.includes(view)) {
