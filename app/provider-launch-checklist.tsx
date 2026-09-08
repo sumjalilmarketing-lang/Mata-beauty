@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 type Checklist = {
   score: number; photo: boolean; description: boolean; services: number; prices: number;
@@ -25,18 +26,20 @@ export function ProviderLaunchChecklist({ userId }: { userId: string }) {
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
   const items = useMemo(() => [
-    ["Ajouter une photo", checklist.photo], ["Compléter la description", checklist.description],
-    ["Ajouter 3 prestations", checklist.services >= 3], ["Ajouter les tarifs", checklist.prices >= 3],
-    ["Configurer les disponibilités", checklist.availability], ["Ajouter 3 photos portfolio", checklist.portfolio >= 3],
-    ["Publier une première vidéo", checklist.video], ["Vérifier son identité", checklist.verified],
-  ] as Array<[string, boolean]>, [checklist]);
+    ["Compléter mon profil", checklist.photo && checklist.description, "/pro/public-profile"],
+    ["Créer une prestation", checklist.services > 0, "/pro/services"],
+    ["Définir mes tarifs", checklist.prices > 0, "/pro/services"],
+    ["Configurer mes disponibilités", checklist.availability, "/pro/agenda"],
+    ["Publier ma première réalisation", checklist.video, "/pro/videos"],
+  ] as Array<[string, boolean, string]>, [checklist]);
 
   if (!available) return null;
-  const progressLabel = checklist.ready ? "Profil prêt" : `${Math.max(0, Math.min(100, checklist.score))} %`;
+  const completed = items.filter(([, complete]) => complete).length;
+  const progressLabel = `${completed} / ${items.length}`;
   return <article className="panel launch-checklist">
-    <div className="panel-heading"><div><span className="launch-kicker">LANCEMENT</span><h2>Votre profil en moins de 10 minutes</h2><p>Complétez les étapes essentielles pour être trouvé et réservé.</p></div><strong>{progressLabel}</strong></div>
-    <progress max="100" value={checklist.score} aria-label={`Complétude ${checklist.score} sur 100`} />
-    <div className="launch-checklist-grid">{items.map(([label, complete]) => <div className={complete ? "complete" : ""} key={label}><span>{complete ? "✓" : "○"}</span><p>{label}</p></div>)}</div>
-    {!checklist.ready && <small>Il vous manque {items.filter(([, complete]) => !complete).length} étape(s) pour un profil prêt au lancement.</small>}
+    <div className="panel-heading"><div><span className="launch-kicker">PREMIERS PAS</span><h2>Configurer mon activité</h2><p>Complétez votre profil, puis préparez vos premières réservations.</p></div><strong>{progressLabel}</strong></div>
+    <progress max={items.length} value={completed} aria-label={`${completed} étapes sur ${items.length}`} />
+    <div className="launch-checklist-grid">{items.map(([label, complete, href]) => <Link className={complete ? "complete" : ""} href={href} key={label}><span>{complete ? "✓" : "○"}</span><p>{label}</p></Link>)}</div>
+    <small>{checklist.verified ? "Profil vérifié par Mata Beauty." : "La validation de votre profil reste nécessaire avant sa publication."}</small>
   </article>;
 }

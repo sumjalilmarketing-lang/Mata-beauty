@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -9,6 +11,7 @@ import { VideoPublisher } from "./video-publisher";
 import { SocialDashboard } from "./social-dashboard";
 import { ClientControlCenter } from "./client-control-center";
 import { ProviderLaunchChecklist } from "./provider-launch-checklist";
+import { ProfessionalDocuments } from "./professional-documents";
 import { ReferralCard } from "./referral-card";
 
 type Role = "client" | "provider" | "admin";
@@ -83,8 +86,10 @@ export function LiveDashboard({
   displayName,
   onBack,
   onSignOut,
+  moduleKey,
 }: {
   role: Role;
+  moduleKey?: string;
   userId: string;
   displayName: string;
   onBack: () => void;
@@ -95,6 +100,7 @@ export function LiveDashboard({
   const [providerProfile, setProviderProfile] = useState<ProviderProfileRow | null>(null);
   const [clientProfile, setClientProfile] = useState<ClientAccountRow | null>(null);
   const [pendingProviders, setPendingProviders] = useState<PendingProviderRow[]>([]);
+  const [ownServices, setOwnServices] = useState<Array<{ id: string; title: string; price_amount: number; duration_minutes: number }>>([]);
   const [baseServices, setBaseServices] = useState<BaseServiceRow[]>([]);
   const [adminMetrics, setAdminMetrics] = useState({ users: 0, providersPending: 0, reportsOpen: 0 });
   const [loading, setLoading] = useState(true);
@@ -105,7 +111,7 @@ export function LiveDashboard({
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setError("Supabase n’est pas configuré.");
+      setError("Votre espace est momentanément indisponible.");
       setLoading(false);
       return;
     }
@@ -157,18 +163,21 @@ export function LiveDashboard({
         }
 
         if (role === "provider") {
-          const [profileResult, serviceResult] = await Promise.all([
+          const [profileResult, serviceResult, ownResult] = await Promise.all([
             supabase
               .from("provider_profiles")
               .select("profile_id,business_name,bio,city,service_mode,status,activity_type,years_experience,base_address,languages,cancellation_policy,onboarding_progress")
               .eq("profile_id", userId)
               .maybeSingle(),
             supabase.from("services").select("id,name").eq("is_active", true).order("name"),
+            supabase.from("provider_services").select("id,title,price_amount,duration_minutes").eq("provider_id", userId).eq("is_active", true).order("title"),
           ]);
           if (profileResult.error) throw profileResult.error;
           if (serviceResult.error) throw serviceResult.error;
           setProviderProfile(profileResult.data as ProviderProfileRow | null);
           setBaseServices((serviceResult.data ?? []) as BaseServiceRow[]);
+          if (ownResult.error) throw ownResult.error;
+          setOwnServices(ownResult.data ?? []);
         }
       }
       const { data: notificationData, error: notificationError } = await supabase
@@ -303,6 +312,7 @@ export function LiveDashboard({
     else {
       form.reset();
       setFeedback("Prestation ajoutée.");
+      await load();
     }
   }
 
@@ -335,9 +345,10 @@ export function LiveDashboard({
     else await load();
   }
 
+  const show = (...keys: string[]) => !moduleKey || keys.includes(moduleKey);
   return (
-    <main className="dashboard">
-      <aside className="sidebar">
+    <main className={moduleKey ? "focused-dashboard" : "dashboard"}>
+      {!moduleKey && <aside className="sidebar">
         <button className="brand brand-button" onClick={onBack}><span className="brand-mark">M</span><span>Mata <i>Beauty</i></span></button>
         <p className="role-pill">Espace {role}</p>
         <nav>
@@ -347,27 +358,23 @@ export function LiveDashboard({
           <button onClick={() => document.getElementById("live-notifications")?.scrollIntoView({ behavior: "smooth" })}>◌ Notifications <i>{notifications.filter((item) => !item.read_at).length}</i></button>
         </nav>
         <button className="back-link" onClick={() => void onSignOut()}>Se déconnecter</button>
-      </aside>
+      </aside>}
       <section className="dashboard-main">
-        <div className="dashboard-top">
-          <div><p className="eyebrow">Données Supabase</p><h1>Bonjour, {displayName} 👋</h1><p>Les informations ci-dessous proviennent de votre compte connecté.</p></div>
+        {show("dashboard") && <><div className="dashboard-top">
+          <div><p className="eyebrow">Votre activité</p><h1>{displayName ? `Bonjour, ${displayName}` : "Mon activité"}</h1><p>Retrouvez vos rendez-vous et vos prochaines étapes.</p></div>
           <span className="live-badge">Connecté</span>
         </div>
+        </>}
         {feedback && <p className="dashboard-feedback" role="status">{feedback}</p>}
         {error && <div className="dashboard-error" role="alert"><p>{error}</p><button className="outline-button" onClick={() => void load()}>Réessayer</button></div>}
-        {loading ? (
+        {show("dashboard") && (loading ? (
           <div className="metric-grid" aria-label="Chargement"><article className="skeleton-card" /><article className="skeleton-card" /><article className="skeleton-card" /></div>
         ) : (
-          <div className="metric-grid">{metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>Calculé depuis la base</small></article>)}</div>
-        )}
-        <article className="panel insight-panel">
-          <div className="panel-heading"><div><h2>{role === "provider" ? "Activité des 7 derniers jours" : role === "admin" ? "Croissance de la plateforme" : "Votre activité beauté"}</h2><small>Vue synthétique</small></div><span className="insight-trend">↗ Données actualisées</span></div>
-          <div className="bar-chart" aria-label="Graphique d’activité">{[38, 58, 44, 72, 61, 86, 68].map((height, index) => <span key={index} style={{ height: `${height}%` }}><i>{["L", "M", "M", "J", "V", "S", "D"][index]}</i></span>)}</div>
-        </article>
-
-        {role === "client" && <ClientControlCenter userId={userId} />}
-        {role === "client" && <ReferralCard type="client" />}
-        {role === "client" && clientProfile && <details className="panel onboarding-panel legacy-profile-form"><summary>Informations rapides</summary><article>
+          <div className="metric-grid">{metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
+        ))}
+        {role === "client" && show("profile") && <ClientControlCenter userId={userId} />}
+        {role === "client" && !moduleKey && <ReferralCard type="client" />}
+        {role === "client" && !moduleKey && clientProfile && <details className="panel onboarding-panel legacy-profile-form"><summary>Informations rapides</summary><article>
           <div className="panel-heading"><div><h2>Mon profil beauté</h2><p>Ces informations personnalisent vos recommandations et vos rendez-vous.</p></div></div>
           <form className="dashboard-form" onSubmit={(event) => void saveClientProfile(event)}>
             <label>Prénom<input name="firstName" required minLength={2} defaultValue={clientProfile.first_name ?? ""} /></label>
@@ -380,17 +387,17 @@ export function LiveDashboard({
             <button className="primary-button" type="submit">Enregistrer mon profil</button>
           </form>
         </article></details>}
-        {role === "client" && <SocialDashboard role="client" userId={userId} />}
+        {role === "client" && show("inspirations") && <SocialDashboard role="client" userId={userId} />}
 
         {role === "provider" && providerProfile && (
           <>
-          <ProviderLaunchChecklist userId={userId} />
-          <ReferralCard type="provider" />
-          <VideoPublisher userId={userId} providerApproved={providerProfile.status === "approved"} onPublished={load} />
-          <SocialDashboard role="provider" userId={userId} />
-          <article className="panel onboarding-panel">
-            <div className="panel-heading">
-              <div><h2>Profil professionnel</h2><p className={`provider-state ${providerProfile.status}`}>{providerStatusLabels[providerProfile.status]}</p><label>Progression {providerProfile.onboarding_progress} %<progress value={providerProfile.onboarding_progress} max="100" /></label></div>
+          {show("dashboard") && <ProviderLaunchChecklist userId={userId} />}
+          {!moduleKey && <ReferralCard type="provider" />}
+          {!moduleKey && <VideoPublisher userId={userId} providerApproved={providerProfile.status === "approved"} onPublished={load} />}
+          {show("statistics") && <SocialDashboard role="provider" userId={userId} />}
+          {show("public-profile", "services") && <article className="panel onboarding-panel">
+            {show("public-profile") && <><div className="panel-heading">
+              <div><h2>Profil professionnel</h2>{providerProfile.status === "pending_review" && <p>Votre demande est en cours de validation. Vous pouvez préparer vos prestations, vos disponibilités et vos brouillons.</p>}<Link href="/salon/profile">Informations de mon salon</Link><p className={`provider-state ${providerProfile.status}`}>{providerStatusLabels[providerProfile.status]}</p><label>Progression {providerProfile.onboarding_progress} %<progress value={providerProfile.onboarding_progress} max="100" /></label></div>
               {["draft", "rejected"].includes(providerProfile.status) && <button className="outline-button" disabled={providerProfile.onboarding_progress < 100} onClick={() => void submitProviderForReview()}>Envoyer pour validation</button>}
             </div>
             <form className="dashboard-form" onSubmit={(event) => void saveProviderProfile(event)}>
@@ -405,15 +412,16 @@ export function LiveDashboard({
               <label className="wide">Politique d’annulation (20 caractères minimum)<textarea name="cancellationPolicy" rows={3} defaultValue={providerProfile.cancellation_policy ?? ""} /></label>
               <button className="primary-button" type="submit">Enregistrer le profil</button>
             </form>
-            <form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
+            <ProfessionalDocuments providerId={userId} /></>}
+            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <div className="control-list-row" key={service.id}><strong>{service.title}</strong><span>{service.duration_minutes} min · {service.price_amount.toLocaleString("fr-FR")} FCFA</span></div>)}<Link href="/pro/videos">Retour au Studio</Link><form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
               <h3 className="wide">Ajouter une prestation</h3>
               <label>Type<select name="serviceId" required defaultValue=""><option value="" disabled>Choisir</option>{baseServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
               <label>Nom affiché<input name="title" required minLength={2} /></label>
               <label>Durée (minutes)<input name="durationMinutes" type="number" required min={15} max={720} step={15} /></label>
               <label>Prix (FCFA)<input name="priceAmount" type="number" required min={0} step={500} /></label>
               <button className="primary-button" type="submit">Ajouter la prestation</button>
-            </form>
-          </article>
+            </form></>}
+          </article>}
           </>
         )}
 
@@ -433,10 +441,10 @@ export function LiveDashboard({
           </article>
         )}
 
-        {role !== "admin" && (
+        {role !== "admin" && show("dashboard", "bookings") && (
           <article className="panel" id="live-bookings">
             <div className="panel-heading"><h2>Réservations</h2><button onClick={() => void load()}>Actualiser</button></div>
-            {!loading && bookings.length === 0 && <div className="compact-empty">Aucune réservation pour le moment.</div>}
+            {!loading && bookings.length === 0 && <div className="compact-empty">Aucun rendez-vous pour le moment.</div>}
             {bookings.map((booking) => (
               <div className="appointment live-appointment" key={booking.id}>
                 <span className="date-block">{new Intl.DateTimeFormat("fr-SN", { day: "2-digit", month: "short", timeZone: "Africa/Dakar" }).format(new Date(booking.starts_at))}</span>
@@ -445,7 +453,7 @@ export function LiveDashboard({
                   <small>{new Intl.DateTimeFormat("fr-SN", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(booking.starts_at))} · {booking.provider_services?.duration_minutes ?? Math.round((new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60000)} min</small>
                   <small>{booking.location_mode === "client_address" ? booking.appointment_address : "Chez le professionnel"} · {booking.total_amount.toLocaleString("fr-FR")} {booking.currency}</small>
                 </div>
-                <span className={booking.status === "confirmed" ? "status confirmed" : "status pending"}>{booking.status}</span>
+                <span className={booking.status === "confirmed" ? "status confirmed" : "status pending"}>{{ pending: "En attente", confirmed: "Confirmé", in_progress: "En cours", completed: "Terminé", declined: "Refusé", cancelled_by_client: "Annulé", cancelled_by_provider: "Annulé", no_show: "Absence", disputed: "Litige" }[booking.status] ?? "Rendez-vous"}</span>
                 <div className="appointment-actions">
                   {role === "provider" && booking.status === "pending" && <>
                     <button onClick={() => void updateStatus(booking, "confirmed")}>Accepter</button>
@@ -471,7 +479,7 @@ export function LiveDashboard({
             onClose={() => setMessageBooking(null)}
           />
         )}
-        <article className="panel notifications-panel" id="live-notifications">
+        {show("notifications") && <article className="panel notifications-panel" id="live-notifications">
           <div className="panel-heading"><h2>Notifications</h2></div>
           {!loading && notifications.length === 0 && <div className="compact-empty">Aucune notification.</div>}
           {notifications.map((notification) => (
@@ -480,7 +488,7 @@ export function LiveDashboard({
               {!notification.read_at && <i>Nouveau</i>}
             </button>
           ))}
-        </article>
+        </article>}
       </section>
     </main>
   );

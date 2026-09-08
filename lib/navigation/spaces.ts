@@ -235,5 +235,28 @@ export function workspaceModule(space: WorkspaceSpaceKey, key: string) {
 
 export function workspaceHref(space: WorkspaceSpaceKey, moduleKey = "dashboard") {
   const definition = workspaceSpaces[space];
+  if (space === "client" && ["dashboard", "feed"].includes(moduleKey)) return "/";
+  if (space === "client" && moduleKey === "discover") return "/discover";
   return moduleKey === "dashboard" ? definition.prefix : `${definition.prefix}/${moduleKey}`;
+}
+
+export const simpleNavigation = {
+  client: ["feed", "discover", "bookings", "messages", "profile"],
+  pro: ["dashboard", "videos", "services", "agenda", "messages", "revenue", "public-profile"],
+} as const;
+
+export function navigationLabel(space: WorkspaceSpaceKey, item: WorkspaceModule) {
+  if (space === "client") return ({ feed: "Inspiration", discover: "Explorer", bookings: "Rendez-vous", inspirations: "Inspirations enregistrées" } as Record<string, string>)[item.key] ?? item.label;
+  if (space === "pro" && item.key === "public-profile") return "Profil";
+  return item.label;
+}
+
+export function navigationParent(space: WorkspaceSpaceKey, key: string) {
+  if (space === "client") return simpleNavigation.client.some((item) => item === key) ? key : "profile";
+  if (space === "pro") {
+    if (key === "bookings") return "agenda";
+    if (key === "statistics") return "dashboard";
+    return simpleNavigation.pro.some((item) => item === key) ? key : "public-profile";
+  }
+  return key;
 }

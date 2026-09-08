@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -233,6 +235,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
       <label>Localisation<input name="location" maxLength={160} placeholder="Dakar, Sénégal" /></label>
       {contentType === "availability" && <label>Créneau disponible<input name="availableAt" type="datetime-local" required /></label>}
       {contentType === "promotion" && <><label>Remise (%)<input name="discount" type="number" min="1" max="90" required /></label><label>Fin de l’offre<input name="promotionEndsAt" type="datetime-local" required /></label><label>Places disponibles<input name="promotionSlots" type="number" min="1" max="10000" required /></label></>}
+      {services.length === 0 && <Link className="wide primary-button" href="/pro/services">Créer une prestation</Link>}
       <label>Catégorie et prestation<select name="serviceId" defaultValue=""><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title} · {service.duration_minutes} min · {service.price_amount.toLocaleString("fr-FR")} F</option>)}</select></label>
       <label>Visibilité<select name="visibility" defaultValue="public"><option value="public">Tout le monde</option><option value="followers">Abonnés</option></select></label>
       <label>Publication<select name="status" defaultValue={providerApproved ? "published" : "draft"}><option value="draft">Brouillon</option><option value="scheduled" disabled={!providerApproved}>Programmer</option><option value="published" disabled={!providerApproved}>Publier maintenant</option></select></label>

@@ -68,12 +68,13 @@ test.describe.serial("contrôle d’accès admin distant",()=>{
   test("l’agent onboarding voit les dossiers et décisions prestataires uniquement",async({page})=>{
     if(bypass)await page.route(`${new URL(remoteAppUrl).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
     await page.goto(`${remoteAppUrl}/admin`);await page.getByLabel("Adresse administrateur").fill(accounts.get("onboarding")!.email);await page.getByLabel("Mot de passe").fill(password);await page.getByRole("button",{name:"Accéder à l’administration"}).click();
-    await expect(page.getByRole("heading",{name:"Vérifications",level:1})).toBeVisible({timeout:20000});
+    await expect(page.getByRole("heading",{name:"Validations professionnelles",level:1})).toBeVisible({timeout:20000});
     await expect(page.getByText("Agent onboarding")).toBeVisible();
     const nav=page.getByRole("navigation",{name:"Navigation Super Admin"});
-    for(const name of ["Utilisateurs","Prestataires","Salons","Vérifications"])await expect(nav.getByRole("button",{name})).toBeVisible();
+    for(const name of ["Utilisateurs","Prestataires","Salons","Validations professionnelles"])await expect(nav.getByRole("button",{name})).toBeVisible();
     for(const name of ["Réservations","Paiements","Support","Journaux d’audit"])await expect(nav.getByRole("button",{name})).toHaveCount(0);
-    await expect(page.getByRole("button",{name:"Approuver"}).first()).toBeVisible();
+    await page.getByText("Examiner le dossier", { exact: true }).first().click();
+    await expect(page.getByRole("button",{name:"Valider", exact:true}).first()).toBeVisible();
   });
 
   test("la finance voit uniquement réservations et modules financiers audités",async({page})=>{
@@ -91,6 +92,17 @@ test.describe.serial("contrôle d’accès admin distant",()=>{
     await expect(page.getByRole("heading",{name:"Vue d’ensemble",level:1})).toBeVisible({timeout:20000});
     const nav=page.getByRole("navigation",{name:"Navigation Super Admin"});
     for(const name of ["Utilisateurs","Prestataires","Paiements","Administrateurs","Rôles et permissions","Journaux d’audit","Sécurité"])await expect(nav.getByRole("button",{name})).toBeVisible();
+    await nav.getByRole("button", { name: "Validations professionnelles", exact: true }).click();
+    const row = page.getByRole("row").filter({ hasText: `UI Provider ${run}` });
+    await row.getByText("Examiner le dossier", { exact: true }).click();
+    await expect(row.getByRole("heading", { name: `UI Provider ${run}` })).toBeVisible();
+    await expect(row.getByText("Aucun document transmis.")).toBeVisible();
+    await row.getByRole("button", { name: "Valider", exact: true }).click();
+    await page.getByLabel("Motif obligatoire").fill("Dossier QA vérifié pour la recette de simplification.");
+    await page.getByRole("button", { name: "Confirmer", exact: true }).click();
+    await expect(page.getByText("Décision appliquée et journalisée.")).toBeVisible();
+    const approved = await admin.from("provider_profiles").select("status").eq("profile_id", accounts.get("provider")!.id).single();
+    expect(approved.error).toBeNull(); expect(approved.data?.status).toBe("approved");
     const sessions=await admin.from("admin_sessions").select("id").eq("user_id",accounts.get("super")!.id).is("revoked_at",null);
     expect(sessions.error).toBeNull();expect(sessions.data!.length).toBeGreaterThan(0);
     const logs=await admin.from("audit_logs").select("id").eq("actor_id",accounts.get("super")!.id).eq("action","admin.signed_in");

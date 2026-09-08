@@ -4,6 +4,7 @@ import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { ProviderReview } from "./provider-review";
 import { LaunchAdmin } from "./launch-admin";
 
 type AdminContext = {
@@ -161,7 +162,7 @@ const navigation = [
   { key: "users", label: "Utilisateurs", icon: "◎", permission: "users.read" },
   { key: "providers", label: "Prestataires", icon: "✦", permission: "providers.read" },
   { key: "salons", label: "Salons", icon: "⌑", permission: "providers.read" },
-  { key: "verification", label: "Vérifications", icon: "✓", permission: "documents.review" },
+  { key: "verification", label: "Validations professionnelles", icon: "✓", permission: "documents.review" },
   { key: "bookings", label: "Réservations", icon: "▣", permission: "bookings.read" },
   { key: "calendar", label: "Calendrier", icon: "□", permission: "bookings.read" },
   { key: "categories", label: "Catégories", icon: "◇", permission: "categories.manage" },
@@ -542,6 +543,7 @@ function UsersModule({ context, notify }: { context: AdminContext; notify: (mess
 }
 
 function ProvidersModule({ context, verificationOnly, notify }: { context: AdminContext; verificationOnly: boolean; notify: (message: string) => void }) {
+  const [opened, setOpened] = useState<string | null>(null);
   const [rows, setRows] = useState<ProviderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmation, setConfirmation] = useState<{ row: ProviderRow; status: "approved" | "rejected" | "suspended" } | null>(null);
@@ -556,7 +558,7 @@ function ProvidersModule({ context, verificationOnly, notify }: { context: Admin
   if (loading) return <LoadingSkeleton />;
   return <><div className="admin-filter-bar"><span>{rows.length} prestataires autorisés</span></div>
     {rows.length ? <div className="admin-table-wrap"><table className="admin-data-table"><thead><tr><th>Prestataire</th><th>Ville</th><th>Note</th><th>Inscription</th><th>Statut</th><th>Décision</th></tr></thead><tbody>{rows.map((row) =>
-      <tr key={row.profile_id}><td><strong>{row.business_name}</strong><small>{row.profile_id.slice(0, 8)}</small></td><td>{row.city}</td><td>★ {Number(row.average_rating).toFixed(1)}<small>{row.review_count} avis</small></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.status} /></td><td><PermissionGuard permission="providers.verify" context={context}><button className="table-action positive" onClick={() => setConfirmation({ row, status: "approved" })}>Approuver</button><button className="table-action danger" onClick={() => setConfirmation({ row, status: "rejected" })}>Rejeter</button></PermissionGuard><PermissionGuard permission="providers.suspend" context={context}><button className="table-action danger" onClick={() => setConfirmation({ row, status: "suspended" })}>Suspendre</button></PermissionGuard></td></tr>,
+      <tr key={row.profile_id}><td><strong>{row.business_name}</strong><small>{row.profile_id.slice(0, 8)}</small></td><td>{row.city}</td><td>★ {Number(row.average_rating).toFixed(1)}<small>{row.review_count} avis</small></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.status} /></td><td><details onToggle={(event) => { if (event.currentTarget.open) setOpened(row.profile_id); }}><summary>Examiner le dossier</summary>{opened === row.profile_id && <ProviderReview providerId={row.profile_id} />}<PermissionGuard permission="providers.verify" context={context}><button className="table-action positive" onClick={() => setConfirmation({ row, status: "approved" })}>Valider</button><button className="table-action danger" onClick={() => setConfirmation({ row, status: "rejected" })}>Refuser</button></PermissionGuard><PermissionGuard permission="providers.suspend" context={context}><button className="table-action danger" onClick={() => setConfirmation({ row, status: "suspended" })}>Suspendre</button></PermissionGuard></details></td></tr>,
     )}</tbody></table></div> : <EmptyState title="File de vérification à jour" description="Aucun prestataire ne correspond aux filtres sélectionnés." />}
     {confirmation && <ConfirmationModal title={`${confirmation.status === "approved" ? "Approuver" : confirmation.status === "rejected" ? "Rejeter" : "Suspendre"} ${confirmation.row.business_name} ?`} description="La décision sera appliquée immédiatement et enregistrée dans le journal d’audit." dangerous={confirmation.status !== "approved"} onCancel={() => setConfirmation(null)} onConfirm={async (reason) => {
       const { error } = await getSupabaseBrowserClient()!.rpc("admin_set_provider_status", { target_provider_id: confirmation.row.profile_id, next_status: confirmation.status, reason });

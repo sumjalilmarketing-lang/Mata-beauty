@@ -24,7 +24,7 @@ export function WorkspaceMessaging({ userId }: { userId: string }) {
     if (!client) {
       queueMicrotask(() => {
         if (active) {
-          setError("Supabase n’est pas configuré.");
+          setError("La messagerie est momentanément indisponible.");
           setLoading(false);
         }
       });
@@ -46,14 +46,14 @@ export function WorkspaceMessaging({ userId }: { userId: string }) {
 
   return <section className="workspace-content">
     <div className="workspace-intro">
-      <div><span>Module sécurisé</span><h2>Messages</h2><p>Conversations privées liées à vos rendez-vous.</p></div>
-      <div className="workspace-status"><i />Temps réel et accusés de lecture</div>
+      <div><h2>Messages</h2><p>Conversations privées liées à vos rendez-vous.</p></div>
+
     </div>
     <article className="panel" id="live-bookings">
-      <div className="panel-heading"><h2>Conversations par réservation</h2></div>
+      <div className="panel-heading"><h2>Mes conversations</h2></div>
       {error && <p role="alert" className="conversation-error">{error}</p>}
       {loading && <div className="compact-empty">Chargement de vos rendez-vous…</div>}
-      {!loading && !error && bookings.length === 0 && <div className="compact-empty">Aucune réservation disponible pour démarrer une conversation.</div>}
+      {!loading && !error && bookings.length === 0 && <div className="compact-empty">Aucune conversation pour le moment. Retrouvez ici vos échanges après une réservation.</div>}
       {bookings.map((booking) => <div className="appointment live-appointment" key={booking.id}>
         <span className="date-block">{new Intl.DateTimeFormat("fr-SN", { day: "2-digit", month: "short", timeZone: "Africa/Dakar" }).format(new Date(booking.starts_at))}</span>
         <div>

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { FormEvent, type ReactNode } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { workspaceHref, workspaceSpaces, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
+import { workspaceHref, workspaceSpaces, simpleNavigation, navigationLabel, navigationParent, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import "./workspace.css";
+import { ProductHelp } from "./product-help";
 
 type Props = {
   space: WorkspaceSpaceKey;
@@ -22,8 +23,12 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
   const activeModule = modules.find((item) => item.key === moduleKey) ?? modules[0] ?? definition.modules[0];
   const pathname = usePathname();
   const router = useRouter();
-  const groups = [...new Set(modules.map((item) => item.group))];
-  const mobileItems = modules.filter((item) => item.primary).slice(0, 4);
+  const simpleKeys = space === "client" || space === "pro" ? simpleNavigation[space] : null;
+  const mainModules = simpleKeys ? simpleKeys.flatMap((key) => modules.filter((item) => item.key === key)) : modules;
+  const groups = simpleKeys ? ["Navigation"] : [...new Set(modules.map((item) => item.group))];
+  const mobileItems = simpleKeys ? mainModules : modules.filter((item) => item.primary).slice(0, 4);
+  const parent = navigationParent(space, moduleKey);
+  const secondary = simpleKeys ? modules.filter((item) => item.key !== "dashboard" && !mainModules.includes(item) && navigationParent(space, item.key) === parent) : [];
   const notificationsModule = modules.find((item) => item.key === "notifications");
 
   function search(event: FormEvent<HTMLFormElement>) {
@@ -51,11 +56,11 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
       <nav aria-label={`Navigation ${definition.label}`}>
         {groups.map((group) => <div className="workspace-nav-group" key={group}>
           <p>{group}</p>
-          {modules.filter((item) => item.group === group).map((item) => {
+          {mainModules.filter((item) => simpleKeys || item.group === group).map((item) => {
             const href = workspaceHref(space, item.key);
-            const active = pathname === href || item.key === moduleKey;
+            const active = pathname === href || item.key === parent;
             return <Link aria-current={active ? "page" : undefined} className={active ? "active" : ""} href={href} key={item.key}>
-              <span aria-hidden>{item.icon}</span>{item.label}
+              <span aria-hidden>{item.icon}</span>{navigationLabel(space, item)}
             </Link>;
           })}
         </div>)}
@@ -68,11 +73,13 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
         <div className="workspace-tools"><form role="search" onSubmit={search}><label><span className="sr-only">Rechercher dans ce module</span><input name="workspace-search" type="search" placeholder="Rechercher…" /></label></form>{notificationsModule && <Link className="workspace-notifications" href={workspaceHref(space, notificationsModule.key)} aria-label="Notifications">◌</Link>}<span className="workspace-account" title={userEmail}>{userEmail.slice(0, 1).toUpperCase()}</span></div>
       </header>
       <div className="workspace-breadcrumb"><Link href={definition.prefix}>{definition.label}</Link><span>/</span><span>{activeModule.label}</span></div>
+      {secondary.length > 0 && <details className="workspace-secondary" open={secondary.some((item) => item.key === moduleKey)}><summary>{space === "client" ? "Mon compte" : "Dans cette rubrique"}</summary><nav aria-label="Navigation secondaire">{secondary.map((item) => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined}>{navigationLabel(space, item)}</Link>)}</nav></details>}
       {children}
+      {(parent === "profile" || parent === "public-profile") && <ProductHelp professional={space === "pro"} />}
     </main>
     <nav className="workspace-mobile-nav" aria-label="Navigation mobile">
-      {mobileItems.map((item) => <Link className={item.key === moduleKey ? "active" : ""} href={workspaceHref(space, item.key)} key={item.key}><span>{item.icon}</span><small>{item.label}</small></Link>)}
-      <Link className={!mobileItems.some((item) => item.key === moduleKey) ? "active" : ""} href={`${definition.prefix}/menu`}><span>•••</span><small>Plus</small></Link>
+      {mobileItems.map((item) => <Link className={item.key === parent ? "active" : ""} href={workspaceHref(space, item.key)} key={item.key}><span>{item.icon}</span><small>{navigationLabel(space, item)}</small></Link>)}
+      {!simpleKeys && <Link className={!mobileItems.some((item) => item.key === moduleKey) ? "active" : ""} href={`${definition.prefix}/menu`}><span>•••</span><small>Plus</small></Link>}
     </nav>
   </div>;
 }

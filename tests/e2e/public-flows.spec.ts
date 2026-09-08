@@ -20,8 +20,8 @@ test.beforeEach(async ({ page }) => {
 
 test("premium home opens a real category results screen", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
-  await expect(page.getByRole("heading", { name: /Prenez soin de vous/ })).toBeVisible();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
+  await expect(page.getByRole("heading", { name: "Explorer", exact: true })).toBeVisible();
   await expect(page.getByPlaceholder("Que recherchez-vous ?")).toBeVisible();
   const tressesCategory = page.locator(".photo-category-grid button").filter({ hasText: "Tresses" });
   await expect(tressesCategory).toBeVisible();
@@ -55,7 +55,7 @@ test("mobile bottom navigation works without horizontal overflow", async ({ page
   await page.goto("/");
   const navigation = page.getByRole("navigation", { name: "Navigation de l’application" });
   await expect(navigation).toBeVisible();
-  await navigation.getByRole("button", { name: "Découvrir" }).click();
+  await navigation.getByRole("button", { name: "Explorer" }).click();
   await expect(page.getByPlaceholder("Que recherchez-vous ?")).toBeVisible();
   const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(hasOverflow).toBe(false);
@@ -130,10 +130,11 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await feed.evaluate((node) => node.scrollTo({ top: 0, behavior: "auto" }));
   await page.locator(".social-video-card video").first().dispatchEvent("canplay");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
-  await page.getByRole("button", { name: "Tresses", exact: true }).click();
+  await page.getByRole("button", { name: "Près de moi", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(2);
-  await page.getByRole("button", { name: "Make-up", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Aucune inspiration Make-up" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Filtres du feed" }).getByRole("button")).toHaveCount(3);
+  await page.getByRole("button", { name: "Tendances", exact: true }).click();
+  await expect(page.locator(".social-video-card")).toHaveCount(2);
 });
 
 test("Google login starts a real OAuth request with a fixed callback", async ({ page }) => {
@@ -148,7 +149,7 @@ test("Google login starts a real OAuth request with a fixed callback", async ({ 
   const redirect = new URL(oauthUrl.searchParams.get("redirect_to") ?? "https://invalid.test");
   expect(redirect.pathname).toBe("/auth/callback");
   expect(redirect.searchParams.get("intent")).toBe("client");
-  expect(redirect.searchParams.get("next")).toBe("/");
+  expect(redirect.searchParams.get("next")).toBe("/app/profile");
 });
 
 test("a protected destination survives the authentication handoff", async ({ page }) => {

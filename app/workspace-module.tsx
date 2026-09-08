@@ -10,6 +10,10 @@ import { CreatorStudio } from "./creator-studio";
 import { ClientControlCenter } from "./client-control-center";
 import { SalonControlCenter } from "./salon-control-center";
 import { WorkspaceMessaging } from "./workspace-messaging";
+import { LiveDashboard } from "./live-dashboard";
+import { SocialDashboard } from "./social-dashboard";
+import { ProviderAgenda, ProviderRevenue } from "./provider-activity";
+import { ClientFavorites } from "./client-favorites";
 
 type Row = Record<string, unknown>;
 type ResourceDefinition = { table: string; select: string; title: (row: Row) => string; meta: (row: Row) => string };
@@ -32,7 +36,9 @@ const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, Resour
 
 export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
-  const definition = module.resource ? resources[module.resource] : module.key === "dashboard" ? resources.bookings : undefined;
+  const focused = (space === "pro" && ["dashboard", "services", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
+  const custom = focused || ["messages", "profile", "videos", "inspirations"].includes(module.key) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue"].includes(module.key));
+  const definition = custom ? undefined : module.resource ? resources[module.resource] : module.key === "dashboard" ? resources.bookings : undefined;
   const searchParams = useSearchParams();
   const query = (searchParams.get("q") ?? "").trim().toLocaleLowerCase("fr");
   const [rows, setRows] = useState<Row[]>([]);
@@ -52,25 +58,31 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   }, [definition, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
+  if (focused) return <LiveDashboard role={space === "client" ? "client" : "provider"} userId={userId} displayName="" moduleKey={module.key} onBack={() => window.location.assign("/")} onSignOut={async () => { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/"); }} />;
+  if (space === "pro" && module.key === "agenda") return <ProviderAgenda userId={userId} />;
+  if (space === "pro" && module.key === "revenue") return <ProviderRevenue userId={userId} />;
+  if (space === "client" && module.key === "favorites") return <ClientFavorites userId={userId} />;
+  if (space === "client" && module.key === "inspirations") return <SocialDashboard role="client" userId={userId} />;
+
   if (space === "salon" && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
   if (space === "salon" && module.key !== "videos") return <SalonControlCenter module={module} userId={userId} />;
   if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;
   if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
-  if (space === "client" && module.key === "profile") return <ClientControlCenter userId={userId} />;
+  if (space === "client" && ["profile", "settings", "payments", "reviews", "support"].includes(module.key)) return <ClientControlCenter userId={userId} />;
   const shortcuts = workspaceSpaces[space].modules.filter((item) => item.key !== module.key && allowedModuleKeys.includes(item.key)).slice(0, 4);
   return <section className="workspace-content">
-    <div className="workspace-intro"><div><span>Module sécurisé</span><h2>{module.label}</h2><p>{module.description}</p>{module.key === "dashboard" && (space === "pro" || space === "salon") && <Link className="workspace-quick-publish" href={workspaceHref(space, "videos")}>＋ Publier une vidéo</Link>}</div><div className="workspace-status"><i />Données limitées par vos droits</div></div>
-    <div className="workspace-metrics">
+    <div className="workspace-intro"><div><h2>{module.label}</h2><p>{module.description}</p>{module.key === "dashboard" && (space === "pro" || space === "salon") && <Link className="workspace-quick-publish" href={workspaceHref(space, "videos")}>＋ Publier une vidéo</Link>}</div></div>
+    {!["client", "pro"].includes(space) && <div className="workspace-metrics">
       <article><span>Éléments visibles</span><strong>{state === "ready" ? visibleRows.length : "—"}</strong><small>{query ? `Recherche « ${query} »` : "Périmètre autorisé"}</small></article>
       <article><span>État du module</span><strong>{state === "unavailable" ? "Limité" : "Actif"}</strong><small>Accès contrôlé côté serveur</small></article>
       <article><span>Espace</span><strong>{workspaceSpaces[space].label.replace("Espace ", "")}</strong><small>Session conservée</small></article>
     </div>
-    <div className="workspace-grid">
+    }<div className="workspace-grid">
       <article className="workspace-panel"><header><div><span>Vue actuelle</span><h3>{module.label}</h3></div></header>
-        {state === "loading" && <div className="workspace-empty">Chargement des données autorisées…</div>}
+        {state === "loading" && <div className="workspace-empty">Chargement…</div>}
         {state === "unavailable" && <div className="workspace-empty"><strong>Données momentanément indisponibles</strong><p>Réessayez dans quelques instants. Aucun changement n’a été appliqué.</p></div>}
-        {state === "empty" && <div className="workspace-empty"><strong>Aucun élément à afficher</strong><p>Votre périmètre ne contient encore aucune donnée pour ce module.</p></div>}
-        {state === "ready" && definition && visibleRows.length === 0 && <div className="workspace-empty"><strong>Aucun résultat</strong><p>Aucune donnée autorisée ne correspond à cette recherche.</p></div>}
+        {state === "empty" && <div className="workspace-empty"><strong>Aucun élément à afficher</strong><p>Vos informations apparaîtront ici dès votre première activité.</p></div>}
+        {state === "ready" && definition && visibleRows.length === 0 && <div className="workspace-empty"><strong>Aucun résultat</strong><p>Essayez un autre mot-clé.</p></div>}
         {state === "ready" && definition && visibleRows.length > 0 && <div className="workspace-list">{visibleRows.map((row, index) => <div key={String(row.id ?? index)}><span>{definition.title(row)}</span><small>{definition.meta(row)}</small></div>)}</div>}
       </article>
       <aside className="workspace-panel workspace-shortcuts"><header><div><span>Accès rapides</span><h3>Continuer</h3></div></header>{shortcuts.map((item) => <Link href={workspaceHref(space, item.key)} key={item.key}><span>{item.icon}</span><div><strong>{item.label}</strong><small>{item.description}</small></div><b>›</b></Link>)}</aside>

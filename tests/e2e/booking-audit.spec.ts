@@ -169,7 +169,7 @@ test.describe("audit chronométré de réservation", () => {
     const startedAt = Date.now();
     let actions = 0;
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
     await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click(); actions += 1;
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await page.locator(".premium-provider-card").click(); actions += 1;
@@ -252,7 +252,7 @@ test.describe("audit chronométré de réservation", () => {
     const state: AuditState = { bookingCreated: true, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
     await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click();
     await page.locator(".premium-provider-card").click();
     await page.getByRole("button", { name: /Tresses express/ }).click();
@@ -284,7 +284,7 @@ test.describe("audit chronométré de réservation", () => {
     const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
     await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click();
     await page.locator(".premium-provider-card").click();
     await page.getByRole("button", { name: /Tresses express/ }).click();

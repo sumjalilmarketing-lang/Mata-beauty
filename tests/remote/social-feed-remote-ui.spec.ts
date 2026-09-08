@@ -167,8 +167,8 @@ test.afterAll(async () => {
     expect.soft(remaining.error).toBeNull();
     expect.soft(remaining.data).toEqual([]);
   }
-  if (availabilityId) expect.soft((await admin.from("availability_rules").delete().eq("id", availabilityId)).error).toBeNull();
-  if (providerServiceId) expect.soft((await admin.from("provider_services").delete().eq("id", providerServiceId)).error).toBeNull();
+  if (availabilityId) expect.soft((await admin.from("availability_rules").delete().eq("provider_id", providerId)).error).toBeNull();
+  if (providerServiceId) expect.soft((await admin.from("provider_services").delete().eq("provider_id", providerId)).error).toBeNull();
   for (const userId of userIds) expect.soft((await admin.auth.admin.deleteUser(userId)).error).toBeNull();
   if (userIds.length) {
     const profiles = await admin.from("profiles").select("id").in("id", userIds);
@@ -188,6 +188,21 @@ test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/pro/);
+  await expect(page.getByRole("navigation", { name: "Navigation Espace professionnel" }).getByRole("link")).toHaveText(["⌂Dashboard", "▶Studio", "≡Prestations", "□Agenda", "✉Messages", "¤Revenus", "○Profil"]);
+  await page.goto("/pro/services");
+  await page.getByLabel("Type", { exact: true }).selectOption({ index: 1 });
+  await page.getByLabel("Nom affiché").fill(`Prestation simple ${run}`);
+  await page.getByLabel("Durée (minutes)").fill("60");
+  await page.getByLabel("Prix (FCFA)").fill("12000");
+  await page.getByRole("button", { name: "Ajouter la prestation" }).click();
+  await expect(page.getByText("Prestation ajoutée.")).toBeVisible();
+  await expect(page.locator(".control-list-row").filter({ hasText: `Prestation simple ${run}` })).toBeVisible();
+  await page.goto("/pro/agenda");
+  await page.getByLabel("Jour", { exact: true }).selectOption(String((new Date(Date.now() + 86400000).getUTCDay() + 1) % 7));
+  await page.getByRole("button", { name: "Ajouter un horaire" }).click();
+  await expect(page.getByText("Disponibilités enregistrées.")).toBeVisible();
+  await page.goto("/pro/revenue");
+  await expect(page.getByText("Vos revenus apparaîtront ici après vos premières prestations.")).toBeVisible();
   await page.goto("/pro/videos");
   const fixture = await request.get("https://samplelib.com/mp4/sample-5s-360p.mp4");
   expect(fixture.ok()).toBeTruthy();
@@ -340,7 +355,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await page.getByLabel("Adresse e-mail").fill(clientEmail);
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Dashboard", exact: true }).first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Profil", exact: true }).first()).toBeVisible({ timeout: 20_000 });
   await page.goto("/");
   await expect(page.getByRole("navigation", { name: "Navigation de l’application" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 20_000 });
@@ -413,6 +428,15 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await firstSlot.click();
   await page.getByRole("button", { name: /^Confirmer ·/ }).click();
   await expect(page.getByRole("heading", { name: "Votre rendez-vous est créé" })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("link", { name: "Message", exact: true }).click();
+  await page.getByRole("button", { name: "Messages", exact: true }).first().click();
+  await page.getByPlaceholder("Écrire un message…").fill(`Bonjour, réservation simple ${run}`);
+  await page.getByRole("button", { name: "Envoyer", exact: true }).click();
+  await expect(page.getByText(`Bonjour, réservation simple ${run}`)).toBeVisible();
+  await page.goto("/app/bookings");
+  await expect(page.locator(".live-appointment").first()).toBeVisible();
+  await page.goto("/app/profile");
+  await expect(page.getByRole("navigation", { name: "Navigation Espace client" }).getByRole("link")).toHaveCount(5);
   const booking = await admin.from("bookings").select("id,client_id,provider_id,source_post_id").eq("source_post_id", studioPostId).eq("client_id", clientId).single();
   expect(booking.error).toBeNull(); bookingId = booking.data!.id;
   expect(booking.data).toMatchObject({ client_id: clientId, provider_id: providerId, source_post_id: studioPostId });
@@ -437,7 +461,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await providerPage.getByRole("button", { name: "Se connecter", exact: true }).click();
   await providerPage.waitForURL(/\/pro/);
   await providerPage.goto("/pro/bookings");
-  await expect(providerPage.locator(".workspace-list > div").first()).toBeVisible({ timeout: 20_000 });
+  await expect(providerPage.locator(".live-appointment").first()).toBeVisible({ timeout: 20_000 });
   await providerPage.goto("/pro/videos");
   await providerPage.getByRole("button", { name: "Statistiques" }).click();
   await expect(providerPage.getByRole("heading", { name: "Performances" })).toBeVisible();
@@ -549,17 +573,16 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   expect(paginationRequests).toHaveLength(1);
   const cardTexts = await page.locator(".social-video-card").allTextContents();
   expect(new Set(cardTexts).size).toBe(cardTexts.length);
-  for (const [filter, marker] of [["Make-up", "makeup"], ["Barbier", "barbier"], ["Tresses", "tresses"], ["Ongles", "ongles"]] as const) {
-    await page.getByRole("button", { name: filter, exact: true }).click();
-    await expect(page.getByText(new RegExp(`E2E ${marker}`)).first()).toBeVisible();
-  }
+  await expect(page.getByRole("navigation", { name: "Filtres du feed" }).getByRole("button")).toHaveText(["Pour toi", "Près de moi", "Tendances"]);
+  await page.getByRole("button", { name: "Près de moi", exact: true }).click();
+  await expect(page.locator(".social-video-card").first()).toBeVisible();
   await page.getByRole("button", { name: "Tendances", exact: true }).click();
   await expect.poll(() => page.locator(".social-video-card").count()).toBeGreaterThanOrEqual(10);
 });
 
 test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async ({ browser }) => {
   test.setTimeout(180_000);
-  for (const width of [320, 360, 375, 390, 430]) {
+  for (const width of [320, 360, 375, 390, 430, 768, 1024, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: width <= 360 ? 740 : width <= 390 ? 844 : 932 } });
     const page = await context.newPage();
     await preparePage(page);
@@ -571,6 +594,7 @@ test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async (
     await page.waitForURL(/\/app/);
     await page.goto("/");
     await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 20_000 });
+    await page.screenshot({ path: `work/ultra-simple/feed-${width}.png` });
     const mobileCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
     await mobileCard.getByRole("button", { name: "Profil de Mata Feed Pro" }).click();
     await expect(page.getByText("Mata Feed Pro").first()).toBeVisible();
@@ -579,6 +603,7 @@ test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async (
     await mobileCard.getByRole("button", { name: "Réserver", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Réserver" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
+    await page.screenshot({ path: `work/ultra-simple/booking-${width}.png` });
     await context.close();
   }
 });
@@ -625,5 +650,31 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
   } finally {
     await context.close();
     await webkitBrowser.close();
+  }
+});
+
+test("la navigation professionnelle reste simple sur mobile", async ({ browser }) => {
+  test.setTimeout(180_000);
+  for (const width of [360, 375, 390, 430]) {
+    const context = await browser.newContext({ viewport: { width, height: 844 } });
+    const page = await context.newPage();
+    await preparePage(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Publier une vidéo" }).click();
+    await page.getByLabel("Adresse e-mail").fill(providerEmail);
+    await page.getByLabel("Mot de passe").fill(password);
+    await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+    await page.waitForURL(/\/pro/);
+    await page.goto("/pro/videos");
+    await expect(page.getByRole("navigation", { name: "Navigation mobile" }).getByRole("link")).toHaveCount(7);
+    await expect(page.getByRole("button", { name: "Publier la vidéo", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
+    await page.screenshot({ path: `work/ultra-simple/studio-${width}.png` });
+    await page.goto("/pro/messages");
+    await page.getByRole("button", { name: "Messages", exact: true }).first().click();
+    await page.getByPlaceholder("Écrire un message…").focus();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
+    await page.screenshot({ path: `work/ultra-simple/messages-${width}.png` });
+    await context.close();
   }
 });

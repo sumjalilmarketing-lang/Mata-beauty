@@ -92,7 +92,7 @@ test("the commercial launch layer is measurable, curated, RLS-protected, and hon
   assert.match(migration, /Limite analytique atteinte/);
   assert.match(migration, /public\.is_super_admin\(\)/);
   assert.match(launchAdmin, /100 utilisateurs et 20 professionnels/);
-  assert.match(checklist, /Votre profil en moins de 10 minutes/);
+  assert.match(checklist, /Configurer mon activité/);
   assert.match(referrals, /Aucune récompense financière n’est active/);
   assert.match(studio, /Filmer/);
   assert.match(studio, /Avant \/ Après/);
