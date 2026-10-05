@@ -148,3 +148,12 @@ La validation globale reste ouverte : nouvelle Preview, production et domaine r�
 - Test : le parcours salon coupe maintenant volontairement le WebSocket côté client pour vérifier la récupération réelle de la réponse en base. Résultat du retest à enregistrer.
 - Nettoyage QA : les messages référencent leur auteur avec ON DELETE RESTRICT ; suppression explicite des conversations synthétiques avant suppression des comptes. Les quatre comptes résiduels des deux exécutions concernées ont été supprimés après vérification de leurs identifiants de recette.
 - Production / mata-beauty.com : non déployé à ce stade.
+
+### Recette Preview bc7c3aa et pagination
+
+- Dossier agent complet PASS ; publication vidéo/photo/avant-après, RLS, renouvellement de lien signé, lecture/pause/son, molette aux trois résolutions, interactions, réservation et modération PASS.
+- BUG-FEED-PAGINATION-01 : deux requêtes HTTP 200 de pagination au même curseur observées après des chargements initiaux anonyme/authentifié qui se chevauchent. Les anciennes réponses peuvent rétablir un curseur périmé. Ajout d'une génération de chargement ; seuls les résultats du chargement courant peuvent modifier les publications, le curseur et les interactions. Test conservé avec exigence d'une seule requête.
+- Incident externe consigné : HTTP 502 de Storage lors de la signature d'une miniature pendant la publication, qui a néanmoins abouti. Aucun masquage de cette erreur dans la recette.
+- Les tests mobiles situés après la pagination n'ont pas été exécutés dans ce run en mode séquentiel ; restent à reprendre.
+
+- Retest du 6 octobre sur Preview 44caba9 (https://mata-beauty-bkxoh6g71-africrm.vercel.app/, dpl_C3uAjgSYbTUVNsNgo2wPsVx86q2s) : les deux tests catalogue/salon PASS, dont la réception de la réponse avec WebSocket client coupé, confirmation/démarrage/fin du rendez-vous, avis et statistiques. Nettoyage des comptes sans erreur. BUG-MESSAGES-01 validé sur Preview ; production toujours en attente.

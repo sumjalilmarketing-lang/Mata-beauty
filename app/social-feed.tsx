@@ -129,6 +129,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   const loadingMore = useRef(false);
   const pageRequests = useRef(new AbortController());
   const initialPageReady = useRef(false);
+  const loadGeneration = useRef(0);
   const feedCursor = useRef<{ publishedAt: string; id: string } | null>(null);
 
   const visiblePosts = useMemo(() => diversifyFeed(posts
@@ -155,6 +156,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   }, []);
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     initialPageReady.current = false;
     const signal = pageRequests.current.signal;
     if (signal.aborted) return;
@@ -164,10 +166,10 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     if (cached.length) { setPosts(cached); setState("ready"); }
     else setState("loading");
     const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE).abortSignal(signal);
-    if (signal.aborted) return;
+    if (signal.aborted || generation !== loadGeneration.current) return;
     if (error) { if (!cached.length) setState("error"); else setFeedback("Réseau lent · inspirations enregistrées affichées."); return; }
     const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
-    if (signal.aborted) return;
+    if (signal.aborted || generation !== loadGeneration.current) return;
     const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
     const ranked = diversifyFeed(mapped);
     setPosts(ranked);
@@ -187,6 +189,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
         authors.length ? supabase.from("favorites").select("provider_id").in("provider_id", authors) : Promise.resolve({ data: [] }),
         supabase.from("bookings").select("provider_services(title)").eq("client_id", authenticated.userId).order("created_at", { ascending: false }).limit(20),
       ]);
+      if (signal.aborted || generation !== loadGeneration.current) return;
       setLiked(new Set((likes ?? []).map((item) => item.post_id)));
       setSaved(new Set((saves ?? []).map((item) => item.post_id)));
       setFollowed(new Set((follows ?? []).map((item) => item.followed_provider_id)));
@@ -196,6 +199,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   }, [authenticated]);
 
   const loadMore = useCallback(async () => {
+    const generation = loadGeneration.current;
     const signal = pageRequests.current.signal;
     if (!initialPageReady.current || !hasMore || loadingMore.current || signal.aborted) return;
     const supabase = getSupabaseBrowserClient();
@@ -206,10 +210,10 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
       const cursor = feedCursor.current;
       if (cursor) query = query.or(`published_at.lt.${cursor.publishedAt},and(published_at.eq.${cursor.publishedAt},id.lt.${cursor.id})`);
       const { data, error } = await query.abortSignal(signal);
-      if (signal.aborted) return;
+      if (signal.aborted || generation !== loadGeneration.current) return;
       if (error) { setFeedback("La suite des inspirations n’a pas pu être chargée. Actualisez pour réessayer."); return; }
       const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
-      if (signal.aborted) return;
+      if (signal.aborted || generation !== loadGeneration.current) return;
       const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
       setPosts((current) => { const next = diversifyFeed([...current, ...mapped.filter((item) => !current.some((existing) => existing.id === item.id))]); writeFeedCache(next); return next; });
       const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
