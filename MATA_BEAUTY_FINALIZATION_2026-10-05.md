@@ -164,3 +164,10 @@ La validation globale reste ouverte : nouvelle Preview, production et domaine r�
 - BUG-NAV-WEBKIT-01 : annulation explicite du catalogue avec AbortController au départ/à la destruction, relance au retour depuis le cache navigateur. Le lecteur vidéo n'est pas modifié.
 - La trace montrait aussi l'annulation par WebKit du POST bienvenue lancé sans attente malgré keepalive. L'authentification attend maintenant cet appel avant redirection, avec timeout de douze secondes et poursuite de connexion en cas d'échec de transport. La file durable permet la reprise, sans faux succès de livraison.
 - Retest navigateur requis pour ces deux corrections. Production non modifiée.
+
+### Préparation de production du 6 octobre
+
+- Preview a3766a9 (https://mata-beauty-dgzbz1zro-africrm.vercel.app/, dpl_6Lp1ggU9BuVRDNzKLvyZ7E5RoFgn) : publication réelle et parcours WebKit iPhone avec retour/avance PASS, sans erreur applicative console/réseau dans la vérification finale. L'appel bienvenue n'est plus annulé par la redirection.
+- Contrôle des données existantes en production : quatre rôles professional sans profil approuvé (trois dossiers draft, un profil professionnel absent), aucune prestation pour ces comptes. Migration 20261006002500 retire seulement ces autorisations prématurées et écrit un audit par retrait ; comptes, dossiers et publications conservés. L'approbation ultérieure réattribue le rôle par le workflow.
+- Migration de réconciliation appliquée en QA et testée en transaction annulée avec deux comptes synthétiques : rôle approuvé conservé, rôle non approuvé retiré, audit présent. Aucun compte synthétique de ce contrôle conservé.
+- Le lot comporte désormais quatre migrations. Déploiement production et retest du domaine encore à exécuter à ce point du rapport.
