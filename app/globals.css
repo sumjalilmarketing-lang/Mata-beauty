@@ -584,6 +584,7 @@ body{background:#080810;color:#fff8fc}
 .location-picker button,.feed-location-panel>button{min-height:44px;padding:8px 12px;border-radius:8px;color:#fff;background:#702454;font-weight:700}
 .location-picker p{margin:0;font-size:12px;line-height:1.5}.location-picker button:disabled{opacity:.65}
 .feed-location-toggle{justify-self:start;min-height:32px;padding:5px 10px;border-radius:8px;background:#261522;color:#fff;font-size:11px}
+.social-feed-header:has(.feed-location-panel){height:auto;max-height:calc(100dvh - 80px);overflow-y:auto}
 .feed-location-panel{padding:8px;background:#160d18;border-radius:12px;max-height:calc(100dvh - 190px);overflow:auto;box-shadow:0 12px 32px #0008}.feed-location-panel>button{width:100%;margin-top:8px}
 @media(min-width:900px){
   .premium-app-frame:has(.social-feed-shell){width:100%;border-inline:0}

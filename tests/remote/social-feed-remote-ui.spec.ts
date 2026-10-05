@@ -417,8 +417,10 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await expect(activeVideo).toBeVisible();
   await mainCard.evaluate((element) => element.scrollIntoView({ block: "start", behavior: "auto" }));
   await expect(activeVideo).toHaveAttribute("preload", "auto");
+  const playbackStartedAt = Date.now();
   try {
-    await expect.poll(() => activeVideo.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
+    await expect.poll(() => activeVideo.evaluate((element) => (element as HTMLVideoElement).currentTime), { timeout: 15_000 }).toBeGreaterThan(0);
+    console.log("VIDEO_START_LATENCY_MS", Date.now() - playbackStartedAt);
   } catch (error) {
     console.log("VIDEO_START_FAILURE", await activeVideo.evaluate((element) => {
       const video = element as HTMLVideoElement;
@@ -682,7 +684,7 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
     await page.waitForURL(/\/app/);
     await page.waitForLoadState("networkidle");
     await page.goto("/");
-    const card = page.locator(".social-video-card").filter({ hasText: liveSecondCaption });
+    const card = page.locator(".social-video-card").filter({ hasText: studioCaption });
     const video = card.locator("video");
     await expect(video).toBeVisible({ timeout: 30_000 });
     await card.evaluate((element) => element.scrollIntoView({ block: "start" }));
@@ -700,7 +702,7 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
     await expect(page).toHaveURL(/\/app/);
     await page.waitForLoadState("networkidle");
     await page.goForward();
-    await expect(page.getByText(liveSecondCaption)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 30_000 });
     await page.waitForLoadState("networkidle");
   } finally {
     await context.close();

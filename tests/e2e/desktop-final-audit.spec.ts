@@ -72,6 +72,9 @@ test("nearby permission refusal offers a manual zone and keeps it in Explorer (s
   await page.goto("/");
   await page.getByRole("button", { name: "Près de moi", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Localisation refusée" })).toBeVisible();
+  await expect(page.getByLabel("Ville ou quartier")).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Voir les résultats", exact: true })).toBeInViewport();
+  await expect(page.getByRole("navigation", { name: "Filtres du feed" })).toBeInViewport();
   await page.getByLabel("Ville ou quartier").fill("Dakar");
   await page.getByRole("button", { name: "Voir les résultats", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(3);

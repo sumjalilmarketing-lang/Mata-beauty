@@ -65,7 +65,7 @@ async function signIn(page: Page, email: string, entry: "Profil" | "Publier") {
   await page.getByLabel("Adresse e-mail").fill(email);
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
-  await expect(page).toHaveURL(/\/(app|pro)\//, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/(app|pro)(\/|$)/, { timeout: 20_000 });
   await expect(page.getByRole("navigation", { name: /Navigation Espace/ })).toBeVisible();
 }
 

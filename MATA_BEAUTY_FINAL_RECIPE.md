@@ -77,3 +77,19 @@ Trace réseau : plusieurs requêtes `social_feed` sans curseur après retour au 
 ### Profil, messagerie et contraste — FINAL-008
 
 Profil client réel sur Preview : **PASS**, identité/préférences/confidentialité/support vérifiés en base et fixtures nettoyées. Le test de messagerie nécessitait de remplacer un ancien texte de diagnostic supprimé, l'entrée de connexion professionnelle et un repère de notification trop strict. La notification est présente dans la capture réelle, mais son texte est trop sombre sur le fond de l'espace compte. Correction CSS locale du titre, du corps et du badge ; retest visuel déployé requis. Les échanges de ce test séparé restent NON VALIDÉS jusqu'à sa fin (le parcours messagerie inclus dans la réservation vidéo a déjà passé).
+
+### Dernière Preview 7160465 — résultats complémentaires
+
+URL : https://mata-beauty-gz0jzk6a5-africrm.vercel.app/ (`dpl_3XrJPL9fNjXhSZnkawtdhy2L7kEd`).
+
+- Messagerie isolée : **1/1 PASS** après correction du test d'URL qui exigeait à tort `/pro/` au lieu de reconnaître `/pro`. Connexions distinctes, notification, message client, réponse professionnelle, réception et statut Lu testés réellement. Aucune modification du transport de messagerie.
+- Navigateur réel desktop : scroll depuis la marge latérale, `scrollTop` passe de 0 à 814 ; une seule vidéo en lecture, deux sources vidéo affectées aux lecteurs. Pas une mesure de fuite mémoire.
+- Suite groupée : **6 PASS, 2 FAIL, 5 non exécutés**. Le premier échec de messagerie a été retesté PASS isolément. Le second concerne un démarrage vidéo ne progressant pas dans les cinq secondes du test ; requêtes média HTTP 206, aucune erreur native du lecteur, test Range indépendant 206 en 575 ms. Cela ne prouve pas un blocage infini ; la lenteur reste une réserve. Le prochain test observe jusqu'à 15 secondes et journalise la latence réelle, sans déclarer la performance bonne sur cette seule base.
+- WebKit est retesté séparément à partir de la vidéo réellement publiée par le premier test, afin qu'un échec d'un autre parcours ne masque plus son résultat.
+- Les comptes temporaires des tests précédents ont été contrôlés en base : zéro restant avant le nouveau passage.
+
+### Panneau de localisation tronqué — FINAL-009
+
+Reproduction dans le navigateur réel : ouvrir Près de moi sur desktop. Le panneau est presque entièrement tronqué, malgré des contrôles présents dans le DOM. Cause : hauteur fixe de 108 px de la grille d'en-tête ; la ligne contenant le panneau avec overflow se contracte. Correction : hauteur automatique de l'en-tête quand le panneau est ouvert, hauteur maximale limitée à la fenêtre et défilement interne disponible. Test renforcé : champ, bouton Voir les résultats et filtres simultanément dans la zone visible, puis changement de zone et conservation dans Explorer. **7/7 PASS locaux** sur les tailles demandées, GPS/API simulés. Retest visuel en Preview encore requis.
+
+Retest FINAL-006 sur Preview 7160465 : **2/2 PASS** (publication réelle puis WebKit iPhone 390 px). Lecture, retour vers le compte et avance vers le feed réussis ; aucune erreur `record_video_view`, aucune erreur API dans ce passage. L'injection Vercel Live reste refusée par la CSP et est distinguée depuis l'origine des erreurs applicatives. Le correctif `beforeunload` est validé sur ce passage ; production non modifiée.
