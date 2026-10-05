@@ -292,15 +292,28 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       return;
     }
     let active = true;
-    void fetchPublishedProviders(supabase).then((items) => {
-      if (!active) return;
+    let catalogRequest = new AbortController();
+    const cancelCatalog = () => catalogRequest.abort();
+    window.addEventListener("beforeunload", cancelCatalog);
+    window.addEventListener("pagehide", cancelCatalog);
+    const loadCatalog = () => {
+      const signal = catalogRequest.signal;
+      void fetchPublishedProviders(supabase, undefined, signal).then((items) => {
+      if (!active || signal.aborted) return;
       const providers: Provider[] = items.map((item) => ({
         ...item,
         initials: item.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
       }));
       setCatalog(providers);
       setCatalogState(providers.length ? "live" : "empty");
-    }).catch(() => { if (active) setCatalogState("error"); });
+    }).catch(() => { if (active && !signal.aborted) setCatalogState("error"); }); };
+    const resumeCatalog = () => {
+      if (!catalogRequest.signal.aborted) return;
+      catalogRequest = new AbortController();
+      loadCatalog();
+    };
+    window.addEventListener("pageshow", resumeCatalog);
+    loadCatalog();
     void fetchActivePromotions(supabase).then((items) => { if (active) setPromotions(items); }).catch(() => {});
     void fetchActiveCategories(supabase).then((items) => { if (active) setCategories(items); }).catch(() => {});
     const oauthIntent = oauthReturn.current.intent;
@@ -322,7 +335,13 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
         if (active && bookingData) setUpcomingBookings(bookingData);
       }
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+      cancelCatalog();
+      window.removeEventListener("beforeunload", cancelCatalog);
+      window.removeEventListener("pagehide", cancelCatalog);
+      window.removeEventListener("pageshow", resumeCatalog);
+    };
   }, []);
 
   useEffect(() => {

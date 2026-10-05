@@ -116,7 +116,7 @@ export function AuthModal({
       const profile = await ensureAuthenticatedProfile(supabase, user.id);
       const { data: currentSession } = await supabase.auth.getSession();
       if (currentSession.session) {
-        void fetch("/api/auth/welcome", { method: "POST", keepalive: true, headers: { Authorization: `Bearer ${currentSession.session.access_token}` } })
+        await fetch("/api/auth/welcome", { method: "POST", signal: AbortSignal.timeout(12_000), headers: { Authorization: `Bearer ${currentSession.session.access_token}` } })
           .catch(() => console.warn("welcome_email_request_pending"));
       }
       onAuthenticated(profile);

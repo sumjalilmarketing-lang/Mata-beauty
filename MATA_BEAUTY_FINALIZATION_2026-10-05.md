@@ -157,3 +157,10 @@ La validation globale reste ouverte : nouvelle Preview, production et domaine r�
 - Les tests mobiles situés après la pagination n'ont pas été exécutés dans ce run en mode séquentiel ; restent à reprendre.
 
 - Retest du 6 octobre sur Preview 44caba9 (https://mata-beauty-bkxoh6g71-africrm.vercel.app/, dpl_C3uAjgSYbTUVNsNgo2wPsVx86q2s) : les deux tests catalogue/salon PASS, dont la réception de la réponse avec WebSocket client coupé, confirmation/démarrage/fin du rendez-vous, avis et statistiques. Nettoyage des comptes sans erreur. BUG-MESSAGES-01 validé sur Preview ; production toujours en attente.
+
+### Recette Preview 0888be0 — navigation WebKit
+
+- Pagination et filtres PASS (une seule requête), cinq largeurs mobiles PASS, lecture WebKit iPhone PASS et navigation professionnelle mobile effectuée. La suite reste FAIL à cause de sa vérification console finale : exception Fetch pendant le retour navigateur WebKit, sur le chargement du catalogue provider_profiles annulé lors du départ de page. Aucune erreur HTTP 400/502 observée dans ce run.
+- BUG-NAV-WEBKIT-01 : annulation explicite du catalogue avec AbortController au départ/à la destruction, relance au retour depuis le cache navigateur. Le lecteur vidéo n'est pas modifié.
+- La trace montrait aussi l'annulation par WebKit du POST bienvenue lancé sans attente malgré keepalive. L'authentification attend maintenant cet appel avant redirection, avec timeout de douze secondes et poursuite de connexion en cas d'échec de transport. La file durable permet la reprise, sans faux succès de livraison.
+- Retest navigateur requis pour ces deux corrections. Production non modifiée.

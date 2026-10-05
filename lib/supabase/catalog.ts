@@ -59,7 +59,7 @@ type ProviderRecord = {
   }>;
 };
 
-export async function fetchPublishedProviders(client: SupabaseClient, providerId?: string): Promise<CatalogProvider[]> {
+export async function fetchPublishedProviders(client: SupabaseClient, providerId?: string, signal?: AbortSignal): Promise<CatalogProvider[]> {
   const records: ProviderRecord[] = [];
   for (let offset = 0; ; offset += 100) {
     let query = client
@@ -78,6 +78,7 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
     .order("profile_id")
     .range(offset, offset + 99);
   if (providerId) query = query.eq("profile_id", providerId);
+  if (signal) query = query.abortSignal(signal);
   const { data, error } = await query;
 
   if (error) throw error;
