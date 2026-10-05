@@ -296,4 +296,22 @@ test.describe("audit chronométré de réservation", () => {
     await expect(page.getByText(/10:00/)).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
   });
+
+  test("signale une panne des disponibilités et permet de réessayer", async ({ page }) => {
+    const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
+    await mockSupabase(page, state);
+    let unavailable = true;
+    await page.route(`${api}/rest/v1/rpc/get_available_slots`, async (route) => {
+      if (unavailable) return json(route, { message: "Service unavailable" }, 503);
+      return route.fallback();
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Réserver", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Réserver" }).getByRole("alert")).toContainText("Les disponibilités n’ont pas pu être chargées");
+    await expect(page.getByText("Aucun créneau publié ce jour.", { exact: false })).toHaveCount(0);
+    unavailable = false;
+    await page.getByRole("dialog", { name: "Réserver" }).getByRole("button", { name: "Réessayer", exact: true }).click();
+    await expect(page.getByRole("button", { name: "10:00", exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Réserver" }).getByRole("alert")).toHaveCount(0);
+  });
 });

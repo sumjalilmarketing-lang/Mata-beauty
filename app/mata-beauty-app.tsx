@@ -714,6 +714,8 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
   const [slots, setSlots] = useState<string[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
+  const [availabilityError, setAvailabilityError] = useState(false);
+  const [availabilityAttempt, setAvailabilityAttempt] = useState(0);
   const [waitingForAuthentication, setWaitingForAuthentication] = useState(false);
   const [paymentCapabilities, setPaymentCapabilities] = useState<PaymentCapabilities>({ onlineCheckoutEnabled: false, environment: "disabled", provider: "none", methods: [] });
   const [paymentCapabilitiesLoading, setPaymentCapabilitiesLoading] = useState(true);
@@ -756,23 +758,27 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      void Promise.resolve().then(() => setAvailabilityLoading(false));
+      void Promise.resolve().then(() => { setAvailabilityLoading(false); setAvailabilityError(true); });
       return;
     }
     let active = true;
-    void Promise.resolve().then(() => { if (active) setAvailabilityLoading(true); });
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
+    void Promise.resolve().then(() => { if (active) { setAvailabilityLoading(true); setAvailabilityError(false); } });
     void supabase.rpc("get_available_slots", {
       target_provider_id: provider.profileId,
       target_provider_service_id: service.id,
       from_date: form.date,
       days: 1,
-    }).then(({ data, error }) => {
+    }).abortSignal(controller.signal).then(({ data, error }) => {
+      window.clearTimeout(timeout);
       if (!active) return;
       setSlots(error ? [] : ((data ?? []) as AvailabilitySlot[]).map((slot) => new Date(slot.slot_start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" })));
+      setAvailabilityError(Boolean(error));
       setAvailabilityLoading(false);
     });
-    return () => { active = false; };
-  }, [form.date, provider.profileId, service.id]);
+    return () => { active = false; window.clearTimeout(timeout); controller.abort(); };
+  }, [form.date, provider.profileId, service.id, availabilityAttempt]);
 
   const quickDates = useMemo(() => buildQuickDates(), []);
   async function confirm() {
@@ -799,7 +805,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
       {confirmation ? <BookingSuccess provider={provider} service={service} confirmation={confirmation} onClose={onClose} /> : <>
         <div className="fast-booking-progress" aria-label={`Étape ${step} sur 2`}><span className={step >= 1 ? "active" : ""}>1 <small>Créneau</small></span><i /><span className={step >= 2 ? "active" : ""}>2 <small>Confirmation</small></span></div>
         <div className="premium-booking-content">
-          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount)}</b></div><h3>Quand êtes-vous disponible ?</h3><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>Autre</small><strong>＋</strong><input aria-label="Choisir une autre date" type="date" min={today} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "" })} /></label></div><div className="slot-section-title"><strong>Créneaux disponibles</strong><small>Mis à jour en direct</small></div>{availabilityLoading ? <div className="slot-loading">Recherche des meilleurs créneaux…</div> : slots.length ? <div className="premium-slot-grid">{slots.map((time) => <button className={form.time === time ? "active" : ""} key={time} onClick={() => { setForm({ ...form, time }); setStep(2); }}>{time}</button>)}</div> : <div className="no-slots">Aucun créneau publié ce jour. Essayez une autre date.</div>}</>}
+          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount)}</b></div><h3>Quand êtes-vous disponible ?</h3><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>Autre</small><strong>＋</strong><input aria-label="Choisir une autre date" type="date" min={today} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "" })} /></label></div><div className="slot-section-title"><strong>Créneaux disponibles</strong><small>Mis à jour en direct</small></div>{availabilityLoading ? <div className="slot-loading">Recherche des meilleurs créneaux…</div> : availabilityError ? <div role="alert" className="no-slots">Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.<button onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>Réessayer</button></div> : slots.length ? <div className="premium-slot-grid">{slots.map((time) => <button className={form.time === time ? "active" : ""} key={time} onClick={() => { setForm({ ...form, time }); setStep(2); }}>{time}</button>)}</div> : <div className="no-slots">Aucun créneau publié ce jour. Essayez une autre date.</div>}</>}
           {step === 2 && <>
             <h3>Vérifiez et confirmez</h3>
             <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date)} à {form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name}</small></div><b>{formatPrice(service.price_amount)}</b></div>
