@@ -5,10 +5,11 @@ export function notificationDestination(item: Pick<NotificationItem, "kind" | "d
   // Never follow arbitrary URLs from legacy notification data.
   if (typeof href === "string" && /^\/(?:app|pro|onboarding|moderation|admin)(?:\/[a-z-]+)?(?:\?(?:dossier|booking|conversation)=[0-9a-f-]{36})?(?:#booking-[0-9a-f-]{36})?$/.test(href)) return href;
   const postId = item.data?.post_id;
+  if (["social_moderation", "publication_completed"].includes(item.kind)) return "/pro/videos";
   if (typeof postId === "string" && uuid.test(postId)) return `/posts/${postId}`;
   if (["professional_application", "provider_status"].includes(item.kind)) return item.data.status === "approved" ? "/pro" : "/app/application";
   const bookingId = item.data?.booking_id;
-  if (typeof bookingId === "string" && uuid.test(bookingId)) return `/app/bookings#booking-${bookingId}`;
+  if (typeof bookingId === "string" && uuid.test(bookingId)) return `${item.kind === "booking_created" ? "/pro" : "/app"}/bookings#booking-${bookingId}`;
   if (item.kind === "welcome") return "/app/profile";
   return null;
 }

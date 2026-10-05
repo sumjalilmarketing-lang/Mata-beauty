@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { SocialDashboard } from "./social-dashboard";
 import { VideoPublisher } from "./video-publisher";
+import { statusLabel } from "@/lib/ui/status-label";
 
 type StudioTab = "create" | "videos" | "photos" | "before_after" | "drafts" | "scheduled" | "statistics";
 type CreatorPost = {
@@ -87,7 +88,7 @@ export function CreatorStudio({ userId, providerApproved }: { userId: string; pr
       {state === "loading" && <div className="compact-empty">Chargement de vos publications…</div>}
       {state === "error" && <div className="compact-empty">Vos publications sont momentanément indisponibles.</div>}
       {(state === "empty" || (state === "ready" && visible.length === 0)) && <div className="compact-empty">Publiez votre première réalisation.</div>}
-      {visible.length > 0 && <div className="studio-post-grid">{visible.map((post) => <article key={post.id}>{post.thumbnail_url ? <Image src={post.thumbnail_url} alt="" width={320} height={420} unoptimized /> : <span className="studio-media-placeholder">▶</span>}<div><small>{post.post_type.replaceAll("_", " ")} · {post.status}</small><strong>{post.title || post.caption || "Publication Mata Beauty"}</strong><span>{post.view_count} vues · {post.like_count} likes · {post.comment_count} commentaires</span><time>{new Date(post.published_at ?? post.created_at).toLocaleDateString("fr-FR")}</time><footer>{post.status === "published" && <button onClick={() => void manage(post.id, "hide")}>Masquer</button>}{["hidden", "archived"].includes(post.status) && <button onClick={() => void manage(post.id, "republish")}>Republier</button>}<button onClick={() => void manage(post.id, "archive")}>Archiver</button><button className="danger" onClick={() => void manage(post.id, "delete")}>Supprimer</button></footer></div></article>)}</div>}
+      {visible.length > 0 && <div className="studio-post-grid">{visible.map((post) => <article key={post.id}>{post.thumbnail_url ? <Image src={post.thumbnail_url} alt="" width={320} height={420} unoptimized /> : <span className="studio-media-placeholder">▶</span>}<div><small>{statusLabel(post.post_type)} · {statusLabel(post.status)}</small><strong>{post.title || post.caption || "Publication Mata Beauty"}</strong><span>{post.view_count} vues · {post.like_count} likes · {post.comment_count} commentaires</span><time>{new Date(post.published_at ?? post.created_at).toLocaleDateString("fr-FR")}</time><footer>{post.status === "published" && <button onClick={() => void manage(post.id, "hide")}>Masquer</button>}{["hidden", "archived"].includes(post.status) && <button onClick={() => void manage(post.id, "republish")}>Republier</button>}<button onClick={() => void manage(post.id, "archive")}>Archiver</button><button className="danger" onClick={() => void manage(post.id, "delete")}>Supprimer</button></footer></div></article>)}</div>}
     </article>}
   </section>;
 }

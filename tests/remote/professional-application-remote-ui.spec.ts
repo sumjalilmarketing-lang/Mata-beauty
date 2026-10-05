@@ -6,6 +6,13 @@ const url = process.env.REMOTE_SUPABASE_URL ?? "";
 const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY ?? "", { auth: { persistSession: false } });
 const run = randomUUID(), password = `QA-${randomUUID()}!`, accounts: { id: string; email: string }[] = [];
 const business = `Dossier UI ${run}`;
+function samplePdf() {
+  const stream="BT /F1 18 Tf 50 740 Td (DOCUMENT DE RECETTE - AUCUNE PIECE REELLE) Tj ET";
+  const objects=["<< /Type /Catalog /Pages 2 0 R >>","<< /Type /Pages /Kids [3 0 R] /Count 1 >>","<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`];
+  let pdf="%PDF-1.4\n";const offsets=[0];for(const [index,object] of objects.entries()){offsets.push(Buffer.byteLength(pdf));pdf+=`${index+1} 0 obj\n${object}\nendobj\n`;}
+  const xref=Buffer.byteLength(pdf);pdf+=`xref\n0 6\n0000000000 65535 f \n${offsets.slice(1).map(offset=>`${String(offset).padStart(10,"0")} 00000 n \n`).join("")}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(pdf);
+}
 async function login(page: Page, email: string) {
   const base = process.env.REMOTE_APP_URL, bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   if (base && bypass) await page.route(`${new URL(base).origin}/**`, route => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
@@ -62,7 +69,7 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
   await expect(page.getByRole("heading", { name: "Votre dossier a été envoyé" })).toHaveCount(0);
   for (const kind of ["identity", "business_registration", "qualification", "address_proof"]) {
     await page.getByLabel("Type de document").selectOption(kind);
-    await page.locator('input[type="file"]').setInputFiles({ name: `${kind}.png`, mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") });
+    await page.locator('input[type="file"]').setInputFiles(kind === "qualification" ? {name:"qualification.pdf",mimeType:"application/pdf",buffer:samplePdf()} : { name: `${kind}.png`, mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") });
     await page.getByRole("button", { name: "Envoyer le document", exact: true }).click();
     await expect(page.getByRole("button", { name: "Envoyer le document", exact: true })).toBeEnabled();
   }
@@ -77,6 +84,8 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
     await login(reviewer, accounts[1].email); await reviewer.goto("/onboarding/notifications");
     await reviewer.locator(".notification-card").filter({ hasText: "Nouveau dossier professionnel" }).getByRole("button", { name: "Ouvrir", exact: true }).click();
     await expect(reviewer).toHaveURL(new RegExp(`dossier=${accounts[0].id}`));
+    const openedNotification=await admin.from("notifications").select("read_at").eq("profile_id",accounts[1].id).eq("kind","application_to_review").contains("data",{provider_id:accounts[0].id}).single();
+    expect(openedNotification.error).toBeNull();expect(openedNotification.data!.read_at).not.toBeNull();
     await expect(reviewer.getByRole("heading", { name: business, exact: true })).toBeVisible();
     await expect(reviewer.getByRole("definition").filter({ hasText: /^Candidature QA$/ })).toBeVisible();
     await expect(reviewer.getByRole("definition").filter({ hasText: /^Français$/ })).toBeVisible();
@@ -90,7 +99,8 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
     for (const name of ["Pièce d’identité", "Immatriculation", "Qualification", "Justificatif d’adresse"]) {
       await reviewer.getByRole("button", { name: `Voir ${name}`, exact: true }).click();
       await expect(reviewer.getByRole("dialog")).toBeVisible();
-      await expect(reviewer.getByRole("dialog").getByRole("img")).toBeVisible();
+      if(name === "Qualification") { await expect(reviewer.getByTitle("Document PDF privé")).toBeVisible();await reviewer.screenshot({path:"work/final-audit/part3-document-pdf.png"}); }
+      else {await expect(reviewer.getByRole("dialog").getByRole("img")).toBeVisible();await reviewer.getByRole("slider",{name:"Zoom du document"}).focus();await reviewer.getByRole("slider",{name:"Zoom du document"}).press("ArrowRight");await expect(reviewer.getByRole("slider",{name:"Zoom du document"})).toHaveValue("125");}
       const opened = context.waitForEvent("page");
       await reviewer.getByRole("link", { name: "Ouvrir le document privé dans un nouvel onglet" }).click();
       const document = await opened; await document.waitForLoadState();
@@ -119,6 +129,8 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
     await page.goto("/app/notifications");
     await page.locator(".notification-card").filter({ hasText: "Votre compte professionnel est approuvé" }).getByRole("button", { name: "Ouvrir", exact: true }).click();
     await expect(page).toHaveURL(/\/pro$/);
+    const approvedNotifications=await admin.from("notifications").select("id").eq("profile_id",accounts[0].id).contains("data",{status:"approved"});
+    expect(approvedNotifications.error).toBeNull();expect(approvedNotifications.data).toHaveLength(1);
     expect(errors).toEqual([]);
   } catch (error) {
     await reviewer.screenshot({ path: "work/final-audit/application-review-failure.png", fullPage: true });

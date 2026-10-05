@@ -5,6 +5,7 @@ import { BookingMessages } from "./booking-messages";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { useSearchParams } from "next/navigation";
+import { statusLabel } from "@/lib/ui/status-label";
 
 type BookingRow = {
   id: string;
@@ -66,7 +67,7 @@ export function WorkspaceMessaging({ userId }: { userId: string }) {
           <strong>{booking.provider_services?.title ?? "Prestation beauté"}</strong>
           <small>{new Intl.DateTimeFormat("fr-SN", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(booking.starts_at))}</small>
         </div>
-        <span className={booking.status === "confirmed" ? "status confirmed" : "status pending"}>{booking.status}</span>
+        <span className={booking.status === "confirmed" ? "status confirmed" : "status pending"}>{statusLabel(booking.status)}</span>
         <div className="appointment-actions"><button type="button" onClick={() => setSelected(booking)}>Messages</button></div>
       </div>)}
     </article>

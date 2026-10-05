@@ -21,7 +21,10 @@ test.beforeAll(async()=>{
     const result=await admin.auth.admin.createUser({email,password,email_confirm:true,app_metadata:{qa_suppress_email:true},user_metadata:{display_name:`Recette ${role}`,legal_accepted:true}});
     expect(result.error).toBeNull();const id=result.data.user!.id;accounts.set(role,{id,email});
     await admin.from("welcome_email_deliveries").update({status:"needs_review"}).eq("user_id",id);
-    if(role==="provider") expect((await admin.from("provider_profiles").insert({profile_id:id,business_name:`UX Pro ${run}`,slug:`ux-pro-${run}`,status:"approved",city:"Dakar"})).error).toBeNull();
+    if(role==="provider") {
+      expect((await admin.from("provider_profiles").insert({profile_id:id,business_name:`UX Pro ${run}`,slug:`ux-pro-${run}`,status:"draft",city:"Dakar"})).error).toBeNull();
+      expect((await admin.from("provider_profiles").update({status:"approved"}).eq("profile_id",id)).error).toBeNull();
+    }
     if(!["client","provider"].includes(role)) {
       const r=await admin.from("admin_roles").select("id").eq("key",role).single();expect(r.error).toBeNull();
       expect((await admin.from("profiles").update({role:"admin"}).eq("id",id)).error).toBeNull();
@@ -31,6 +34,8 @@ test.beforeAll(async()=>{
 });
 test.afterAll(async()=>{ for(const account of accounts.values()) expect((await admin.auth.admin.deleteUser(account.id)).error).toBeNull(); });
 test("visiteur : navigation et écran mobile",async({page})=>{
+  const bypass=process.env.VERCEL_AUTOMATION_BYPASS_SECRET,base=process.env.REMOTE_APP_URL;
+  if(bypass&&base) await page.route(`${new URL(base).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
   await page.goto("/");await expect(page.getByRole("navigation",{name:"Navigation de l’application"})).toBeVisible();
   await page.getByRole("button",{name:"Explorer",exact:true}).click();
   await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
@@ -41,17 +46,17 @@ for(const role of roles) test(`${role} : menus, notifications privées, responsi
   await login(page,role);
   if(role==="admin"||role==="super_admin") {
     await page.goto("/admin");const nav=page.getByRole("navigation",{name:"Navigation Super Admin"});await expect(nav).toBeVisible();
-    const names=await nav.getByRole("button").allTextContents();
-    for(const name of names) { await nav.getByRole("button",{name:name.trim(),exact:true}).click();await expect(page.locator(".admin-page h1")).toBeVisible(); }
-    await nav.getByRole("button",{name:"Validations professionnelles",exact:true}).click();
+    const names=await nav.locator("button span").allTextContents();
+    for(const name of names) { await nav.getByTitle(name.trim(),{exact:true}).click();await expect(page.locator(".admin-page h1")).toHaveText(name.trim()); }
+    await nav.getByTitle("Validations professionnelles",{exact:true}).click();
     for(const [width,height] of [[1366,768],[1440,900],[1920,1080]]) {await page.setViewportSize({width,height});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:`work/final-audit/part3-${role}-${width}.png`,fullPage:true});}
-    await nav.getByRole("button",{name:"Notifications",exact:true}).click();await expect(page.getByRole("heading",{name:"Mes notifications"})).toBeVisible();
-    await page.getByRole("button",{name:"Se déconnecter",exact:true}).click();await expect(page.getByLabel("Adresse administrateur")).toBeVisible();
+    await nav.getByTitle("Notifications",{exact:true}).click();await expect(page.getByRole("heading",{name:"Mes notifications"})).toBeVisible();
+    await page.locator(".admin-signout").click();await expect(page.getByLabel("Adresse administrateur")).toBeVisible();
   } else {
     const prefix=role==="provider"?"/pro":role==="verification_agent"?"/onboarding":role==="support"?"/support-agent":role==="moderator"?"/moderation":"/app";
     await page.goto(prefix+(role==="client"?"/profile":""));
     const links=await page.locator(".workspace-sidebar nav a").evaluateAll(elements=>elements.map(element=>(element as HTMLAnchorElement).getAttribute("href")!));
-    for(const href of [...new Set(links)]) {await page.goto(href);await expect(page.locator(".workspace-topbar h1")).toBeVisible();}
+    for(const href of [...new Set(links)]) {await page.goto(href);if(href==="/"||href.startsWith("/?")||href==="/discover") await expect(page.getByRole("navigation",{name:"Navigation de l’application"})).toBeVisible();else await expect(page.locator(".workspace-topbar h1")).toBeVisible();}
     await page.goto(`${prefix}/notifications`);await expect(page.getByRole("heading",{name:"Mes notifications"})).toBeVisible();
     await page.reload();await expect(page.getByRole("heading",{name:"Mes notifications"})).toBeVisible();
     for(const [width,height] of [[1366,768],[1440,900],[1920,1080],[390,844]]) {await page.setViewportSize({width,height});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:`work/final-audit/part3-${role}-${width}.png`,fullPage:true});}

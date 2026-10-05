@@ -35,6 +35,7 @@ export function ProviderAgenda({ userId }: { userId: string }) {
   }
   async function remove(id: string) {
     const client = getSupabaseBrowserClient(); if (!client || busy) return;
+    if (!window.confirm("Supprimer cet horaire ? Les rendez-vous existants seront conservés, mais aucun nouveau rendez-vous ne pourra utiliser cette disponibilité.")) return;
     setBusy(true);
     const result = await client.from("availability_rules").delete().eq("id", id).eq("provider_id", userId);
     setNotice(result.error ? "La suppression a échoué." : "Horaire supprimé. Les rendez-vous existants sont conservés.");
