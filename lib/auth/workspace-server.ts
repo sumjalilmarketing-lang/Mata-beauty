@@ -29,6 +29,7 @@ export async function requireWorkspace(space: WorkspaceSpaceKey, moduleKey: stri
     ownsBusiness: (ownedResult.count ?? 0) > 0,
     isCollaborator: (collaboratorResult.count ?? 0) > 0,
   };
+  if (["pro", "salon"].includes(space) && providerResult.data?.status !== "approved") redirect("/app/application");
   if (!canAccessWorkspace(space, identity)) redirect(`/?acces=refuse&returnTo=${encodeURIComponent(requestedPath)}`);
   const currentModule = workspaceModule(space, moduleKey);
   if (!canAccessWorkspaceModule(identity, currentModule.permission)) redirect(workspaceModule(space, "dashboard").key === currentModule.key ? "/" : workspacePath(space));

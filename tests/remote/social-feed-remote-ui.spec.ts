@@ -104,6 +104,7 @@ async function publishStudioVideo(page: Page, title: string, caption: string, ha
 }
 
 test.beforeAll(async () => {
+  test.setTimeout(120_000);
   admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   clientId = await createUser(clientEmail);
   providerId = await createUser(providerEmail, true);
@@ -120,7 +121,15 @@ test.beforeAll(async () => {
   ])).error).toBeNull();
   providerApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   expect((await providerApi.auth.signInWithPassword({ email: providerEmail, password })).error).toBeNull();
+  expect((await providerApi.rpc("synchronize_account_status")).error).toBeNull();
   expect((await providerApi.rpc("request_professional_profile")).error).toBeNull();
+  expect((await providerApi.rpc("save_professional_onboarding", { target_business_name: `QA Vidéo ${run}`, target_bio: "Professionnel de recette pour les tests réels de publication vidéo.", target_city: "Dakar", target_service_mode: "salon", target_activity_type: "independent", target_years_experience: 3, target_base_address: "Adresse fictive QA Dakar", target_languages: ["Français"], target_cancellation_policy: "Annulation possible avant le rendez-vous." })).error).toBeNull();
+  for (const kind of ["identity", "business_registration", "qualification", "address_proof"]) {
+    const path = `${providerId}/${randomUUID()}.png`;
+    expect((await providerApi.storage.from("provider-documents").upload(path, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"), { contentType: "image/png" })).error).toBeNull();
+    expect((await providerApi.from("provider_documents").insert({ provider_id: providerId, kind, storage_path: path })).error).toBeNull();
+  }
+  expect((await providerApi.rpc("submit_provider_for_review")).error).toBeNull();
   clientApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   expect((await clientApi.auth.signInWithPassword({ email: clientEmail, password })).error).toBeNull();
   moderatorApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -155,6 +164,9 @@ test.afterAll(async () => {
   if (clientId && providerId) expect.soft((await admin.from("bookings").delete().eq("client_id", clientId).eq("provider_id", providerId)).error).toBeNull();
   if (providerId) expect.soft((await admin.from("posts").delete().eq("author_id", providerId)).error).toBeNull();
   if (providerId) {
+    const documents = await admin.storage.from("provider-documents").list(providerId);
+    expect.soft(documents.error).toBeNull();
+    if (documents.data?.length) expect.soft((await admin.storage.from("provider-documents").remove(documents.data.map(file => `${providerId}/${file.name}`))).error).toBeNull();
     const bucket = admin.storage.from("provider-social-media");
     const { data: folders, error: foldersError } = await bucket.list(providerId, { limit: 100 });
     expect.soft(foldersError).toBeNull();

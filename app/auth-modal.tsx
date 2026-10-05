@@ -109,8 +109,17 @@ export function AuthModal({
       if (userError) throw userError;
       if (!user) throw new Error("La session n’a pas pu être créée.");
       await supabase.rpc("synchronize_account_status");
-      if (intendedRole === "provider") await supabase.rpc("request_professional_profile");
-      onAuthenticated(await ensureAuthenticatedProfile(supabase, user.id));
+      if (intendedRole === "provider") {
+        const { error } = await supabase.rpc("request_professional_profile");
+        if (error) throw error;
+      }
+      const profile = await ensureAuthenticatedProfile(supabase, user.id);
+      const { data: currentSession } = await supabase.auth.getSession();
+      if (currentSession.session) {
+        void fetch("/api/auth/welcome", { method: "POST", keepalive: true, headers: { Authorization: `Bearer ${currentSession.session.access_token}` } })
+          .catch(() => console.warn("welcome_email_request_pending"));
+      }
+      onAuthenticated(profile);
     } catch (error) {
       setFeedback(authErrorMessage(error));
     }

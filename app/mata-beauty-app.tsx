@@ -137,6 +137,11 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [minRating, setMinRating] = useState("0");
   const [maxPrice, setMaxPrice] = useState("50000");
   const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (notice !== "Connectez-vous pour continuer vers votre espace.") return;
+    const timer = window.setTimeout(() => setNotice(current => current === notice ? "" : current), 6000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
   const [authenticated, setAuthenticated] = useState<AuthenticatedProfile | null>(null);
   const [authRequest, setAuthRequest] = useState<{ role: "client" | "provider" | "admin"; mode: "login" | "register" | "reset"; returnTo?: string } | null>(null);
   const [paymentReturn, setPaymentReturn] = useState<{ id: string; mode: "return" | "cancelled" } | null>(null);
@@ -543,7 +548,9 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }
 
   function handleAuthenticated(signedIn: AuthenticatedProfile) {
+    setNotice("");
     if (!booking) {
+      if (authRequest?.role === "provider" && !signedIn.roles.includes("provider")) { window.location.assign("/app/application"); return; }
       const requested = authRequest?.returnTo ? safeOAuthDestination(authRequest.returnTo) : null;
       if (requested && requested !== "/") {
         window.location.assign(requested);

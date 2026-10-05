@@ -30,6 +30,8 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
   const parent = navigationParent(space, moduleKey);
   const secondary = simpleKeys ? modules.filter((item) => item.key !== "dashboard" && !mainModules.includes(item) && navigationParent(space, item.key) === parent) : [];
   const notificationsModule = modules.find((item) => item.key === "notifications");
+  const visibleSpaces = ["client", "pro", "salon", "staff"].includes(space)
+    ? availableSpaces.filter(key => ["client", "pro", "salon", "staff"].includes(key)) : availableSpaces;
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,7 +52,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
       <label className="workspace-space-picker">
         <span>Espace actif</span>
         <select value={space} onChange={(event) => router.push(workspaceHref(event.target.value as WorkspaceSpaceKey))}>
-          {availableSpaces.map((key) => <option key={key} value={key}>{workspaceSpaces[key].label}</option>)}
+          {visibleSpaces.map((key) => <option key={key} value={key}>{workspaceSpaces[key].label}</option>)}
         </select>
       </label>
       <nav aria-label={`Navigation ${definition.label}`}>
@@ -73,7 +75,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
         <div className="workspace-tools"><form role="search" onSubmit={search}><label><span className="sr-only">Rechercher dans ce module</span><input name="workspace-search" type="search" placeholder="Rechercher…" /></label></form>{notificationsModule && <Link className="workspace-notifications" href={workspaceHref(space, notificationsModule.key)} aria-label="Notifications">◌</Link>}<span className="workspace-account" title={userEmail}>{userEmail.slice(0, 1).toUpperCase()}</span></div>
       </header>
       <div className="workspace-breadcrumb"><Link href={definition.prefix}>{definition.label}</Link><span>/</span><span>{activeModule.label}</span></div>
-      {secondary.length > 0 && <details className="workspace-secondary" open={secondary.some((item) => item.key === moduleKey)}><summary>{space === "client" ? "Mon compte" : "Dans cette rubrique"}</summary><nav aria-label="Navigation secondaire">{secondary.map((item) => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined}>{navigationLabel(space, item)}</Link>)}</nav></details>}
+      {secondary.length > 0 && !(space === "client" && moduleKey === "profile") && <details className="workspace-secondary" open={secondary.some((item) => item.key === moduleKey)}><summary>{space === "client" ? "Mon compte" : "Dans cette rubrique"}</summary><nav aria-label="Navigation secondaire">{secondary.map((item) => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined}>{navigationLabel(space, item)}</Link>)}</nav></details>}
       {children}
       {(parent === "profile" || parent === "public-profile") && <ProductHelp professional={space === "pro"} />}
     </main>

@@ -19,9 +19,10 @@ type ProfileRow = {
 };
 
 export async function loadAuthenticatedProfile(supabase: SupabaseClient, userId: string): Promise<AuthenticatedProfile> {
-  const [{ data: profile, error: profileError }, { data: accountRoles, error: rolesError }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: accountRoles, error: rolesError }, provider] = await Promise.all([
     supabase.from("profiles").select("role,is_suspended,account_status,first_name,last_name,phone").eq("id", userId).single(),
     supabase.from("account_roles").select("role").eq("profile_id", userId),
+    supabase.from("provider_profiles").select("status").eq("profile_id", userId).maybeSingle(),
   ]);
   if (profileError || !profile) throw profileError ?? new Error("Profil introuvable.");
   const row = profile as ProfileRow;
@@ -31,13 +32,14 @@ export async function loadAuthenticatedProfile(supabase: SupabaseClient, userId:
   const roles = new Set<ApplicationRole>();
   for (const item of accountRoles ?? []) {
     if (item.role === "customer") roles.add("client");
-    if (item.role === "professional") roles.add("provider");
+    if (item.role === "professional" && provider.data?.status === "approved") roles.add("provider");
   }
   if (row.role === "admin") roles.add("admin");
-  if (!roles.size) roles.add(row.role === "provider" ? "provider" : "client");
+  if (!roles.size) roles.add(row.role === "provider" && provider.data?.status === "approved" ? "provider" : "client");
   const orderedRoles = [...roles];
   const primaryRole = row.role === "admin" ? "admin" : row.role === "provider" && roles.has("provider") ? "provider" : "client";
   if (rolesError) throw rolesError;
+  if (provider.error) throw provider.error;
   return {
     userId,
     role: primaryRole,

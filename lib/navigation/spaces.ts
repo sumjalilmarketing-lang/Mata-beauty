@@ -40,6 +40,7 @@ const clientModules = [
   module("support", "Support", "?", "Compte", "Vos demandes d’assistance et leur suivi.", { resource: "reports" }),
   module("profile", "Profil", "○", "Compte", "Identité, coordonnées, ville, bio et préférences beauté.", { resource: "profiles" }),
   module("settings", "Paramètres", "⚙", "Compte", "Sécurité, notifications, confidentialité et gestion des données."),
+  module("application", "Ma candidature professionnelle", "◇", "Compte", "Préparez vos informations et documents, puis suivez leur vérification."),
 ] as const;
 
 const proModules = [

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { applicationOrigin } from "@/lib/payments/server";
 import { normalizeOAuthIntent, oauthErrorCode, safeOAuthDestination } from "@/lib/auth/redirect";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { sendWelcomeEmail } from "@/lib/email/welcome";
 
 function callbackRedirect(request: Request, parameters: Record<string, string>, fallback = "/") {
   const requested = new URL(request.url).searchParams.get("next");
@@ -29,6 +30,8 @@ export async function GET(request: Request) {
       return callbackRedirect(request, { auth_error: "profile_creation_failed" });
     }
     if (intent === "professional") {
+      const { error: statusError } = await supabase.rpc("synchronize_account_status");
+      if (statusError) return callbackRedirect(request, { auth_error: "professional_request_failed" });
       const { error: professionalError } = await supabase.rpc("request_professional_profile");
       if (professionalError) return callbackRedirect(request, { auth_error: "professional_request_failed" });
     }
@@ -36,6 +39,11 @@ export async function GET(request: Request) {
     if (profile?.is_suspended) {
       await supabase.auth.signOut();
       return callbackRedirect(request, { auth_error: "account_suspended" });
+    }
+    const { data: authenticated } = await supabase.auth.getUser();
+    if (authenticated.user) {
+      try { await sendWelcomeEmail(authenticated.user.id); }
+      catch { console.error("welcome_email_delivery_failed"); }
     }
     return callbackRedirect(request, {
       auth: "google",
