@@ -101,6 +101,13 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   if (!admin) return;
+  const accountIds = [moderatorId, salonId, catalogProviderId, clientId].filter(Boolean);
+  if (accountIds.length) {
+    const memberships = await admin.from("conversation_members").select("conversation_id").in("profile_id", accountIds);
+    expect.soft(memberships.error).toBeNull();
+    const conversationIds = [...new Set((memberships.data ?? []).map(row => row.conversation_id))];
+    if (conversationIds.length) expect.soft((await admin.from("conversations").delete().in("id", conversationIds)).error).toBeNull();
+  }
   if (salonBookingId) await admin.from("bookings").delete().eq("id", salonBookingId);
   if (salonBusinessId) {
     const media = await admin.from("business_media").select("storage_path").eq("business_id", salonBusinessId);
@@ -148,6 +155,8 @@ test("le Salon réalise son CRUD navigateur puis reçoit réservation, message, 
   const clientContext: BrowserContext = await browser.newContext();
   const salonPage = await salonContext.newPage();
   const clientPage = await clientContext.newPage();
+  // A dropped realtime connection must not leave a saved reply invisible.
+  await clientPage.routeWebSocket(/\/realtime\/v1\/websocket/, socket => socket.close());
   await signIn(salonPage, salonEmail);
 
   await salonPage.goto("/salon/profile");

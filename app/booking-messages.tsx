@@ -44,6 +44,7 @@ export function BookingMessages({
   const [loading, setLoading] = useState(Boolean(supabase));
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(supabase ? "" : "Supabase n’est pas configuré.");
+  const [refreshError, setRefreshError] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
   const loadMembers = useCallback(async (selectedConversationId: string) => {
@@ -73,6 +74,8 @@ export function BookingMessages({
 
     let active = true;
     let channel: RealtimeChannel | null = null;
+    let refreshTimer: ReturnType<typeof setInterval> | undefined;
+    let reconcile = () => {};
 
     async function initialize() {
       setLoading(true);
@@ -98,6 +101,42 @@ export function BookingMessages({
       setMessages(initialMessages);
       setHasOlder(initialMessages.length === pageSize);
       await markRead(selectedConversationId);
+      if (!active) return;
+
+      // Realtime can miss an insert between the initial SELECT and subscription,
+      // or while disconnected. Reconcile from the last successful read cursor.
+      let cursor = initialMessages.at(-1)?.created_at ?? "1970-01-01T00:00:00.000Z";
+      let refreshing = false;
+      async function refreshMessages() {
+        if (!active || refreshing) return;
+        refreshing = true;
+        try {
+          const since = cursor;
+          let received = false;
+          for (let offset = 0; active; offset += pageSize) {
+            const result = await client.from("messages").select("id,sender_id,body,created_at")
+              .eq("conversation_id", selectedConversationId).is("deleted_at", null)
+              .gte("created_at", since).order("created_at").order("id")
+              .range(offset, offset + pageSize - 1);
+            if (result.error) throw result.error;
+            if (!active) return;
+            const incoming = result.data as MessageRow[];
+            received ||= incoming.some(message => message.sender_id !== userId && message.created_at > since);
+            setMessages(current => mergeMessages(current, incoming));
+            if (incoming.length) cursor = incoming.at(-1)!.created_at;
+            if (incoming.length < pageSize) break;
+          }
+          if (received) await markRead(selectedConversationId);
+          else await loadMembers(selectedConversationId);
+          if (active) setRefreshError("");
+        } catch (caught: unknown) {
+          if (active) setRefreshError(publicErrorMessage(caught, "Actualisation interrompue. Une nouvelle tentative sera effectuée."));
+        } finally { refreshing = false; }
+      }
+      reconcile = () => { void refreshMessages(); };
+      refreshTimer = setInterval(reconcile, 10_000);
+      window.addEventListener("online", reconcile);
+      window.addEventListener("focus", reconcile);
 
       channel = client
         .channel(`booking-conversation:${selectedConversationId}`)
@@ -117,7 +156,7 @@ export function BookingMessages({
           table: "conversation_members",
           filter: `conversation_id=eq.${selectedConversationId}`,
         }, () => void loadMembers(selectedConversationId).catch(() => undefined))
-        .subscribe();
+        .subscribe(status => { if (status === "SUBSCRIBED") reconcile(); });
     }
 
     void initialize().catch((caught: unknown) => {
@@ -128,6 +167,9 @@ export function BookingMessages({
 
     return () => {
       active = false;
+      clearInterval(refreshTimer);
+      window.removeEventListener("online", reconcile);
+      window.removeEventListener("focus", reconcile);
       if (channel) void client.removeChannel(channel);
     };
   }, [bookingId, loadMembers, markRead, supabase, userId]);
@@ -194,6 +236,7 @@ export function BookingMessages({
         <button type="button" onClick={onClose}>Fermer</button>
       </div>
       {error && <p className="conversation-error" role="alert">{error}</p>}
+      {refreshError && <p className="conversation-error" role="alert">{refreshError}</p>}
       <div className="message-list" aria-live="polite" aria-busy={loading}>
         {hasOlder && <button className="load-older" type="button" onClick={() => void loadOlder()}>Afficher les messages précédents</button>}
         {loading && <p className="compact-empty">Chargement de la conversation…</p>}

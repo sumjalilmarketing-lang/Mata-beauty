@@ -137,3 +137,14 @@ La validation globale reste ouverte : nouvelle Preview, production et domaine r�
 - Le dossier agent affiche maintenant aussi l'identité du candidat, son expérience, ses langues et ses conditions d'annulation, sous les politiques de lecture existantes. Retest navigateur requis.
 - Resend installé et domaine mata-beauty.com vérifié après les autorisations explicites de l'utilisateur pour les conditions et le report de la configuration 2FA. Transport réel et idempotence validés sur l'adresse officielle de test Resend. Réception dans une boîte utilisateur encore non vérifiée ; adresse exacte demandée.
 - Les nouveaux changements applicatifs et les trois migrations restent hors production à cet instant.
+
+### BUG-MESSAGES-01 — message enregistré mais non reçu en direct
+
+- Écran : conversation privée client / salon.
+- Reproduction : répondre côté salon alors que la conversation cliente est ouverte.
+- Observé sur Preview bc7c3aa : INSERT du message HTTP 201 dans la trace, absence du message chez le client après 30 secondes.
+- Cause : chargement initial suivi d'un abonnement Realtime sans rattrapage des événements manqués ni resynchronisation lors d'une reconnexion.
+- Correction : lecture incrémentale paginée à la souscription, au retour réseau/focus et toutes les dix secondes, fusion par identifiant ; nettoyage de l'abonnement, des événements et du timer à la fermeture. Erreur de synchronisation explicitement affichée et effacée après récupération.
+- Test : le parcours salon coupe maintenant volontairement le WebSocket côté client pour vérifier la récupération réelle de la réponse en base. Résultat du retest à enregistrer.
+- Nettoyage QA : les messages référencent leur auteur avec ON DELETE RESTRICT ; suppression explicite des conversations synthétiques avant suppression des comptes. Les quatre comptes résiduels des deux exécutions concernées ont été supprimés après vérification de leurs identifiants de recette.
+- Production / mata-beauty.com : non déployé à ce stade.
