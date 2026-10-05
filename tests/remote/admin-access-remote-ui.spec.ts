@@ -40,7 +40,20 @@ test.describe.serial("contrôle d’accès admin distant",()=>{
     await provision("super","super_admin");
   });
 
-  test.afterAll(async()=>{for(const account of [...accounts.values()].reverse())await admin.auth.admin.deleteUser(account.id);});
+  test.afterAll(async()=>{
+    const providerId = accounts.get("provider")?.id;
+    if (providerId) {
+      const documents = await admin.from("provider_documents").select("id,storage_path").eq("provider_id", providerId);
+      expect(documents.error).toBeNull();
+      if (documents.data?.length) {
+        expect((await admin.storage.from("provider-documents").remove(documents.data.map(document => document.storage_path))).error).toBeNull();
+        expect((await admin.from("document_reviews").delete().in("document_id", documents.data.map(document => document.id))).error).toBeNull();
+      }
+    }
+    for(const account of [...accounts.values()].reverse()) expect((await admin.auth.admin.deleteUser(account.id)).error).toBeNull();
+    const remaining = await admin.from("profiles").select("id").in("id", [...accounts.values()].map(account => account.id));
+    expect(remaining.error).toBeNull(); expect(remaining.data).toHaveLength(0);
+  });
 
   for(const label of ["client","provider"]){
     test(`${label} est refusé sans chargement du centre de contrôle`,async({page})=>{
@@ -86,17 +99,42 @@ test.describe.serial("contrôle d’accès admin distant",()=>{
     for(const name of ["Utilisateurs","Prestataires","Support","Administrateurs"])await expect(nav.getByRole("button",{name})).toHaveCount(0);
   });
 
+  test("le professionnel transmet un document privé depuis son profil", async ({ page }) => {
+    test.setTimeout(60_000);
+    if(bypass)await page.route(`${new URL(remoteAppUrl).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
+    await page.goto("/");
+    await page.getByRole("button", { name: "Publier une vidéo" }).click();
+    await page.getByLabel("Adresse e-mail").fill(accounts.get("provider")!.email);
+    await page.getByLabel("Mot de passe").fill(password);
+    await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+    await page.waitForURL(/\/pro/);
+    await page.goto("/pro/public-profile");
+    await page.locator('input[name="document"]').setInputFiles({ name: "document-qa.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") });
+    await page.getByRole("button", { name: "Envoyer le document" }).click();
+    await expect(page.getByText("Document envoyé pour vérification.")).toBeVisible();
+    const document = await admin.from("provider_documents").select("id,storage_path").eq("provider_id", accounts.get("provider")!.id).single();
+    expect(document.error).toBeNull();
+    expect(document.data!.storage_path.startsWith(`${accounts.get("provider")!.id}/`)).toBe(true);
+  });
+
   test("le super administrateur voit tout et sa connexion est journalisée",async({page})=>{
+    test.setTimeout(60_000);
     if(bypass)await page.route(`${new URL(remoteAppUrl).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
     await page.goto(`${remoteAppUrl}/admin`);await page.getByLabel("Adresse administrateur").fill(accounts.get("super")!.email);await page.getByLabel("Mot de passe").fill(password);await page.getByRole("button",{name:"Accéder à l’administration"}).click();
     await expect(page.getByRole("heading",{name:"Vue d’ensemble",level:1})).toBeVisible({timeout:20000});
     const nav=page.getByRole("navigation",{name:"Navigation Super Admin"});
     for(const name of ["Utilisateurs","Prestataires","Paiements","Administrateurs","Rôles et permissions","Journaux d’audit","Sécurité"])await expect(nav.getByRole("button",{name})).toBeVisible();
-    await nav.getByRole("button", { name: "Validations professionnelles", exact: true }).click();
+    await nav.getByRole("button", { name: "Validations professionnelles" }).click();
     const row = page.getByRole("row").filter({ hasText: `UI Provider ${run}` });
     await row.getByText("Examiner le dossier", { exact: true }).click();
     await expect(row.getByRole("heading", { name: `UI Provider ${run}` })).toBeVisible();
-    await expect(row.getByText("Aucun document transmis.")).toBeVisible();
+    await expect(row.getByText("Pièce d’identité", { exact: true })).toBeVisible();
+    page.once("dialog", dialog => dialog.accept("Complément QA : vérifier la lisibilité du document."));
+    await row.getByRole("button", { name: "Demander un complément" }).click();
+    await expect(row.getByText("Demande de complément enregistrée dans l’historique de vérification.")).toBeVisible();
+    const reviews = await admin.from("document_reviews").select("decision,reason").eq("reviewer_id", accounts.get("super")!.id);
+    expect(reviews.error).toBeNull();
+    expect(reviews.data).toEqual([expect.objectContaining({ decision: "more_information", reason: "Complément QA : vérifier la lisibilité du document." })]);
     await row.getByRole("button", { name: "Valider", exact: true }).click();
     await page.getByLabel("Motif obligatoire").fill("Dossier QA vérifié pour la recette de simplification.");
     await page.getByRole("button", { name: "Confirmer", exact: true }).click();

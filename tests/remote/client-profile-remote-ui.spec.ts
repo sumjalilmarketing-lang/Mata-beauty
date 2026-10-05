@@ -7,7 +7,14 @@ const run=`${Date.now()}-${randomUUID().slice(0,6)}`, email=`codex-profile-ui-${
 let admin:SupabaseClient,userId="";
 
 test.beforeAll(async()=>{admin=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});const made=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{display_name:"Mata Profil UI",legal_accepted:"true"}});expect(made.error).toBeNull();userId=made.data.user!.id;});
-test.afterAll(async()=>{if(userId)await admin.auth.admin.deleteUser(userId);});
+test.afterAll(async()=>{
+  if (!userId) return;
+  expect((await admin.from("support_tickets").delete().eq("requester_id", userId)).error).toBeNull();
+  expect((await admin.from("account_deletion_requests").delete().eq("profile_id", userId)).error).toBeNull();
+  expect((await admin.auth.admin.deleteUser(userId)).error).toBeNull();
+  const remaining = await admin.from("profiles").select("id").eq("id", userId);
+  expect(remaining.error).toBeNull(); expect(remaining.data).toHaveLength(0);
+});
 
 test("le profil personnel gère réellement identité préférences support et confidentialité",async({page})=>{
   if(remoteAppUrl&&bypass)await page.route(`${new URL(remoteAppUrl).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));

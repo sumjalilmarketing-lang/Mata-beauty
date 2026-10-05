@@ -11,6 +11,7 @@ export default defineConfig({
   fullyParallel: false,
   reporter: "list",
   use: {
+    actionTimeout: 30_000,
     baseURL: remoteAppUrl ?? "http://localhost:3100",
     trace: "retain-on-failure",
     video: "retain-on-failure",

@@ -11,7 +11,7 @@ test("the public experience is a real booking application", async () => {
     readFile(new URL("app/layout.tsx", root), "utf8"),
   ]);
   assert.match(page, /MataBeautyApp/);
-  assert.match(app, /Prenez soin de vous/);
+  assert.match(app, /<h1>Explorer<\/h1>/);
   assert.match(app, /Catégories populaires/);
   assert.match(app, /Étape \$\{step\} sur 2/);
   assert.match(app, /Voir les créneaux/);
@@ -117,7 +117,7 @@ test("the official Mata identity drives the design system and installable assets
   assert.match(styles, /prefers-reduced-motion/);
   assert.match(styles, /data-theme="dark"/);
   assert.match(app, /mata-splash/);
-  assert.match(app, /mata-hero-card/);
+  assert.match(app, /premium-bottom-nav/);
   assert.match(app + admin, /\/brand\/mata-app-icon\.webp/);
   assert.match(manifest, /icon-192\.png/);
   assert.match(manifest, /purpose: "maskable"/);

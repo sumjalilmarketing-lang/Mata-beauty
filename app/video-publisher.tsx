@@ -237,10 +237,12 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
       {contentType === "promotion" && <><label>Remise (%)<input name="discount" type="number" min="1" max="90" required /></label><label>Fin de l’offre<input name="promotionEndsAt" type="datetime-local" required /></label><label>Places disponibles<input name="promotionSlots" type="number" min="1" max="10000" required /></label></>}
       {services.length === 0 && <Link className="wide primary-button" href="/pro/services">Créer une prestation</Link>}
       <label>Catégorie et prestation<select name="serviceId" defaultValue=""><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title} · {service.duration_minutes} min · {service.price_amount.toLocaleString("fr-FR")} F</option>)}</select></label>
+      <details className="wide publisher-options"><summary>Options de publication</summary>
       <label>Visibilité<select name="visibility" defaultValue="public"><option value="public">Tout le monde</option><option value="followers">Abonnés</option></select></label>
       <label>Publication<select name="status" defaultValue={providerApproved ? "published" : "draft"}><option value="draft">Brouillon</option><option value="scheduled" disabled={!providerApproved}>Programmer</option><option value="published" disabled={!providerApproved}>Publier maintenant</option></select></label>
       <label>Date programmée<input name="scheduledFor" type="datetime-local" /></label>
       <label className="wide legal-consent"><input name="allowComments" type="checkbox" defaultChecked /><span>Autoriser les commentaires.</span></label>
+      </details>
       <label className="wide legal-consent"><input name="consent" type="checkbox" /><span>Je confirme avoir l’autorisation des personnes reconnaissables dans cette vidéo.</span></label>
       {!providerApproved && <p className="wide publisher-notice">Votre profil doit être approuvé avant une publication publique. Le brouillon reste disponible.</p>}
       {feedback && <p className="wide dashboard-feedback" role="status">{feedback}</p>}

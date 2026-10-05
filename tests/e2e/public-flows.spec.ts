@@ -5,6 +5,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.beforeEach(async ({ page }) => {
+  await page.route("https://audit.supabase.co/auth/v1/authorize**", (route) => route.fulfill({ status: 204 }));
   await page.route("http://localhost:3000/api/auth/providers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ google: true }) }));
   await page.route("https://audit.supabase.co/rest/v1/categories**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 }]) }));
   await page.route("https://audit.supabase.co/rest/v1/provider_profiles**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{

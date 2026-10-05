@@ -190,7 +190,8 @@ test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page
   await page.waitForURL(/\/pro/);
   await expect(page.getByRole("navigation", { name: "Navigation Espace professionnel" }).getByRole("link")).toHaveText(["⌂Dashboard", "▶Studio", "≡Prestations", "□Agenda", "✉Messages", "¤Revenus", "○Profil"]);
   await page.goto("/pro/services");
-  await page.getByLabel("Type", { exact: true }).selectOption({ index: 1 });
+  await expect(page.locator('.service-form select[name="serviceId"]')).toBeVisible();
+  await page.locator('.service-form select[name="serviceId"]').selectOption({ index: 1 });
   await page.getByLabel("Nom affiché").fill(`Prestation simple ${run}`);
   await page.getByLabel("Durée (minutes)").fill("60");
   await page.getByLabel("Prix (FCFA)").fill("12000");
@@ -198,7 +199,7 @@ test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page
   await expect(page.getByText("Prestation ajoutée.")).toBeVisible();
   await expect(page.locator(".control-list-row").filter({ hasText: `Prestation simple ${run}` })).toBeVisible();
   await page.goto("/pro/agenda");
-  await page.getByLabel("Jour", { exact: true }).selectOption(String((new Date(Date.now() + 86400000).getUTCDay() + 1) % 7));
+  await page.locator('select[name="day"]').selectOption(String((new Date(Date.now() + 86400000).getUTCDay() + 1) % 7));
   await page.getByRole("button", { name: "Ajouter un horaire" }).click();
   await expect(page.getByText("Disponibilités enregistrées.")).toBeVisible();
   await page.goto("/pro/revenue");
@@ -302,6 +303,7 @@ test("RLS masque les contenus non publiables et interdit les modifications étra
   await page.locator('input[name="video"]').setInputFiles({ name: "brouillon-rls.mp4", mimeType: "video/mp4", buffer: qaVideoBuffer });
   await page.locator('input[name="title"]').fill(draftTitle);
   await page.locator('textarea[name="caption"]').fill(draftTitle);
+  await page.getByText("Options de publication", { exact: true }).click();
   await page.locator('select[name="status"]').selectOption("draft");
   await page.getByRole("button", { name: "Publier la vidéo" }).click();
   await expect(page.getByText(draftTitle)).toBeVisible({ timeout: 60_000 });
@@ -378,7 +380,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await liveProviderContext.close();
 
   const navigation = page.getByRole("navigation", { name: "Navigation de l’application" });
-  await navigation.getByRole("button", { name: "Accueil" }).click();
+  await navigation.getByRole("button", { name: "Explorer", exact: true }).click();
   await navigation.getByRole("button", { name: "Inspiration" }).click();
   await expect(page.getByText(liveSecondCaption)).toBeVisible({ timeout: 30_000 });
   expect((await admin.from("posts").select("id").eq("author_id", providerId).eq("title", liveSecondTitle).single()).error).toBeNull();
@@ -509,6 +511,7 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   await page.waitForURL(/\/app/);
   await page.goto("/");
   const reportedCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
+  await page.waitForLoadState("networkidle");
   page.once("dialog", (dialog) => dialog.accept());
   await reportedCard.getByRole("button", { name: "Signaler" }).click();
   await expect(page.getByText("Signalement transmis à la modération.")).toBeVisible();
@@ -521,7 +524,7 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   const adminContext = await browser.newContext();
   const adminPage = await adminContext.newPage();
   await preparePage(adminPage);
-  await adminPage.goto(`${remoteAppUrl}/admin`);
+  await adminPage.goto("/admin");
   await adminPage.getByLabel("Adresse administrateur").fill(moderatorEmail);
   await adminPage.getByLabel("Mot de passe").fill(password);
   await adminPage.getByRole("button", { name: "Accéder à l’administration" }).click();
