@@ -57,7 +57,7 @@ async function preparePage(page: Page) {
   await page.addInitScript(() => window.localStorage.setItem("mata-launch-welcome", "done"));
   page.on("console", (message) => {
     if (message.type() === "error" && !message.text().includes("https://vercel.live/_next-live/feedback/feedback.js")) {
-      browserConsoleErrors.push(message.text());
+      browserConsoleErrors.push(`${page.url().split("?")[0]}: ${message.text()}`);
     }
   });
   page.on("pageerror", (error) => browserConsoleErrors.push(error.message));

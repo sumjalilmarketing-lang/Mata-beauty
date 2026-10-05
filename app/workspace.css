@@ -31,3 +31,5 @@
 .workspace-layout .panel { background: var(--ws-card); color: #fff8fc; border-color: var(--ws-line); }
 .workspace-layout .dashboard-form label, .workspace-layout .dashboard-form h3 { color: #fff8fc; }
 .workspace-layout .panel a { color: var(--ws-pink); }
+.workspace-layout .panel-heading h2, .workspace-layout .appointment div strong { color: #fff8fc; }
+.workspace-layout .appointment div small { color: #c9c1cc; }
