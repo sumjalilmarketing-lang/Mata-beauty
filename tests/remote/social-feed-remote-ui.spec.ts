@@ -18,6 +18,8 @@ const liveSecondTitle = `Deuxième vidéo active ${run}`;
 const liveSecondCaption = `Nouvelle publication sans rebuild ${run}`;
 const photoTitle = `Photo Studio réelle ${run}`;
 const beforeAfterTitle = `Avant Après réel ${run}`;
+const messageRun = run.replace(/[0-9]/g, (digit) => String.fromCharCode(97 + Number(digit)));
+const bookingMessage = `Bonjour, réservation simple ${messageRun}`;
 let admin: SupabaseClient;
 let clientId = "";
 let providerId = "";
@@ -150,7 +152,7 @@ test.afterAll(async () => {
     expect.soft((await admin.from("reports").delete().in("reporter_id", userIds)).error).toBeNull();
     expect.soft((await admin.from("moderation_actions").delete().in("actor_id", userIds)).error).toBeNull();
   }
-  if (bookingId) expect.soft((await admin.from("bookings").delete().eq("id", bookingId)).error).toBeNull();
+  if (clientId && providerId) expect.soft((await admin.from("bookings").delete().eq("client_id", clientId).eq("provider_id", providerId)).error).toBeNull();
   if (providerId) expect.soft((await admin.from("posts").delete().eq("author_id", providerId)).error).toBeNull();
   if (providerId) {
     const bucket = admin.storage.from("provider-social-media");
@@ -316,6 +318,27 @@ test("RLS masque les contenus non publiables et interdit les modifications étra
   expect(draft.data?.status).toBe("draft");
   expect((await clientApi.from("social_feed").select("id").eq("id", draft.data!.id)).data).toEqual([]);
 
+  const anonymousApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  expect((await superApi.from("launch_feed_selection").insert([
+    { post_id: studioPostId, selected_by: superId },
+    { post_id: draft.data!.id, selected_by: superId },
+  ])).error).toBeNull();
+  const selectionIds = [studioPostId, draft.data!.id];
+  const publicSelection = await anonymousApi.from("launch_feed_selection").select("post_id").in("post_id", selectionIds);
+  expect(publicSelection.error).toBeNull();
+  expect(publicSelection.data).toEqual([{ post_id: studioPostId }]);
+  expect((await clientApi.from("launch_feed_selection").insert({ post_id: photoPostId, selected_by: clientId })).error?.code).toBe("42501");
+  expect((await anonymousApi.from("launch_feed_selection").insert({ post_id: photoPostId, selected_by: clientId })).error?.code).toBe("42501");
+  const forbiddenSelectionUpdate = await providerApi.from("launch_feed_selection").update({ is_active: false }).eq("post_id", studioPostId).select("post_id");
+  expect(forbiddenSelectionUpdate.error).toBeNull();
+  expect(forbiddenSelectionUpdate.data).toEqual([]);
+  expect((await superApi.from("launch_feed_selection").update({ is_active: false }).eq("post_id", studioPostId)).error).toBeNull();
+  expect((await anonymousApi.from("launch_feed_selection").select("post_id").in("post_id", selectionIds)).data).toEqual([]);
+  const adminSelection = await superApi.from("launch_feed_selection").select("post_id").in("post_id", selectionIds);
+  expect(adminSelection.error).toBeNull();
+  expect(adminSelection.data).toHaveLength(2);
+  expect((await superApi.from("launch_feed_selection").delete().in("post_id", selectionIds)).error).toBeNull();
+
   const original = await admin.from("posts").select("caption").eq("id", studioPostId).single();
   const clientMutation = await clientApi.from("posts").update({ caption: "Modification cliente interdite" }).eq("id", studioPostId).select("id");
   expect(clientMutation.error).toBeNull();
@@ -394,7 +417,25 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await expect(activeVideo).toBeVisible();
   await mainCard.evaluate((element) => element.scrollIntoView({ block: "start", behavior: "auto" }));
   await expect(activeVideo).toHaveAttribute("preload", "auto");
-  await expect.poll(() => activeVideo.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
+  try {
+    await expect.poll(() => activeVideo.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
+  } catch (error) {
+    console.log("VIDEO_START_FAILURE", await activeVideo.evaluate((element) => {
+      const video = element as HTMLVideoElement;
+      return { currentTime: video.currentTime, readyState: video.readyState, networkState: video.networkState, paused: video.paused, error: video.error?.code ?? null, source: video.currentSrc.split("?")[0], connected: video.isConnected };
+    }));
+    const mediaUrl = await activeVideo.evaluate((element) => (element as HTMLVideoElement).currentSrc);
+    const started = Date.now();
+    try {
+      const mediaResponse = await page.request.get(mediaUrl, { timeout: 15_000, headers: { Range: "bytes=0-65535" } });
+      console.log("VIDEO_RANGE_DIAGNOSTIC", { status: mediaResponse.status(), bytes: (await mediaResponse.body()).length, elapsedMs: Date.now() - started });
+    } catch { console.log("VIDEO_RANGE_DIAGNOSTIC", { timedOut: true, elapsedMs: Date.now() - started }); }
+    console.log("VIDEO_PLAYER_DIAGNOSTIC", await page.locator("video").evaluateAll((elements) => elements.map((element) => {
+      const video = element as HTMLVideoElement;
+      return { time: video.currentTime, ready: video.readyState, network: video.networkState, paused: video.paused, hasSource: Boolean(video.getAttribute("src")) };
+    })));
+    throw error;
+  }
   expect(await activeVideo.evaluate((element) => { const video = element as HTMLVideoElement; return { muted: video.muted, loop: video.loop, preload: video.preload }; })).toEqual({ muted: true, loop: true, preload: "auto" });
   await mainCard.getByRole("button", { name: "Mettre la vidéo en pause" }).click();
   await expect.poll(() => activeVideo.evaluate((element) => (element as HTMLVideoElement).paused)).toBeTruthy();
@@ -436,9 +477,9 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await expect(page.getByRole("heading", { name: "Votre rendez-vous est créé" })).toBeVisible({ timeout: 20_000 });
   await page.getByRole("link", { name: "Message", exact: true }).click();
   await page.getByRole("button", { name: "Messages", exact: true }).first().click();
-  await page.getByPlaceholder("Écrire un message…").fill(`Bonjour, réservation simple ${run}`);
+  await page.getByPlaceholder("Écrire un message…").fill(bookingMessage);
   await page.getByRole("button", { name: "Envoyer", exact: true }).click();
-  await expect(page.getByText(`Bonjour, réservation simple ${run}`)).toBeVisible();
+  await expect(page.getByText(bookingMessage)).toBeVisible();
   await page.goto("/app/bookings");
   await expect(page.locator(".live-appointment").first()).toBeVisible();
   await page.goto("/app/profile");
@@ -483,8 +524,8 @@ test("le feed social distant relie les interactions au profil et à la réservat
 
   const conversation = await clientApi.rpc("ensure_booking_conversation", { target_booking_id: bookingId });
   expect(conversation.error).toBeNull();
-  expect((await clientApi.from("messages").insert({ conversation_id: conversation.data, sender_id: clientId, body: `Golden path cliente ${run}` })).error).toBeNull();
-  expect((await providerApi.from("messages").insert({ conversation_id: conversation.data, sender_id: providerId, body: `Golden path artiste ${run}` })).error).toBeNull();
+  expect((await clientApi.from("messages").insert({ conversation_id: conversation.data, sender_id: clientId, body: `Golden path cliente ${messageRun}` })).error).toBeNull();
+  expect((await providerApi.from("messages").insert({ conversation_id: conversation.data, sender_id: providerId, body: `Golden path artiste ${messageRun}` })).error).toBeNull();
   for (const status of ["confirmed", "in_progress", "completed"] as const) {
     const transition = await providerApi.from("bookings").update({ status }).eq("id", bookingId).select("status").single();
     expect(transition.error).toBeNull(); expect(transition.data?.status).toBe(status);
