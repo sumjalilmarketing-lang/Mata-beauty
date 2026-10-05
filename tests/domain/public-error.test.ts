@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { publicErrorMessage } from "../../lib/ui/public-error";
 
 describe("publicErrorMessage", () => {
+  it("explains a contact-details restriction without exposing the backend marker", () => {
+    const result = publicErrorMessage({ code: "P0001", message: "MATA_ANTI_CIRCUMVENTION:contact_details" });
+    expect(result).toContain("Les coordonnées personnelles ne peuvent pas être partagées ici.");
+    expect(result).not.toContain("MATA_ANTI_CIRCUMVENTION");
+  });
   it("maps booking conflicts without exposing SQL", () => {
     expect(publicErrorMessage({ code: "23P01", message: "exclusion constraint bookings_no_overlap" })).toBe("Ce créneau vient d’être réservé. Choisissez-en un autre.");
   });

@@ -1,6 +1,24 @@
-# Finalisation MATA Beauty — 5 octobre 2026
+# Finalisation MATA Beauty — 5 et 6 octobre 2026
 
-État : EN COURS. Production de départ : e7821ef, mata-beauty.com. Aucun résultat de la recette précédente ne vaut automatiquement validation des nouveaux changements.
+État : DÉPLOYÉ, RECETTE PRODUCTION EN COURS. Production actuelle : 213c2748823eda302d858f7681c17bb6709bb9f6 sur mata-beauty.com, déploiement dpl_67WDCDorh8zjyRLanHmuNM2enxRj. Les sections suivantes conservent l'historique des corrections ; leurs mentions « non déployé » décrivent l'étape datée, pas cet état courant. Aucun PASS global de tous les écrans n'est revendiqué.
+
+## Vérification réelle après déploiement
+
+| Zone | Action testée | Résultat attendu | Résultat observé | Statut | Correction |
+|---|---|---|---|---|---|
+| Production | Version du domaine | Dernier build et backend production | HTTP 200 ; 15 scripts identiques au déploiement immuable ; backend production présent, QA absent | PASS | Déploiement --prod, aucune promotion de build QA |
+| Google Auth | Connexion compte existant | Retour et session active | Retour sur /app/profile, nouveau profil affiché ; un seul compte Google en base | PASS | Synchronisation du statut et callback existant conservés |
+| Session | Refresh, logout, route protégée, reconnexion | Persistance, refus sans session, reconnexion | Profil conservé au refresh ; /app/profile redirige vers connexion après logout ; Google rétablit la session | PASS | Contrôle serveur conservé |
+| Bienvenue | Envoi API puis répétition | Un seul message | Boîte officielle Resend : sent puis skipped, une tentative et un reçu fournisseur | PASS transport/API | File privée et clé d'idempotence |
+| Bienvenue | Réception dans boîte humaine | E-mail consultable | Adresse de test exacte toujours à confirmer ; pas d'envoi supposé | NOT TESTED | Aucune livraison humaine inventée |
+| Rôles Pro | Réconciliation historique | Aucun rôle sans approbation | 4 retraits journalisés, 0 rôle prématuré restant ; comptes et contenus conservés | PASS | Migration versionnée |
+| Sécurité bienvenue | Lecture anonyme/client | Refus | RLS active, aucun privilège SELECT anon/authenticated | PASS | Table réservée au service |
+| Vidéo production | Publier MP4, photo et avant/après | Médias publiés et lisibles | Parcours Studio réels et nettoyage PASS sur le domaine | PASS | Workflow Pro validé avec quatre pièces dans la fixture |
+| Vidéo → réservation | Lecture, pause, scroll, interactions, réserver | Bon contexte et création réelle | Test navigateur complet PASS, contrôles console/réseau finaux PASS | PASS | Défilement desktop et générations de chargement |
+| Profil production | Identité, préférences, support, confidentialité | Sauvegarde réelle et compte isolé | Test navigateur et contrôles en base PASS ; compte synthétique nettoyé | PASS | Profil séparé des paramètres |
+| Google → réservation | Vidéo, réservation, historique, annulation | Même compte, prestation, prix et créneau | Lecture observée à 4,11 s ; réservation pending de 09:00 à 09:30 UTC, 1000 XOF, compte Google correct ; historique et annulation réels | PASS | Paiement sur place, aucun débit |
+
+Preuves locales : work/final-audit/production-version-213c274.json, welcome-production.json, production-profile-213c274.png. Domaine immuable : https://mata-beauty-ob9og1est-africrm.vercel.app/.
 
 ## Audit préalable
 
@@ -171,3 +189,9 @@ La validation globale reste ouverte : nouvelle Preview, production et domaine r�
 - Contrôle des données existantes en production : quatre rôles professional sans profil approuvé (trois dossiers draft, un profil professionnel absent), aucune prestation pour ces comptes. Migration 20261006002500 retire seulement ces autorisations prématurées et écrit un audit par retrait ; comptes, dossiers et publications conservés. L'approbation ultérieure réattribue le rôle par le workflow.
 - Migration de réconciliation appliquée en QA et testée en transaction annulée avec deux comptes synthétiques : rôle approuvé conservé, rôle non approuvé retiré, audit présent. Aucun compte synthétique de ce contrôle conservé.
 - Le lot comporte désormais quatre migrations. Déploiement production et retest du domaine encore à exécuter à ce point du rapport.
+
+### Deux ajustements après contrôle du domaine
+
+- BUG-TIMEZONE-01 : depuis un navigateur réglé sur Paris, le feed indiquait 11:00 alors que le récapitulatif et la base utilisaient correctement 09:00 à Dakar. Cause : toLocaleString sans timeZone dans le prochain créneau du feed. Correction : Africa/Dakar, comme le parcours de réservation. Retest visuel après publication à enregistrer.
+- Le premier test salon en production a reçu MATA_ANTI_CIRCUMVENTION:contact_details : son identifiant numérique long ressemblait à un numéro de téléphone. L'identifiant du message de test devient alphabétique, comme dans la recette vidéo ; la règle de production n'est pas désactivée. L'interface explique maintenant ce refus au lieu d'un échec générique, avec test unitaire dédié.
+- Preuves Google supplémentaires : work/final-audit/google-booking-production-213c274.png et google-history-production-213c274.png. La réservation fictive a été annulée par le bouton du compte client avant nettoyage.

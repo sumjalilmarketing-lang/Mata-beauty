@@ -18,8 +18,9 @@ let expectedCategories: string[] = [];
 let makeupCategory = "";
 const salonName = `Salon Golden ${run}`;
 const salonServiceTitle = `Make-up Salon ${run}`;
-const salonMessage = `Message salon réel ${run}`;
-const salonReply = `Réponse salon réelle ${run}`;
+const messageRun = run.replace(/[0-9]/g, digit => String.fromCharCode(97 + Number(digit)));
+const salonMessage = `Message salon réel ${messageRun}`;
+const salonReply = `Réponse salon réelle ${messageRun}`;
 
 let admin: SupabaseClient;
 let clientApi: SupabaseClient;

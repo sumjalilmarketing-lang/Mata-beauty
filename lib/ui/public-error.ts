@@ -7,6 +7,8 @@ export function publicErrorMessage(error: unknown, fallback = "L’action n’a 
   const normalizedCode = typeof code === "string" ? code : "";
   const normalizedMessage = typeof message === "string" ? message.toLocaleLowerCase("fr") : "";
 
+  if (normalizedMessage.includes("mata_anti_circumvention:contact_details")) return "Les coordonnées personnelles ne peuvent pas être partagées ici. Poursuivez vos échanges dans la messagerie MATA Beauty.";
+
   if (normalizedCode === "23P01") return "Ce créneau vient d’être réservé. Choisissez-en un autre.";
   if (normalizedCode === "23505") return "Cet élément existe déjà.";
   if (normalizedCode === "23503") return "Cette action dépend d’un élément qui n’est plus disponible.";
