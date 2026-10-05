@@ -65,3 +65,15 @@ La production n'a pas été remplacée par cette Preview. La validation finale r
 - Correction ciblée dans `app/social-feed.tsx` : annuler aussi le contrôleur sur `beforeunload`, sans modifier le lecteur, sans supprimer l'erreur du collecteur de tests et sans affaiblir CORS.
 - Retest du correctif : EN ATTENTE de nouvelle Preview. Production et domaine officiel : NON DÉPLOYÉ.
 - Le diagnostic précédent avait essayé de démarrer une trace déjà activée par Playwright ; cette erreur de configuration du test a été retirée. La trace utilisée ci-dessus vient ensuite du passage réellement exécuté.
+
+### Preview e91afa9 et pagination — FINAL-007
+
+URL : https://mata-beauty-7y1rfk0nw-africrm.vercel.app/ (`dpl_J4Prv5purd58ksJ12w51WK4ZTHTz`). Contraste auth vérifié visuellement dans le navigateur : liens et surtitre lisibles.
+
+Suite distante : **8 PASS, 1 FAIL, 3 non exécutés**. Publication MP4/photo, RLS, renouvellement des médias, interactions/réservation et modération passent. La pagination échoue : huit cartes restent affichées après scroll. La série étant séquentielle, le retest WebKit n'a pas été exécuté ; il ne peut pas être déclaré PASS.
+
+Trace réseau : plusieurs requêtes `social_feed` sans curseur après retour au feed. Le cache permet de scroller avant que la requête initiale ait installé son curseur ; `loadMore` relance alors la première page. Correction locale : interdire la pagination tant que la première page fraîche n'est pas prête. Test dédié avec cache navigateur et première réponse ralentie de 1,5 s : **2/2 PASS**, desktop 1366 px et mobile 390 px, exactement une première page puis une page avec curseur, neuf publications distinctes. API simulée ; retest distant requis.
+
+### Profil, messagerie et contraste — FINAL-008
+
+Profil client réel sur Preview : **PASS**, identité/préférences/confidentialité/support vérifiés en base et fixtures nettoyées. Le test de messagerie nécessitait de remplacer un ancien texte de diagnostic supprimé, l'entrée de connexion professionnelle et un repère de notification trop strict. La notification est présente dans la capture réelle, mais son texte est trop sombre sur le fond de l'espace compte. Correction CSS locale du titre, du corps et du badge ; retest visuel déployé requis. Les échanges de ce test séparé restent NON VALIDÉS jusqu'à sa fin (le parcours messagerie inclus dans la réservation vidéo a déjà passé).

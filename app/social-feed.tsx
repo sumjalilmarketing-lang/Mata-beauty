@@ -128,6 +128,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   const completedViews = useRef(new Set<string>());
   const loadingMore = useRef(false);
   const pageRequests = useRef(new AbortController());
+  const initialPageReady = useRef(false);
   const feedCursor = useRef<{ publishedAt: string; id: string } | null>(null);
 
   const visiblePosts = useMemo(() => diversifyFeed(posts
@@ -154,6 +155,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   }, []);
 
   const load = useCallback(async () => {
+    initialPageReady.current = false;
     const signal = pageRequests.current.signal;
     if (signal.aborted) return;
     const supabase = getSupabaseBrowserClient();
@@ -173,6 +175,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     setHasMore(mapped.length === FEED_BATCH_SIZE);
     const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
     feedCursor.current = last ? { publishedAt: last.published_at, id: last.id } : null;
+    initialPageReady.current = true;
     setState(mapped.length ? "ready" : "empty");
     if (authenticated) {
       const ids = mapped.map((item) => item.id);
@@ -194,7 +197,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
 
   const loadMore = useCallback(async () => {
     const signal = pageRequests.current.signal;
-    if (!hasMore || loadingMore.current || signal.aborted) return;
+    if (!initialPageReady.current || !hasMore || loadingMore.current || signal.aborted) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     loadingMore.current = true;

@@ -18,6 +18,36 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("cached feed can paginate during a slow initial refresh without repeating page one (simulated network)", async ({ page }) => {
+  let slowRefresh = false;
+  const cursors: boolean[] = [];
+  const rows = Array.from({ length: 9 }, (_, index) => ({
+    id: `00000000-0000-4000-8000-00000000000${index}`,
+    author_id: "11111111-1111-4111-8111-111111111111",
+    caption: `Publication pagination ${index + 1}`, business_name: "Atelier test", slug: "atelier-test", city: "Dakar",
+    post_type: "photo", video_url: "/brand/icon-192.png", media_urls: ["/brand/icon-192.png"],
+    view_count: 0, like_count: 0, comment_count: 0, save_count: 0, share_count: 0,
+    duration_seconds: 0, average_rating: 0, review_count: 0,
+    published_at: new Date(Date.now() - index * 1000).toISOString(),
+  }));
+  await page.route("https://audit.supabase.co/rest/v1/social_feed**", async (route) => {
+    const hasCursor = new URL(route.request().url()).searchParams.has("or");
+    cursors.push(hasCursor);
+    // Keep the first page in flight while the user scrolls the already-rendered cache.
+    if (slowRefresh && !hasCursor) await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(hasCursor ? rows.slice(8) : rows.slice(0, 8)) });
+  });
+  await page.goto("/");
+  await expect(page.locator(".social-video-card")).toHaveCount(8);
+  slowRefresh = true;
+  cursors.length = 0;
+  await page.reload();
+  await expect(page.locator(".social-video-card")).toHaveCount(8);
+  await page.locator(".social-feed").evaluate((node) => node.scrollTo({ top: node.scrollHeight, behavior: "auto" }));
+  await expect(page.locator(".social-video-card")).toHaveCount(9, { timeout: 10_000 });
+  expect(cursors).toEqual([false, true]);
+});
+
 test("nearby uses commercial coordinates and excludes unknown locations (simulated GPS)", async ({ page, context }) => {
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 14.7, longitude: -17.4, accuracy: 30 });

@@ -11,15 +11,15 @@ const runId = `${Date.now()}-${randomUUID().slice(0, 8)}`;
 const password = `Mata-UI-${randomUUID()}!`;
 const clientEmail = `codex-ui-client-${runId}@example.test`;
 const providerEmail = `codex-ui-provider-${runId}@example.test`;
-const clientMessage = `Message cliente UI ${runId}`;
-const providerMessage = `Réponse professionnelle UI ${runId}`;
+const messageRun = runId.replace(/[0-9]/g, (digit) => String.fromCharCode(97 + Number(digit)));
+const clientMessage = `Message cliente UI ${messageRun}`;
+const providerMessage = `Réponse professionnelle UI ${messageRun}`;
 
 let admin: SupabaseClient;
 let clientId = "";
 let providerId = "";
 let providerServiceId = "";
 let bookingId = "";
-let conversationId = "";
 
 async function createUser(email: string, professionalIntent = false) {
   const { data, error } = await admin.auth.admin.createUser({
@@ -60,11 +60,13 @@ async function signIn(page: Page, email: string, entry: "Profil" | "Publier") {
     }
   }, { endpoint: supabaseUrl, key: anonKey });
   expect(connectivity).toEqual({ ok: true, status: 200, error: "" });
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: entry }).click();
+  if (entry === "Publier") await page.getByRole("button", { name: "Publier une vidéo", exact: true }).click();
+  else await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: entry }).click();
   await page.getByLabel("Adresse e-mail").fill(email);
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
-  await expect(page.getByText("Données limitées par vos droits")).toBeVisible({ timeout: 20_000 });
+  await expect(page).toHaveURL(/\/(app|pro)\//, { timeout: 20_000 });
+  await expect(page.getByRole("navigation", { name: /Navigation Espace/ })).toBeVisible();
 }
 
 test.beforeAll(async () => {
@@ -133,11 +135,11 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   if (!admin) return;
-  if (conversationId) await admin.from("conversations").delete().eq("id", conversationId);
-  if (bookingId) await admin.from("bookings").delete().eq("id", bookingId);
-  if (providerServiceId) await admin.from("provider_services").delete().eq("id", providerServiceId);
-  if (providerId) await admin.auth.admin.deleteUser(providerId);
-  if (clientId) await admin.auth.admin.deleteUser(clientId);
+  if (bookingId) expect.soft((await admin.from("conversations").delete().eq("booking_id", bookingId)).error).toBeNull();
+  if (clientId && providerId) expect.soft((await admin.from("bookings").delete().eq("client_id", clientId).eq("provider_id", providerId)).error).toBeNull();
+  if (providerServiceId) expect.soft((await admin.from("provider_services").delete().eq("id", providerServiceId)).error).toBeNull();
+  if (providerId) expect.soft((await admin.auth.admin.deleteUser(providerId)).error).toBeNull();
+  if (clientId) expect.soft((await admin.auth.admin.deleteUser(clientId)).error).toBeNull();
 });
 
 test("la cliente et le professionnel échangent réellement depuis l’interface", async ({ browser }) => {
@@ -162,11 +164,11 @@ test("la cliente et le professionnel échangent réellement depuis l’interface
     .select("id")
     .eq("booking_id", bookingId)
     .single();
-  conversationId = conversation!.id;
+  expect(conversation?.id).toBeTruthy();
 
-  await signIn(providerPage, providerEmail, "Profil");
-  await providerPage.locator(".workspace-sidebar").getByRole("link", { name: "Notifications", exact: true }).click();
-  await expect(providerPage.getByText("Nouveau message", { exact: true })).toBeVisible();
+  await signIn(providerPage, providerEmail, "Publier");
+  await providerPage.getByRole("link", { name: "Notifications", exact: true }).click();
+  await expect(providerPage.locator(".notification-row").filter({ hasText: "Nouveau message" })).toBeVisible();
   await providerPage.getByRole("link", { name: "Messages", exact: true }).click();
   const providerBooking = providerPage.locator(".live-appointment").filter({ hasText: `Messagerie UI ${runId}` });
   await providerBooking.getByRole("button", { name: "Messages" }).click();
