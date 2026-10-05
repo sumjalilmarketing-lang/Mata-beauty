@@ -60,7 +60,11 @@ async function preparePage(page: Page) {
       browserConsoleErrors.push(`${page.url().split("?")[0]}: ${message.text()}`);
     }
   });
-  page.on("pageerror", (error) => browserConsoleErrors.push(error.message));
+  page.on("pageerror", (error) => {
+    const diagnostic = `${test.info().title} | ${page.url().split("?")[0]} | ${error.stack ?? error.message}`;
+    console.log("Application page error", diagnostic);
+    browserConsoleErrors.push(diagnostic);
+  });
   page.on("response", (response) => {
     if (response.status() >= 400 && !response.url().includes("vercel.live")) {
       browserNetworkErrors.push(`${response.status()} ${response.request().method()} ${response.url().split("?")[0]}`);

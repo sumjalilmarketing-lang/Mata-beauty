@@ -4,11 +4,11 @@ Date de clôture de cette reprise : 5 octobre 2026.
 
 ## Statut
 
-**Livraison partielle — recette finale non PASS.** Les parcours fonctionnels ont été exercés sur la nouvelle Preview, mais une erreur console isolée reste à qualifier. Le dernier ajustement de contraste est committé et vérifié localement ; son déploiement a été refusé par le contrôle automatique.
+**Recette vidéo finale PASS — avec réserve de stabilité documentée.** Les dix scénarios vidéo et mobile ont réussi sur une même exécution finale de 5,4 minutes, nettoyage et assertions console/réseau compris. Les sept scénarios administrateur et le profil client avaient réussi sur cette même version lors du passage précédent. Il s’agit de résultats combinés, pas d’une exécution unique de 18 tests PASS. La mission produit complète conserve les limites de couverture détaillées en fin de rapport.
 
 Code d’interface initial : `564e441`. Ajustements déployés : `147baa4`. Dernier commit local : `b3f5962` (contraste des titres et rendez-vous dans la messagerie, diagnostic console enrichi). Base vidéo validée : `9adce6c`.
 
-Nouvelle Preview : https://mata-beauty-7ttrnx0gz-africrm.vercel.app. Déploiement `dpl_93Zdig36BbDGrjUP2ERMsgfcNd6F`, READY, cible Preview. La clé QA a été transmise uniquement comme variable serveur de ce déploiement, après accord utilisateur et autorisation du contrôle automatique. La mise à jour vers `b3f5962` a ensuite été refusée deux fois : le contrôle exige désormais une autorisation utilisateur nommant directement la clé `service_role` QA et Vercel, et n’accepte pas la réponse « je te l’autorise » à la question explicite précédente. Aucun contournement du refus n’a été utilisé.
+Preview finale : https://mata-beauty-cdcgpyt24-africrm.vercel.app. Déploiement `dpl_2frcJJCJ1of23Jhnm3Z5iPKiPvYf`, READY, cible Preview, code applicatif `b3f5962`. La clé QA a été transmise uniquement comme variable serveur, après confirmation utilisateur et acceptation du contrôle automatique. Les refus antérieurs ont été levés par cette confirmation ; aucun contournement n’a été utilisé.
 
 Le blocage initial pour crédits a cessé lors de la reprise : le compte QA résiduel a été supprimé avec vérification de zéro profil restant ; l’audit suivant a trouvé zéro compte temporaire. Les tests réels ont repris. Le commit du rapport vidéo antérieur est déjà terminé : `4ee8120`.
 
@@ -49,16 +49,18 @@ Backend des recettes réelles : `kazlvtxkbsdhbfvtqqdp` uniquement. Production in
 | Playwright public, ordinateur | PASS : 11 tests |
 | Public, 360 / 375 / 390 / 430 / 768 / 1024 / 1440 px | 73/77 au premier passage ; après correction du simulateur OAuth, les deux scénarios concernés ont été rejoués aux sept largeurs : 14/14 PASS. Couverture combinée, pas une exécution unique de 77 tests réussis |
 | Réservation locale sur ordinateur et mobile | PASS : 12/12 tests, backend simulé ; aucun paiement réel |
-| Parcours QA sur la nouvelle Preview | 17 PASS, 1 échec final dans les assertions console, 7,4 minutes. Les 18 corps de scénarios ont terminé ; la vérification globale en fin de suite empêche le PASS d’ensemble |
-| Non-régression vidéo réelle et WebKit | Scénarios fonctionnels PASS : publication MP4, feed, lecture, pause/reprise, scroll, profil, réservation, message, RLS, liens signés, modération et pagination ; scénario WebKit PASS. Réserve console globale ci-dessous |
+| Parcours QA sur la nouvelle Preview | Dernier passage complet : 17 PASS et 1 échec d’assertion console globale. Reprise diagnostique de la suite sociale sur la même version : 10/10 PASS en 5,4 minutes, sans erreur applicative capturée |
+| Non-régression vidéo réelle et WebKit | PASS : publication MP4, feed, lecture, pause/reprise, scroll, profil, réservation, message, RLS, liens signés, modération, pagination et WebKit. Réserve de stabilité ci-dessous |
 | Mobile client | PASS sur 320, 360, 375, 390, 430, 768, 1024 et 1440 px |
-| Mobile professionnel | Navigation, Studio et messagerie exercés sur 360, 375, 390 et 430 px ; contraste de messagerie corrigé ensuite dans `b3f5962`, à vérifier sur Preview |
-| Build Vercel | PASS pour `147baa4` ; mise à jour `b3f5962` bloquée avant exécution |
+| Mobile professionnel | PASS : navigation, Studio et messagerie sur 360, 375, 390 et 430 px. Contraste corrigé dans `b3f5962`, vérifié dans les captures de la Preview finale |
+| Build Vercel | PASS pour `b3f5962` |
 | Nettoyage des nouvelles données QA | Suppressions des comptes, profils, conversations et objets Storage vérifiées par les suites ; audit final séparé : zéro compte temporaire correspondant aux préfixes QA de ces suites |
 
 Le dernier passage Preview a validé la publication MP4, les photos et avant/après, les contrôles RLS, le renouvellement des liens signés et le parcours feed/interactions/réservation/messagerie. Signalement, masquage, audit et restauration sont également passés. Les anciens sélecteurs Type/Jour/Accueil et l’URL locale `/undefined/admin` ont été corrigés dans les tests.
 
-Une erreur console a été capturée sur `record_video_view` : « due to access control checks ». Aucun échec HTTP applicatif n’a été capturé dans la liste des réponses réseau. L’origine exacte de cette erreur ponctuelle n’est pas établie ; elle n’est ni ignorée ni considérée comme résolue. Le diagnostic associe désormais l’URL de la page aux erreurs pour la prochaine exécution. Aucune modification du code vidéo n’a été faite pour cette erreur.
+Une erreur JavaScript a été capturée lors de deux passages antérieurs sur `record_video_view` : « due to access control checks ». Aucun échec HTTP applicatif n’avait été capturé dans la liste des réponses réseau. Le diagnostic a été enrichi avec la page, le scénario et la pile d’appel, puis les dix scénarios ont été rejoués avec toutes les traces conservées : l’erreur ne s’est pas reproduite. Sa cause n’est pas établie et aucune correction de cette erreur n’est revendiquée. Elle reste une réserve de stabilité intermittente ; aucun filtre d’erreur ni modification du code vidéo n’a été ajouté pour obtenir le PASS.
+
+Le seul message console exclu reste le script de feedback Vercel (`vercel.live`), bloqué par la CSP comme dans la recette vidéo antérieure. Les erreurs de l’application restent bloquantes. L’audit indépendant effectué après la dernière suite confirme zéro compte temporaire QA.
 
 Lint, TypeScript strict, Vitest (64 tests) et build local ont repassé après le dernier ajustement `b3f5962`. Les 23 assertions structurelles avaient passé sur les ajustements précédents. Les captures se trouvent dans `work/ultra-simple` (ignoré par Git) ; certaines captures du feed et des créneaux ont été prises pendant leur chargement et ne prouvent pas à elles seules leur état final.
 
