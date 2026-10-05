@@ -36,7 +36,8 @@ test("public navigation and interaction inventory on the deployed application", 
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => { if (response.status() >= 400 && !response.url().includes("vercel.live")) errors.push(`${response.status()} ${response.url().split("?")[0]}`); });
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  if (bypass) await page.setExtraHTTPHeaders({ "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" });
+  const remoteUrl = process.env.REMOTE_APP_URL;
+  if (bypass && remoteUrl) await page.route(`${new URL(remoteUrl).origin}/**`, route => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
   try {
     await page.goto("/");
     await expect(page.getByRole("navigation", { name: "Navigation de l’application" })).toBeVisible();

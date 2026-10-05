@@ -444,6 +444,11 @@ test("le feed social distant relie les interactions au profil et à la réservat
     await expect.poll(() => desktopFeed.evaluate(node => node.scrollTop)).toBeGreaterThan(100);
   }
   await page.setViewportSize({ width: 1280, height: 720 });
+  // Start playback assertions from a fresh feed view after the viewport/gesture
+  // matrix; an in-flight wheel snap can otherwise move the target offscreen.
+  await navigation.getByRole("button", { name: "Explorer", exact: true }).click();
+  await navigation.getByRole("button", { name: "Inspiration" }).click();
+  await expect(page.getByText(liveSecondCaption)).toBeVisible({ timeout: 30_000 });
 
   const mainCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
   const activeVideo = mainCard.locator("video");
@@ -481,12 +486,12 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await page.evaluate(() => Object.defineProperty(navigator, "share", { configurable: true, value: async () => undefined }));
   await mainCard.getByRole("button", { name: "Partager" }).click();
   await expect(page.getByText("Partage enregistré.")).toBeVisible();
-  const feed = page.locator(".social-feed");
-  await feed.evaluate((node) => node.scrollTo({ top: node.clientHeight, behavior: "auto" }));
+  const nextCard = page.locator(".social-video-card").filter({ hasText: liveSecondCaption });
+  await nextCard.evaluate(node => node.scrollIntoView({ block: "start", behavior: "auto" }));
   await expect.poll(() => activeVideo.evaluate((element) => (element as HTMLVideoElement).paused)).toBeTruthy();
   await expect.poll(() => page.locator(".social-video-card video").evaluateAll((elements) => (elements as HTMLVideoElement[]).filter((video) => !video.paused).length)).toBeLessThanOrEqual(1);
-  await expect(page.locator(".social-video-card video").nth(1)).toHaveAttribute("preload", /^(metadata|none)$/);
-  await feed.evaluate((node) => node.scrollTo({ top: 0, behavior: "auto" }));
+  await expect(activeVideo).toHaveAttribute("preload", /^(metadata|none)$/);
+  await mainCard.evaluate(node => node.scrollIntoView({ block: "start", behavior: "auto" }));
   await expect(page.getByText(studioCaption)).toBeVisible();
   await mainCard.getByRole("button", { name: "J’aime" }).click();
   await mainCard.getByRole("button", { name: "Enregistrer" }).click();

@@ -5,8 +5,14 @@ export function normalizedSearch(value: string) {
 }
 
 export function matchesSearch(query: string, text: string) {
-  const haystack = normalizedSearch(text);
-  return normalizedSearch(query).split(" ").filter((term) => term && !["a", "au", "aux", "de", "des", "du", "en", "pres", "moi"].includes(term)).every((term) => haystack.includes(term));
+  const vocabulary: Record<string, string> = {
+    barber: "barbier", barbers: "barbier", barbiers: "barbier",
+    coiffeur: "coiffure", coiffeurs: "coiffure", coiffeuse: "coiffure", coiffeuses: "coiffure",
+    onglerie: "ongles", tresse: "tresses", hommes: "homme", femmes: "femme",
+  };
+  const words = (value: string) => normalizedSearch(value).split(" ").map(term => vocabulary[term] ?? term);
+  const haystack = words(text).join(" ");
+  return words(query).filter((term) => term && !["a", "au", "aux", "de", "des", "du", "en", "pres", "moi"].includes(term)).every((term) => haystack.includes(term));
 }
 
 export function distanceKm(origin: Coordinates, destination: Coordinates | null | undefined): number | null {

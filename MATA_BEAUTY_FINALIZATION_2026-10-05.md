@@ -121,3 +121,10 @@ La validation globale reste ouverte : nouvelle Preview, production et domaine r�
 - Nouveau compte Google : synchronisation du statut confirmé pour toutes les intentions, avant tentative de bienvenue.
 - Les comptes synthétiques des tests navigateur sont exclus explicitement des envois de bienvenue par leur fixture serveur ; aucun e-mail réel à example.test.
 - Dernière vérification locale de stabilisation : lint, typecheck, 70 tests et build PASS. Recette vidéo/mobile complète encore en cours à cet instant.
+
+### Recherche et gestes desktop
+
+- BUG-SEARCH-01 : Barber/Barbier, Coiffeur/Coiffure et Onglerie/Ongles ne correspondaient pas dans la recherche multi-termes. Normalisation d'un vocabulaire limité, sans supprimer les contraintes de lieu ou de public. Les cinq exemples demandés et leurs contre-exemples passent ; suite portée à 72 tests. Fichiers : lib/domain/location.ts, tests/domain/location.test.ts.
+- Molette descendante/montante et séries de petits deltas vérifiées sur Preview aux résolutions 1366×768, 1440×900 et 1920×1080. Aucun changement du moteur vidéo dans ce lot.
+- Deux hypothèses du test vidéo corrigées : fin d'un geste après changement de viewport, puis index DOM supposé fixe après une nouvelle publication. Les contrôles ciblent maintenant l'identité de la vidéo quittée. Lecture/pause/reprise/son déjà observés PASS ; séquence complète en cours de reprise.
+- Les contrôles de candidature incluent maintenant les accès directs d'un client à six espaces internes. Leur résultat final doit être enregistré après exécution.

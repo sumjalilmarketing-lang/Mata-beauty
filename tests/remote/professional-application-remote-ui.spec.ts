@@ -43,6 +43,10 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
   test.setTimeout(180_000);
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
   await login(page, accounts[0].email);
+  for (const route of ["/onboarding", "/support-agent", "/moderation", "/finance", "/operations", "/staff"]) {
+    await page.goto(route);
+    await expect(page).toHaveURL(/acces=refuse/);
+  }
   await page.goto("/pro"); await expect(page).toHaveURL(/\/app\/application/);
   await page.getByLabel("Nom de votre activité").fill(business);
   await page.getByRole("button", { name: "Commencer mon dossier" }).click();

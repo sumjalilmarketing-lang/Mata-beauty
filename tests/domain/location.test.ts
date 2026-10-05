@@ -14,4 +14,16 @@ describe("location matching and distances", () => {
     expect(distanceKm(origin, origin)).toBe(0);
     expect(distanceKm(origin, { latitude: 14.71, longitude: -17.4 })).toBeCloseTo(1.112, 2);
   });
+  it("matches the requested natural-language service and area examples", () => {
+    expect(matchesSearch("Tresses près de moi", "Tresses collées Dakar")).toBe(true);
+    expect(matchesSearch("Barber Dakar", "Barbier Dakar")).toBe(true);
+    expect(matchesSearch("Massage Almadies", "Massage relaxant Almadies")).toBe(true);
+    expect(matchesSearch("Ongles Mermoz", "Onglerie Mermoz")).toBe(true);
+    expect(matchesSearch("Coiffeur homme Keur Massar", "Coiffure hommes Keur Massar")).toBe(true);
+  });
+  it("keeps every location and service constraint after synonym matching", () => {
+    expect(matchesSearch("Barber Dakar", "Barbier Thiès")).toBe(false);
+    expect(matchesSearch("Coiffeur homme Keur Massar", "Coiffure femme Keur Massar")).toBe(false);
+    expect(matchesSearch("Massage Almadies", "Ongles Almadies")).toBe(false);
+  });
 });
