@@ -121,3 +121,98 @@ Domaine : https://mata-beauty.com/. Relevé du 5 octobre 2026, session anonyme. 
 | Filtres | □Rendez-vous | button |  | NOT TESTED |
 | Filtres | ✉Messages | button |  | NOT TESTED |
 | Filtres | ○Profil | button |  | NOT TESTED |
+
+## Preview — second passage du 5 octobre 2026
+
+URL : https://mata-beauty-1d0ftxdtg-africrm.vercel.app
+
+TEST AUTOMATISÉ sur application et API réelles, session anonyme. 86 contrôles recensés : 28 PASS et 58 NOT TESTED. Les boutons homonymes sont distingués par occurrence ; les contrôles derrière une modale ne sont pas inclus dans son inventaire. Aucun statut ne vaut validation exhaustive de toute la fonctionnalité.
+
+| Écran | Élément | Occurrence | Action vérifiée | Statut |
+|---|---|---|---|---|
+| Inspiration | Publier une vidéo | 1 |  | NOT TESTED |
+| Inspiration | Rechercher | 1 |  | NOT TESTED |
+| Inspiration | Pour toi | 1 |  | NOT TESTED |
+| Inspiration | Près de moi | 1 |  | NOT TESTED |
+| Inspiration | Tendances | 1 |  | NOT TESTED |
+| Inspiration | Découvrir les professionnels | 1 |  | NOT TESTED |
+| Inspiration | ▶Inspiration | 1 |  | NOT TESTED |
+| Inspiration | Explorer | 1 | Clic → Explorer | PASS |
+| Inspiration | □Rendez-vous | 1 | Clic hors session → connexion demandée | PASS |
+| Inspiration | ✉Messages | 1 | Clic hors session → connexion demandée | PASS |
+| Inspiration | ○Profil | 1 | Clic hors session → connexion demandée | PASS |
+| Connexion | Fermer | 1 | Clic → modale fermée | PASS |
+| Connexion | GContinuer avec Google | 1 |  | NOT TESTED |
+| Connexion | Adresse e-mail | 1 |  | NOT TESTED |
+| Connexion | Mot de passe | 1 |  | NOT TESTED |
+| Connexion | Se connecter | 1 |  | NOT TESTED |
+| Connexion | Créer un compte | 1 | Clic → inscription | PASS |
+| Connexion | Mot de passe oublié | 1 | Clic → formulaire de réinitialisation | PASS |
+| Inscription | Fermer | 1 |  | NOT TESTED |
+| Inscription | GContinuer avec Google | 1 |  | NOT TESTED |
+| Inscription | Nom affiché | 1 |  | NOT TESTED |
+| Inscription | Adresse e-mail | 1 |  | NOT TESTED |
+| Inscription | Mot de passe | 1 |  | NOT TESTED |
+| Inscription | Accepter les conditions générales et la politique de confidentialité | 1 |  | NOT TESTED |
+| Inscription | Créer le compte | 1 |  | NOT TESTED |
+| Inscription | Déjà inscrit ? Se connecter | 1 | Clic → connexion | PASS |
+| Réinitialisation | Fermer | 1 |  | NOT TESTED |
+| Réinitialisation | Adresse e-mail | 1 |  | NOT TESTED |
+| Réinitialisation | Envoyer le lien | 1 |  | NOT TESTED |
+| Réinitialisation | Déjà inscrit ? Se connecter | 1 |  | NOT TESTED |
+| Explorer | Activer le thème clair | 1 |  | NOT TESTED |
+| Explorer | Ouvrir mon compte | 1 |  | NOT TESTED |
+| Explorer | Que recherchez-vous ? | 1 |  | NOT TESTED |
+| Explorer | Ouvrir les filtres | 1 |  | NOT TESTED |
+| Explorer | Utiliser ma position | 1 |  | NOT TESTED |
+| Explorer | Ville ou quartier | 1 |  | NOT TESTED |
+| Explorer | Voir sur Google Maps | 1 |  | NOT TESTED |
+| Explorer | Voir tout | 1 |  | NOT TESTED |
+| Explorer | ✦Coiffure femme | 1 | Clic → catégorie correcte | PASS |
+| Explorer | ≋Tresses | 1 | Clic → catégorie correcte | PASS |
+| Explorer | ✂Coiffure homme | 1 | Clic → catégorie correcte | PASS |
+| Explorer | ◌Locks | 1 | Clic → catégorie correcte | PASS |
+| Explorer | ◇Perruques et lace wigs | 1 | Clic → catégorie correcte | PASS |
+| Explorer | ♢Make-up | 1 | Clic → catégorie correcte | PASS |
+| Explorer | ◐Onglerie | 1 | Clic → catégorie correcte | PASS |
+| Explorer | ⌁Cils & sourcils | 1 | Clic → catégorie correcte | PASS |
+| Explorer | ✂Barbier | 1 | Clic → catégorie correcte | PASS |
+| Explorer | ♡Soins visage | 1 | Clic → catégorie correcte | PASS |
+| Explorer | ⌂Beauté à domicile | 1 | Clic → catégorie correcte | PASS |
+| Explorer | Voir tout | 2 |  | NOT TESTED |
+| Explorer | Quand souhaitez-vous réserver ? | 1 |  | NOT TESTED |
+| Explorer | Conditions générales | 1 | Clic → document légal affiché | PASS |
+| Explorer | Politique de confidentialité | 1 | Clic → document légal affiché | PASS |
+| Explorer | Politique cookies | 1 | Clic → document légal affiché | PASS |
+| Explorer | Conditions prestataires | 1 | Clic → document légal affiché | PASS |
+| Explorer | Politique d’annulation | 1 | Clic → document légal affiché | PASS |
+| Explorer | Règles communautaires | 1 | Clic → document légal affiché | PASS |
+| Explorer | Politique contenus | 1 | Clic → document légal affiché | PASS |
+| Explorer | Signalement / modération | 1 | Clic → document légal affiché | PASS |
+| Explorer | ▶Inspiration | 1 |  | NOT TESTED |
+| Explorer | Explorer | 1 |  | NOT TESTED |
+| Explorer | □Rendez-vous | 1 |  | NOT TESTED |
+| Explorer | ✉Messages | 1 |  | NOT TESTED |
+| Explorer | ○Profil | 1 |  | NOT TESTED |
+| Recherche | Retour | 1 |  | NOT TESTED |
+| Recherche | Filtres | 1 | Clic → filtres visibles | PASS |
+| Recherche | Tout | 1 |  | NOT TESTED |
+| Recherche | Devenir prestataire | 1 |  | NOT TESTED |
+| Recherche | ▶Inspiration | 1 |  | NOT TESTED |
+| Recherche | Explorer | 1 |  | NOT TESTED |
+| Recherche | □Rendez-vous | 1 |  | NOT TESTED |
+| Recherche | ✉Messages | 1 |  | NOT TESTED |
+| Recherche | ○Profil | 1 |  | NOT TESTED |
+| Filtres | Retour | 1 |  | NOT TESTED |
+| Filtres | Filtres | 1 |  | NOT TESTED |
+| Filtres | Tout | 1 |  | NOT TESTED |
+| Filtres | Prix maximum 50 000 FCFA | 1 |  | NOT TESTED |
+| Filtres | Toutes4 et plus4,5 et plus | 1 |  | NOT TESTED |
+| Filtres | À domicile | 1 |  | NOT TESTED |
+| Filtres | Vérifié | 1 |  | NOT TESTED |
+| Filtres | Devenir prestataire | 1 |  | NOT TESTED |
+| Filtres | ▶Inspiration | 1 |  | NOT TESTED |
+| Filtres | Explorer | 1 |  | NOT TESTED |
+| Filtres | □Rendez-vous | 1 |  | NOT TESTED |
+| Filtres | ✉Messages | 1 |  | NOT TESTED |
+| Filtres | ○Profil | 1 |  | NOT TESTED |

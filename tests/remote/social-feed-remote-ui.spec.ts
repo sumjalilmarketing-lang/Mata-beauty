@@ -663,6 +663,11 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
   const webkitBrowser = await webkit.launch();
   const context = await webkitBrowser.newContext({ baseURL: remoteAppUrl ?? "http://localhost:3100", viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
+  await page.addInitScript(() => {
+    window.addEventListener("beforeunload", () => console.log("QA beforeunload", Date.now()));
+    window.addEventListener("pagehide", () => console.log("QA pagehide", Date.now()));
+    window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => console.log("QA unhandled rejection", Date.now(), String(event.reason)));
+  });
   page.on("requestfailed", (request) => console.log("WebKit request failed", Date.now(), request.url().split("?")[0], request.failure()?.errorText));
   page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) console.log("WebKit navigation", Date.now(), frame.url().split("?")[0]); });
   page.on("console", (message) => { if (message.type() === "error") console.log("WebKit console", Date.now(), message.text()); });

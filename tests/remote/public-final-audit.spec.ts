@@ -1,25 +1,33 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 
-type Entry = { page: string; element: string; kind: string; href: string; status: "NOT TESTED" | "PASS"; action?: string };
+type Entry = { page: string; element: string; kind: string; href: string; occurrence: number; status: "NOT TESTED" | "PASS"; action?: string };
 const entries = new Map<string, Entry>();
 
 async function inventory(page: Page, zone: string) {
-  const controls = await page.locator("button,a,input,select,textarea").evaluateAll((elements) => elements.filter((element) => {
+  const dialog = page.getByRole("dialog");
+  const scope = await dialog.count() ? dialog : page.locator("body");
+  const controls = await scope.locator("button,a,input,select,textarea").evaluateAll((elements) => elements.filter((element) => {
     const bounds = element.getBoundingClientRect();
     return bounds.width > 0 && bounds.height > 0 && getComputedStyle(element).visibility !== "hidden";
   }).map((element) => ({
     element: element.getAttribute("aria-label") || element.textContent?.trim() || element.closest("label")?.textContent?.trim() || element.getAttribute("placeholder") || element.tagName,
     kind: element.tagName.toLowerCase(), href: element instanceof HTMLAnchorElement ? element.pathname : "",
   })));
+  const occurrences = new Map<string, number>();
   for (const control of controls) {
-    const key = `${zone}|${control.kind}|${control.element}|${control.href}`;
-    if (!entries.has(key)) entries.set(key, { page: zone, ...control, status: "NOT TESTED" });
+    const identity = `${zone}|${control.kind}|${control.element}|${control.href}`;
+    const occurrence = (occurrences.get(identity) ?? 0) + 1;
+    occurrences.set(identity, occurrence);
+    const key = `${identity}|${occurrence}`;
+    if (!entries.has(key)) entries.set(key, { page: zone, ...control, occurrence, status: "NOT TESTED" });
   }
 }
 
 function passed(zone: string, label: string, action: string) {
-  for (const entry of entries.values()) if (entry.page === zone && entry.element.includes(label)) { entry.status = "PASS"; entry.action = action; }
+  const matches = [...entries.values()].filter((entry) => entry.page === zone && entry.element.includes(label));
+  // An action on one control is not evidence for another control with the same label.
+  if (matches.length === 1) { matches[0].status = "PASS"; matches[0].action = action; }
 }
 
 test("public navigation and interaction inventory on the deployed application", async ({ page }) => {
@@ -28,7 +36,7 @@ test("public navigation and interaction inventory on the deployed application", 
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => { if (response.status() >= 400 && !response.url().includes("vercel.live")) errors.push(`${response.status()} ${response.url().split("?")[0]}`); });
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  if (bypass) await page.setExtraHTTPHeaders({ "x-vercel-protection-bypass": bypass });
+  if (bypass) await page.setExtraHTTPHeaders({ "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" });
   try {
     await page.goto("/");
     await expect(page.getByRole("navigation", { name: "Navigation de l’application" })).toBeVisible();
@@ -60,6 +68,23 @@ test("public navigation and interaction inventory on the deployed application", 
     await expect(page.getByRole("heading", { name: "Explorer", exact: true })).toBeVisible();
     passed("Inspiration", "Explorer", "Clic → Explorer");
     await inventory(page, "Explorer");
+    const categories = await page.locator(".photo-category-grid button strong").allTextContents();
+    for (const category of categories) {
+      await page.locator(".photo-category-grid button").filter({ hasText: category }).click();
+      await expect(page.getByRole("heading", { name: category, exact: true })).toBeVisible();
+      passed("Explorer", category, "Clic → catégorie correcte");
+      await page.getByRole("button", { name: "Retour", exact: true }).click();
+      await expect(page.getByRole("heading", { name: "Explorer", exact: true })).toBeVisible();
+    }
+    const legal = await page.locator('a[href^="/legal/"]').evaluateAll((links) => links.map((link) => ({ href: link.getAttribute("href")!, label: link.textContent!.trim() })));
+    for (const link of legal) {
+      await page.locator(`a[href="${link.href}"]`).click();
+      await expect(page).toHaveURL(new RegExp(`${link.href}$`));
+      await expect(page.locator("h1")).toBeVisible();
+      passed("Explorer", link.label, "Clic → document légal affiché");
+      await page.goBack();
+      await expect(page.getByRole("heading", { name: "Explorer", exact: true })).toBeVisible();
+    }
     await page.getByPlaceholder("Que recherchez-vous ?").fill("aucun-resultat-qa-inexistant");
     await page.getByPlaceholder("Que recherchez-vous ?").press("Enter");
     await expect(page.getByRole("heading", { name: "Rechercher", exact: true })).toBeVisible();
@@ -78,7 +103,7 @@ test("public navigation and interaction inventory on the deployed application", 
 test("deployed authentication fits all requested viewports", async ({ page }) => {
   test.setTimeout(120_000);
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  if (bypass) await page.setExtraHTTPHeaders({ "x-vercel-protection-bypass": bypass });
+  if (bypass) await page.setExtraHTTPHeaders({ "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" });
   await mkdir("work/final-audit", { recursive: true });
   for (const [width, height] of [[375, 812], [390, 844], [430, 932], [768, 1024], [1366, 768], [1440, 900], [1920, 1080]]) {
     await page.setViewportSize({ width, height });

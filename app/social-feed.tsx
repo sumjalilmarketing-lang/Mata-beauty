@@ -223,10 +223,13 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
     const leave = () => pageRequests.current.abort();
     const resume = () => { if (pageRequests.current.signal.aborted) pageRequests.current = new AbortController(); };
     resume();
+    // WebKit may reject fetches while a navigation is pending, before pagehide fires.
+    window.addEventListener("beforeunload", leave);
     window.addEventListener("pagehide", leave);
     window.addEventListener("pageshow", resume);
     return () => {
       leave();
+      window.removeEventListener("beforeunload", leave);
       window.removeEventListener("pagehide", leave);
       window.removeEventListener("pageshow", resume);
     };
