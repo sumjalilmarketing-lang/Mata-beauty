@@ -1,14 +1,51 @@
 # MATA Beauty — recette finale en cours
 
+## Complément FINAL-010 — catalogue antérieur à une publication
+
+- Écran : feed, bouton Réserver.
+- Reproduction réelle : garder la page ouverte, publier la vidéo d'un nouveau professionnel, revenir dans Inspiration puis Réserver.
+- Observé sur 2d705be : prestation annoncée indisponible ; un refresh complet permet la réservation.
+- Attendu : charger la prestation nouvellement publiée sans imposer de refresh.
+- Cause : bookSocialService dépendait uniquement du catalogue initial en mémoire, malgré un feed actualisé.
+- Fichiers : app/mata-beauty-app.tsx ; tests/e2e/booking-audit.spec.ts.
+- Correction e7821ef : résolution ciblée du professionnel et de la prestation exacte absents du catalogue ; erreur réseau explicite ; abandon des réponses obsolètes.
+- Tests : régression simulée desktop et mobile 390 px 2/2 PASS ; lint, typecheck, 66 tests unitaires et build PASS.
+- Preview : 3/3 PASS (MP4, photo/avant-après, interactions/réservation), après correction de la sélection de tests qui omettait la préparation photo. Aucun code produit modifié pour cet échec de préparation.
+- Production / mata-beauty.com : 3/3 PASS (MP4 publié, photo/avant-après publiés, interactions → lecture/pause/son/scroll → réservation → compte client/pro et base). Démarrage vidéo mesuré à 1 102 ms. Console/API surveillées par la suite, sans erreur finale relevée. Données temporaires nettoyées.
+- Version : e7821ef déployé, 15 assets JavaScript identiques entre domaine et URL immuable ; backend production présent, QA absent ; métadonnée Vercel du commit, alias et READY lus après déploiement. Preuves : work/final-audit/production-version-e7821ef.json, work/final-audit/production-e7821ef, work/final-audit/preview-e7821ef-complete.
+- Google : session toujours active sur /app/profile après ce déploiement ; le parcours complet Google avec création/annulation a été réalisé juste avant sur 2d705be. Aucun nouveau consentement Google n'a été sollicité.
+
 5 octobre 2026. Domaine confirmé à nouveau : **https://mata-beauty.com/**. Les mentions de matasbeauty.com dans les consignes jointes sont remplacées par cette confirmation explicite.
 
 ## Portée et état
 
-**NON TERMINÉ.** Ce rapport distingue tests réels de production, automatisation du navigateur et données/position simulées. Les corrections de ce lot sont locales tant qu'un déploiement et son retest ne sont pas mentionnés ci-dessous. Le lecteur vidéo et son mécanisme de lecture n'ont pas été réécrits.
+**AUDIT EXHAUSTIF NON TERMINÉ ; CORRECTIFS DÉPLOYÉS ET PARCOURS CRITIQUES RETESTÉS.** Production actuelle : commit `e7821ef60b2c1088e89399a9d5d5bab298695893`, déploiement `dpl_2Wvq3CmXb6CbGbRM8M3iusHdJMUV`, domaine **https://mata-beauty.com/**. Les 15 fichiers JavaScript servis par le domaine sont identiques à ceux du déploiement immuable `https://mata-beauty-prvlx9fjk-africrm.vercel.app/`. Backend production confirmé, backend QA absent du document servi. Le lecteur vidéo et son mécanisme de lecture n'ont pas été réécrits. Les résultats étendus ci-dessous ont été obtenus sur 2d705be ; le complément FINAL-010 précise les retests sur e7821ef.
+
+Recette étendue 2d705be — Preview : 14/14 PASS. Production : 13 PASS et un échec de préparation de données de messagerie (réservation sans disponibilité, correctement refusée). Après déclaration du créneau de test, messagerie isolée 1/1 PASS. Ne pas présenter cela comme une unique exécution de 14/14 PASS. Comptes temporaires vérifiés après nettoyage de ce passage : zéro restant en production et en QA.
+
+Google réel après déploiement : déconnexion, route protégée refusée, bouton Google, retour sur le domaine officiel, session active et conservée après actualisation. Consentement Google déjà accordé, sans nouvelle saisie de mot de passe. Un seul compte correspondant, relié à Google, vérifié en base. Le parcours Google → vidéo → réservation fictive → confirmation → historique → annulation a ensuite réussi dans cette session. La base confirme le service, la vidéo source et le statut cancelled_by_client. Fixture et notifications supprimées, zéro restant vérifié. Première inscription Google et refus de consentement restent NOT TESTED.
+
+Retour utilisateur téléphone : le panneau s’ouvre, mais aucun résultat. Vérification production : aucune publication liée à un établissement géolocalisé ; feed public vide après nettoyage QA. Ceci explique l’absence de résultats sans prouver l’obtention des coordonnées GPS. GPS réel accepté reste NOT TESTED. Le navigateur de ce poste retourne une position indisponible. L'inventaire public courant contient 86 contrôles : 28 PASS et 58 NOT TESTED dans cette matrice ; les parcours connectés sont consignés séparément. Réseau dégradé exhaustif, concurrence de réservations, mémoire prolongée, tous les boutons de tous les rôles et livraison complète des e-mails ne sont pas certifiés.
+
+| Zone | Action testée | Résultat attendu | Résultat observé après déploiement | Statut | Correction |
+|---|---|---|---|---|---|
+| Feed vidéo | Publication puis lecture | Média réel lisible | MP4 publié, vidéo en lecture ; démarrage mesuré à 2 027 ms sur production | PASS automatisé réel | Moteur de lecture conservé |
+| Feed vidéo | Scroll, pagination, retour WebKit | Une vidéo active, suite chargée, retour sans erreur | Parcours distant réussi, contrôle console/API réussi | PASS automatisé réel | Curseur initial requis ; annulation avant navigation |
+| Desktop | Molette dans les marges | Le feed défile | Vérifié réellement sur Preview et géométrie responsive retestée en production | PASS Preview ; production responsive PASS | Zone défilante pleine largeur |
+| Connexion | Sept tailles | Carte centrée, bouton Google contenu | Champs et boutons accessibles | PASS automatisé réel | Grille et contraste |
+| Réservation | Vidéo → créneau → confirmation | Bon prestataire/service/prix, création persistée | Réservation réelle confirmée en UI et vérifiée en base, visible dans le parcours compte/pro | PASS automatisé réel | Gestion d'erreur de disponibilités antérieure conservée |
+| Messagerie | Message, réponse, statut Lu | Échange client/pro | Échange et notification vérifiés | PASS automatisé réel après réparation de fixture | Repères du test actualisés, contraste notifications |
+| Compte | Identité, préférences, support, confidentialité | Changements persistés | Valeurs vérifiées en base | PASS automatisé réel | Pas de réécriture du module |
+| Google | Logout → route protégée → Google → refresh | Session retrouvée sur domaine officiel | Compte existant actif, pas de doublon | PASS navigateur réel | Configuration OAuth précédente conservée |
+| Proximité manuelle | GPS indisponible → Dakar → Explorer → refresh | Alternative utilisable, zone conservée | Message explicite, champ et bouton accessibles, Dakar conservé après actualisation sur /discover | PASS navigateur réel en production | Panneau à hauteur automatique et zone conservée dans l'onglet |
+| Proximité | GPS réel accepté et distances | Position réelle et classement exact | Téléphone : panneau ouvert, aucun résultat ; aucune publication géolocalisée en base. Position indisponible sur ce poste | NOT TESTED pour GPS accepté | GPS, alternative manuelle et distances implémentés ; preuves simulées séparées |
+| Production | Version de mata-beauty.com | Dernier build attendu | HTTPS 200, commit et 15 assets identiques ; www redirige vers domaine canonique | PASS réel | Déploiement production 2d705be |
+
+Les sections suivantes conservent l'historique de diagnostic, y compris les échecs et états avant déploiement.
 
 Le premier inventaire public réel recense **117 couples écran/contrôle**, dont **9 PASS** et **108 NOT TESTED** dans cette matrice. Ce n'est pas le total de l'application entière. Aucun échec console/réseau n'a été relevé dans ce passage anonyme réussi. Voir `MATA_BEAUTY_FINAL_INTERACTION_MATRIX.md`. Les anciens parcours vidéo/professionnel/réservation restent consignés séparément dans `MATA_BEAUTY_PRODUCTION_QA.md` ; leurs résultats ne sont pas additionnés artificiellement à ce nouvel inventaire.
 
-## Anomalies reproduites et corrections
+## Historique des anomalies avant déploiement
 
 | ID | Page | Cause observée | Correction locale | Vérification | Production vérifiée |
 |---|---|---|---|---|---|
@@ -93,3 +130,29 @@ URL : https://mata-beauty-gz0jzk6a5-africrm.vercel.app/ (`dpl_3XrJPL9fNjXhSZnkaw
 Reproduction dans le navigateur réel : ouvrir Près de moi sur desktop. Le panneau est presque entièrement tronqué, malgré des contrôles présents dans le DOM. Cause : hauteur fixe de 108 px de la grille d'en-tête ; la ligne contenant le panneau avec overflow se contracte. Correction : hauteur automatique de l'en-tête quand le panneau est ouvert, hauteur maximale limitée à la fenêtre et défilement interne disponible. Test renforcé : champ, bouton Voir les résultats et filtres simultanément dans la zone visible, puis changement de zone et conservation dans Explorer. **7/7 PASS locaux** sur les tailles demandées, GPS/API simulés. Retest visuel en Preview encore requis.
 
 Retest FINAL-006 sur Preview 7160465 : **2/2 PASS** (publication réelle puis WebKit iPhone 390 px). Lecture, retour vers le compte et avance vers le feed réussis ; aucune erreur `record_video_view`, aucune erreur API dans ce passage. L'injection Vercel Live reste refusée par la CSP et est distinguée depuis l'origine des erreurs applicatives. Le correctif `beforeunload` est validé sur ce passage ; production non modifiée.
+
+## Recette regroupée du commit 2d705be
+
+Preview : https://mata-beauty-1gu7rehti-africrm.vercel.app/ — `dpl_78q8ASBgvZcoQnuL4y8urXVud8Nn`.
+
+**14/14 PASS en 7,2 minutes**, application et API QA réelles : profil client, échanges avec statut Lu, navigation publique, auth sur sept tailles, publication MP4/photo/avant-après, RLS, renouvellement des liens signés, interactions vidéo et réservation persistée, modération, pagination, parcours responsive, WebKit et navigation professionnelle mobile. Latence mesurée de démarrage vidéo : **468 ms** sur ce passage ; l'échec antérieur au seuil de cinq secondes reste conservé comme réserve de performance intermittente.
+
+Contrôles locaux obligatoires avant commit : lint, TypeScript, 66 tests unitaires et build PASS. Le document utilisateur non suivi `docs/PRODUCTION_READINESS_2026-08-16.md` reste exclu des commits.
+
+Vérifications visuelles réelles complémentaires : panneau de localisation intégralement visible, saisie Dakar puis bouton Voir les résultats utilisables ; notifications lisibles dans leur espace sombre (capture : `work/final-audit/notifications-preview.jpg`). GPS réel accepté toujours NON VALIDÉ ; indisponibilité avec alternative manuelle validée.
+
+Contrôles domaine avant déploiement : `mata-beauty.com` résout vers Vercel et répond HTTPS 200 ; `www.mata-beauty.com` aboutit à `https://mata-beauty.com/`. Aucun changement DNS effectué.
+
+Déploiement de production du même commit lancé après ces résultats. Vérification du build servi et recette sur le domaine officiel EN ATTENTE ; ne pas confondre les 14 PASS de Preview avec des PASS de production.
+
+## Clôture de ce lot de déploiement
+
+Production READY : https://mata-beauty-h6p3o4ng2-africrm.vercel.app/, alias https://mata-beauty.com/, commit `2d705bec76b731b842ab4f5bae842a709454d862`. Comparaison des assets et environnement enregistrée dans `work/final-audit/production-version.json`. La première comparaison sans bypass portait sur la page de connexion Vercel du déploiement immuable ; la comparaison corrigée utilise son accès autorisé et laisse le domaine public sans bypass. Résultat : **15/15 assets identiques**, HTTP 200, environnement production confirmé.
+
+Suite de production : **13 PASS, 1 échec de préparation de fixture** en 6,2 minutes. La protection de créneau a rejeté la réservation du test de messagerie, dont le prestataire n'avait pas d'horaire déclaré. La fixture crée désormais cet horaire ; retest isolé directement sur mata-beauty.com : **1/1 PASS**. Aucun assouplissement de disponibilité ni migration de production pour faire passer ce test.
+
+Les dix tests sociaux passent sur le domaine officiel, y compris publication, réservation, pagination, responsive, WebKit et navigation professionnelle. Les contrôles de console/API applicatifs de cette suite passent. Les tests de profil, messagerie et inventaire public ne constituent pas une preuve exhaustive de tous les rôles ni de tous les cas limites.
+
+Google réel et localisation manuelle ont également été utilisés dans le navigateur utilisateur après déploiement (voir synthèse en tête). Retour téléphone reçu : panneau ouvert, aucun résultat. Aucune publication géolocalisée disponible en production pour comparer des distances réelles. Aucun mot de passe fourni dans la conversation n'a été utilisé pour ce passage Google.
+
+Après nettoyage, requête en base production : **zéro compte temporaire de recette restant**. La session réelle de l'utilisateur est conservée. Le parcours supplémentaire Google a créé puis annulé une réservation fictive, vérifiée dans l'historique et en base ; fixture, réservation et notifications ont ensuite été nettoyées. Les rapports restent marqués audit incomplet tant que les contrôles listés comme NOT TESTED n'ont pas été réalisés.
