@@ -357,20 +357,35 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   useEffect(() => {
     if (!pendingSocialBooking) return;
     let active = true;
-    void Promise.resolve().then(() => {
+    void Promise.resolve().then(async () => {
       if (!active) return;
-      const provider = catalog.find((item) => item.profileId === pendingSocialBooking.authorId);
+      let provider = catalog.find((item) => item.profileId === pendingSocialBooking.authorId && item.serviceId === pendingSocialBooking.service.id);
+      if (!provider) {
+        const client = getSupabaseBrowserClient();
+        if (client) {
+          try {
+            const entries = await fetchPublishedProviders(client, pendingSocialBooking.authorId);
+            const item = entries.find((entry) => entry.serviceId === pendingSocialBooking.service.id);
+            if (item) provider = { ...item, initials: item.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() };
+          } catch {
+            if (active) { setNotice("La prestation n’a pas pu être chargée. Réessayez."); setPendingSocialBooking(null); }
+            return;
+          }
+        }
+      }
+      if (!active) return;
       if (provider) {
+        setNotice("");
         setRestoredBookingRequest(null);
         setBooking({ provider, service: pendingSocialBooking.service, sourcePostId: pendingSocialBooking.sourcePostId });
         setPendingSocialBooking(null);
-      } else if (catalogState !== "loading") {
+      } else {
         setNotice("Cette prestation n’est pas disponible actuellement.");
         setPendingSocialBooking(null);
       }
     });
     return () => { active = false; };
-  }, [catalog, catalogState, pendingSocialBooking]);
+  }, [catalog, pendingSocialBooking]);
 
   function openAccount(section: "client" | "provider" | "admin" = "client") {
     if (authenticated?.roles.includes(section)) window.location.assign(section === "provider" ? "/pro" : section === "admin" ? "/admin" : "/app");
@@ -436,12 +451,12 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }
 
   function bookSocialService(authorId: string, service: ProviderService, sourcePostId: string) {
-    const provider = catalog.find((item) => item.profileId === authorId);
+    const provider = catalog.find((item) => item.profileId === authorId && item.serviceId === service.id);
     if (provider) startBooking({ provider, service, sourcePostId });
-    else if (catalogState === "loading") {
+    else {
       setPendingSocialBooking({ authorId, service, sourcePostId });
       setNotice("Ouverture des créneaux…");
-    } else setNotice("Cette prestation n’est pas disponible actuellement.");
+    }
   }
 
   async function toggleFavorite(provider: Provider) {

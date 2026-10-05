@@ -113,6 +113,9 @@ test.beforeAll(async () => {
 
   const startsAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
   startsAt.setUTCHours(11, 0, 0, 0);
+  expect((await admin.from("availability_rules").insert({
+    provider_id: providerId, weekday: startsAt.getUTCDay(), starts_at: "09:00", ends_at: "18:00", slot_interval_minutes: 30,
+  })).error).toBeNull();
   const clientApi = createClient(supabaseUrl, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -138,6 +141,7 @@ test.afterAll(async () => {
   if (bookingId) expect.soft((await admin.from("conversations").delete().eq("booking_id", bookingId)).error).toBeNull();
   if (clientId && providerId) expect.soft((await admin.from("bookings").delete().eq("client_id", clientId).eq("provider_id", providerId)).error).toBeNull();
   if (providerServiceId) expect.soft((await admin.from("provider_services").delete().eq("id", providerServiceId)).error).toBeNull();
+  if (providerId) expect.soft((await admin.from("availability_rules").delete().eq("provider_id", providerId)).error).toBeNull();
   if (providerId) expect.soft((await admin.auth.admin.deleteUser(providerId)).error).toBeNull();
   if (clientId) expect.soft((await admin.auth.admin.deleteUser(clientId)).error).toBeNull();
 });

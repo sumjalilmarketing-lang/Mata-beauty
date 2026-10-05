@@ -297,6 +297,24 @@ test.describe("audit chronométré de réservation", () => {
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
   });
 
+  test("réserve une publication arrivée après le chargement du catalogue", async ({ page }) => {
+    const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
+    await mockSupabase(page, state);
+    let targetedReads = 0;
+    await page.route(`${api}/rest/v1/provider_profiles**`, async (route) => {
+      const url = new URL(route.request().url());
+      if (!url.searchParams.get("select")?.includes("provider_services!inner")) return route.fallback();
+      if (url.searchParams.get("profile_id") === `eq.${providerId}`) { targetedReads += 1; return route.fallback(); }
+      return json(route, []);
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Réserver", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Réserver" })).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "10:00", exact: true })).toBeVisible();
+    expect(targetedReads).toBeGreaterThan(0);
+  });
+
   test("signale une panne des disponibilités et permet de réessayer", async ({ page }) => {
     const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
