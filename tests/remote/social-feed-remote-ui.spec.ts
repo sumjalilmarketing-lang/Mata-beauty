@@ -48,7 +48,11 @@ async function createUser(email: string, professional = false) {
   let lastError = "Erreur Auth inconnue";
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: professional ? "Mata Feed Pro" : "Mata Feed Cliente", legal_accepted: "true", professional_intent: professional ? "true" : "false" } });
-    if (!error && data.user) return data.user.id;
+    if (!error && data.user) {
+      // Synthetic QA inboxes must never receive production welcome mail.
+      expect((await admin.from("welcome_email_deliveries").update({ status: "needs_review" }).eq("user_id", data.user.id)).error).toBeNull();
+      return data.user.id;
+    }
     lastError = error?.message ?? lastError;
     if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 750));
   }
@@ -123,7 +127,7 @@ test.beforeAll(async () => {
   expect((await providerApi.auth.signInWithPassword({ email: providerEmail, password })).error).toBeNull();
   expect((await providerApi.rpc("synchronize_account_status")).error).toBeNull();
   expect((await providerApi.rpc("request_professional_profile")).error).toBeNull();
-  expect((await providerApi.rpc("save_professional_onboarding", { target_business_name: `QA Vidéo ${run}`, target_bio: "Professionnel de recette pour les tests réels de publication vidéo.", target_city: "Dakar", target_service_mode: "salon", target_activity_type: "independent", target_years_experience: 3, target_base_address: "Adresse fictive QA Dakar", target_languages: ["Français"], target_cancellation_policy: "Annulation possible avant le rendez-vous." })).error).toBeNull();
+  expect((await providerApi.rpc("save_professional_onboarding", { target_business_name: "Mata Feed Pro", target_bio: "Professionnel de recette pour les tests réels de publication vidéo.", target_city: "Dakar", target_service_mode: "salon", target_activity_type: "independent", target_years_experience: 3, target_base_address: "Adresse fictive QA Dakar", target_languages: ["Français"], target_cancellation_policy: "Annulation possible avant le rendez-vous." })).error).toBeNull();
   for (const kind of ["identity", "business_registration", "qualification", "address_proof"]) {
     const path = `${providerId}/${randomUUID()}.png`;
     expect((await providerApi.storage.from("provider-documents").upload(path, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"), { contentType: "image/png" })).error).toBeNull();
@@ -360,13 +364,14 @@ test("RLS masque les contenus non publiables et interdit les modifications étra
   otherProviderId = await createUser(otherEmail, true);
   const otherApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   expect((await otherApi.auth.signInWithPassword({ email: otherEmail, password })).error).toBeNull();
+  expect((await otherApi.rpc("synchronize_account_status")).error).toBeNull();
   expect((await otherApi.rpc("request_professional_profile")).error).toBeNull();
   const otherMutation = await otherApi.from("posts").update({ caption: "Modification prestataire étrangère interdite" }).eq("id", studioPostId).select("id");
   expect(otherMutation.error).toBeNull();
   expect(otherMutation.data).toEqual([]);
   expect((await admin.from("posts").select("caption").eq("id", studioPostId).single()).data?.caption).toBe(original.data?.caption);
 
-  expect((await superApi.rpc("admin_set_provider_status", { target_provider_id: providerId, next_status: "rejected", reason: "Test RLS prestataire non validé" })).error).toBeNull();
+  expect((await superApi.rpc("admin_set_provider_status", { target_provider_id: providerId, next_status: "suspended", reason: "Test RLS prestataire suspendu" })).error).toBeNull();
   expect((await clientApi.from("social_feed").select("id").eq("id", studioPostId)).data).toEqual([]);
   expect((await superApi.rpc("admin_set_provider_status", { target_provider_id: providerId, next_status: "approved", reason: "Restauration après test RLS" })).error).toBeNull();
   expect((await clientApi.from("social_feed").select("id").eq("id", studioPostId).single()).error).toBeNull();
@@ -423,6 +428,22 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await navigation.getByRole("button", { name: "Inspiration" }).click();
   await expect(page.getByText(liveSecondCaption)).toBeVisible({ timeout: 30_000 });
   expect((await admin.from("posts").select("id").eq("author_id", providerId).eq("title", liveSecondTitle).single()).error).toBeNull();
+
+  const desktopFeed = page.locator(".social-feed");
+  for (const [width, height] of [[1366, 768], [1440, 900], [1920, 1080]]) {
+    await page.setViewportSize({ width, height });
+    const bounds = await desktopFeed.boundingBox(); expect(bounds).not.toBeNull();
+    await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+    await page.mouse.wheel(0, -5000);
+    await expect.poll(() => desktopFeed.evaluate(node => node.scrollTop)).toBeLessThan(5);
+    await page.mouse.wheel(0, 1000);
+    await expect.poll(() => desktopFeed.evaluate(node => node.scrollTop)).toBeGreaterThan(100);
+    await page.mouse.wheel(0, -5000);
+    await expect.poll(() => desktopFeed.evaluate(node => node.scrollTop)).toBeLessThan(5);
+    for (let tick = 0; tick < 12; tick++) await page.mouse.wheel(0, 70);
+    await expect.poll(() => desktopFeed.evaluate(node => node.scrollTop)).toBeGreaterThan(100);
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   const mainCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
   const activeVideo = mainCard.locator("video");

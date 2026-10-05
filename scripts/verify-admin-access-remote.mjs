@@ -88,8 +88,8 @@ async function main(){
   assert.equal(await visibleCount(onboarding.api,"provider_profiles","profile_id",probe.id),1,"onboarding can read pending providers");
   assert.equal(await visibleCount(onboarding.api,"audit_logs","id",auditProbe.data.id),0,"onboarding cannot read audit logs");
   const approved=await onboarding.api.rpc("admin_set_provider_status",{target_provider_id:probe.id,next_status:"approved",reason:`Onboarding audit ${run}`});
-  assert.ifError(approved.error);
-  assert.equal((await admin.from("provider_profiles").select("status").eq("profile_id",probe.id).single()).data.status,"approved");
+  assert.ok(approved.error, "even an onboarding agent cannot approve an incomplete, unsubmitted dossier");
+  assert.equal((await admin.from("provider_profiles").select("status").eq("profile_id",probe.id).single()).data.status,"pending_review");
 
   assert.equal(await visibleCount(finance.api,"profiles","id",support.id),0,"finance cannot read internal user profiles");
   assert.equal(await visibleCount(finance.api,"provider_profiles","profile_id",provider.id),0,"finance cannot read pending providers");

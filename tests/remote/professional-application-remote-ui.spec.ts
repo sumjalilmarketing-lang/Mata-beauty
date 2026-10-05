@@ -8,7 +8,7 @@ const run = randomUUID(), password = `QA-${randomUUID()}!`, accounts: { id: stri
 const business = `Dossier UI ${run}`;
 async function login(page: Page, email: string) {
   const base = process.env.REMOTE_APP_URL, bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  if (base && bypass) await page.route(`${new URL(base).origin}/**`, route => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass } }));
+  if (base && bypass) await page.route(`${new URL(base).origin}/**`, route => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" } }));
   await page.goto("/");
   await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
   await page.getByLabel("Adresse e-mail").fill(email);

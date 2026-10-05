@@ -6,7 +6,7 @@ const url=process.env.REMOTE_SUPABASE_URL??"", serviceKey=process.env.SUPABASE_S
 const run=`${Date.now()}-${randomUUID().slice(0,6)}`, email=`codex-profile-ui-${run}@example.test`, password=`Mata-Profile-${randomUUID()}!`;
 let admin:SupabaseClient,userId="";
 
-test.beforeAll(async()=>{admin=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});const made=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{display_name:"Mata Profil UI",legal_accepted:"true"}});expect(made.error).toBeNull();userId=made.data.user!.id;});
+test.beforeAll(async()=>{admin=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});const made=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{display_name:"Mata Profil UI",legal_accepted:"true"}});expect(made.error).toBeNull();userId=made.data.user!.id;expect((await admin.from("welcome_email_deliveries").update({status:"needs_review"}).eq("user_id",userId)).error).toBeNull();});
 test.afterAll(async()=>{
   if (!userId) return;
   expect((await admin.from("support_tickets").delete().eq("requester_id", userId)).error).toBeNull();

@@ -29,9 +29,9 @@ export async function GET(request: Request) {
       await supabase.auth.signOut();
       return callbackRedirect(request, { auth_error: "profile_creation_failed" });
     }
+    const { error: statusError } = await supabase.rpc("synchronize_account_status");
+    if (statusError) return callbackRedirect(request, { auth_error: "profile_creation_failed" });
     if (intent === "professional") {
-      const { error: statusError } = await supabase.rpc("synchronize_account_status");
-      if (statusError) return callbackRedirect(request, { auth_error: "professional_request_failed" });
       const { error: professionalError } = await supabase.rpc("request_professional_profile");
       if (professionalError) return callbackRedirect(request, { auth_error: "professional_request_failed" });
     }

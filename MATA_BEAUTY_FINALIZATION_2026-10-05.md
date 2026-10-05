@@ -111,3 +111,13 @@ La validation globale reste ouverte : nouvelle Preview, production et domaine r�
 - Correction : Resend réel, domaine vérifié, file privée créée uniquement pour les nouveaux comptes, claim sérialisé et reçu durable.
 - Retest : quatre tests unitaires, isolation/concurrence en QA et transport Resend réel PASS. Envoi produit de bout en bout et réception utilisateur encore à tester.
 - Preview : transport non configuré volontairement. Production / mata-beauty.com : code non encore déployé.
+
+### Stabilisation après première Preview
+
+- Commit applicatif initial : 5464f401da9cba6dd09e0191d6e5ffee0214d908 ; Preview https://mata-beauty-apcowco5n-africrm.vercel.app/ (dpl_BcjvAhsKvXMJB9StvvYxo4ZjcWbU).
+- Profil et santé publique PASS. Candidature complète PASS après correction du cookie de protection Vercel du test ; l'échec initial portait sur le service worker redirigé vers cette protection.
+- BUG-ONBOARDING-03 : la première transition de revue bloquait aussi la réactivation d'un professionnel suspendu. La migration 20261005211600 autorise uniquement une réactivation avec providers.verify, documents.review et providers.suspend, explication et dossier complet. Suspension, invisibilité du feed, réactivation et visibilité restaurée PASS API dans la recette vidéo Preview.
+- Matrice API des six rôles PASS : contexte, permissions granulaires, RLS allow/deny, journalisation connexion et attribution sensible de rôle. L'agent ne peut pas approuver un dossier incomplet non soumis.
+- Nouveau compte Google : synchronisation du statut confirmé pour toutes les intentions, avant tentative de bienvenue.
+- Les comptes synthétiques des tests navigateur sont exclus explicitement des envois de bienvenue par leur fixture serveur ; aucun e-mail réel à example.test.
+- Dernière vérification locale de stabilisation : lint, typecheck, 70 tests et build PASS. Recette vidéo/mobile complète encore en cours à cet instant.
