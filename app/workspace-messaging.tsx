@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BookingMessages } from "./booking-messages";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { useSearchParams } from "next/navigation";
 
 type BookingRow = {
   id: string;
@@ -13,6 +14,7 @@ type BookingRow = {
 };
 
 export function WorkspaceMessaging({ userId }: { userId: string }) {
+  const requestedBooking = useSearchParams().get("booking");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [selected, setSelected] = useState<BookingRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,11 +40,15 @@ export function WorkspaceMessaging({ userId }: { userId: string }) {
       .then(({ data, error: bookingError }) => {
         if (!active) return;
         if (bookingError) setError(publicErrorMessage(bookingError, "Impossible de charger vos conversations."));
-        else setBookings((data ?? []) as unknown as BookingRow[]);
+        else {
+          const loaded = (data ?? []) as unknown as BookingRow[];
+          setBookings(loaded);
+          if (requestedBooking) setSelected(loaded.find(booking => booking.id === requestedBooking) ?? null);
+        }
         setLoading(false);
       });
     return () => { active = false; };
-  }, []);
+  }, [requestedBooking]);
 
   return <section className="workspace-content">
     <div className="workspace-intro">

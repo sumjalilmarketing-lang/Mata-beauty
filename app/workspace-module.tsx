@@ -17,6 +17,7 @@ import { LiveDashboard } from "./live-dashboard";
 import { SocialDashboard } from "./social-dashboard";
 import { ProviderAgenda, ProviderRevenue } from "./provider-activity";
 import { ClientFavorites } from "./client-favorites";
+import { NotificationCenter } from "./notification-center";
 
 type Row = Record<string, unknown>;
 type ResourceDefinition = { table: string; select: string; title: (row: Row) => string; meta: (row: Row) => string };
@@ -61,6 +62,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   }, [definition, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
+  if (module.key === "notifications") return <NotificationCenter userId={userId} />;
   if (focused) return <LiveDashboard role={space === "client" ? "client" : "provider"} userId={userId} displayName="" moduleKey={module.key} onBack={() => window.location.assign("/")} onSignOut={async () => { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/"); }} />;
   if (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) return <OnboardingQueue moduleKey={module.key} />;
   if (space === "pro" && module.key === "agenda") return <ProviderAgenda userId={userId} />;

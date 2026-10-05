@@ -5,6 +5,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { ProviderReview } from "./provider-review";
+import { OnboardingQueue } from "./onboarding-queue";
+import { NotificationCenter, NotificationBadge } from "./notification-center";
 import { LaunchAdmin } from "./launch-admin";
 
 type AdminContext = {
@@ -403,7 +405,7 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
             }}><StatusBadge value={result.entity_type} /><span><strong>{result.title}</strong><small>{result.subtitle}</small></span></button>,
           )}</div>}
         </div>
-        <div className="admin-top-actions"><span className="secure-indicator">● Sécurisé</span><button aria-label="Ouvrir le journal d’audit" onClick={() => setActiveModule("audit")}>◌</button></div>
+        <div className="admin-top-actions"><span className="secure-indicator">● Sécurisé</span>{visibleNavigation.some(item => item.key === "notifications") && <button aria-label="Notifications" onClick={() => setActiveModule("notifications")}>◌<NotificationBadge /></button>}<button aria-label="Ouvrir le journal d’audit" onClick={() => setActiveModule("audit")}>≣</button></div>
       </header>
       <div className="admin-page">
         {notice && <div className="admin-toast" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
@@ -473,7 +475,9 @@ function AdminModule({
   if (module === "overview" || module === "statistics") return <Overview context={context} setModule={setModule} />;
   if (module === "launch" || module === "cohort" || module === "platform-health") return <LaunchAdmin mode={module} />;
   if (module === "users") return <UsersModule context={context} notify={notify} />;
-  if (module === "providers" || module === "verification") return <ProvidersModule context={context} verificationOnly={module === "verification"} notify={notify} />;
+  if (module === "notifications") return <NotificationCenter />;
+  if (module === "verification") return <OnboardingQueue moduleKey="dashboard" />;
+  if (module === "providers") return <ProvidersModule context={context} verificationOnly={false} notify={notify} />;
   if (module === "bookings" || module === "calendar") return <BookingsModule context={context} calendar={module === "calendar"} notify={notify} />;
   if (module === "categories" || module === "services") return <CatalogModule services={module === "services"} notify={notify} />;
   if (module === "payments" || module === "commissions" || module === "payouts") return <FinanceModule section={module} />;
@@ -558,8 +562,9 @@ function ProvidersModule({ context, verificationOnly, notify }: { context: Admin
   if (loading) return <LoadingSkeleton />;
   return <><div className="admin-filter-bar"><span>{rows.length} prestataires autorisés</span></div>
     {rows.length ? <div className="admin-table-wrap"><table className="admin-data-table"><thead><tr><th>Prestataire</th><th>Ville</th><th>Note</th><th>Inscription</th><th>Statut</th><th>Décision</th></tr></thead><tbody>{rows.map((row) =>
-      <tr key={row.profile_id}><td><strong>{row.business_name}</strong><small>{row.profile_id.slice(0, 8)}</small></td><td>{row.city}</td><td>★ {Number(row.average_rating).toFixed(1)}<small>{row.review_count} avis</small></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.status} /></td><td><details onToggle={(event) => { if (event.currentTarget.open) setOpened(row.profile_id); }}><summary>Examiner le dossier</summary>{opened === row.profile_id && <ProviderReview providerId={row.profile_id} />}<PermissionGuard permission="providers.verify" context={context}><button className="table-action positive" onClick={() => setConfirmation({ row, status: "approved" })}>Valider</button><button className="table-action danger" onClick={() => setConfirmation({ row, status: "rejected" })}>Refuser</button></PermissionGuard><PermissionGuard permission="providers.suspend" context={context}><button className="table-action danger" onClick={() => setConfirmation({ row, status: "suspended" })}>Suspendre</button></PermissionGuard></details></td></tr>,
+      <tr key={row.profile_id}><td><strong>{row.business_name}</strong></td><td>{row.city}</td><td>★ {Number(row.average_rating).toFixed(1)}<small>{row.review_count} avis</small></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.status} /></td><td><button className="table-action" onClick={() => setOpened(row.profile_id)}>Examiner le dossier</button>{row.status === "approved" && <PermissionGuard permission="providers.suspend" context={context}><button className="table-action danger" onClick={() => setConfirmation({ row, status: "suspended" })}>Suspendre le compte</button></PermissionGuard>}{row.status === "suspended" && <PermissionGuard permission="providers.suspend" context={context}><PermissionGuard permission="providers.verify" context={context}><button className="table-action positive" onClick={() => setConfirmation({ row, status: "approved" })}>Réactiver le professionnel</button></PermissionGuard></PermissionGuard>}</td></tr>,
     )}</tbody></table></div> : <EmptyState title="File de vérification à jour" description="Aucun prestataire ne correspond aux filtres sélectionnés." />}
+    {opened && <article className="admin-panel dossier-container"><button className="table-action" onClick={() => setOpened(null)}>Fermer le dossier</button><ProviderReview key={opened} providerId={opened} /><p>Les candidatures en attente sont traitées dans « Validations professionnelles ».</p></article>}
     {confirmation && <ConfirmationModal title={`${confirmation.status === "approved" ? "Approuver" : confirmation.status === "rejected" ? "Rejeter" : "Suspendre"} ${confirmation.row.business_name} ?`} description="La décision sera appliquée immédiatement et enregistrée dans le journal d’audit." dangerous={confirmation.status !== "approved"} onCancel={() => setConfirmation(null)} onConfirm={async (reason) => {
       const { error } = await getSupabaseBrowserClient()!.rpc("admin_set_provider_status", { target_provider_id: confirmation.row.profile_id, next_status: confirmation.status, reason });
       notify(error ? publicErrorMessage(error, "La décision n’a pas pu être appliquée.") : "Décision appliquée et journalisée.");
@@ -801,5 +806,5 @@ function OperationalModule({ module, context }: { module: ModuleKey; context: Ad
     roles: "Matrice des permissions granulaires et rôles système.",
     security: "Sessions, MFA, contrôles d’accès et alertes de sécurité.",
   };
-  return <section className="admin-dashboard-grid"><article className="admin-panel span-two"><p>Module opérationnel</p><h2>{navigation.find((item) => item.key === module)?.label}</h2><p>{descriptions[module] || "Gestion centralisée avec données Supabase et contrôles RLS."}</p><div className="module-capabilities"><StatusBadge value="RLS actif" /><StatusBadge value="Audit actif" /><StatusBadge value={context.is_super_admin ? "Super Admin" : "Permission limitée"} /></div></article><article className="admin-panel"><p>État</p><h2>Aucune tâche urgente</h2><EmptyState title="File à jour" description="Les prochains éléments apparaîtront ici automatiquement." /></article></section>;
+  return <section className="admin-dashboard-grid"><article className="admin-panel span-two"><p>Rubrique administrative</p><h2>{navigation.find((item) => item.key === module)?.label}</h2><p>{descriptions[module] || "Informations réservées à votre rôle."}</p><p>Cette rubrique ne dispose pas encore d’un écran de gestion connecté. Elle ne permet pas de conclure qu’aucune demande ou alerte n’est en attente.</p><div className="module-capabilities"><StatusBadge value={context.is_super_admin ? "Super Admin" : "Permission limitée"} /></div></article></section>;
 }

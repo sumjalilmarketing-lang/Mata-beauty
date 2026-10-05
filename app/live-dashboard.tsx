@@ -13,6 +13,7 @@ import { ClientControlCenter } from "./client-control-center";
 import { ProviderLaunchChecklist } from "./provider-launch-checklist";
 import { ProfessionalDocuments } from "./professional-documents";
 import { ReferralCard } from "./referral-card";
+import { NotificationCenter } from "./notification-center";
 
 type Role = "client" | "provider" | "admin";
 type ProviderStatus = "draft" | "pending_review" | "approved" | "rejected" | "suspended";
@@ -200,6 +201,10 @@ export function LiveDashboard({
     return () => window.clearTimeout(task);
   }, [load]);
 
+  useEffect(() => {
+    if (!loading && window.location.hash.startsWith("#booking-")) document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: "center" });
+  }, [loading, bookings]);
+
   const metrics = useMemo(() => {
     if (role === "admin") {
       return [
@@ -333,18 +338,6 @@ export function LiveDashboard({
     }
   }
 
-  async function markNotificationRead(notificationId: string) {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    const { error: updateError } = await supabase
-      .from("notifications")
-      .update({ read_at: new Date().toISOString() })
-      .eq("id", notificationId)
-      .eq("profile_id", userId);
-    if (updateError) setFeedback(updateError.message);
-    else await load();
-  }
-
   const show = (...keys: string[]) => !moduleKey || keys.includes(moduleKey);
   return (
     <main className={moduleKey ? "focused-dashboard" : "dashboard"}>
@@ -446,7 +439,7 @@ export function LiveDashboard({
             <div className="panel-heading"><h2>Réservations</h2><button onClick={() => void load()}>Actualiser</button></div>
             {!loading && bookings.length === 0 && <div className="compact-empty">Aucun rendez-vous pour le moment.</div>}
             {bookings.map((booking) => (
-              <div className="appointment live-appointment" key={booking.id}>
+              <div className="appointment live-appointment" key={booking.id} id={`booking-${booking.id}`}>
                 <span className="date-block">{new Intl.DateTimeFormat("fr-SN", { day: "2-digit", month: "short", timeZone: "Africa/Dakar" }).format(new Date(booking.starts_at))}</span>
                 <div>
                   <strong>{booking.provider_services?.title ?? "Prestation beauté"}</strong>
@@ -479,16 +472,7 @@ export function LiveDashboard({
             onClose={() => setMessageBooking(null)}
           />
         )}
-        {show("notifications") && <article className="panel notifications-panel" id="live-notifications">
-          <div className="panel-heading"><h2>Notifications</h2></div>
-          {!loading && notifications.length === 0 && <div className="compact-empty">Aucune notification.</div>}
-          {notifications.map((notification) => (
-            <button className={notification.read_at ? "notification-row read" : "notification-row"} key={notification.id} onClick={() => !notification.read_at && void markNotificationRead(notification.id)}>
-              <span>{notification.title}<small>{notification.body}</small></span>
-              {!notification.read_at && <i>Nouveau</i>}
-            </button>
-          ))}
-        </article>}
+        {show("notifications") && <article className="panel notifications-panel" id="live-notifications"><NotificationCenter userId={userId} /></article>}
       </section>
     </main>
   );

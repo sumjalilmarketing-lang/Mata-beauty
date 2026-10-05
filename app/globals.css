@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./dossier.css";
 
 :root {
   --plum: #541331;
