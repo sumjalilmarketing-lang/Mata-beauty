@@ -128,3 +128,12 @@ La validation globale reste ouverte : nouvelle Preview, production et domaine r�
 - Molette descendante/montante et séries de petits deltas vérifiées sur Preview aux résolutions 1366×768, 1440×900 et 1920×1080. Aucun changement du moteur vidéo dans ce lot.
 - Deux hypothèses du test vidéo corrigées : fin d'un geste après changement de viewport, puis index DOM supposé fixe après une nouvelle publication. Les contrôles ciblent maintenant l'identité de la vidéo quittée. Lecture/pause/reprise/son déjà observés PASS ; séquence complète en cours de reprise.
 - Les contrôles de candidature incluent maintenant les accès directs d'un client à six espaces internes. Leur résultat final doit être enregistré après exécution.
+
+### Compléments de recette et anomalie desktop
+
+- Preview d7f02423b0ebaa860902157c651fbac82cf8972c : profil client, santé publique, candidature avec quatre pièces consultées et six URL internes refusées PASS. Catalogue des onze catégories, CRUD salon et messagerie réelle PASS séparément.
+- BUG-FEED-WHEEL-01 : les petits deltas de molette peuvent revenir continuellement à zéro avec `scroll-snap-type: mandatory`, notamment sur grand écran. Reproduction indépendante dans Chromium avec vingt deltas de 70 px : mandatory = 0, proximity = 1285 px. La première hypothèse d'une distance insuffisante n'expliquait donc pas tout. Correction CSS limitée aux périphériques avec survol et pointeur fin ; accroche mobile inchangée. Retest complet en attente, aucun PASS global.
+- Une erreur Storage 400 provenait de l'ancienne publication synthétique QA « Publication Salon 1791236045824-dfd2bb », dont le fichier n'existait plus. Cette seule publication orpheline a été supprimée après contrôle du compte example.test et du chemin manquant. Le nettoyage du test salon supprime désormais ses publications explicitement et vérifie les erreurs de suppression des comptes.
+- Le dossier agent affiche maintenant aussi l'identité du candidat, son expérience, ses langues et ses conditions d'annulation, sous les politiques de lecture existantes. Retest navigateur requis.
+- Resend installé et domaine mata-beauty.com vérifié après les autorisations explicites de l'utilisateur pour les conditions et le report de la configuration 2FA. Transport réel et idempotence validés sur l'adresse officielle de test Resend. Réception dans une boîte utilisateur encore non vérifiée ; adresse exacte demandée.
+- Les nouveaux changements applicatifs et les trois migrations restent hors production à cet instant.

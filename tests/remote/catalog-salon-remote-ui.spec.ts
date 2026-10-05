@@ -13,7 +13,9 @@ const clientEmail = `codex-catalog-client-${run}@example.test`;
 const catalogEmail = `codex-catalog-provider-${run}@example.test`;
 const salonEmail = `codex-salon-owner-${run}@example.test`;
 const moderatorEmail = `codex-salon-moderator-${run}@example.test`;
-const expectedCategories = ["Coiffure femme", "Coiffure homme", "Tresses africaines", "Locks", "Perruques et lace wigs", "Maquillage", "Onglerie", "Cils et sourcils", "Barbier", "Soins du visage", "Beauté à domicile"];
+const expectedCategorySlugs = ["coiffure-femme", "coiffure-homme", "tresses-africaines", "locks", "perruques-lace-wigs", "maquillage", "onglerie", "cils-sourcils", "barbier", "soins-visage", "beaute-domicile"];
+let expectedCategories: string[] = [];
+let makeupCategory = "";
 const salonName = `Salon Golden ${run}`;
 const salonServiceTitle = `Make-up Salon ${run}`;
 const salonMessage = `Message salon réel ${run}`;
@@ -39,6 +41,7 @@ test.describe.configure({ mode: "serial" });
 async function createUser(email: string, professional = false) {
   const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: professional ? "Professionnel Catalogue" : "Cliente Catalogue", legal_accepted: "true", professional_intent: professional ? "true" : "false" } });
   expect(created.error).toBeNull();
+  expect((await admin.from("welcome_email_deliveries").update({ status: "needs_review" }).eq("user_id", created.data.user!.id)).error).toBeNull();
   return created.data.user!.id;
 }
 
@@ -58,6 +61,7 @@ async function signIn(page: Page, email: string) {
 }
 
 test.beforeAll(async () => {
+  test.setTimeout(90_000);
   admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   clientId = await createUser(clientEmail);
   catalogProviderId = await createUser(catalogEmail, true);
@@ -70,8 +74,10 @@ test.beforeAll(async () => {
   expect((await admin.from("provider_profiles").update({ business_name: `Catalogue Golden ${run}`, slug: `catalogue-golden-${run}`.toLowerCase(), status: "approved", city: "Dakar", service_mode: "both" }).eq("profile_id", catalogProviderId)).error).toBeNull();
   expect((await admin.from("provider_profiles").update({ business_name: salonName, slug: `salon-golden-${run}`.toLowerCase(), status: "approved", city: "Dakar", service_mode: "salon" }).eq("profile_id", salonId)).error).toBeNull();
 
-  const categories = await admin.from("categories").select("id,name,slug").in("name", expectedCategories).eq("is_active", true);
-  expect(categories.error).toBeNull(); expect(categories.data).toHaveLength(expectedCategories.length);
+  const categories = await admin.from("categories").select("id,name,slug").in("slug", expectedCategorySlugs).eq("is_active", true);
+  expect(categories.error).toBeNull(); expect(categories.data).toHaveLength(expectedCategorySlugs.length);
+  expectedCategories = categories.data!.map(category => category.name);
+  makeupCategory = categories.data!.find(category => category.slug === "maquillage")!.name;
   const categoryIds = categories.data!.map((category) => category.id);
   const services = await admin.from("services").select("id,category_id,slug").in("category_id", categoryIds).eq("is_active", true).order("slug");
   expect(services.error).toBeNull();
@@ -103,6 +109,7 @@ test.afterAll(async () => {
     await admin.from("businesses").delete().eq("id", salonBusinessId);
   }
   if (salonId) {
+    expect.soft((await admin.from("posts").delete().eq("author_id", salonId)).error).toBeNull();
     const bucket = admin.storage.from("provider-social-media");
     const listed = await bucket.list(salonId, { limit: 100 });
     const paths = (listed.data ?? []).filter((item) => item.id).map((item) => `${salonId}/${item.name}`);
@@ -110,14 +117,14 @@ test.afterAll(async () => {
   }
   if (catalogServiceIds.length) await admin.from("provider_services").delete().in("id", catalogServiceIds);
   if (availabilityIds.length) await admin.from("availability_rules").delete().in("id", availabilityIds);
-  for (const id of [moderatorId, salonId, catalogProviderId, clientId]) if (id) await admin.auth.admin.deleteUser(id);
+  for (const id of [moderatorId, salonId, catalogProviderId, clientId]) if (id) expect.soft((await admin.auth.admin.deleteUser(id)).error).toBeNull();
 });
 
 test("chaque catégorie distante rejoint un profil, une prestation, un prix et des créneaux", async ({ page }) => {
   test.setTimeout(120_000);
   await enablePreview(page);
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
   for (const category of expectedCategories) {
     const categoryButton = page.locator(".photo-category-grid button").filter({ hasText: category });
     await expect(categoryButton).toBeVisible();
@@ -214,8 +221,8 @@ test("le Salon réalise son CRUD navigateur puis reçoit réservation, message, 
 
   await signIn(clientPage, clientEmail);
   await clientPage.goto("/");
-  await clientPage.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Découvrir" }).click();
-  await clientPage.locator(".photo-category-grid button").filter({ hasText: "Maquillage" }).click();
+  await clientPage.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
+  await clientPage.locator(".photo-category-grid button").filter({ hasText: makeupCategory }).click();
   await clientPage.locator(".premium-provider-card").filter({ hasText: salonName }).click();
   await clientPage.getByRole("button", { name: salonServiceTitle }).click();
   await clientPage.getByLabel("Choisir une autre date").fill(bookingDate.toISOString().slice(0, 10));

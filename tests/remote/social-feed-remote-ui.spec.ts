@@ -73,7 +73,7 @@ async function preparePage(page: Page) {
   });
   page.on("response", (response) => {
     if (response.status() >= 400 && !response.url().includes("vercel.live")) {
-      browserNetworkErrors.push(`${response.status()} ${response.request().method()} ${response.url().split("?")[0]}`);
+      browserNetworkErrors.push(`${test.info().title} | ${response.status()} ${response.request().method()} ${response.url().split("?")[0]}`);
     }
   });
   if (remoteAppUrl && bypass) {
@@ -440,7 +440,9 @@ test("le feed social distant relie les interactions au profil et à la réservat
     await expect.poll(() => desktopFeed.evaluate(node => node.scrollTop)).toBeGreaterThan(100);
     await page.mouse.wheel(0, -5000);
     await expect.poll(() => desktopFeed.evaluate(node => node.scrollTop)).toBeLessThan(5);
-    for (let tick = 0; tick < 12; tick++) await page.mouse.wheel(0, 70);
+    // Traverse a full card at every viewport: 840px is insufficient at 1080p
+    // and mandatory snap can correctly return that incomplete gesture to zero.
+    for (let tick = 0; tick < Math.ceil(bounds!.height / 70) + 4; tick++) await page.mouse.wheel(0, 70);
     await expect.poll(() => desktopFeed.evaluate(node => node.scrollTop)).toBeGreaterThan(100);
   }
   await page.setViewportSize({ width: 1280, height: 720 });

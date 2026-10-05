@@ -75,6 +75,9 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
     await login(reviewer, accounts[1].email); await reviewer.goto("/onboarding");
     await reviewer.locator(".control-list-row").filter({ hasText: business }).getByRole("button", { name: "Examiner le dossier" }).click();
     await expect(reviewer.getByRole("heading", { name: business, exact: true })).toBeVisible();
+    await expect(reviewer.getByText("Candidat : Candidature QA", { exact: true })).toBeVisible();
+    await expect(reviewer.getByText("Langues : Français", { exact: true })).toBeVisible();
+    await expect(reviewer.getByText("Conditions d’annulation : Annulation possible avant le rendez-vous.", { exact: true })).toBeVisible();
     for (const name of ["Pièce d’identité", "Immatriculation", "Qualification", "Justificatif d’adresse"]) {
       const opened = context.waitForEvent("page");
       await reviewer.getByRole("button", { name: `Voir ${name}`, exact: true }).click();
