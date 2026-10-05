@@ -1,11 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { AuthModal, type AuthenticatedProfile } from "./auth-modal";
 import { LiveDashboard } from "./live-dashboard";
 import { SocialFeed } from "./social-feed";
+import { LocationPicker } from "./location-picker";
+import { distanceKm, matchesSearch, type Coordinates } from "@/lib/domain/location";
 import { calculateBookingEnd, calculateBookingQuote } from "@/lib/domain/booking";
 import { isTrustedSandboxCheckoutUrl, type PaymentMethod } from "@/lib/domain/payments";
 import { fetchActiveCategories, fetchActivePromotions, fetchPublishedProviders, type CatalogCategory, type CatalogPromotion } from "@/lib/supabase/catalog";
@@ -24,6 +26,8 @@ type Provider = {
   specialty: string;
   category: string;
   area: string;
+  address?: string;
+  coordinates?: Coordinates;
   price: number;
   rating: number;
   reviews: number;
@@ -64,7 +68,7 @@ const bookingDraftSchema = z.object({
   selection: z.object({
     provider: z.object({
       id: z.string().min(1), profileId: z.string().min(1), serviceId: z.string().min(1), name: z.string(), specialty: z.string(),
-      category: z.string(), area: z.string(), price: z.number().int().nonnegative(), rating: z.number(), reviews: z.number().int().nonnegative(),
+      category: z.string(), area: z.string(), address: z.string().optional(), coordinates: z.object({ latitude: z.number(), longitude: z.number() }).optional(), price: z.number().int().nonnegative(), rating: z.number(), reviews: z.number().int().nonnegative(),
       initials: z.string(), verified: z.boolean(), homeService: z.boolean(), durationMinutes: z.number().int(), businessId: z.string().uuid().optional(), coverUrl: z.string().optional(),
     }),
     service: z.object({ id: z.string().min(1), title: z.string(), duration_minutes: z.number().int(), price_amount: z.number().int().nonnegative(), business_id: z.string().uuid().nullable().optional() }),
@@ -111,9 +115,10 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Toutes");
   const [subcategory, setSubcategory] = useState("Tout");
-  const [area, setArea] = useState("Dakar, Sénégal");
+  const [area, setArea] = useState("");
+  const [position, setPosition] = useState<Coordinates | null>(null);
   const [date, setDate] = useState("");
-  const [screen, setScreen] = useState<"feed" | "home" | "results">(initialScreen);
+  const [screen, applyScreen] = useState<"feed" | "home" | "results">(initialScreen);
   const [catalog, setCatalog] = useState<Provider[]>([]);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [catalogState, setCatalogState] = useState<"loading" | "live" | "empty" | "error">("loading");
@@ -136,6 +141,34 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [authRequest, setAuthRequest] = useState<{ role: "client" | "provider" | "admin"; mode: "login" | "register" | "reset"; returnTo?: string } | null>(null);
   const [paymentReturn, setPaymentReturn] = useState<{ id: string; mode: "return" | "cancelled" } | null>(null);
   const [showLaunchWelcome, setShowLaunchWelcome] = useState(false);
+
+  function setScreen(next: "feed" | "home" | "results", nextCategory = category) {
+    applyScreen(next);
+    const url = new URL(window.location.href);
+    url.pathname = next === "feed" ? "/" : "/discover";
+    url.search = "";
+    if (next === "results") {
+      url.searchParams.set("screen", "results");
+      if (query) url.searchParams.set("q", query);
+      if (area) url.searchParams.set("zone", area);
+      if (nextCategory !== "Toutes") url.searchParams.set("category", nextCategory);
+    }
+    if (`${url.pathname}${url.search}` !== `${window.location.pathname}${window.location.search}`) window.history.pushState(null, "", `${url.pathname}${url.search}`);
+  }
+
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      applyScreen(params.get("screen") === "results" ? "results" : window.location.pathname === "/discover" ? "home" : "feed");
+      setQuery(params.get("q") ?? "");
+      setCategory(params.get("category") ?? "Toutes");
+      try { setArea((params.get("zone") ?? window.sessionStorage.getItem("mata-location-zone") ?? "").slice(0, 120)); } catch { setArea(params.get("zone") ?? ""); }
+      setProfile(null);
+    };
+    void Promise.resolve().then(restore);
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("mata-theme");
@@ -227,15 +260,25 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     const normalized = `${query.replace(/près de moi/gi, "")} ${subcategory === "Tout" ? "" : subcategory}`.trim().toLocaleLowerCase("fr");
     return catalog.filter((provider) => {
       const haystack = `${provider.name} ${provider.specialty} ${provider.category} ${provider.area}`.toLocaleLowerCase("fr");
-      return (!normalized || haystack.includes(normalized))
+      const distance = position ? distanceKm(position, provider.coordinates) : null;
+      return matchesSearch(normalized, haystack)
         && (category === "Toutes" || haystack.includes(category.toLocaleLowerCase("fr")))
-        && (!area.trim() || area === "Tout Dakar" || provider.area.toLocaleLowerCase("fr").includes(area.split(",")[0].trim().toLocaleLowerCase("fr")))
+        && (!area.trim() || matchesSearch(area, `${provider.area} ${provider.address ?? ""}`))
+        && (!position || (distance !== null && distance <= 25))
         && (!homeOnly || provider.homeService)
         && (!verifiedOnly || provider.verified)
         && provider.rating >= Number(minRating)
         && provider.price <= Number(maxPrice);
-    });
-  }, [area, catalog, category, homeOnly, maxPrice, minRating, query, subcategory, verifiedOnly]);
+    }).sort((a, b) => position ? (distanceKm(position, a.coordinates) ?? Infinity) - (distanceKm(position, b.coordinates) ?? Infinity) : 0);
+  }, [area, catalog, category, homeOnly, maxPrice, minRating, position, query, subcategory, verifiedOnly]);
+
+  const changeLocation = useCallback((nextArea: string, nextPosition: Coordinates | null) => {
+    setArea(nextArea); setPosition(nextPosition);
+    // Keep the manual zone for this tab only. Never persist personal GPS coordinates.
+    try { window.sessionStorage.setItem("mata-location-zone", nextArea.slice(0, 120)); } catch { /* Location remains usable without storage. */ }
+  }, []);
+  const feedLocation = useMemo(() => ({ area, position, providers: catalog, onChange: changeLocation }), [area, position, catalog, changeLocation]);
+  const locationPicker = <LocationPicker area={area} position={position} suggestions={[...new Set(catalog.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={changeLocation} />;
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -342,7 +385,8 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
 
   function startBooking(selection: BookingSelection) {
     setRestoredBookingRequest(null);
-    setBooking(selection);
+    const matchingProvider = catalog.find((item) => item.serviceId === selection.service.id && item.profileId === selection.provider.profileId);
+    setBooking({ ...selection, provider: matchingProvider ?? { ...selection.provider, address: undefined, coordinates: undefined, businessId: selection.service.business_id ?? undefined } });
     const client = getSupabaseBrowserClient();
     if (client) void recordProductEvent(client, "booking_started", { provider_id: selection.provider.profileId, service_id: selection.service.id, source: selection.sourcePostId ? "video" : "catalog" });
   }
@@ -364,7 +408,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     setCategory(label);
     setSubcategory("Tout");
     setQuery("");
-    setScreen("results");
+    setScreen("results", label);
     const client = getSupabaseBrowserClient();
     if (client) void recordProductEvent(client, "category_viewed", { category: label, area });
   }
@@ -464,18 +508,18 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       });
       if (!paymentResponse.ok) {
         setNotice("La réservation est enregistrée, mais le paiement n’a pas pu être préparé. Aucun débit n’a eu lieu.");
-        return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? `Chez ${provider.name}` : request.address };
+        return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
       }
       const checkout = paymentCheckoutSchema.safeParse(await paymentResponse.json().catch(() => null));
       if (!checkout.success || !checkout.data.checkoutUrl || !isTrustedSandboxCheckoutUrl(checkout.data.checkoutUrl)) {
         setNotice("La réservation est enregistrée, mais aucun checkout sandbox fiable n’est disponible. Aucun débit n’a eu lieu.");
-        return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? `Chez ${provider.name}` : request.address };
+        return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
       }
       setNotice("Redirection sécurisée vers PayDunya Sandbox…");
       window.location.assign(checkout.data.checkoutUrl);
       return null;
     }
-    return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? `Chez ${provider.name}` : request.address };
+    return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
   }
 
   async function signOut() {
@@ -512,6 +556,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       {notice && <div className="toast" role="status">{notice}</div>}
       <div className="premium-app-frame">
         {screen === "feed" ? <SocialFeed
+          location={feedLocation}
           authenticated={authenticated}
           onRequireAuth={() => setAuthRequest({ role: "client", mode: "login" })}
           onDiscover={() => setScreen("home")}
@@ -520,6 +565,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
           onBook={bookSocialService}
         /> : screen === "home" ? (
           <HomeScreen
+            locationPicker={locationPicker} nearbyProviders={filteredProviders}
             authenticated={authenticated}
             query={query}
             setQuery={setQuery}
@@ -595,9 +641,10 @@ function LaunchWelcome({ area, categories, onArea, onCategory, onClose }: { area
 }
 
 function HomeScreen({
-  authenticated, query, setQuery, area, setArea, date, setDate, suggestions, categories, catalog, catalogState, nextAvailability, promotions,
+  authenticated, query, setQuery, area, locationPicker, nearbyProviders, date, setDate, suggestions, categories, catalog, catalogState, nextAvailability, promotions,
   upcomingBookings, favorites, onSearch, onCategory, onViewProvider, onBook, onFavorite, onAccount, onProviderRegister, onInspiration, theme, onToggleTheme,
 }: {
+  locationPicker: ReactNode; nearbyProviders: Provider[];
   authenticated: AuthenticatedProfile | null;
   query: string; setQuery: (value: string) => void; area: string; setArea: (value: string) => void;
   date: string; setDate: (value: string) => void; suggestions: string[]; categories: CatalogCategory[]; catalog: Provider[];
@@ -611,7 +658,7 @@ function HomeScreen({
     <header className="mobile-topbar"><Brand /><div><button aria-label={theme === "dark" ? "Activer le thème clair" : "Activer le thème sombre"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button><button className="user-orb" aria-label="Ouvrir mon compte" onClick={onAccount}>{authenticated ? "MB" : "○"}</button></div></header>
     <section className="welcome-copy"><h1>Explorer</h1></section>
     <form className="mobile-search" onSubmit={onSearch}><span>⌕</span><input list="premium-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Que recherchez-vous ?" /><button type="button" aria-label="Ouvrir les filtres" onClick={() => onSearch()}>⌘</button><datalist id="premium-suggestions">{suggestions.map((item) => <option key={item} value={item} />)}</datalist></form>
-    <label className="location-card"><span>⌖</span><span>Ville ou quartier<input aria-label="Ville ou quartier" value={area} onChange={(event) => setArea(event.target.value)} /></span></label><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${query || "salon beauté"} ${area}`)}`} target="_blank" rel="noreferrer">Voir sur Google Maps</a>
+    {locationPicker}<a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${query || "salon beauté"} ${area}`)}`} target="_blank" rel="noreferrer">Voir sur Google Maps</a>
     <div className="section-title"><h2>Catégories populaires</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div>
     <div className="photo-category-grid">{categories.map((item, index) => { const image = item.imageUrl ?? (item.icon && (/^https?:\/\//.test(item.icon) || item.icon.startsWith("/")) ? item.icon : categoryAtlas); return <button key={item.id} onClick={() => onCategory(item.name)}><span className="category-photo" style={{ backgroundImage: `url(${image})`, backgroundPosition: item.imagePosition ?? (image === categoryAtlas ? `${(index % 5) * 25}% ${index < 5 ? 0 : 100}%` : "center") }} role="img" aria-label={`Illustration ${item.name}`}>{item.icon && image === categoryAtlas ? item.icon : ""}</span><strong>{item.name}</strong></button>; })}</div>
     {categories.length === 0 && catalogState !== "loading" && <div className="premium-empty compact"><span>◇</span><h3>Aucune catégorie active</h3><p>Les catégories publiées par l’administration apparaîtront ici.</p></div>}
@@ -619,7 +666,7 @@ function HomeScreen({
     {catalog.some((provider) => isToday(nextAvailability[provider.id])) ? <CatalogBlock providers={catalog.filter((provider) => isToday(nextAvailability[provider.id])).slice(0, 4)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister} /> : <div className="premium-empty compact"><span>◷</span><h3>Aucun créneau aujourd’hui</h3><p>Consultez les prochains créneaux réellement publiés.</p></div>}
     {catalog.some((provider) => isTomorrow(nextAvailability[provider.id])) && <><div className="section-title"><h2>Disponibles demain</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={catalog.filter((provider) => isTomorrow(nextAvailability[provider.id])).slice(0, 4)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/></>}
     {catalog.some((provider) => isLaterThisWeek(nextAvailability[provider.id])) && <><div className="section-title"><h2>Cette semaine</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={catalog.filter((provider) => isLaterThisWeek(nextAvailability[provider.id])).slice(0, 4)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/></>}
-    {catalog.length > 0 && <><div className="section-title"><h2>Près de vous</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={catalog.filter((provider) => area === "Tout Dakar" || provider.area.toLocaleLowerCase("fr").includes("dakar")).slice(0, 3)} fallbackProviders={catalog.slice(0, 3)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/><div className="section-title"><h2>Meilleurs avis</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={[...catalog].sort((a,b) => b.rating-a.rating || b.reviews-a.reviews).slice(0, 3)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/><div className="section-title"><h2>Nouveaux talents</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={catalog.slice(-3).reverse()} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/><section className="launch-inspiration-cta"><span>▶ INSPIRATION</span><h2>Découvrez les dernières transformations.</h2><button onClick={onInspiration}>Ouvrir le feed</button></section></>}
+    {catalog.length > 0 && <><div className="section-title"><h2>Près de vous</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={nearbyProviders.slice(0, 3)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/><div className="section-title"><h2>Meilleurs avis</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={[...catalog].sort((a,b) => b.rating-a.rating || b.reviews-a.reviews).slice(0, 3)} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/><div className="section-title"><h2>Nouveaux talents</h2><button onClick={() => onCategory("Toutes")}>Voir tout</button></div><CatalogBlock providers={catalog.slice(-3).reverse()} catalogState={catalogState} favorites={favorites} nextAvailability={nextAvailability} onView={onViewProvider} onBook={onBook} onFavorite={onFavorite} onProviderRegister={onProviderRegister}/><section className="launch-inspiration-cta"><span>▶ INSPIRATION</span><h2>Découvrez les dernières transformations.</h2><button onClick={onInspiration}>Ouvrir le feed</button></section></>}
     {catalog.length > 0 && <section className="mata-recommendations"><div className="section-title"><h2>Choisis pour vous</h2><span>✦ Sélection intelligente</span></div><button onClick={() => onViewProvider(catalog[0])}><strong>{catalog[0].name}</strong><small>{catalog[0].specialty} · {catalog[0].rating.toFixed(1)} ★</small><b>Découvrir</b></button></section>}
     {catalog.some((provider) => nextAvailability[provider.id]) && <section className="next-availability-strip"><strong>Prochaines disponibilités</strong>{catalog.filter((provider) => nextAvailability[provider.id]).slice(0, 5).map((provider) => <button key={provider.id} onClick={() => onBook(provider)}><span>{formatSlotLabel(nextAvailability[provider.id])}</span><small>{provider.name}</small></button>)}</section>}
     {promotions.length > 0 && <section className="premium-offers"><div className="section-title"><h2>Offres du moment</h2></div>{promotions.slice(0, 2).map((promotion) => <article key={promotion.id}><span>{promotion.discountType === "percentage" ? `−${promotion.discountValue}%` : `−${formatPrice(promotion.discountValue)}`}</span><div><strong>{promotion.title}</strong><small>{promotion.description}</small></div></article>)}</section>}
@@ -810,7 +857,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
             <h3>Vérifiez et confirmez</h3>
             <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <Image src={provider.coverUrl} alt="" fill sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date)} à {form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name}</small></div><b>{formatPrice(service.price_amount)}</b></div>
             {collaborators.length > 0 && <label>Collaboratrice<select aria-label="Choisir une collaboratrice" value={form.collaboratorId} onChange={(event) => setForm({ ...form, collaboratorId: event.target.value })}><option value="">Sans préférence</option>{collaborators.map((person) => <option key={person.id} value={person.id}>{person.display_name}{person.title ? ` · ${person.title}` : ""}</option>)}</select></label>}
-            <fieldset className="location-choice"><legend>Où ?</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>Chez le professionnel</strong><small>{provider.area}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>À mon domicile</strong><small>Le professionnel se déplace</small></span></label>}</fieldset>
+            <fieldset className="location-choice"><legend>Où ?</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>Chez le professionnel</strong><small>{provider.address ? `${provider.address} · ${provider.area}` : `${provider.area} · adresse à confirmer avec le professionnel`}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>À mon domicile</strong><small>Le professionnel se déplace</small></span></label>}</fieldset>
             {form.locationMode === "client_address" && <label>Adresse<textarea autoFocus value={form.address} placeholder="Votre adresse complète" onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}
             <fieldset className="location-choice"><legend>Paiement</legend>
               <label><input type="radio" name="payment" checked={form.paymentMethod === "on_site"} onChange={() => setForm({ ...form, paymentMethod: "on_site" })} /><span><strong>Sur place</strong><small>Aucun débit aujourd’hui</small></span></label>

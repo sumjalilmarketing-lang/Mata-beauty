@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { diversifyFeed, matchesSocialFeedFilter, socialFeedFilters, type SocialFeedFilter } from "@/lib/domain/social-feed";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AuthenticatedProfile } from "./auth-modal";
+import { LocationPicker } from "./location-picker";
+import { distanceKm, formatDistance, matchesSearch, type Coordinates } from "@/lib/domain/location";
 
 type FeedPost = {
   id: string; authorId: string; caption: string; videoUrl: string; thumbnailUrl: string | null;
@@ -86,7 +88,8 @@ async function resolvePrivateMedia(row: SocialFeedRow): Promise<SocialFeedRow | 
   return { ...row, video_url: signedMedia[0]!, thumbnail_url: signedThumbnail, media_urls: signedMedia.filter((url): url is string => Boolean(url)) };
 }
 
-export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish, onOpenProvider, onBook }: {
+export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish, onOpenProvider, onBook, location }: {
+  location: { area: string; position: Coordinates | null; providers: Array<{ profileId: string; serviceId: string; area: string; address?: string; coordinates?: Coordinates }>; onChange: (area: string, position: Coordinates | null) => void };
   authenticated: AuthenticatedProfile | null;
   onRequireAuth: () => void;
   onDiscover: () => void;
@@ -104,6 +107,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   const [favoriteProviders, setFavoriteProviders] = useState<Set<string>>(new Set());
   const [bookingInterests, setBookingInterests] = useState<Set<string>>(new Set());
   const [feedFilter, setFeedFilter] = useState<SocialFeedFilter>("Pour toi");
+  const [showLocation, setShowLocation] = useState(false);
   const [commentsPost, setCommentsPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [commentText, setCommentText] = useState("");
@@ -127,13 +131,20 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   const feedCursor = useRef<{ publishedAt: string; id: string } | null>(null);
 
   const visiblePosts = useMemo(() => diversifyFeed(posts
-    .filter((post) => matchesSocialFeedFilter(feedFilter, post))
+    .filter((post) => {
+      if (feedFilter !== "Près de moi") return matchesSocialFeedFilter(feedFilter, post);
+      const provider = location.providers.find((item) => item.serviceId === post.serviceId);
+      if (location.position) { const distance = distanceKm(location.position, provider?.coordinates); return distance !== null && distance <= 25; }
+      return Boolean(location.area.trim()) && matchesSearch(location.area, `${provider?.area ?? post.city} ${provider?.address ?? ""}`);
+    })
     .map((post) => ({ ...post,
+      distance: location.position ? distanceKm(location.position, location.providers.find((item) => item.serviceId === post.serviceId)?.coordinates) : null,
       followed: followed.has(post.authorId) || favoriteProviders.has(post.authorId),
       specialtyAffinity: liked.has(post.id) || saved.has(post.id) || [...bookingInterests].some((term) => `${post.serviceTitle ?? ""} ${post.hashtags.join(" ")}`.toLocaleLowerCase("fr").includes(term)) ? 1 : 0,
-      proximityScore: post.city.toLocaleLowerCase("fr").includes("dakar") ? 1 : 0,
+      proximityScore: 0,
       availableSoon: Boolean((realAvailability[post.id] ?? post.availableAt) && new Date(realAvailability[post.id] ?? post.availableAt ?? 0).getTime() < Date.now()+72*3_600_000),
-    }))), [bookingInterests, favoriteProviders, feedFilter, followed, liked, posts, realAvailability, saved]);
+    }))).sort((a, b) => feedFilter === "Près de moi" && location.position
+      ? (distanceKm(location.position, location.providers.find((item) => item.serviceId === a.serviceId)?.coordinates) ?? Infinity) - (distanceKm(location.position, location.providers.find((item) => item.serviceId === b.serviceId)?.coordinates) ?? Infinity) : 0), [bookingInterests, favoriteProviders, feedFilter, followed, liked, location, posts, realAvailability, saved]);
 
   const getSessionHash = useCallback(async () => {
     const session = window.sessionStorage.getItem("mata-feed-session") ?? crypto.randomUUID();
@@ -193,7 +204,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
       if (cursor) query = query.or(`published_at.lt.${cursor.publishedAt},and(published_at.eq.${cursor.publishedAt},id.lt.${cursor.id})`);
       const { data, error } = await query.abortSignal(signal);
       if (signal.aborted) return;
-      if (error) return;
+      if (error) { setFeedback("La suite des inspirations n’a pas pu être chargée. Actualisez pour réessayer."); return; }
       const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
       if (signal.aborted) return;
       const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
@@ -203,6 +214,10 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
       setHasMore((data ?? []).length === FEED_BATCH_SIZE);
     } finally { loadingMore.current = false; }
   }, [hasMore]);
+
+  useEffect(() => {
+    if (feedFilter === "Près de moi" && (location.area.trim() || location.position) && state === "ready" && hasMore) void loadMore();
+  }, [feedFilter, hasMore, loadMore, location.area, location.position, posts.length, state]);
 
   useEffect(() => {
     const leave = () => pageRequests.current.abort();
@@ -398,10 +413,11 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
   const selectFilter = useCallback((filter: SocialFeedFilter) => {
     filterAnchor.current = visiblePosts[activeIndex]?.id ?? null;
     setFeedFilter(filter);
+    setShowLocation(filter === "Près de moi");
   }, [activeIndex, visiblePosts]);
 
   const activePost = visiblePosts[activeIndex];
-  const header = useMemo(() => <header className="social-feed-header"><div className="feed-title-row"><strong>MATA</strong><span>INSPIRATION</span><div className="feed-header-actions"><button aria-label="Publier une vidéo" onClick={onPublish}>＋</button><button aria-label="Rechercher" onClick={onDiscover}>⌕</button></div></div><nav className="feed-filter-strip" aria-label="Filtres du feed">{socialFeedFilters.slice(0, 3).map((filter) => <button key={filter} aria-pressed={feedFilter === filter} className={feedFilter === filter ? "active" : ""} onClick={() => selectFilter(filter)}>{filter}</button>)}</nav></header>, [feedFilter, onDiscover, onPublish, selectFilter]);
+  const header = useMemo(() => <header className="social-feed-header"><div className="feed-title-row"><strong>MATA</strong><span>INSPIRATION</span><div className="feed-header-actions"><button aria-label="Publier une vidéo" onClick={onPublish}>＋</button><button aria-label="Rechercher" onClick={onDiscover}>⌕</button></div></div><nav className="feed-filter-strip" aria-label="Filtres du feed">{socialFeedFilters.slice(0, 3).map((filter) => <button key={filter} aria-pressed={feedFilter === filter} className={feedFilter === filter ? "active" : ""} onClick={() => selectFilter(filter)}>{filter}</button>)}</nav>{feedFilter === "Près de moi" && <button className="feed-location-toggle" onClick={() => setShowLocation((value) => !value)}>{location.position ? "Près de vous · 25 km" : location.area || "Choisir ma zone"} · Modifier</button>}{showLocation && <div className="feed-location-panel"><LocationPicker autoLocate area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} /><button onClick={() => setShowLocation(false)}>Voir les résultats</button></div>}</header>, [feedFilter, location, onDiscover, onPublish, selectFilter, showLocation]);
 
   if (state === "loading") return <section className="social-feed-shell">{header}<div className="feed-skeleton" aria-label="Chargement du feed" /></section>;
   if (state !== "ready") return <section className="social-feed-shell">{header}<div className="social-feed-empty"><span>▶</span><h1>{state === "error" ? "Le feed est indisponible" : "Les premières inspirations arrivent bientôt."}</h1><p>{state === "error" ? "Réessayez dans quelques instants." : "Explorez les prestations et les professionnels près de vous."}</p><button onClick={state === "error" ? () => void load() : onDiscover}>{state === "error" ? "Réessayer" : "Découvrir les professionnels"}</button></div></section>;
@@ -423,7 +439,7 @@ export function SocialFeed({ authenticated, onRequireAuth, onDiscover, onPublish
         <button aria-label="Partager" onClick={() => void share(post)}>↗<small>{compact.format(post.shareCount)}</small></button>
         <button aria-label="Signaler" onClick={() => void report(post)}>⚑<small>Signaler</small></button>
       </aside>
-      <div className="social-caption"><button className="creator-name" onClick={() => void openProvider(post)}>@{post.slug} {post.verified && <b>✓</b>}</button><span>{post.locationLabel ?? post.city} · {post.serviceTitle ?? "Beauté professionnelle"} · ★ {post.averageRating.toFixed(1)}</span>{post.title && <strong>{post.title}</strong>}<p>{post.caption}</p>{post.postType === "promotion" && post.promotionDiscount !== null && <span className="social-offer">−{post.promotionDiscount}% · {post.promotionSlots ?? "Places limitées"} place(s)</span>}<span>{(post.hashtags.length ? post.hashtags.slice(0, 3) : ["matabeauty"]).map((tag) => `#${tag}`).join(" · ")}</span>{post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service"><button className="service-profile-link" onClick={() => void openProvider(post)}><small>PRESTATION</small><strong>{post.serviceTitle}</strong><span>{post.durationMinutes} min · {price(post.priceAmount)}</span><em>{realAvailability[post.id] ? `Prochain créneau ${new Date(realAvailability[post.id] as string).toLocaleString("fr-FR", { weekday: "short", hour:"2-digit", minute:"2-digit" })}` : realAvailability[post.id] === null ? "Voir les prochaines disponibilités" : "Disponibilités en cours…"}</em></button><button onClick={() => void book(post)}>Réserver</button></div>}</div>
+      <div className="social-caption"><button className="creator-name" onClick={() => void openProvider(post)}>@{post.slug} {post.verified && <b>✓</b>}</button><span>{post.locationLabel ?? post.city}{post.distance !== null ? ` · ${formatDistance(post.distance)}` : ""} · {post.serviceTitle ?? "Beauté professionnelle"} · ★ {post.averageRating.toFixed(1)}</span>{post.title && <strong>{post.title}</strong>}<p>{post.caption}</p>{post.postType === "promotion" && post.promotionDiscount !== null && <span className="social-offer">−{post.promotionDiscount}% · {post.promotionSlots ?? "Places limitées"} place(s)</span>}<span>{(post.hashtags.length ? post.hashtags.slice(0, 3) : ["matabeauty"]).map((tag) => `#${tag}`).join(" · ")}</span>{post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service"><button className="service-profile-link" onClick={() => void openProvider(post)}><small>PRESTATION</small><strong>{post.serviceTitle}</strong><span>{post.durationMinutes} min · {price(post.priceAmount)}</span><em>{realAvailability[post.id] ? `Prochain créneau ${new Date(realAvailability[post.id] as string).toLocaleString("fr-FR", { weekday: "short", hour:"2-digit", minute:"2-digit" })}` : realAvailability[post.id] === null ? "Voir les prochaines disponibilités" : "Disponibilités en cours…"}</em></button><button onClick={() => void book(post)}>Réserver</button></div>}</div>
     </article>)}
   </div>{activePost?.isSponsored && <span className="sponsored-label">Contenu sponsorisé</span>}
   {commentsPost && <div className="comments-backdrop" onMouseDown={(event) => event.target===event.currentTarget && setCommentsPost(null)}><section className="comments-sheet" role="dialog" aria-modal="true" aria-label="Commentaires"><header><strong>Commentaires</strong><button aria-label="Fermer" onClick={() => setCommentsPost(null)}>×</button></header><div>{comments.length ? comments.map((comment) => <article className={comment.parent_id ? "comment-reply" : ""} key={comment.id}><span>{comment.profiles?.display_name?.slice(0,1) ?? "M"}</span><p><strong>{comment.profiles?.display_name ?? "Membre Mata"}</strong>{comment.body}<small><button onClick={() => setReplyTo(comment)}>Répondre</button>{authenticated?.userId===comment.author_id ? <button onClick={() => void deleteComment(comment)}>Supprimer</button> : <button onClick={() => void reportComment(comment)}>Signaler</button>}</small></p></article>) : <p className="no-comments">Soyez la première à commenter.</p>}</div><footer>{replyTo && <span className="reply-indicator">Réponse à {replyTo.profiles?.display_name ?? "un membre"} <button onClick={() => setReplyTo(null)}>×</button></span>}<input aria-label="Ajouter un commentaire" value={commentText} maxLength={1000} onChange={(event) => setCommentText(event.target.value)} placeholder={replyTo ? "Écrire une réponse…" : "Ajouter un commentaire…"} /><button disabled={!commentText.trim()} onClick={() => void addComment()}>Publier</button></footer></section></div>}

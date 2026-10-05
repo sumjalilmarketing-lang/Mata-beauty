@@ -623,6 +623,8 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   expect(new Set(cardTexts).size).toBe(cardTexts.length);
   await expect(page.getByRole("navigation", { name: "Filtres du feed" }).getByRole("button")).toHaveText(["Pour toi", "Près de moi", "Tendances"]);
   await page.getByRole("button", { name: "Près de moi", exact: true }).click();
+  await page.getByLabel("Ville ou quartier").fill("Dakar");
+  await page.getByRole("button", { name: "Voir les résultats", exact: true }).click();
   await expect(page.locator(".social-video-card").first()).toBeVisible();
   await page.getByRole("button", { name: "Tendances", exact: true }).click();
   await expect.poll(() => page.locator(".social-video-card").count()).toBeGreaterThanOrEqual(10);

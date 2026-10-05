@@ -132,6 +132,8 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await page.locator(".social-video-card video").first().dispatchEvent("canplay");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await page.getByRole("button", { name: "Près de moi", exact: true }).click();
+  await page.getByLabel("Ville ou quartier").fill("Dakar");
+  await page.getByRole("button", { name: "Voir les résultats", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(2);
   await expect(page.getByRole("navigation", { name: "Filtres du feed" }).getByRole("button")).toHaveCount(3);
   await page.getByRole("button", { name: "Tendances", exact: true }).click();

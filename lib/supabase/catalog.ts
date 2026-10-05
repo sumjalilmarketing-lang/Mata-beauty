@@ -8,6 +8,8 @@ export type CatalogProvider = {
   specialty: string;
   category: string;
   area: string;
+  address?: string;
+  coordinates?: { latitude: number; longitude: number };
   price: number;
   rating: number;
   reviews: number;
@@ -52,30 +54,39 @@ type ProviderRecord = {
     duration_minutes: number;
     price_amount: number;
     business_id: string | null;
+    businesses: { address: string; city: string; area: string | null; latitude: number | null; longitude: number | null } | null;
     services: { name: string; categories: { name: string } | null } | null;
   }>;
 };
 
 export async function fetchPublishedProviders(client: SupabaseClient, providerId?: string): Promise<CatalogProvider[]> {
-  let query = client
+  const records: ProviderRecord[] = [];
+  for (let offset = 0; ; offset += 100) {
+    let query = client
     .from("provider_profiles")
     .select(`
       profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,cover_url,
       provider_services!inner(
         id,title,duration_minutes,price_amount,business_id,
+        businesses(address,city,area,latitude,longitude),
         services(name,categories(name))
       )
     `)
     .eq("status", "approved")
     .eq("provider_services.is_active", true)
     .order("average_rating", { ascending: false })
-    .limit(24);
+    .order("profile_id")
+    .range(offset, offset + 99);
   if (providerId) query = query.eq("profile_id", providerId);
   const { data, error } = await query;
 
   if (error) throw error;
+    const batch = (data ?? []) as unknown as ProviderRecord[];
+    records.push(...batch);
+    if (batch.length < 100) break;
+  }
 
-  return ((data ?? []) as unknown as ProviderRecord[]).flatMap((provider) =>
+  return records.flatMap((provider) =>
     provider.provider_services.map((service) => ({
       id: service.id,
       profileId: provider.profile_id,
@@ -83,7 +94,10 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
       name: provider.business_name,
       specialty: service.title || service.services?.name || "Prestation beauté",
       category: service.services?.categories?.name || "Beauté",
-      area: provider.city,
+      area: service.businesses ? [service.businesses.area, service.businesses.city].filter(Boolean).join(", ") : provider.city,
+      address: service.businesses?.address || undefined,
+      coordinates: service.businesses?.latitude != null && service.businesses.longitude != null
+        ? { latitude: Number(service.businesses.latitude), longitude: Number(service.businesses.longitude) } : undefined,
       price: service.price_amount,
       rating: Number(provider.average_rating),
       reviews: provider.review_count,
