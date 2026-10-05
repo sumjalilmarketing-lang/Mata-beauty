@@ -1,6 +1,6 @@
 # Finalisation MATA Beauty — 5 et 6 octobre 2026
 
-État : DÉPLOYÉ, RECETTE PRODUCTION EN COURS. Production actuelle : 213c2748823eda302d858f7681c17bb6709bb9f6 sur mata-beauty.com, déploiement dpl_67WDCDorh8zjyRLanHmuNM2enxRj. Les sections suivantes conservent l'historique des corrections ; leurs mentions « non déployé » décrivent l'étape datée, pas cet état courant. Aucun PASS global de tous les écrans n'est revendiqué.
+État : DÉPLOYÉ, PARCOURS CRITIQUES RETESTÉS ; ACCEPTATION EXHAUSTIVE ENCORE OUVERTE. Production actuelle : 7710c29505ee6641a2daafbc77d551ec5908ea1c sur mata-beauty.com, déploiement dpl_GY8BYvW6YS59CEMe47dpadaRHbNn. Les sections suivantes conservent l'historique des corrections ; leurs mentions « non déployé » décrivent l'étape datée, pas cet état courant. Aucun PASS global de tous les écrans n'est revendiqué.
 
 ## Vérification réelle après déploiement
 
@@ -17,8 +17,19 @@
 | Vidéo → réservation | Lecture, pause, scroll, interactions, réserver | Bon contexte et création réelle | Test navigateur complet PASS, contrôles console/réseau finaux PASS | PASS | Défilement desktop et générations de chargement |
 | Profil production | Identité, préférences, support, confidentialité | Sauvegarde réelle et compte isolé | Test navigateur et contrôles en base PASS ; compte synthétique nettoyé | PASS | Profil séparé des paramètres |
 | Google → réservation | Vidéo, réservation, historique, annulation | Même compte, prestation, prix et créneau | Lecture observée à 4,11 s ; réservation pending de 09:00 à 09:30 UTC, 1000 XOF, compte Google correct ; historique et annulation réels | PASS | Paiement sur place, aucun débit |
+| Salon production | Catalogue, CRUD, réservation, échange, avis, statistiques | Données et échanges cohérents | Deux tests navigateur PASS, réponse reçue même avec WebSocket coupé ; nettoyage PASS | PASS | Rattrapage des messages, fixture alphabétique |
+| Rôles production | Six profils, droits et audit | Autorisations granulaires et isolation | client/provider/support/onboarding/finance/super_admin : contexte, RLS allow/deny, audit connexion et action sensible PASS | PASS | Contrôles serveur et migration d'approbation |
+| Horaire du feed | Navigateur Paris, prestation Dakar | 09:00 dans le feed comme dans la réservation | Après dernier déploiement : 09:00 dans les deux vues, lecture active à 4,14 s, console sans erreur | PASS | Fuseau Africa/Dakar explicite |
 
-Preuves locales : work/final-audit/production-version-213c274.json, welcome-production.json, production-profile-213c274.png. Domaine immuable : https://mata-beauty-ob9og1est-africrm.vercel.app/.
+Preuves locales : work/final-audit/production-version-7710c29.json, welcome-production.json, production-profile-213c274.png, production-feed-timezone-7710c29.png. Domaine immuable final : https://mata-beauty-gwxpdtz5x-africrm.vercel.app/. Vérification HTTP 200, quinze scripts identiques, backend production présent et QA absent.
+
+### Limites de l'acceptation
+
+- Aucun professionnel réel approuvé ni publication réelle visible hors comptes synthétiques à la vérification finale. Le feed vide après nettoyage est l'état des données, pas une preuve de panne vidéo. La mise en service commerciale exige de vrais dossiers complets, vérifiés par un agent, puis leurs publications.
+- Réception dans une boîte humaine, nouveau compte Google avec premier consentement, matrice complète des refus/annulations OAuth et GPS sur téléphone physique : non validés par ce lot. La connexion Google existante et le transport Resend réel sont validés séparément.
+- Les parcours critiques ci-dessus et les contrôles Preview sont testés ; l'inventaire antérieur de chaque contrôle de chaque écran et tous les scénarios d'injection de panne ne sont pas entièrement clos. Ne pas transformer les cas non exécutés en PASS.
+- Avertissements préexistants de l'advisor Supabase conservés dans l'audit ; cette livraison ne revendique pas leur résolution générale. Paiements toujours mock/sur place.
+- Tous les correctifs applicatifs sont commités et déployés. Derniers contrôles locaux : lint, typecheck, 73 tests, build PASS. Les preuves techniques et captures sont dans work/final-audit (ignoré de Git) ; aucun secret committé.
 
 ## Audit préalable
 
