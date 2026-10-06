@@ -117,3 +117,58 @@ test.describe('MFA obligatoire',()=>{
     await expect(page.getByAltText('Code QR de configuration du second facteur')).toHaveCount(0);
   });
 });
+
+test('sante : mesures independantes et panne sans faux zero', async ({page}) => {
+  await login(page, 'super_admin');
+  await page.goto('/admin');
+  const nav = page.getByRole('navigation', {name:'Navigation Super Admin'});
+  await nav.getByTitle('Santé plateforme', {exact:true}).click();
+  const grid = page.locator('.health-grid');
+  await expect(grid).toBeVisible();
+  await expect(grid.locator('article').filter({has:page.getByText('Application',{exact:true})}).locator('strong')).toHaveText('Opérationnelle');
+  await expect(grid.locator('article').filter({has:page.getByText('Réservations 24 h',{exact:true})}).locator('strong')).toHaveText(/^\d+$/);
+  await page.route('**/rest/v1/bookings?*', route => route.abort('failed'));
+  await page.route('**/api/health/server', route => route.abort('failed'));
+  await page.getByRole('button',{name:'Actualiser',exact:true}).click();
+  await expect(grid.locator('article').filter({has:page.getByText('Application',{exact:true})}).locator('strong')).toHaveText('Indisponible');
+  await expect(grid.locator('article').filter({has:page.getByText('Réservations 24 h',{exact:true})}).locator('strong')).toHaveText('Indisponible');
+  await expect(grid.locator('article').filter({has:page.getByText('Notifications 24 h',{exact:true})}).locator('strong')).toHaveText(/^\d+$/);
+  await page.screenshot({path:'work/final-audit/health-partial-outage.png',fullPage:true});
+  await page.unroute('**/rest/v1/bookings?*');
+  await page.unroute('**/api/health/server');
+  await page.getByRole('button',{name:'Actualiser',exact:true}).click();
+  await expect(grid.locator('article').filter({has:page.getByText('Application',{exact:true})}).locator('strong')).toHaveText('Opérationnelle');
+  await page.locator('.admin-signout').click();
+  await expect(page.getByLabel('Adresse administrateur')).toBeVisible();
+});
+
+test('support : demande client, reponse agent et resolution', async ({page, browser}) => {
+  test.setTimeout(120000);
+  const subject = `Demande recette ${run}`;
+  await login(page,'client'); await page.goto('/app/support');
+  await page.getByPlaceholder('Décrivez brièvement votre demande').fill(subject);
+  await page.getByRole('button',{name:'Envoyer',exact:true}).click();
+  await expect(page.getByText('Demande envoyée au support.',{exact:true})).toBeVisible();
+  const context = await browser.newContext(); const staffPage = await context.newPage();
+  try {
+    await login(staffPage,'support'); await staffPage.goto('/support-agent/tickets');
+    await staffPage.getByRole('button',{name:subject,exact:true}).click();
+    await staffPage.getByLabel('Réponse au support').fill('Votre demande de recette a bien été reçue.');
+    await staffPage.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();
+    await expect(staffPage.getByText('Demande mise à jour.',{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:subject,exact:true}).click();
+    await expect(page.getByText('Votre demande de recette a bien été reçue.',{exact:true})).toBeVisible();
+    await page.getByLabel('Réponse au support').fill('Merci, le problème est résolu.');
+    await page.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();
+    await expect(page.getByText('Demande mise à jour.',{exact:true})).toBeVisible();
+    await staffPage.getByRole('button',{name:'Actualiser les échanges',exact:true}).click();
+    await expect(staffPage.getByText('Merci, le problème est résolu.',{exact:true})).toBeVisible();
+    await staffPage.getByRole('button',{name:'Résoudre',exact:true}).click();
+    await expect(staffPage.getByText('Demande mise à jour.',{exact:true})).toBeVisible();
+    const ticket = await admin.from('support_tickets').select('status').eq('requester_id',accounts.get('client')!.id).eq('subject',subject).single();
+    expect(ticket.data?.status).toBe('resolved');
+    await page.reload(); await expect(page.locator('.control-list-row').filter({hasText:subject})).toContainText('resolved');
+    await staffPage.getByRole('button',{name:'Se déconnecter',exact:true}).click(); await expect(staffPage).toHaveURL(/\/$/);
+  } finally { await context.close(); }
+  await page.getByRole('button',{name:'Se déconnecter',exact:true}).click(); await expect(page).toHaveURL(/\/$/);
+});

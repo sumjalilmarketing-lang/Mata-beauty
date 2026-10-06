@@ -8,6 +8,8 @@ import { ProviderReview } from "./provider-review";
 import { OnboardingQueue } from "./onboarding-queue";
 import { NotificationCenter, NotificationBadge } from "./notification-center";
 import { LaunchAdmin } from "./launch-admin";
+import { SupportInbox } from "./support-inbox";
+import { ModerationInbox } from "./moderation-inbox";
 
 type AdminContext = {
   is_super_admin: boolean;
@@ -482,6 +484,8 @@ function AdminModule({
 }) {
   if (module === "overview" || module === "statistics") return <Overview context={context} setModule={setModule} />;
   if (module === "launch" || module === "cohort" || module === "platform-health") return <LaunchAdmin mode={module} />;
+  if (module === "reports") return <ModerationInbox />;
+  if (module === "support") return <SupportInbox />;
   if (module === "users") return <UsersModule context={context} notify={notify} />;
   if (module === "notifications") return <NotificationCenter />;
   if (module === "verification") return <OnboardingQueue moduleKey="dashboard" />;

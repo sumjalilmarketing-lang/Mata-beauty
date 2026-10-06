@@ -635,6 +635,13 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   expect(action.data).toMatchObject({ action: "hide", actor_id: moderatorId });
   expect(audit.data).toMatchObject({ action: "social.post.hide", actor_id: moderatorId });
   expect((await clientApi.from("social_feed").select("id").eq("id", studioPostId)).data).toHaveLength(0);
+  await adminPage.getByRole("navigation", { name: "Navigation Super Admin" }).getByRole("button", { name: "Signalements", exact: true }).click();
+  await adminPage.getByTestId(`report-${report.data!.id}`).click();
+  await adminPage.getByLabel("Décision", {exact:true}).selectOption("close");
+  await adminPage.getByLabel("Justification", {exact:true}).fill("Publication masquée et décision vérifiée pendant la recette.");
+  await adminPage.getByRole("button", {name:"Enregistrer la décision",exact:true}).click();
+  await expect(adminPage.getByText("Décision enregistrée.",{exact:true})).toBeVisible();
+  expect((await admin.from("reports").select("status").eq("id",report.data!.id).single()).data?.status).toBe("resolved");
   await adminContext.close();
 
   const restored = await superApi.rpc("admin_moderate_social_post", { target_post_id: studioPostId, decision: "restore", reason: "Restauration contrôlée Super Admin" });

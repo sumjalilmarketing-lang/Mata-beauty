@@ -18,6 +18,8 @@ import { SocialDashboard } from "./social-dashboard";
 import { ProviderAgenda, ProviderRevenue } from "./provider-activity";
 import { ClientFavorites } from "./client-favorites";
 import { NotificationCenter } from "./notification-center";
+import { SupportInbox } from "./support-inbox";
+import { ModerationInbox } from "./moderation-inbox";
 
 type Row = Record<string, unknown>;
 type ResourceDefinition = { table: string; select: string; title: (row: Row) => string; meta: (row: Row) => string };
@@ -41,7 +43,9 @@ const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, Resour
 export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const focused = (space === "pro" && ["dashboard", "services", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
-  const custom = focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || ["messages", "profile", "videos", "inspirations"].includes(module.key) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue"].includes(module.key));
+  const supportInbox = space === "support" && ["dashboard", "tickets", "unassigned", "mine", "priority"].includes(module.key);
+  const moderationInbox = space === "moderation" && ["dashboard", "reports"].includes(module.key);
+  const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || ["messages", "profile", "videos", "inspirations"].includes(module.key) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue"].includes(module.key));
   const definition = custom ? undefined : module.resource ? resources[module.resource] : module.key === "dashboard" ? resources.bookings : undefined;
   const searchParams = useSearchParams();
   const query = (searchParams.get("q") ?? "").trim().toLocaleLowerCase("fr");
@@ -62,6 +66,8 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   }, [definition, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
+  if (moderationInbox) return <ModerationInbox />;
+  if (supportInbox) return <SupportInbox key={module.key} filter={module.key} userId={userId} />;
   if (module.key === "notifications") return <NotificationCenter userId={userId} />;
   if (focused) return <LiveDashboard role={space === "client" ? "client" : "provider"} userId={userId} displayName="" moduleKey={module.key} onBack={() => window.location.assign("/")} onSignOut={async () => { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/"); }} />;
   if (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) return <OnboardingQueue moduleKey={module.key} />;
