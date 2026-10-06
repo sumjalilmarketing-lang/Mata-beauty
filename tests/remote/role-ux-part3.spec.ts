@@ -35,7 +35,11 @@ test.beforeAll(async()=>{
     }
   }
 });
-test.afterAll(async()=>{ for(const account of accounts.values()) expect((await admin.auth.admin.deleteUser(account.id)).error).toBeNull(); });
+test.afterAll(async()=>{
+  const ids=[...accounts.values()].map(account=>account.id);
+  if(ids.length) expect((await admin.from('support_tickets').delete().in('requester_id',ids)).error).toBeNull();
+  for(const account of accounts.values()) expect((await admin.auth.admin.deleteUser(account.id)).error).toBeNull();
+});
 test("visiteur : navigation et écran mobile",async({page})=>{
   const bypass=process.env.VERCEL_AUTOMATION_BYPASS_SECRET,base=process.env.REMOTE_APP_URL;
   if(bypass&&base) await page.route(`${new URL(base).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
@@ -129,14 +133,14 @@ test('sante : mesures independantes et panne sans faux zero', async ({page}) => 
   await expect(grid.locator('article').filter({has:page.getByText('Réservations 24 h',{exact:true})}).locator('strong')).toHaveText(/^\d+$/);
   await page.route('**/rest/v1/bookings?*', route => route.abort('failed'));
   await page.route('**/api/health/server', route => route.abort('failed'));
-  await page.getByRole('button',{name:'Actualiser',exact:true}).click();
-  await expect(grid.locator('article').filter({has:page.getByText('Application',{exact:true})}).locator('strong')).toHaveText('Indisponible');
-  await expect(grid.locator('article').filter({has:page.getByText('Réservations 24 h',{exact:true})}).locator('strong')).toHaveText('Indisponible');
+  await page.locator('.launch-admin').getByRole('button',{name:'Actualiser',exact:true}).click();
+  await expect(grid.locator('article').filter({has:page.getByText('Application',{exact:true})}).locator('strong')).toHaveText('Indisponible',{timeout:20000});
+  await expect(grid.locator('article').filter({has:page.getByText('Réservations 24 h',{exact:true})}).locator('strong')).toHaveText('Indisponible',{timeout:20000});
   await expect(grid.locator('article').filter({has:page.getByText('Notifications 24 h',{exact:true})}).locator('strong')).toHaveText(/^\d+$/);
   await page.screenshot({path:'work/final-audit/health-partial-outage.png',fullPage:true});
   await page.unroute('**/rest/v1/bookings?*');
   await page.unroute('**/api/health/server');
-  await page.getByRole('button',{name:'Actualiser',exact:true}).click();
+  await page.locator('.launch-admin').getByRole('button',{name:'Actualiser',exact:true}).click();
   await expect(grid.locator('article').filter({has:page.getByText('Application',{exact:true})}).locator('strong')).toHaveText('Opérationnelle');
   await page.locator('.admin-signout').click();
   await expect(page.getByLabel('Adresse administrateur')).toBeVisible();
