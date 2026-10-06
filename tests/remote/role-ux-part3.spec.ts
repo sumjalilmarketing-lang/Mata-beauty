@@ -6,6 +6,7 @@ const admin=createClient(url,process.env.SUPABASE_SERVICE_ROLE_KEY??"",{auth:{pe
 const password=`QA-${randomUUID()}!`,run=randomUUID();
 const roles=["client","provider","verification_agent","support","moderator","admin","super_admin"];
 const accounts=new Map<string,{id:string;email:string}>();
+test.use({trace:'off',video:'off',screenshot:'off'});
 async function login(page:Page,role:string) {
   const bypass=process.env.VERCEL_AUTOMATION_BYPASS_SECRET,base=process.env.REMOTE_APP_URL;
   if(bypass&&base) await page.route(`${new URL(base).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
@@ -15,7 +16,8 @@ async function login(page:Page,role:string) {
   await page.getByRole("button",{name:"Se connecter",exact:true}).click();await expect(page).toHaveURL(/\/app/,{timeout:30000});
 }
 test.beforeAll(async()=>{
-  if(url!=="https://kazlvtxkbsdhbfvtqqdp.supabase.co") throw new Error("QA only");
+  const productionAllowed=process.env.ALLOW_PRODUCTION_QA==="mata-beauty.com"&&process.env.REMOTE_APP_URL==="https://mata-beauty.com"&&url==="https://qjdwxdbvrxedyfolnpol.supabase.co";
+  if(url!=="https://kazlvtxkbsdhbfvtqqdp.supabase.co"&&!productionAllowed) throw new Error("Explicit production acceptance authorization required");
   for(const role of roles) {
     const email=`codex-ux-${role}-${run}@example.test`;
     const result=await admin.auth.admin.createUser({email,password,email_confirm:true,app_metadata:{qa_suppress_email:true},user_metadata:{display_name:`Recette ${role}`,legal_accepted:true}});
@@ -44,6 +46,15 @@ test("visiteur : navigation et écran mobile",async({page})=>{
 for(const role of roles) test(`${role} : menus, notifications privées, responsive et session`,async({page})=>{
   test.setTimeout(180000);const errors:string[]=[];page.on("pageerror",e=>errors.push(e.message));
   await login(page,role);
+  if(role==='client'||role==='provider') {
+    for(const route of ['/onboarding','/support-agent','/moderation','/finance','/operations','/staff']) {
+      await page.goto(route);await expect(page).toHaveURL(/acces=refuse/);
+    }
+    for(const route of ['/admin','/admin/users','/admin/roles']) {
+      await page.goto(route);await expect(page.getByRole('heading',{name:'Compte non autorisé'})).toBeVisible();
+      await expect(page.getByRole('navigation',{name:'Navigation Super Admin'})).toHaveCount(0);
+    }
+  }
   if(role==="admin"||role==="super_admin") {
     await page.goto("/admin");const nav=page.getByRole("navigation",{name:"Navigation Super Admin"});await expect(nav).toBeVisible();
     const names=await nav.locator("button span").allTextContents();
@@ -66,4 +77,36 @@ for(const role of roles) test(`${role} : menus, notifications privées, responsi
     await page.setViewportSize({width:1366,height:768});await page.getByRole("button",{name:"Se déconnecter",exact:true}).click();await page.goto(`${prefix}/notifications`);await expect(page).toHaveURL(/connexion=requise/);
   }
   expect(errors).toEqual([]);
+});
+
+test.describe('MFA obligatoire',()=>{
+  test('le second facteur conditionne réellement les permissions et le tableau de bord',async({page})=>{
+    test.setTimeout(120000);
+    const account=accounts.get('super_admin')!;
+    expect((await admin.from('admin_user_roles').update({requires_mfa:true}).eq('user_id',account.id)).error).toBeNull();
+    await login(page,'super_admin');await page.goto('/admin');
+    await expect(page.getByRole('heading',{name:'Vérification en deux étapes'})).toBeVisible();
+    await expect(page.getByRole('navigation',{name:'Navigation Super Admin'})).toHaveCount(0);
+    const enrollment=page.waitForResponse(response=>response.url().endsWith('/auth/v1/factors')&&response.request().method()==='POST');
+    await page.getByRole('button',{name:'Préparer la vérification'}).click();
+    const factor=await (await enrollment).json() as {totp:{secret:string}};
+    await expect(page.getByAltText('Code QR de configuration du second facteur')).toBeVisible();
+    await page.getByLabel('Code d’authentification').fill('000000');await page.getByRole('button',{name:'Vérifier le code'}).click();
+    await expect(page.getByText('Code invalide ou expiré. Saisissez le code actuel.',{exact:true})).toBeVisible();
+    const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits='';for(const char of factor.totp.secret.replace(/=/g,''))bits+=alphabet.indexOf(char).toString(2).padStart(5,'0');
+    const bytes=[];for(let index=0;index+8<=bits.length;index+=8)bytes.push(parseInt(bits.slice(index,index+8),2));
+    const counter=Buffer.alloc(8);counter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
+    const {createHmac}=await import('node:crypto');const digest=createHmac('sha1',Buffer.from(bytes)).update(counter).digest();const offset=digest[19]&15;
+    const otp=((digest.readUInt32BE(offset)&0x7fffffff)%1000000).toString().padStart(6,'0');
+    await page.getByLabel('Code d’authentification').fill(otp);await page.getByRole('button',{name:'Vérifier le code'}).click();
+    await expect(page.getByRole('navigation',{name:'Navigation Super Admin'})).toBeVisible({timeout:20000});
+    await page.reload();await expect(page.getByRole('navigation',{name:'Navigation Super Admin'})).toBeVisible();
+    await page.locator('.admin-signout').click();await expect(page.getByLabel('Adresse administrateur')).toBeVisible();
+    await page.getByLabel('Adresse administrateur').fill(account.email);await page.getByLabel('Mot de passe').fill(password);
+    await page.getByRole('button',{name:'Accéder à l’administration'}).click();
+    await expect(page.getByRole('heading',{name:'Vérification en deux étapes'})).toBeVisible();
+    await page.getByRole('button',{name:'Préparer la vérification'}).click();
+    await expect(page.getByLabel('Code d’authentification')).toBeVisible();
+    await expect(page.getByAltText('Code QR de configuration du second facteur')).toHaveCount(0);
+  });
 });

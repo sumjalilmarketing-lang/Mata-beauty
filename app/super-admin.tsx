@@ -299,7 +299,7 @@ function ConfirmationModal({
 export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: string; supabaseAnonKey: string }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const [context, setContext] = useState<AdminContext | null>(null);
-  const [sessionState, setSessionState] = useState<"loading" | "anonymous" | "unauthorized" | "ready">("loading");
+  const [sessionState, setSessionState] = useState<"loading" | "anonymous" | "unauthorized" | "mfa" | "ready">("loading");
   const [activeModule, setActiveModule] = useState<ModuleKey>("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
@@ -318,6 +318,13 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
       if (!session.session?.user) {
         setContext(null);
         setSessionState("anonymous");
+        return;
+      }
+      const mfa = await withTimeout(supabase.rpc("admin_mfa_required"));
+      if (mfa.error) throw mfa.error;
+      if (mfa.data === true) {
+        setContext(null);
+        setSessionState("mfa");
         return;
       }
       const { data, error } = await withTimeout(supabase.rpc("get_admin_context"));
@@ -369,6 +376,7 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: s
 
   if (sessionState === "loading") return <main className="admin-auth-shell"><LoadingSkeleton /></main>;
   if (sessionState === "anonymous") return <AdminLogin onAuthenticated={resolveSession} configured={getSupabaseConfiguration().configured} />;
+  if (sessionState === "mfa") return <AdminMfa onVerified={resolveSession} onSignOut={signOut} />;
   if (sessionState === "unauthorized") return <AccessDenied onSignOut={signOut} />;
   if (!context) return null;
 
@@ -807,4 +815,56 @@ function OperationalModule({ module, context }: { module: ModuleKey; context: Ad
     security: "Sessions, MFA, contrôles d’accès et alertes de sécurité.",
   };
   return <section className="admin-dashboard-grid"><article className="admin-panel span-two"><p>Rubrique administrative</p><h2>{navigation.find((item) => item.key === module)?.label}</h2><p>{descriptions[module] || "Informations réservées à votre rôle."}</p><p>Cette rubrique ne dispose pas encore d’un écran de gestion connecté. Elle ne permet pas de conclure qu’aucune demande ou alerte n’est en attente.</p><div className="module-capabilities"><StatusBadge value={context.is_super_admin ? "Super Admin" : "Permission limitée"} /></div></article></section>;
+}
+
+function AdminMfa({ onVerified, onSignOut }: { onVerified: () => Promise<void>; onSignOut: () => Promise<void> }) {
+  const [factorId, setFactorId] = useState("");
+  const [qrCode, setQrCode] = useState("");
+  const [code, setCode] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function prepare() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true); setFeedback("");
+    try {
+      const factors = await supabase.auth.mfa.listFactors();
+      if (factors.error) throw factors.error;
+      const existing = factors.data.totp.find(factor => factor.status === "verified");
+      if (existing) { setFactorId(existing.id); return; }
+      // Remove only incomplete enrollments before restarting this setup.
+      for (const factor of factors.data.all.filter(factor => factor.factor_type === "totp" && factor.status === "unverified")) {
+        const removed = await supabase.auth.mfa.unenroll({ factorId: factor.id });
+        if (removed.error) throw removed.error;
+      }
+      const enrolled = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "MATA Beauty administration" });
+      if (enrolled.error) throw enrolled.error;
+      setFactorId(enrolled.data.id); setQrCode(enrolled.data.totp.qr_code);
+    } catch { setFeedback("Impossible de préparer la vérification. Réessayez."); }
+    finally { setBusy(false); }
+  }
+  async function verify(event: FormEvent) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !factorId) return;
+    setBusy(true); setFeedback("");
+    try {
+      const result = await supabase.auth.mfa.challengeAndVerify({ factorId, code });
+      if (result.error) { setFeedback("Code invalide ou expiré. Saisissez le code actuel."); return; }
+      setQrCode(""); setCode("");
+      await onVerified();
+    } catch { setFeedback("Vérification indisponible. Réessayez."); }
+    finally { setBusy(false); }
+  }
+  return <main className="admin-auth-shell"><section className="admin-login-card">
+    <h1>Vérification en deux étapes</h1>
+    <p>Votre rôle exige un second facteur avant tout accès administratif.</p>
+    {!factorId ? <button className="primary" disabled={busy} onClick={() => void prepare()}>{busy ? "Préparation…" : "Préparer la vérification"}</button> : <form onSubmit={event => void verify(event)}>
+      {qrCode && <><p>Scannez ce code avec votre application d’authentification, puis saisissez le code à six chiffres.</p><Image src={qrCode} alt="Code QR de configuration du second facteur" width={220} height={220} unoptimized /></>}
+      <label>Code d’authentification<input value={code} onChange={event => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required /></label>
+      <button className="primary" disabled={busy || code.length !== 6}>{busy ? "Vérification…" : "Vérifier le code"}</button>
+    </form>}
+    {feedback && <p role="alert">{feedback}</p>}
+    <button className="secondary" disabled={busy} onClick={() => void onSignOut()}>Se déconnecter</button>
+  </section></main>;
 }

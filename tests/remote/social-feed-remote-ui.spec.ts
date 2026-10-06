@@ -705,7 +705,7 @@ test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async (
 
 test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
   test.setTimeout(120_000);
-  const webkitBrowser = await webkit.launch();
+  const webkitBrowser = await webkit.launch({ channel: "" });
   const context = await webkitBrowser.newContext({ baseURL: remoteAppUrl ?? "http://localhost:3100", viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   await page.addInitScript(() => {
