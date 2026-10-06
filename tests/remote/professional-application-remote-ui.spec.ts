@@ -81,6 +81,7 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
   await page.goto("/pro"); await expect(page).toHaveURL(/\/app\/application/);
   const context = await browser.newContext({ baseURL: process.env.REMOTE_APP_URL ?? "http://localhost:3100" }); const reviewer = await context.newPage();
   try {
+    reviewer.on("console", message => { if (message.type() === "error" && /violates.*Content Security Policy|Refused to frame/i.test(message.text()) && !message.text().includes("vercel.live")) errors.push("Document preview blocked by CSP"); });
     reviewer.on("dialog", dialog => dialog.accept(dialog.type() === "prompt" ? "Merci de remplacer la pièce d’identité illisible." : undefined));
     await login(reviewer, accounts[1].email); await reviewer.goto("/onboarding/notifications");
     await reviewer.locator(".notification-card").filter({ hasText: "Nouveau dossier professionnel" }).getByRole("button", { name: "Ouvrir", exact: true }).click();
@@ -100,13 +101,14 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
     for (const name of ["Pièce d’identité", "Immatriculation", "Qualification", "Justificatif d’adresse"]) {
       await reviewer.getByRole("button", { name: `Voir ${name}`, exact: true }).click();
       await expect(reviewer.getByRole("dialog")).toBeVisible();
-      if(name === "Qualification") { await expect(reviewer.getByTitle("Document PDF privé")).toBeVisible();await reviewer.screenshot({path:"work/final-audit/part3-document-pdf.png"}); }
+      if(name === "Qualification") { await expect(reviewer.getByTitle("Document PDF privé")).toBeVisible(); }
       else {await expect(reviewer.getByRole("dialog").getByRole("img")).toBeVisible();await reviewer.getByRole("slider",{name:"Zoom du document"}).focus();await reviewer.getByRole("slider",{name:"Zoom du document"}).press("ArrowRight");await expect(reviewer.getByRole("slider",{name:"Zoom du document"})).toHaveValue("125");}
       const opened = context.waitForEvent("page");
       await reviewer.getByRole("link", { name: "Ouvrir le document privé dans un nouvel onglet" }).click();
       const document = await opened;
       await expect(document).toHaveURL(/\/storage\/v1\/object\/sign\/provider-documents\//);
       expect((await document.request.get(document.url())).status()).toBe(200); await document.close();
+      if(name === "Qualification") await reviewer.screenshot({path:"work/final-audit/part3-document-pdf.png"});
       await reviewer.getByRole("button", { name: "Fermer l’aperçu" }).click();
     }
     await reviewer.locator(".document-row").filter({ hasText: "Pièce d’identité" }).getByRole("button", { name: "Demander un complément" }).click();
