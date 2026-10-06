@@ -6,6 +6,7 @@ import { publicErrorMessage } from "@/lib/ui/public-error";
 
 type Mode = "launch" | "cohort" | "platform-health";
 type RankedMetric = { label: string; value: number };
+type DeliveryHealth = { notifications24h: number; pending: number; sent: number; failed: number; needsReview: number };
 type LaunchMetrics = { target_users: number; target_providers: number; users: number; active_clients: number; providers: number; providers_approved: number; complete_profiles: number; videos: number; bookings: number; booking_conversion: number; onboarding_abandons: number; reports: number; critical_alerts: number; reminder_jobs_pending: number; top_categories: RankedMetric[]; top_searches: RankedMetric[]; top_cities: RankedMetric[] };
 type Provider = { profile_id: string; business_name: string; status: string; verified_at: string | null };
 type CohortRow = { provider_id: string; is_founder: boolean; internal_note: string | null; mata_contact_id: string | null; added_at: string; business_name: string; status: string; verified_at: string | null; onboarding_status: string | null; completeness: number; services_count: number; published_content: number; first_booking_at: string | null; last_activity_at: string | null };
@@ -24,6 +25,7 @@ export function LaunchAdmin({ mode }: { mode: Mode }) {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [health, setHealth] = useState({ server: false, bookings24h: 0, uploads24h: 0, notifications24h: 0, criticalAlerts: 0, version: deployedVersion });
   const [notice, setNotice] = useState("");
+  const [deliveryHealth, setDeliveryHealth] = useState<DeliveryHealth | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -38,15 +40,18 @@ export function LaunchAdmin({ mode }: { mode: Mode }) {
         client.from("provider_profiles").select("profile_id,business_name,status,verified_at").order("created_at", { ascending: true }).limit(100),
         client.from("bookings").select("id", { count: "exact", head: true }).gte("created_at", since),
         client.from("posts").select("id", { count: "exact", head: true }).gte("created_at", since),
-        client.from("notifications").select("id", { count: "exact", head: true }).gte("created_at", since),
+        client.rpc("notification_delivery_health"),
         client.from("fraud_alerts").select("id", { count: "exact", head: true }).eq("severity", "critical").in("status", ["open", "reviewing"]),
         fetch("/api/health/server", { cache: "no-store" }).then((response) => response.ok ? response.json() as Promise<{ ok: boolean }> : { ok: false }),
       ]);
       if (dashboard.error) throw dashboard.error;
+      if (notifications.error) throw notifications.error;
+      const deliveries = notifications.data as DeliveryHealth;
+      setDeliveryHealth(deliveries);
       setMetrics(dashboard.data as LaunchMetrics);
       setCohort((cohortRows.data ?? []) as unknown as CohortRow[]);
       setProviders((providerRows.data ?? []) as Provider[]);
-      setHealth({ server: Boolean(server.ok), bookings24h: bookings.count ?? 0, uploads24h: uploads.count ?? 0, notifications24h: notifications.count ?? 0, criticalAlerts: alerts.count ?? 0, version: deployedVersion });
+      setHealth({ server: Boolean(server.ok), bookings24h: bookings.count ?? 0, uploads24h: uploads.count ?? 0, notifications24h: deliveries.notifications24h, criticalAlerts: alerts.count ?? 0, version: deployedVersion });
     } catch (error) { setNotice(publicErrorMessage(error, "Les données lancement nécessitent la migration Phase 2.")); }
     finally { setLoading(false); }
   }, []);
@@ -83,6 +88,7 @@ export function LaunchAdmin({ mode }: { mode: Mode }) {
     <article><span>Application</span><strong className={health.server ? "healthy" : "critical"}>{health.server ? "Opérationnelle" : "Incident"}</strong><small>Auth · Supabase · rôle serveur</small></article>
     <article><span>Réservations 24 h</span><strong>{health.bookings24h}</strong><small>Créations réelles</small></article><article><span>Uploads 24 h</span><strong>{health.uploads24h}</strong><small>Publications enregistrées</small></article>
     <article><span>Notifications 24 h</span><strong>{health.notifications24h}</strong><small>Internes</small></article><article><span>Alertes critiques</span><strong className={health.criticalAlerts ? "critical" : "healthy"}>{health.criticalAlerts}</strong><small>Anti-fraude ouvertes</small></article><article><span>Version Production</span><strong>{health.version}</strong><small>Commit validé</small></article>
+    {deliveryHealth && <><article><span>E-mails en attente</span><strong>{deliveryHealth.pending}</strong><small>Transactionnels, traitement automatique</small></article><article><span>E-mails envoyés</span><strong>{deliveryHealth.sent}</strong><small>Acceptés par le service d’envoi</small></article><article><span>E-mails à reprendre</span><strong className={deliveryHealth.failed ? "critical" : "healthy"}>{deliveryHealth.failed}</strong><small>Nouvelle tentative automatique</small></article><article><span>E-mails à vérifier</span><strong className={deliveryHealth.needsReview ? "critical" : "healthy"}>{deliveryHealth.needsReview}</strong><small>Intervention technique requise ; aucun renvoi aveugle</small></article></>}
   </div></section>;
 
   if (mode === "cohort") return <section className="admin-module launch-admin"><header><div><span>20 PROFESSIONNELS FONDATEURS</span><h2>Cohorte lancement</h2><p>Accompagnez les premiers professionnels sans exposer de données inutiles.</p></div></header>{notice && <p className="admin-feedback">{notice}</p>}<form className="launch-cohort-form" onSubmit={(event) => void addToCohort(event)}><select name="providerId" required defaultValue=""><option value="">Choisir un prestataire</option>{providers.filter((item) => !cohortIds.has(item.profile_id)).map((item) => <option key={item.profile_id} value={item.profile_id}>{item.business_name} · {item.status}</option>)}</select><input name="note" maxLength={2000} placeholder="Note interne de suivi"/><label><input name="founder" type="checkbox"/> Professionnel fondateur</label><button>Ajouter</button></form><div className="cohort-list">{cohort.map((row) => <article key={row.provider_id}><div><strong>{row.business_name}</strong><small>{row.status} · {row.verified_at ? "Vérifié" : "Vérification en attente"} · {row.completeness}%</small><small>{row.onboarding_status ?? "onboarding inconnu"} · {row.services_count} prestations · {row.published_content} contenus</small><small>Première réservation : {row.first_booking_at ? new Date(row.first_booking_at).toLocaleDateString("fr-FR") : "—"} · Dernière activité : {row.last_activity_at ? new Date(row.last_activity_at).toLocaleDateString("fr-FR") : "—"}</small>{row.internal_note && <p>{row.internal_note}</p>}</div><button onClick={() => void toggleFounder(row)}>{row.is_founder ? "★ Fondateur" : "Activer le badge"}</button></article>)}{cohort.length === 0 && <div className="compact-empty">Aucun professionnel dans la cohorte.</div>}</div></section>;

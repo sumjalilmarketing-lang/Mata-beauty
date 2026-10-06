@@ -26,6 +26,8 @@ try {
   assert.ok((await clients[0].rpc('professional_application_detail',{target_provider_id:users[1]})).error);
   assert.ok((await clients[0].rpc('professional_application_history',{target_provider_id:users[1]})).error);
   assert.ok((await clients[0].rpc('claim_transactional_emails',{batch_size:10})).error);
+  assert.ok((await clients[0].rpc('notification_delivery_health')).error);
+  assert.ok((await clients[0].rpc('dispatch_transactional_notifications')).error);
   const delivery=await service.from('notification_deliveries').select('id,status').eq('notification_id',id).single();assert.equal(delivery.error,null);
   assert.equal((await clients[0].from('notification_deliveries').select('id').eq('id',delivery.data.id)).data.length,0);
   const claimed=await Promise.all([service.rpc('claim_transactional_emails',{batch_size:20}),service.rpc('claim_transactional_emails',{batch_size:20})]);

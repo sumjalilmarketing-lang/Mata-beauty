@@ -47,7 +47,7 @@ test.describe.configure({ mode: "serial" });
 async function createUser(email: string, professional = false) {
   let lastError = "Erreur Auth inconnue";
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: professional ? "Mata Feed Pro" : "Mata Feed Cliente", legal_accepted: "true", professional_intent: professional ? "true" : "false" } });
+    const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, app_metadata: { qa_suppress_email: true }, user_metadata: { display_name: professional ? "Mata Feed Pro" : "Mata Feed Cliente", legal_accepted: "true", professional_intent: professional ? "true" : "false" } });
     if (!error && data.user) {
       // Synthetic QA inboxes must never receive production welcome mail.
       expect((await admin.from("welcome_email_deliveries").update({ status: "needs_review" }).eq("user_id", data.user.id)).error).toBeNull();

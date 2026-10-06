@@ -17,6 +17,7 @@ export default defineConfig({
     video: "retain-on-failure",
     screenshot: "only-on-failure",
     ...devices["Desktop Chrome"],
+    ...(process.env.QA_FULL_CHROMIUM === "1" ? { channel: "chromium" } : {}),
   },
   webServer: [
     ...remoteAppUrl ? [] : [{

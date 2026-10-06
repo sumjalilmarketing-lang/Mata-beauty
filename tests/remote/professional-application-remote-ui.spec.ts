@@ -24,7 +24,8 @@ async function login(page: Page, email: string) {
   await expect(page.getByRole("navigation", { name: "Navigation Espace client" })).toBeVisible({ timeout: 30_000 });
 }
 test.beforeAll(async () => {
-  if (url !== "https://kazlvtxkbsdhbfvtqqdp.supabase.co") throw new Error("QA only");
+  const productionAuthorized = process.env.ALLOW_PRODUCTION_QA === "mata-beauty.com" && url === "https://qjdwxdbvrxedyfolnpol.supabase.co" && process.env.REMOTE_APP_URL === "https://mata-beauty.com";
+  if (url !== "https://kazlvtxkbsdhbfvtqqdp.supabase.co" && !productionAuthorized) throw new Error("Explicit production QA authorization required");
   for (const label of ["candidate", "agent"]) {
     const email = `codex-application-ui-${label}-${run}@example.test`;
     const result = await admin.auth.admin.createUser({ email, password, email_confirm: true, app_metadata: { qa_suppress_email: true }, user_metadata: { display_name: "Candidature QA", legal_accepted: true } });
@@ -103,8 +104,8 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
       else {await expect(reviewer.getByRole("dialog").getByRole("img")).toBeVisible();await reviewer.getByRole("slider",{name:"Zoom du document"}).focus();await reviewer.getByRole("slider",{name:"Zoom du document"}).press("ArrowRight");await expect(reviewer.getByRole("slider",{name:"Zoom du document"})).toHaveValue("125");}
       const opened = context.waitForEvent("page");
       await reviewer.getByRole("link", { name: "Ouvrir le document privé dans un nouvel onglet" }).click();
-      const document = await opened; await document.waitForLoadState();
-      expect(document.url()).toContain("/storage/v1/object/sign/provider-documents/");
+      const document = await opened;
+      await expect(document).toHaveURL(/\/storage\/v1\/object\/sign\/provider-documents\//);
       expect((await document.request.get(document.url())).status()).toBe(200); await document.close();
       await reviewer.getByRole("button", { name: "Fermer l’aperçu" }).click();
     }
