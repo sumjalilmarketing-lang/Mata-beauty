@@ -40,9 +40,9 @@ export function OnboardingQueue({ moduleKey }: { moduleKey: string }) {
   }
   const selectedRow = rows.find(row => row.provider_id === selected);
   const visible = rows.filter(row => filter === "all" || row.status === filter || filter === "draft" && row.status === "profile_incomplete");
-  return <section className="client-control-center" aria-label="Dossiers professionnels">
+  return <section className="client-control-center onboarding-queue" aria-label="Dossiers professionnels">
     <article className="panel"><h2>Dossiers professionnels</h2><p>Consultez les informations et documents du candidat, puis enregistrez votre décision.</p>
-      <label>Afficher<select value={filter} onChange={event => setFilter(event.target.value as keyof typeof filters)}>{Object.entries(filters).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><button onClick={() => void load()}>Actualiser les dossiers</button>
+      <div className="queue-toolbar"><label>Afficher<select value={filter} onChange={event => setFilter(event.target.value as keyof typeof filters)}>{Object.entries(filters).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><button onClick={() => void load()}>Actualiser les dossiers</button></div>
       {notice && <p role="status">{notice}</p>}
       {state === "loading" ? <p role="status">Chargement…</p> : state === "error" ? <p role="alert">Les dossiers sont indisponibles. Réessayez.</p> : visible.length ? visible.map(row => <div className="control-list-row" key={row.provider_id}><div><strong>{row.provider_profiles?.business_name ?? "Candidat"}</strong><p>{row.provider_profiles?.city} · {applicationStatusLabels[row.status] ?? row.status}</p></div><button onClick={() => { setDetailReady(false); setSelected(row.provider_id); setNotice(""); }}>Examiner le dossier</button></div>) : <p>Aucun dossier dans cette rubrique.</p>}
     </article>

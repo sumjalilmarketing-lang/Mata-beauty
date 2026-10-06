@@ -49,6 +49,8 @@ for(const role of roles) test(`${role} : menus, notifications privées, responsi
     const names=await nav.locator("button span").allTextContents();
     for(const name of names) { await nav.getByTitle(name.trim(),{exact:true}).click();await expect(page.locator(".admin-page h1")).toHaveText(name.trim()); }
     await nav.getByTitle("Validations professionnelles",{exact:true}).click();
+    await expect(page.getByText("Chargement…",{exact:true})).toHaveCount(0);
+    await expect(page.getByText("Les dossiers sont indisponibles. Réessayez.",{exact:true})).toHaveCount(0);
     for(const [width,height] of [[1366,768],[1440,900],[1920,1080]]) {await page.setViewportSize({width,height});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:`work/final-audit/part3-${role}-${width}.png`,fullPage:true});}
     await nav.getByTitle("Notifications",{exact:true}).click();await expect(page.getByRole("heading",{name:"Mes notifications"})).toBeVisible();
     await page.locator(".admin-signout").click();await expect(page.getByLabel("Adresse administrateur")).toBeVisible();
