@@ -1,5 +1,9 @@
 # MATA Beauty — levée des blocages du 6 octobre 2026
 
+## Mise à jour Auth, après la livraison visuelle
+
+La production sert désormais **494fefb022d047e39cf01a4a20467bd6b851bc6b**, déploiement **dpl_25N8x1sZi2o47z7NFV794WGXtzhW**. À 15:34:27 UTC, les 15 scripts du domaine et du déploiement immuable sont identiques. Le rapport **MATA_BEAUTY_AUTH_ACCEPTANCE_2026-10-06.md** détaille la reproduction et la correction du défaut de session des invitations, les 11 contrôles Auth PASS sur le domaine, les 24 contrôles de rôle et quatre scénarios vidéo/réservation PASS après déploiement. Le transport Supabase Auth est maintenant raccordé à Resend ; inscription et confirmation réelles testées avec des destinataires de simulation. Le plafond résiduel de **2 e-mails/heure** bloque la suite SMTP ; relèvement en attente de confirmation. Google et boîte humaine non validés. **C — NON PRÊT** demeure ; les constats ci-dessous sont historiques, pas la version actuellement servie.
+
 ## État actualisé après la correction visuelle
 
 La version actuellement servie par mata-beauty.com est **106b2dd72ea1f6fa2a116cdbfa6d8c4125174d55**, déploiement **dpl_A44Nb4cukirEBbR2WFNbS3BozGPt**. Le contrôle du 6 octobre à 12:24:48 UTC compare les 15 scripts du domaine avec ceux du déploiement immuable : identiques, backend production correct, aucun backend QA. L'ancien relevé dc6d62a ci-dessous est conservé comme preuve historique.
