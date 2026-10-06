@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { checkWheel } from "./scroll-acceptance";
 import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
@@ -95,6 +96,7 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
     await expect(reviewer.getByText("Annulation possible avant le rendez-vous.", { exact: true })).toBeVisible();
     for (const [width, height] of [[1366, 768], [1440, 900], [1920, 1080], [390, 844]]) {
       await reviewer.setViewportSize({ width, height });
+      if (width >= 1366) await checkWheel(reviewer, width, height);
       expect(await reviewer.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
       await reviewer.screenshot({ path: `work/final-audit/part3-dossier-${width}.png`, fullPage: true });
     }

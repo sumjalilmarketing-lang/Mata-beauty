@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { checkWheel } from "./scroll-acceptance";
 import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 const url=process.env.REMOTE_SUPABASE_URL??"";
@@ -51,7 +52,9 @@ for(const role of roles) test(`${role} : menus, notifications privées, responsi
       await page.goto(route);await expect(page).toHaveURL(/acces=refuse/);
     }
     for(const route of ['/admin','/admin/users','/admin/roles']) {
-      await page.goto(route);await expect(page.getByRole('heading',{name:'Compte non autorisé'})).toBeVisible();
+      await page.goto(route);
+      if(route==='/admin') await expect(page.getByRole('heading',{name:'Compte non autorisé'})).toBeVisible();
+      else { await expect(page).toHaveURL(/acces=refuse/);await expect(page.getByText('Votre compte ne possède pas l’autorisation requise pour cet espace.',{exact:true})).toBeVisible(); }
       await expect(page.getByRole('navigation',{name:'Navigation Super Admin'})).toHaveCount(0);
     }
   }
@@ -74,7 +77,7 @@ for(const role of roles) test(`${role} : menus, notifications privées, responsi
     await page.goto(`${prefix}/notifications`);await expect(page.getByRole("heading",{name:"Mes notifications"})).toBeVisible();
     await page.reload();await expect(page.getByRole("heading",{name:"Mes notifications"})).toBeVisible();
     for(const [width,height] of [[1366,768],[1440,900],[1920,1080],[390,844]]) {await page.setViewportSize({width,height});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:`work/final-audit/part3-${role}-${width}.png`,fullPage:true});}
-    await page.setViewportSize({width:1366,height:768});await page.getByRole("button",{name:"Se déconnecter",exact:true}).click();await page.goto(`${prefix}/notifications`);await expect(page).toHaveURL(/connexion=requise/);
+    await page.setViewportSize({width:1366,height:768});await page.getByRole("button",{name:"Se déconnecter",exact:true}).click();await expect(page).toHaveURL(/\/$/);await page.goto(`${prefix}/notifications`);await expect(page).toHaveURL(/connexion=requise/);
   }
   expect(errors).toEqual([]);
 });
@@ -101,6 +104,10 @@ test.describe('MFA obligatoire',()=>{
     await page.getByLabel('Code d’authentification').fill(otp);await page.getByRole('button',{name:'Vérifier le code'}).click();
     await expect(page.getByRole('navigation',{name:'Navigation Super Admin'})).toBeVisible({timeout:20000});
     await page.reload();await expect(page.getByRole('navigation',{name:'Navigation Super Admin'})).toBeVisible();
+    await page.getByRole('navigation',{name:'Navigation Super Admin'}).getByTitle('Paramètres',{exact:true}).click();
+    for(const [width,height] of [[1366,768],[1440,900],[1920,1080]]) {
+      await page.setViewportSize({width,height});await checkWheel(page,width,height);
+    }
     await page.locator('.admin-signout').click();await expect(page.getByLabel('Adresse administrateur')).toBeVisible();
     await page.getByLabel('Adresse administrateur').fill(account.email);await page.getByLabel('Mot de passe').fill(password);
     await page.getByRole('button',{name:'Accéder à l’administration'}).click();

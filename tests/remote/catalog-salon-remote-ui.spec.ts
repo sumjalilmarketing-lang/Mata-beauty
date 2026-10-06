@@ -40,7 +40,7 @@ const availabilityIds: string[] = [];
 test.describe.configure({ mode: "serial" });
 
 async function createUser(email: string, professional = false) {
-  const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: professional ? "Professionnel Catalogue" : "Cliente Catalogue", legal_accepted: "true", professional_intent: professional ? "true" : "false" } });
+  const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, app_metadata: { qa_suppress_email: true }, user_metadata: { display_name: professional ? "Professionnel Catalogue" : "Cliente Catalogue", legal_accepted: "true", professional_intent: professional ? "true" : "false" } });
   expect(created.error).toBeNull();
   expect((await admin.from("welcome_email_deliveries").update({ status: "needs_review" }).eq("user_id", created.data.user!.id)).error).toBeNull();
   return created.data.user!.id;
