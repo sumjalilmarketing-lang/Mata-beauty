@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { categorySlugFor, serviceVisual, type CategoryMedia } from "@/lib/catalog/category-media";
 
 export type CatalogProvider = {
   id: string;
@@ -18,6 +19,7 @@ export type CatalogProvider = {
   durationMinutes: number;
   businessId?: string;
   coverUrl?: string;
+  serviceMedia?: CategoryMedia;
 };
 
 export type CatalogPromotion = {
@@ -87,6 +89,42 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
     if (batch.length < 100) break;
   }
 
+  const serviceIds = records.flatMap(provider => provider.provider_services.map(service => service.id));
+  const covers = new Map<string, string>();
+  const postIds = new Map<string, string>();
+  // Optional enrichment: older catalog schemas can still use exact-category editorial media.
+  for (let offset = 0; offset < serviceIds.length; offset += 100) {
+    let request = client.from("provider_services").select("*").in("id", serviceIds.slice(offset, offset + 100));
+    if (signal) request = request.abortSignal(signal);
+    const result = await request;
+    if (result.error) break;
+    for (const row of result.data ?? []) if (typeof row.cover_url === "string" && row.cover_url) covers.set(row.id, row.cover_url);
+  }
+  // Only published, publicly readable posts linked to this exact service qualify.
+  // Keep the original identifiers and Storage object; never copy a professional's media.
+  const missing = serviceIds.filter(id => !covers.has(id));
+  for (let offset = 0; offset < missing.length; offset += 100) {
+    let request = client.from("social_feed").select("id,author_id,provider_service_id,thumbnail_url,media_items").in("provider_service_id", missing.slice(offset, offset + 100)).order("published_at", { ascending: false }).limit(100);
+    if (signal) request = request.abortSignal(signal);
+    const result = await request;
+    if (result.error) break;
+    type MediaPost = { id: string; author_id: string; provider_service_id: string; thumbnail_url: string | null; media_items: Array<{ media_type: string; bucket_id: string; storage_path: string; thumbnail_path: string | null }> | null };
+    const candidates = new Map<string, MediaPost>();
+    for (const post of (result.data ?? []) as unknown as MediaPost[]) {
+      if (!covers.has(post.provider_service_id) && !candidates.has(post.provider_service_id) && records.some(provider => provider.profile_id === post.author_id && provider.provider_services.some(service => service.id === post.provider_service_id))) candidates.set(post.provider_service_id, post);
+    }
+    const posts = [...candidates.values()];
+    for (let start = 0; start < posts.length; start += 8) await Promise.all(posts.slice(start, start + 8).map(async post => {
+      const media = post.media_items?.[0];
+      const path = media?.media_type === "image" ? media.storage_path : media?.thumbnail_path;
+      let src = post.thumbnail_url;
+      if (media?.bucket_id === "provider-social-media" && path?.startsWith(`${post.author_id}/`)) {
+        const signed = await client.storage.from(media.bucket_id).createSignedUrl(path, 3600);
+        src = signed.data?.signedUrl ?? src;
+      }
+      if (src) { covers.set(post.provider_service_id, src); postIds.set(post.provider_service_id, post.id); }
+    }));
+  }
   return records.flatMap((provider) =>
     provider.provider_services.map((service) => ({
       id: service.id,
@@ -106,7 +144,11 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
       homeService: provider.service_mode !== "salon",
       durationMinutes: service.duration_minutes,
       businessId: service.business_id ?? undefined,
-      coverUrl: provider.cover_url ?? undefined,
+      coverUrl: serviceVisual(service.services?.categories?.name ?? "", covers.get(service.id)),
+      serviceMedia: covers.has(service.id) && categorySlugFor(service.services?.categories?.name ?? "") ? {
+        src: covers.get(service.id)!, alt: service.title, origin: "professional" as const,
+        categorySlug: categorySlugFor(service.services?.categories?.name ?? "")!, providerId: provider.profile_id, serviceId: service.id, postId: postIds.get(service.id),
+      } : undefined,
     })),
   );
 }

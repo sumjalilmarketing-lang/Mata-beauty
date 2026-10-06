@@ -1,0 +1,163 @@
+{
+  "generatedWith": "OpenAI image_gen built-in",
+  "purpose": "MATA Beauty editorial category illustrations; never actual professional portfolio evidence",
+  "format": "WebP 640x640 quality 78",
+  "createdOn": "2026-10-06",
+  "images": [
+    {
+      "asset": "/images/categories/locks-1.webp",
+      "categorySlug": "locks",
+      "variant": 1,
+      "originalFile": "exec-8e67081e-74e3-4875-9a37-0af9e47eb37a.png",
+      "promptSubject": "Mature natural dreadlocks arranged half-up, rear three-quarter view"
+    },
+    {
+      "asset": "/images/categories/locks-2.webp",
+      "categorySlug": "locks",
+      "variant": 2,
+      "originalFile": "exec-ca331717-2d66-429c-8d92-0ef70afae361.png",
+      "promptSubject": "Professional retwisting of mature dreadlocks"
+    },
+    {
+      "asset": "/images/categories/tresses-africaines-1.webp",
+      "categorySlug": "tresses-africaines",
+      "variant": 1,
+      "originalFile": "exec-77a2696a-56df-46b3-a788-58eb2461bb9d.png",
+      "promptSubject": "Neatly parted knotless box braids"
+    },
+    {
+      "asset": "/images/categories/tresses-africaines-2.webp",
+      "categorySlug": "tresses-africaines",
+      "variant": 2,
+      "originalFile": "exec-513f23ac-4c23-4f3d-b7c0-c81eccf300b7.png",
+      "promptSubject": "Stylist completing geometric cornrow braids"
+    },
+    {
+      "asset": "/images/categories/coiffure-femme-1.webp",
+      "categorySlug": "coiffure-femme",
+      "variant": 1,
+      "originalFile": "exec-b0992102-b568-4b71-9d1b-ff92523158b4.png",
+      "promptSubject": "A professional hairdresser styling an adult Senegalese woman's natural afro hair into a defined twist-out, clear hair sectioning comb in hand, hair the main subject"
+    },
+    {
+      "asset": "/images/categories/coiffure-femme-2.webp",
+      "categorySlug": "coiffure-femme",
+      "variant": 2,
+      "originalFile": "exec-e7b5b550-8c5b-473f-b6de-ecec5a48502c.png",
+      "promptSubject": "Professional blow-dry service on an adult Black woman, visible round brush and hairdryer working on hair, not makeup"
+    },
+    {
+      "asset": "/images/categories/coiffure-homme-1.webp",
+      "categorySlug": "coiffure-homme",
+      "variant": 1,
+      "originalFile": "exec-4399b098-6565-4615-bb2b-57b0f0a6fc40.png",
+      "promptSubject": "Barber using clippers to create a clean short fade haircut on an adult Black man's scalp, head hair main subject, clean shaven face"
+    },
+    {
+      "asset": "/images/categories/coiffure-homme-2.webp",
+      "categorySlug": "coiffure-homme",
+      "variant": 2,
+      "originalFile": "exec-29b3731f-ecd6-4421-b3db-e8b8998d2737.png",
+      "promptSubject": "Professional stylist using scissors and comb to cut an adult Black man's textured curls, hair cutting clearly visible"
+    },
+    {
+      "asset": "/images/categories/perruques-lace-wigs-1.webp",
+      "categorySlug": "perruques-lace-wigs",
+      "variant": 1,
+      "originalFile": "exec-ef8f9b75-2319-45ec-9eeb-ca318e4d9342.png",
+      "promptSubject": "Close-up of professional stylist hands fitting a lace-front wig on an adult Black woman's head, visible fine lace edge at the forehead and clips holding hair aside, unmistakable wig installation"
+    },
+    {
+      "asset": "/images/categories/perruques-lace-wigs-2.webp",
+      "categorySlug": "perruques-lace-wigs",
+      "variant": 2,
+      "originalFile": "exec-676ec7d6-03d5-43ad-bd97-ea51d23825b4.png",
+      "promptSubject": "Professional adjusting an adult Black woman's bob wig, visible lace front being fitted and a spare wig on a mannequin in softly blurred salon background, actual wig service clearly recognizable"
+    },
+    {
+      "asset": "/images/categories/maquillage-1.webp",
+      "categorySlug": "maquillage",
+      "variant": 1,
+      "originalFile": "exec-2ac7a6f9-216f-44a7-9257-e4910eb6e3a0.png",
+      "promptSubject": "Professional makeup artist applying cheek makeup with a brush to an adult Senegalese woman, open makeup palette visible, face and brush central"
+    },
+    {
+      "asset": "/images/categories/maquillage-2.webp",
+      "categorySlug": "maquillage",
+      "variant": 2,
+      "originalFile": "exec-a47f4149-622a-49ba-ad4b-bc6dd770f066.png",
+      "promptSubject": "Close-up makeup artist applying eyeshadow with a makeup brush on an adult Black woman's eyelid, eyeshadow palette visible, clearly makeup application not lash extensions"
+    },
+    {
+      "asset": "/images/categories/onglerie-1.webp",
+      "categorySlug": "onglerie",
+      "variant": 1,
+      "originalFile": "exec-4275691d-437a-4aca-a6ff-6cd2cb7e0317.png",
+      "promptSubject": "Close-up of a professional manicurist applying nude polish with a small brush to an adult Black woman's fingernails, beautiful natural hands and neat nail workstation"
+    },
+    {
+      "asset": "/images/categories/onglerie-2.webp",
+      "categorySlug": "onglerie",
+      "variant": 2,
+      "originalFile": "exec-7cdd4083-2c6f-4aa9-837f-ee8b72f3b63c.png",
+      "promptSubject": "Detailed close-up of a professional creating fine nail art on an adult dark-skinned woman's fingernails, precision brush visible, intact realistic fingers and nails"
+    },
+    {
+      "asset": "/images/categories/cils-sourcils-1.webp",
+      "categorySlug": "cils-sourcils",
+      "variant": 1,
+      "originalFile": "exec-adbf589a-bf96-4075-8eb1-dc99106996f5.png",
+      "promptSubject": "Macro professional eyelash extension procedure on an adult Black woman's closed eye, white under-eye pads and precise lash tweezers clearly visible, hygienic salon treatment"
+    },
+    {
+      "asset": "/images/categories/cils-sourcils-2.webp",
+      "categorySlug": "cils-sourcils",
+      "variant": 2,
+      "originalFile": "exec-c3eb503c-d4a8-44a3-9fde-089c3a960c03.png",
+      "promptSubject": "Macro professional eyebrow shaping with an eyebrow brush and precision tweezers on an adult Black woman, eyebrow dominates frame, no generic full face makeup portrait"
+    },
+    {
+      "asset": "/images/categories/barbier-1.webp",
+      "categorySlug": "barbier",
+      "variant": 1,
+      "originalFile": "exec-84e0bcaf-431b-4c09-89bc-09e93d9e1ee5.png",
+      "promptSubject": "Close-up professional barber trimming an adult Black man's full beard with a clipper, beard and tool prominent, salon cape and realistic skin"
+    },
+    {
+      "asset": "/images/categories/barbier-2.webp",
+      "categorySlug": "barbier",
+      "variant": 2,
+      "originalFile": "exec-177639dd-68b5-4f0e-a075-3ac92ddd94e2.png",
+      "promptSubject": "Professional barber carefully finishing an adult Black man's beard cheek line with a straight razor, clearly visible beard grooming, no blood or injury"
+    },
+    {
+      "asset": "/images/categories/soins-visage-1.webp",
+      "categorySlug": "soins-visage",
+      "variant": 1,
+      "originalFile": "exec-a03f0df5-9508-484d-b56d-57b3009c6fab.png",
+      "promptSubject": "Professional aesthetician applying a creamy facial mask with brush to an adult Black woman reclining on an institute treatment bed, towel headband visible"
+    },
+    {
+      "asset": "/images/categories/soins-visage-2.webp",
+      "categorySlug": "soins-visage",
+      "variant": 2,
+      "originalFile": "exec-7cb1be55-2523-4bd3-9a32-b9e891e27e2f.png",
+      "promptSubject": "Professional facial treatment with aesthetician hands placing warm towels around an adult Black woman's face on a treatment bed, calm refined institute setting"
+    },
+    {
+      "asset": "/images/categories/beaute-domicile-1.webp",
+      "categorySlug": "beaute-domicile",
+      "variant": 1,
+      "originalFile": "exec-79fe363e-21d3-4914-9cda-344f03e91721.png",
+      "promptSubject": "Professional makeup artist with portable open makeup case providing makeup to an adult Black woman in a clearly identifiable elegant home living room with sofa, home beauty visit, two adults and portable kit visible"
+    },
+    {
+      "asset": "/images/categories/beaute-domicile-2.webp",
+      "categorySlug": "beaute-domicile",
+      "variant": 2,
+      "originalFile": "exec-c0a3d99a-583f-40e6-b1f3-38feb51314be.png",
+      "promptSubject": "Professional mobile manicurist doing an adult Black woman's nails at a portable manicure table in a comfortable home living room, sofa and portable equipment visible, home beauty service clear"
+    }
+  ],
+  "sharedPrompt": "Photorealistic premium editorial beauty service in a Senegalese setting, natural skin, warm neutral/plum accents, square centered composition suitable for responsive crops, no text/logos/watermark/collage; accurately depict the named service."
+}

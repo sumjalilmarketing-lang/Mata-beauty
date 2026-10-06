@@ -28,6 +28,9 @@ const nextConfig: NextConfig = {
         { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), payment=()" },
         { key: "Content-Security-Policy", value: `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; frame-src ${documentFrameSource}; object-src 'none'; form-action 'self' https://app.paydunya.com; img-src 'self' data: blob: https:; media-src 'self' blob: https://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'${developmentEval}; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://app.paydunya.com${upgradeInsecureRequests}` },
       ],
+    }, {
+      source: "/images/categories/:path*",
+      headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
     }];
   },
 };

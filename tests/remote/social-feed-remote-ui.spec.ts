@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, webkit, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { fetchPublishedProviders } from "../../lib/supabase/catalog";
 
 const supabaseUrl = process.env.REMOTE_SUPABASE_URL ?? "";
 const anonKey = process.env.REMOTE_SUPABASE_ANON_KEY ?? "";
@@ -252,6 +253,16 @@ test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page
   expect((await clientApi.from("social_feed").select("id").eq("id", studioPostId).single()).error).toBeNull();
   expect((await clientApi.storage.from("provider-social-media").createSignedUrl(media.storage_path, 60)).error).toBeNull();
   expect((await clientApi.storage.from("provider-social-media").createSignedUrl(media.thumbnail_path!, 60)).error).toBeNull();
+
+  const catalog = await fetchPublishedProviders(clientApi, providerId);
+  const publishedService = catalog.find(service => service.serviceId === providerServiceId);
+  expect(publishedService?.serviceMedia).toMatchObject({ origin: "professional", providerId, serviceId: providerServiceId, postId: studioPostId });
+  expect(publishedService?.coverUrl).toContain(media.thumbnail_path!);
+  await page.goto("/discover");
+  const categoryCard = page.locator(`[data-category="${publishedService!.serviceMedia!.categorySlug}"]`);
+  await expect(categoryCard).toHaveAttribute("data-media-origin", "professional");
+  await expect(categoryCard).toHaveAttribute("data-current-media", new RegExp(studioPostId));
+  await expect(categoryCard.locator("img").first()).toHaveJSProperty("naturalWidth", 1);
 
   const allVideos = await admin.from("posts").select("id,title,social_post_media(storage_path)").eq("author_id", providerId).eq("post_type", "video").eq("status", "published");
   expect(allVideos.error).toBeNull();
