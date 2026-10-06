@@ -16,6 +16,11 @@ try {
     assert.equal((await client.rpc('synchronize_account_status')).error,null);clients.push(client);
   }
   const inserted=await service.from('notifications').insert({profile_id:users[0],kind:'professional_application',title:'Dossier reçu QA',body:'Événement synthétique de recette',data:{status:'submitted'}}).select('id,data').single();
+  assert.equal((await clients[1].from('notification_preferences').upsert({profile_id:users[1],bookings_email:false,reminders_email:false})).error,null);
+  for(const kind of ['booking_status_changed','appointment_reminder']) {
+    const muted=await service.from('notifications').insert({profile_id:users[1],kind,title:'Préférence de recette',body:'Pas d’e-mail attendu',data:{}}).select('id').single();assert.equal(muted.error,null);
+    const delivery=await service.from('notification_deliveries').select('id').eq('notification_id',muted.data.id);assert.equal(delivery.error,null);assert.equal(delivery.data.length,0);
+  }
   assert.equal(inserted.error,null);const id=inserted.data.id;
   assert.equal(inserted.data.data.href,'/app/application');
   assert.equal((await clients[0].from('notifications').select('id').eq('id',id)).data.length,1);

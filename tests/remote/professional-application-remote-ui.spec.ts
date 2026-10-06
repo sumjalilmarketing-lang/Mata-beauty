@@ -112,8 +112,21 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
       const document = await opened;
       await expect(document).toHaveURL(/\/storage\/v1\/object\/sign\/provider-documents\//);
       expect((await document.request.get(document.url())).status()).toBe(200); await document.close();
-      if(name === "Qualification") {await reviewer.bringToFront();await reviewer.screenshot({path:"work/final-audit/part3-document-pdf.png"});}
-      await reviewer.getByRole("button", { name: "Fermer l’aperçu" }).click();
+      if(name === "Qualification") {
+        await reviewer.bringToFront();
+        // The native PDF compositor paints after the frame load event. This pause
+        // is only for the visual evidence; HTTP/CSP/authorization are asserted.
+        await reviewer.waitForTimeout(2000);
+        await reviewer.screenshot({path:"work/final-audit/part3-document-pdf.png"});
+        await reviewer.getByRole("button",{name:"Document précédent"}).click();
+        await expect(reviewer.getByRole("dialog").getByRole("heading",{name:"Justificatif d’adresse",exact:true})).toBeVisible();
+        await reviewer.getByRole("button",{name:"Document suivant"}).click();
+        await expect(reviewer.getByRole("dialog").getByRole("heading",{name:"Qualification",exact:true})).toBeVisible();
+        await reviewer.getByRole("button",{name:"Renouveler l’accès"}).click();
+        await expect(reviewer.getByTitle("Document PDF privé")).toBeVisible();
+      }
+      if(name === "Qualification") {await reviewer.keyboard.press("Escape");await expect(reviewer.getByRole("dialog")).toHaveCount(0);}
+      else await reviewer.getByRole("button", { name: "Fermer l’aperçu" }).click();
     }
     await reviewer.locator(".document-row").filter({ hasText: "Pièce d’identité" }).getByRole("button", { name: "Demander un complément" }).click();
     await expect(reviewer.getByText("Complément demandé. Le candidat a été notifié.")).toBeVisible();
@@ -138,6 +151,15 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
     await expect(page).toHaveURL(/\/pro$/);
     const approvedNotifications=await admin.from("notifications").select("id").eq("profile_id",accounts[0].id).contains("data",{status:"approved"});
     expect(approvedNotifications.error).toBeNull();expect(approvedNotifications.data).toHaveLength(1);
+    await page.goto("/pro/notifications");
+    await page.getByRole("button",{name:"Marquer comme lue",exact:true}).first().click();
+    await page.getByRole("button",{name:"Tout marquer comme lu",exact:true}).click();
+    await expect(page.getByRole("button",{name:"Tout marquer comme lu",exact:true})).toBeDisabled();
+    await page.getByRole("checkbox",{name:"Non lues uniquement"}).check();
+    await expect(page.getByText("Vous avez lu toutes les notifications affichées.")).toBeVisible();
+    await page.getByRole("button",{name:"Actualiser",exact:true}).click();
+    await page.getByRole("checkbox",{name:"Non lues uniquement"}).uncheck();
+    await expect(page.locator(".notification-card").first()).toBeVisible();
     expect(errors).toEqual([]);
   } catch (error) {
     await reviewer.screenshot({ path: "work/final-audit/application-review-failure.png", fullPage: true });

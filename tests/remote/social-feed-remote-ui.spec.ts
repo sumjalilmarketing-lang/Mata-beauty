@@ -243,6 +243,8 @@ test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page
   expect(created.data).toMatchObject({ status: "published", visibility: "public", post_services: [{ provider_service_id: providerServiceId, is_primary: true }] });
   expect(created.data!.published_at).not.toBeNull();
   studioPostId = created.data!.id;
+  const publicationNotice = await admin.from("notifications").select("id,data").eq("profile_id", providerId).eq("kind", "publication_completed").contains("data", { post_id: studioPostId });
+  expect(publicationNotice.error).toBeNull();expect(publicationNotice.data).toHaveLength(1);expect(publicationNotice.data![0].data.href).toBe("/pro/videos");
   const media = created.data!.social_post_media[0];
   expect(media.bucket_id).toBe("provider-social-media");
   expect(media.storage_path).toMatch(new RegExp(`^${providerId}/${studioPostId}/video[.](webm|mp4|mov)$`));
