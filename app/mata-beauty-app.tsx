@@ -665,7 +665,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
           />
         )}
-        <BottomNav active={screen === "feed" ? "inspiration" : "explore"} onExplore={() => setScreen("home")} onFeed={() => setScreen("feed")} onAccount={openClientPage} />
+        <BottomNav authenticated={Boolean(authenticated)} active={screen === "feed" ? "inspiration" : "explore"} onExplore={() => setScreen("home")} onFeed={() => setScreen("feed")} onAccount={openClientPage} />
       </div>
 
       {showLaunchWelcome && <LaunchWelcome area={area} categories={categories} onArea={setArea} onCategory={(value) => { setCategory(value); }} onClose={() => { window.localStorage.setItem("mata-launch-welcome", "done"); setShowLaunchWelcome(false); }} />}
@@ -939,8 +939,8 @@ function BookingMicroFeedback({ bookingId }: { bookingId: string }) {
   return <aside className="micro-feedback"><strong>Votre réservation a-t-elle été simple ?</strong>{sent ? <small>Merci pour votre retour.</small> : <div><button onClick={() => void answer("yes")}>👍 Oui</button><button onClick={() => void answer("no")}>👎 Non</button></div>}</aside>;
 }
 
-function BottomNav({ active, onExplore, onFeed, onAccount }: { active: "explore" | "inspiration"; onExplore: () => void; onFeed: () => void; onAccount: (page: "bookings" | "messages" | "profile") => void }) {
-  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={`inspiration-nav ${active === "inspiration" ? "active" : ""}`} onClick={onFeed}><i>▶</i>Inspiration</button><button aria-label="Explorer" className={active === "explore" ? "active" : ""} onClick={onExplore}><i>⌕</i>Explorer</button><button onClick={() => onAccount("bookings")}><i>□</i>Rendez-vous</button><button onClick={() => onAccount("messages")}><i>✉</i>Messages</button><button onClick={() => onAccount("profile")}><i>○</i>Profil</button></nav>;
+function BottomNav({ authenticated, active, onExplore, onFeed, onAccount }: { authenticated: boolean; active: "explore" | "inspiration"; onExplore: () => void; onFeed: () => void; onAccount: (page: "bookings" | "messages" | "profile") => void }) {
+  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={`inspiration-nav ${active === "inspiration" ? "active" : ""}`} onClick={onFeed}><i>▶</i>Inspiration</button><button aria-label="Explorer" className={active === "explore" ? "active" : ""} onClick={onExplore}><i>⌕</i>Explorer</button><button onClick={() => onAccount("bookings")}><i>□</i>Rendez-vous</button><button onClick={() => onAccount("messages")}><i>✉</i>Messages</button><button aria-label={authenticated ? "Profil" : "Se connecter à MATA Beauty"} onClick={() => onAccount("profile")}><i aria-hidden>○</i>{authenticated ? "Profil" : "Se connecter"}</button></nav>;
 }
 
 function formatDuration(minutes: number) {

@@ -36,3 +36,7 @@
 .workspace-layout .panel a { color: var(--ws-pink); }
 .workspace-layout .panel-heading h2, .workspace-layout .appointment div strong { color: #fff8fc; }
 .workspace-layout .appointment div small { color: #c9c1cc; }
+@media(max-width:720px){
+  .workspace-sidebar{height:auto;min-height:68px;flex-wrap:wrap;gap:12px}
+  .workspace-sidebar .workspace-signout{display:block;flex-basis:100%;min-height:44px;margin-top:0;text-align:center}
+}
