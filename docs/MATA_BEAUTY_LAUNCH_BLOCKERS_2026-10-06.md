@@ -104,11 +104,49 @@ Après durcissement, le catalogue réel compte **17 fonctions SECURITY DEFINER e
 
 Références techniques : [contrôles RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [fonctions SECURITY DEFINER exposées](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable), [mots de passe compromis](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
 
-## Contrôles humains
+## Déploiement et retest du lot dc6d62a
+
+Le 6 octobre 2026 à 02:43:46 UTC, le domaine `https://mata-beauty.com/` répond HTTP 200 et sert les **15 mêmes scripts** que le déploiement immuable `https://mata-beauty-d3bulef52-africrm.vercel.app`, ID `dpl_BHrM5T9NJ3ZyZ6jjUzEfADzAqXiU`, commit source `dc6d62a1a9f9e41b1e190b46d8dba57553f0f482`. Le backend production est présent ; le backend QA est absent. Preuve : `work/final-audit/production-version-dc6d62a.json`.
+
+- Avant commit : lint, TypeScript, 82 tests dans 19 fichiers et build PASS.
+- Après déploiement : `operations-production-dc6d62a`, **3 PASS** (menus Support, Santé en panne partielle puis reprise, échange client/agent/résolution).
+- Après déploiement : `degraded-production-dc6d62a`, **6 PASS** (5 GPS simulés avec fallback manuel, panne feed 503 et reprise).
+- Après déploiement : `video-production-dc6d62a`, **4 PASS** (publication MP4, photo/avant-après, feed/interactions/réservation des deux côtés, signalement/masquage/audit/clôture/restauration). Le scénario réservation provoque un 503, vérifie l’absence de réservation et le bouton réactivé, puis confirme avec succès après reprise.
+- Après déploiement : `security-dossier-production-dc6d62a`, **2 PASS** (candidature, quatre documents dont PDF privé, complément, notifications et approbation ; MFA obligatoire avec permission refusée avant second facteur puis accordée après validation). Total de ce retest production : **15 scénarios PASS**.
+- Ces runs ont tous commencé après l’activation du déploiement sur le domaine. Les erreurs volontaires sont distinguées des erreurs inattendues ; les échecs de sélecteurs précédents restent conservés dans les répertoires de preuve.
+
+## Contrôles humains encore ouverts
 
 Le nouveau compte Google et sa boîte sont disponibles selon l’utilisateur. Le clic effectué depuis MATA a toutefois repris automatiquement le compte déjà connecté chez Google : **ce n’est pas une première inscription**. Le choix du nouveau compte et son consentement ont été confiés à l’utilisateur ; la première inscription et la lecture de ses e-mails restent BLOCKED tant que ce passage n’est pas confirmé.
 
 - GPS réel : **NOT TESTED — PHYSICAL DEVICE REQUIRED**. Cinq états simulés dans le navigateur passent (autorisé, refusé, indisponible, délai dépassé, imprécis), avec saisie manuelle Dakar dans chaque cas.
 - Trackpad physique : **NOT TESTED — PHYSICAL TRACKPAD REQUIRED**. La molette automatisée n’est pas une preuve de trackpad physique.
 - Boîte humaine : réception/lecture/liens/mobile des e-mails bienvenue, réservation, candidature, complément et approbation non constatés dans cette passe. Les anciens reçus Resend prouvent l’acceptation par le transport, pas la lecture humaine.
+
+## Décision au point d’arrêt de la recette
+
+| Bloc | Statut | Preuve/Test | Bloquant |
+|---|---|---|---|
+| Google première inscription | BLOCKED | Nouveau compte disponible selon l’utilisateur, mais navigateur revenu sur l’ancien compte ; choix/consentement humain attendu | OUI |
+| Emails réels | BLOCKED | Transport Resend précédemment accepté ; réception, contenu et liens dans la boîte humaine non vérifiés | OUI |
+| Réservation concurrente | PASS | Deux clients en parallèle, une réservation persistée, autre requête 23P01 ; production | NON |
+| Double réservation | PASS | Deux requêtes du même client, une réservation persistée ; production | NON |
+| Réseau dégradé | NOT TESTED | PASS sur panne feed, réservation 503 et Santé ; upload interrompu, auth, timeouts et tous les autres écrans non couverts intégralement | OUI |
+| GPS | NOT TESTED | Cinq simulations et fallback manuel PASS ; NOT TESTED — PHYSICAL DEVICE REQUIRED | OUI pour clôture mobile |
+| Trackpad physique | NOT TESTED | Molette des dossiers aux trois dimensions PASS ; NOT TESTED — PHYSICAL TRACKPAD REQUIRED | OUI pour clôture desktop |
+| Modules Admin | FAIL | Support/Signalements/Santé retestés PASS en production ; autres raccordements absents ou incorrects inventoriés ci-dessus, parité QA/production incomplète | OUI |
+| Santé plateforme | PASS | Sources indépendantes, absence signalée sans faux zéro, panne/reprise réelles au navigateur sur dc6d62a | NON ; ne prouve pas un service antifraude existant |
+| RBAC | NOT TESTED | Refus Client/Pro, auto-approbation, révocation et suspension Super Admin testés ; qualification de toutes les RPC et matrice entre rôles internes incomplètes | OUI |
+| MFA | PASS | Second facteur et permissions réellement exercés après déploiement ; récupération complète d’un facteur hors périmètre de ce PASS | NON pour le contrôle exécuté |
+| Documents privés | PASS | Upload, ouverture signée, PDF, complément et revue exécutés après déploiement ; contrôle d’accès couvert par les recettes précédentes | NON pour le circuit exécuté |
+| Notifications | NOT TESTED | Circuit candidature jusqu’au clic et destination PASS ; couverture événement/destinataire/destination/lu non exhaustive pour tous les événements | OUI |
+| Production | PASS | Domaine comparé au déploiement dc6d62a, backend correct et 15 scénarios exécutés après bascule | NON pour l’identité de version ; ce PASS n’est pas une autorisation de lancement |
+
+**C — NON PRÊT.** La nouvelle version corrige les défauts reproduits et plusieurs circuits critiques passent réellement. Les raccordements administratifs nécessaires encore incomplets, les réserves de sécurité non qualifiées et les contrôles humains absents empêchent une validation publique.
+
+Comptage au niveau des **14 blocs de cette table**, sans additionner plusieurs fois leurs sous-cas : **BLOQUANTS RESTANTS : 8 ; FAIL : 1 ; NOT TESTED : 5 ; BLOCKED : 2 ; PASS : 6.** Les huit blocs bloquants sont Google, e-mails, réseau dégradé, GPS physique, trackpad physique, modules Admin, RBAC et notifications.
+
+**RISQUES SÉCURITÉ HAUTS/CRITIQUES : 2 réserves ouvertes à impact potentiel haut** : SEC-R01 (RPC privilégiées non entièrement qualifiées) et SEC-R02 (séparation des rôles internes). Il ne s’agit pas de deux nouvelles exploitations prouvées ; la probabilité reste non quantifiée. Les trois failles reproduites SEC-03/04/05 ont été corrigées et retestées. La réserve mots de passe compromis demeure de gravité moyenne ; la parité du schéma constitue un blocage technique supplémentaire inclus dans Modules Admin.
+
+Pour lever cette décision : achever les huit blocs ci-dessus, qualifier chaque RPC et politique restante, aligner le schéma QA/production, corriger les raccordements nécessaires inventoriés et les valeurs trompeuses restantes, puis refaire la recette affectée. Aucun paiement réel ne doit être activé : le mode mock reste imposé.
 
