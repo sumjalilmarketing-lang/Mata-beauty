@@ -16,6 +16,7 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [documentBusy, setDocumentBusy] = useState(false);
   const load = useCallback(async () => {
     const client = getSupabaseBrowserClient(); if (!client) { setState("error"); return; }
     const [profile, dossier] = await Promise.all([
@@ -48,7 +49,7 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
     if (!error) await load();
   }
   async function submit() {
-    if (busy) return; const client = getSupabaseBrowserClient(); if (!client) return;
+    if (busy || documentBusy) return; const client = getSupabaseBrowserClient(); if (!client) return;
     setBusy(true); setNotice("");
     const { error } = await client.rpc("submit_provider_for_review");
     setBusy(false); setNotice(error ? publicErrorMessage(error, "Complétez les informations et les quatre documents avant l’envoi.") : "Dossier envoyé. Notre équipe va examiner votre candidature.");
@@ -80,8 +81,8 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
         <label className="wide">Conditions d’annulation<textarea name="cancellation" minLength={20} defaultValue={candidate.cancellation_policy ?? ""} required /></label>
         <button disabled={busy}>Enregistrer les informations</button>
       </form></article>}
-      <ProfessionalDocuments providerId={userId} readOnly={!editable} />
-      {editable && <article className="panel"><p>Vérifiez les informations et vos quatre documents avant de transmettre le dossier.</p><button className="primary-button" disabled={busy || candidate.onboarding_progress < 100} onClick={() => void submit()}>{busy ? "Envoi…" : "Envoyer mon dossier"}</button></article>}
+      <ProfessionalDocuments providerId={userId} readOnly={!editable} onBusyChange={setDocumentBusy} />
+      {editable && <article className="panel"><p>{documentBusy ? "Attendez la fin de l’envoi du document avant de transmettre le dossier." : "Vérifiez les informations et vos quatre documents avant de transmettre le dossier."}</p><button className="primary-button" disabled={busy || documentBusy || candidate.onboarding_progress < 100} onClick={() => void submit()}>{busy ? "Envoi…" : "Envoyer mon dossier"}</button></article>}
     </>}
   </section>;
 }

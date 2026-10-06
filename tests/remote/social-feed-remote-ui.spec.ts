@@ -158,6 +158,7 @@ test.afterAll(async () => {
   test.setTimeout(120_000);
   const userIds = [providerId, clientId, moderatorId, superId, otherProviderId].filter(Boolean);
   if (userIds.length) {
+    expect.soft((await admin.from("notifications").delete().eq("kind", "application_to_review").in("data->>provider_id", userIds)).error).toBeNull();
     const memberships = await admin.from("conversation_members").select("conversation_id").in("profile_id", userIds);
     expect.soft(memberships.error).toBeNull();
     const conversationIds = [...new Set((memberships.data ?? []).map((item) => item.conversation_id))];

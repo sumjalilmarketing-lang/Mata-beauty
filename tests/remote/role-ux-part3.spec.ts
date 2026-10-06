@@ -48,6 +48,7 @@ for(const role of roles) test(`${role} : menus, notifications privées, responsi
     await page.goto("/admin");const nav=page.getByRole("navigation",{name:"Navigation Super Admin"});await expect(nav).toBeVisible();
     const names=await nav.locator("button span").allTextContents();
     for(const name of names) { await nav.getByTitle(name.trim(),{exact:true}).click();await expect(page.locator(".admin-page h1")).toHaveText(name.trim()); }
+    if(role==="super_admin") {await nav.getByTitle("Santé plateforme",{exact:true}).click();await expect(page.getByText("E-mails à vérifier",{exact:true})).toBeVisible();}
     await nav.getByTitle("Validations professionnelles",{exact:true}).click();
     await expect(page.getByText("Chargement…",{exact:true})).toHaveCount(0);
     await expect(page.getByText("Les dossiers sont indisponibles. Réessayez.",{exact:true})).toHaveCount(0);

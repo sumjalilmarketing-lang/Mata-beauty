@@ -38,6 +38,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => {
   if (accounts[0]) {
+    expect((await admin.from("notifications").delete().eq("kind", "application_to_review").contains("data", { provider_id: accounts[0].id })).error).toBeNull();
     const docs = await admin.from("provider_documents").select("id,storage_path").eq("provider_id", accounts[0].id);
     expect(docs.error).toBeNull();
     if (docs.data?.length) {
@@ -101,14 +102,17 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
     for (const name of ["Pièce d’identité", "Immatriculation", "Qualification", "Justificatif d’adresse"]) {
       await reviewer.getByRole("button", { name: `Voir ${name}`, exact: true }).click();
       await expect(reviewer.getByRole("dialog")).toBeVisible();
-      if(name === "Qualification") { await expect(reviewer.getByTitle("Document PDF privé")).toBeVisible(); }
+      if(name === "Qualification") {
+        const pdf=reviewer.getByTitle("Document PDF privé");await expect(pdf).toBeVisible();
+        const frame=await (await pdf.elementHandle())!.contentFrame();await frame!.waitForLoadState("load");
+      }
       else {await expect(reviewer.getByRole("dialog").getByRole("img")).toBeVisible();await reviewer.getByRole("slider",{name:"Zoom du document"}).focus();await reviewer.getByRole("slider",{name:"Zoom du document"}).press("ArrowRight");await expect(reviewer.getByRole("slider",{name:"Zoom du document"})).toHaveValue("125");}
       const opened = context.waitForEvent("page");
       await reviewer.getByRole("link", { name: "Ouvrir le document privé dans un nouvel onglet" }).click();
       const document = await opened;
       await expect(document).toHaveURL(/\/storage\/v1\/object\/sign\/provider-documents\//);
       expect((await document.request.get(document.url())).status()).toBe(200); await document.close();
-      if(name === "Qualification") await reviewer.screenshot({path:"work/final-audit/part3-document-pdf.png"});
+      if(name === "Qualification") {await reviewer.bringToFront();await reviewer.screenshot({path:"work/final-audit/part3-document-pdf.png"});}
       await reviewer.getByRole("button", { name: "Fermer l’aperçu" }).click();
     }
     await reviewer.locator(".document-row").filter({ hasText: "Pièce d’identité" }).getByRole("button", { name: "Demander un complément" }).click();
@@ -121,7 +125,7 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
     await page.getByRole("button", { name: "Envoyer le document", exact: true }).click();
     await expect(page.getByText("4/4 documents reçus")).toBeVisible();
     await page.getByRole("button", { name: "Envoyer mon dossier" }).click();
-    await expect(page.getByRole("heading", { name: "Votre dossier a été envoyé" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Votre dossier a été envoyé" })).toBeVisible({ timeout: 20_000 });
     await reviewer.goto("/onboarding/notifications");
     await reviewer.locator(".notification-card").filter({ hasText: "Complément reçu : dossier à vérifier" }).getByRole("button", { name: "Ouvrir", exact: true }).click();
     await expect(reviewer.getByRole("heading", { name: "Historique du dossier" })).toBeVisible();

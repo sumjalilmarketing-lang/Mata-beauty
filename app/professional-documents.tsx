@@ -6,10 +6,11 @@ import { publicErrorMessage } from "@/lib/ui/public-error";
 type Document = { id: string; kind: string; storage_path: string; status: string; rejection_reason: string | null; created_at: string };
 const kinds: Record<string, string> = { identity: "Pièce d’identité", business_registration: "Immatriculation", qualification: "Qualification", address_proof: "Justificatif d’adresse" };
 
-export function ProfessionalDocuments({ providerId, review = false, readOnly = false, onReady, onChange }: { providerId: string; review?: boolean; readOnly?: boolean; onReady?: (ready: boolean) => void; onChange?: () => void }) {
+export function ProfessionalDocuments({ providerId, review = false, readOnly = false, onReady, onChange, onBusyChange }: { providerId: string; review?: boolean; readOnly?: boolean; onReady?: (ready: boolean) => void; onChange?: () => void; onBusyChange?: (busy: boolean) => void }) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  function setUploadBusy(value: boolean) { setBusy(value); onBusyChange?.(value); }
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<Document | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -45,14 +46,14 @@ export function ProfessionalDocuments({ providerId, review = false, readOnly = f
     const values = new FormData(form), file = values.get("document");
     if (!(file instanceof File) || !file.size) return;
     if (file.size > 10 * 1024 * 1024 || !["image/jpeg", "image/png", "application/pdf"].includes(file.type)) { setNotice("Choisissez un PDF, JPEG ou PNG de moins de 10 Mo."); return; }
-    setBusy(true);
+    setUploadBusy(true);
     const path = `${providerId}/${crypto.randomUUID()}.${file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : "jpg"}`;
     const uploaded = await client.storage.from("provider-documents").upload(path, file, { contentType: file.type });
-    if (uploaded.error) { setNotice("L’envoi a échoué. Réessayez."); setBusy(false); return; }
+    if (uploaded.error) { setNotice("L’envoi a échoué. Réessayez."); setUploadBusy(false); return; }
     const inserted = await client.from("provider_documents").insert({ provider_id: providerId, kind: String(values.get("kind")), storage_path: path });
     if (inserted.error) await client.storage.from("provider-documents").remove([path]);
     setNotice(inserted.error ? publicErrorMessage(inserted.error, "Le document n’a pas pu être enregistré.") : "Document envoyé pour vérification.");
-    setBusy(false); if (!inserted.error) { form.reset(); await load(); }
+    if (!inserted.error) { form.reset(); await load(); } setUploadBusy(false);
   }
   function open(document: Document) {
     setPreviewUrl(""); setPreviewError(""); setZoom(100); setPreview(document);
