@@ -12,4 +12,11 @@ describe("authErrorMessage", () => {
     expect(authErrorMessage({ status: 429 })).toContain("Trop de tentatives");
     expect(authErrorMessage({ code: "user_banned" })).toContain("suspendu");
   });
+
+  it("explains unusable email sessions and password policy errors safely", () => {
+    expect(authErrorMessage({ name: "AuthSessionMissingError" })).toContain("nouveau lien");
+    expect(authErrorMessage({ code: "otp_expired", message: "private token" })).not.toContain("private token");
+    expect(authErrorMessage({ code: "same_password" })).toContain("différent");
+    expect(authErrorMessage({ code: "weak_password" })).toContain("faible");
+  });
 });

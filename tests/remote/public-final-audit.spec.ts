@@ -45,7 +45,7 @@ test("public navigation and interaction inventory on the deployed application", 
     await inventory(page, "Inspiration");
     for (const label of ["Rendez-vous", "Messages", "Profil"]) {
       await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: label }).click();
-      await expect(page.getByRole("heading", { name: "Bienvenue", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Se connecter", exact: true })).toBeVisible();
       passed("Inspiration", label, "Clic hors session → connexion demandée");
       await inventory(page, "Connexion");
       await page.getByRole("button", { name: "Fermer", exact: true }).click();
@@ -58,7 +58,7 @@ test("public navigation and interaction inventory on the deployed application", 
     passed("Connexion", "Créer un compte", "Clic → inscription");
     await inventory(page, "Inscription");
     await page.getByRole("button", { name: "Déjà inscrit ? Se connecter" }).click();
-    await expect(page.getByRole("heading", { name: "Bienvenue" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Se connecter" })).toBeVisible();
     passed("Inscription", "Déjà inscrit", "Clic → connexion");
     await page.getByRole("button", { name: "Mot de passe oublié", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Mot de passe oublié" })).toBeVisible();

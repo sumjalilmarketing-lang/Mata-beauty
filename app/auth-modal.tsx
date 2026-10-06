@@ -1,7 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { authErrorMessage } from "@/lib/auth/errors";
@@ -14,6 +15,7 @@ const authSchema = z.object({
   displayName: z.string().trim().max(80).optional(),
   email: z.email("Adresse e-mail invalide."),
   password: z.string().optional(),
+  confirmation: z.string().optional(),
   acceptLegal: z.boolean().optional(),
 });
 
@@ -37,6 +39,8 @@ export function AuthModal({
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [feedback, setFeedback] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
+  const submitting = useRef(false);
+  const openingGoogle = useRef(false);
   const configuration = getSupabaseConfiguration();
   const {
     register,
@@ -45,27 +49,33 @@ export function AuthModal({
     formState: { errors, isSubmitting },
   } = useForm<AuthValues>({
     resolver: zodResolver(authSchema),
-    defaultValues: { displayName: "", email: "", password: "", acceptLegal: false },
+    defaultValues: { displayName: "", email: "", password: "", confirmation: "", acceptLegal: false },
   });
 
   async function submit(values: AuthValues) {
+    if (submitting.current || openingGoogle.current) return;
     setFeedback("");
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       setFeedback("Connexion Supabase indisponible : la clé publique n’est pas configurée.");
       return;
     }
+    submitting.current = true;
     try {
       if (mode === "reset") {
         const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
           redirectTo: `${window.location.origin}/auth/update-password`,
         });
         if (error) throw error;
-        setFeedback("Un lien de réinitialisation vient d’être envoyé.");
+        setFeedback("Si un compte correspond à cette adresse, vous recevrez un lien de réinitialisation. Consultez aussi vos courriers indésirables.");
         return;
       }
 
       if (mode === "register") {
+        if (!values.displayName?.trim()) {
+          setFeedback("Saisissez votre nom complet.");
+          return;
+        }
         if (!values.password || values.password.length < 8) {
           setFeedback("Le mot de passe doit contenir au moins 8 caractères.");
           return;
@@ -74,12 +84,17 @@ export function AuthModal({
           setFeedback("Vous devez accepter les conditions et la politique de confidentialité.");
           return;
         }
+        if (values.password !== values.confirmation) {
+          setFeedback("Les mots de passe ne correspondent pas.");
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email: values.email,
           password: values.password,
           options: {
+            emailRedirectTo: `${window.location.origin}/auth/confirm`,
             data: {
-              professional_intent: intendedRole === "provider",
+              professional_intent: false,
               display_name: values.displayName?.trim() || values.email.split("@")[0],
               legal_accepted: true,
             },
@@ -87,9 +102,9 @@ export function AuthModal({
         });
         if (error) throw error;
         if (!data.session) {
-          setFeedback("Compte créé. Confirmez votre adresse e-mail avant de vous connecter.");
+          setFeedback("Consultez votre boîte e-mail pour confirmer votre inscription. Si vous possédez déjà un compte, connectez-vous ou utilisez « Mot de passe oublié ».");
           setMode("login");
-          reset({ ...values, password: "" });
+          reset({ ...values, password: "", confirmation: "" });
           return;
         }
       } else {
@@ -108,7 +123,8 @@ export function AuthModal({
       const user = userData.user;
       if (userError) throw userError;
       if (!user) throw new Error("La session n’a pas pu être créée.");
-      await supabase.rpc("synchronize_account_status");
+      const { error: statusError } = await supabase.rpc("synchronize_account_status");
+      if (statusError) throw statusError;
       if (intendedRole === "provider") {
         const { error } = await supabase.rpc("request_professional_profile");
         if (error) throw error;
@@ -122,12 +138,17 @@ export function AuthModal({
       onAuthenticated(profile);
     } catch (error) {
       setFeedback(authErrorMessage(error));
+    } finally {
+      submitting.current = false;
     }
   }
 
   async function continueWithGoogle() {
+    if (openingGoogle.current || submitting.current) return;
+    openingGoogle.current = true;
     setFeedback("");
     setGoogleLoading(true);
+    try {
     if (!await isGoogleAuthEnabled()) {
       setFeedback("La connexion Google n’est pas encore activée pour Mata Beauty. Utilisez votre e-mail pour le moment.");
       setGoogleLoading(false);
@@ -148,12 +169,17 @@ export function AuthModal({
       options: { redirectTo: redirectTo.toString(), scopes: "openid email profile" },
     });
     if (error) {
-      setFeedback("La connexion Google n’a pas pu démarrer. Réessayez.");
+      throw error;
+    }
+    } catch (error: unknown) {
+      setFeedback(authErrorMessage(error));
+    } finally {
+      openingGoogle.current = false;
       setGoogleLoading(false);
     }
   }
 
-  const title = mode === "login" ? "Bienvenue" : mode === "register" ? "Créer votre compte" : "Mot de passe oublié";
+  const title = mode === "login" ? "Se connecter" : mode === "register" ? "Créer votre compte Client" : "Mot de passe oublié";
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -174,10 +200,10 @@ export function AuthModal({
           </button>
           <div className="auth-divider"><span>ou avec votre e-mail</span></div>
         </>}
-        <form onSubmit={handleSubmit(submit)} noValidate>
+        <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
           {mode === "register" && (
             <label>
-              Nom affiché
+              Nom complet
               <input autoComplete="name" {...register("displayName")} />
             </label>
           )}
@@ -198,9 +224,12 @@ export function AuthModal({
               {errors.password && <small className="field-error">{errors.password.message}</small>}
             </label>
           )}
-          {mode === "register" && <label className="legal-consent"><input type="checkbox" aria-label="Accepter les conditions générales et la politique de confidentialité" {...register("acceptLegal")} /> <span>J’accepte les conditions générales et la politique de confidentialité de Mata Beauty.</span></label>}
+          {mode === "register" && <>
+            <label>Confirmer le mot de passe<input type="password" autoComplete="new-password" {...register("confirmation")} /></label>
+            <label className="legal-consent"><input type="checkbox" aria-label="Accepter les conditions générales et la politique de confidentialité" {...register("acceptLegal")} /> <span>J’accepte les <Link href="/legal/conditions-generales" target="_blank" rel="noopener noreferrer">conditions générales</Link> et la <Link href="/legal/confidentialite" target="_blank" rel="noopener noreferrer">politique de confidentialité</Link> de Mata Beauty.</span></label>
+          </>}
           {feedback && <p className="auth-feedback" role="status">{feedback}</p>}
-          <button className="primary-button full" type="submit" disabled={isSubmitting || !configuration.configured}>
+          <button className="primary-button full" type="submit" disabled={isSubmitting || googleLoading || !configuration.configured}>
             {isSubmitting ? "Veuillez patienter…" : mode === "login" ? "Se connecter" : mode === "register" ? "Créer le compte" : "Envoyer le lien"}
           </button>
         </form>

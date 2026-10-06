@@ -35,7 +35,7 @@ test("premium home opens a real category results screen", async ({ page }) => {
 test("authentication has no fake preview mode", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
-  await expect(page.getByRole("heading", { name: "Bienvenue" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Se connecter" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Se connecter", exact: true })).toBeEnabled();
   await expect(page.getByRole("dialog")).not.toContainText("aperçu");
 });
@@ -157,7 +157,7 @@ test("Google login starts a real OAuth request with a fixed callback", async ({ 
 
 test("a protected destination survives the authentication handoff", async ({ page }) => {
   await page.goto("/?connexion=requise&returnTo=%2Fpro%2Fstudio");
-  await expect(page.getByRole("heading", { name: "Bienvenue" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Se connecter" })).toBeVisible();
   const authorizeRequest = page.waitForRequest((request) => new URL(request.url()).pathname === "/auth/v1/authorize");
   await page.getByRole("button", { name: "Continuer avec Google", exact: true }).click();
   const oauthUrl = new URL((await authorizeRequest).url());
