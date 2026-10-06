@@ -2,7 +2,7 @@
 
 ## Périmètre et état de livraison
 
-Domaine cible : https://mata-beauty.com. Ce rapport concerne la correction visuelle demandée et ses non-régressions. Il ne remplace pas le rapport des blocages de lancement. Au moment de sa rédaction initiale, les changements sont locaux ; Preview et production restent NOT TESTED pour cette version.
+Domaine vérifié : https://mata-beauty.com. La correction est déployée au commit **106b2dd72ea1f6fa2a116cdbfa6d8c4125174d55**. Ce rapport concerne la correction visuelle demandée et ses non-régressions. Il ne remplace pas le rapport des blocages de lancement.
 
 ## Inventaire réel et anomalie initiale
 
@@ -56,12 +56,41 @@ Chaque paire est enregistrée sous public/images/categories/{slug}-1.webp et {sl
 | Réseau | Retard et 404 de l'image suivante | Image précédente conservée | Image courante encore visible | PASS |
 | Mobile | Swipe et tap tactiles émulés | Changer l'image puis ouvrir la catégorie | Parcours exécuté après IMG-03 | PASS |
 | Mobile physique | Téléphone / trackpad réel | Gestes matériels | Aucun matériel pilotable dans cette recette | NOT TESTED |
-| Médias professionnels | Publication réelle → miniature liée dans Explorer | Bon professionnel et bonne prestation | Upload réel sur QA, origine professionnelle affichée, identifiants et miniature contrôlés | PASS |
-| Déploiement | Preview puis mata-beauty.com | Version vérifiée et parcours rejoués | En attente de déploiement | NOT TESTED |
+| Médias professionnels | Publication réelle → miniature liée dans Explorer | Bon professionnel et bonne prestation | Upload réel sur QA puis production, origine professionnelle affichée, identifiants et miniature contrôlés | PASS |
+| Déploiement | Preview puis mata-beauty.com | Version vérifiée et parcours rejoués | 13 scénarios Preview et 19 scénarios production PASS ; version comparée | PASS |
 
 Les tests visuels éditoriaux isolent volontairement le catalogue professionnel (réponse vide) afin de vérifier les 22 illustrations. Ils ne prouvent pas seuls l'intégration professionnelle : celle-ci est contrôlée séparément par la publication réelle dans Studio, la lecture du catalogue et la carte Explorer. Les captures et traces sont conservées dans work/category-audit/ (dossier local ignoré par Git).
 
-La suite vidéo locale a exécuté publication MP4, photo/avant-après, interactions et réservation. Ses assertions métier passent ; le bilan global reste FAIL car l'appel de bienvenue retourne 403 sur localhost : la configuration locale conserve l'origine officielle alors que le navigateur utilise localhost. Le contrôle d'origine n'a pas été affaibli pour faire passer ce test. La même suite doit être rejouée sur Preview puis sur le domaine officiel avant validation de livraison.
+La suite vidéo locale a exécuté publication MP4, photo/avant-après, interactions et réservation. Ses assertions métier passent ; son bilan global reste FAIL car l'appel de bienvenue retourne 403 sur localhost : la configuration locale conserve l'origine officielle alors que le navigateur utilise localhost. Le contrôle d'origine n'a pas été affaibli pour faire passer ce test. La même suite a ensuite été rejouée intégralement avec succès sur Preview puis sur le domaine officiel, sans ces erreurs inattendues. Ce contrôle API ne prouve pas la réception du message par une boîte humaine.
+
+## Preuves de livraison
+
+- Pré-commit : pnpm lint, pnpm typecheck, pnpm test (**85 tests / 20 fichiers**) et pnpm build PASS.
+- Preview : https://mata-beauty-90ivsle1z-africrm.vercel.app, déploiement dpl_4kV6EMgj6ScfZrYM5hajuQMgzcH8, même commit source ; **13 PASS** : visuels 5, publication/feed/réservation/modération 4, catalogue/salon 2, candidature/MFA 2.
+- Production : https://mata-beauty-6ihufgbic-africrm.vercel.app, déploiement dpl_A44Nb4cukirEBbR2WFNbS3BozGPt. Le 6 octobre 2026 à 12:24:48 UTC, https://mata-beauty.com répond HTTP 200 et sert les **15 mêmes scripts** que ce déploiement. Backend production présent, backend QA absent. Preuve : work/final-audit/production-version-106b2dd.json.
+- Après bascule sur mata-beauty.com : **19 PASS** = visuels 5 + publication/feed/réservation/modération 4 + catalogue/salon 2 + candidature/MFA 2 + localisation simulée/panne feed 6. Aucune relance automatique pour transformer un échec en succès (retries 0).
+- Reprise de sécurité après cette recette : **24 contrôles API PASS** sur la base production, séparés des 19 scénarios navigateur. Refus d'auto-attribution Client/Pro et de métadonnées privilégiées, auto-approbation refusée, MFA AAL1 refusée, révocation effective sur une session déjà ouverte, protection du Super Admin face à la suspension via modération. Preuve : work/final-audit/final-role-security.json. Les champs de rôle inconnus sont aussi refusés par le type SQL ; ce refus ne remplace pas le contrôle des rôles valides. Cette passe ne qualifie pas les 87 fonctions exposées ni toute la matrice inter-rôles.
+- Les réservations ont réellement été créées puis vues côté client et professionnel. Les comptes, prestations, publications, documents et réservations sont des fixtures de recette nettoyées en fin de suite. Contrôle indépendant : zéro compte récent restant pour les préfixes de cette recette.
+- Les captures de production sont work/category-audit/grid-{390,768,1366,1440,1920}.png et les captures de chaque carte {largeur}-{slug}.png. Toutes ont été produites après bascule. Les cinq grilles et les détails nécessaires ont été inspectés ; une capture de grille entière peut inclure la barre de navigation fixe, tandis que les captures de carte vérifient son accessibilité après défilement.
+- Aucun changement de moteur vidéo, d'authentification, de migration SQL ni de paiement dans ce commit. Le paiement reste mock. Les corrections antérieures demeurent dans l'historique et les circuits affectés ont été rejoués.
+
+## Matrice visuelle finale sur mata-beauty.com
+
+Les noms d'images ci-dessous sont relatifs à public/images/categories/. PASS mobile signifie navigateur avec viewport mobile et gestes tactiles émulés, pas validation d'un téléphone physique.
+
+| Catégorie | Images | Correspondance | Mobile 390 | Tablette 768 | Desktop 1366/1440/1920 | Statut |
+|---|---|---|---|---|---|---|
+| Coiffure femme | coiffure-femme-1.webp / -2.webp | Coiffage / brushing | PASS | PASS | PASS | PASS |
+| Tresses africaines | tresses-africaines-1.webp / -2.webp | Tresses knotless / collées | PASS | PASS | PASS | PASS |
+| Coiffure homme | coiffure-homme-1.webp / -2.webp | Coupe tondeuse / ciseaux | PASS | PASS | PASS | PASS |
+| Locks | locks-1.webp / -2.webp | Locks / retwist | PASS | PASS | PASS | PASS |
+| Perruques et lace wigs | perruques-lace-wigs-1.webp / -2.webp | Pose / ajustement de perruque | PASS | PASS | PASS | PASS |
+| Maquillage | maquillage-1.webp / -2.webp | Maquillage professionnel | PASS | PASS | PASS | PASS |
+| Onglerie | onglerie-1.webp / -2.webp | Manucure / nail art | PASS | PASS | PASS | PASS |
+| Cils et sourcils | cils-sourcils-1.webp / -2.webp | Extensions / sourcils | PASS | PASS | PASS | PASS |
+| Barbier | barbier-1.webp / -2.webp | Taille / contours de barbe | PASS | PASS | PASS | PASS |
+| Soins du visage | soins-visage-1.webp / -2.webp | Masque / soin chaud | PASS | PASS | PASS | PASS |
+| Beauté à domicile | beaute-domicile-1.webp / -2.webp | Maquillage / manucure à domicile | PASS | PASS | PASS | PASS |
 
 ## Réserves de lancement conservées
 

@@ -1,5 +1,13 @@
 # MATA Beauty — levée des blocages du 6 octobre 2026
 
+## État actualisé après la correction visuelle
+
+La version actuellement servie par mata-beauty.com est **106b2dd72ea1f6fa2a116cdbfa6d8c4125174d55**, déploiement **dpl_A44Nb4cukirEBbR2WFNbS3BozGPt**. Le contrôle du 6 octobre à 12:24:48 UTC compare les 15 scripts du domaine avec ceux du déploiement immuable : identiques, backend production correct, aucun backend QA. L'ancien relevé dc6d62a ci-dessous est conservé comme preuve historique.
+
+Cette livraison corrige les images et carrousels des 11 catégories. **19 scénarios navigateur PASS sur le domaine après déploiement**, puis **24 contrôles API de sécurité PASS** (auto-attribution, auto-approbation, MFA, révocation et protection du Super Admin). Le rapport détaillé est MATA_BEAUTY_CATEGORY_VISUAL_ACCEPTANCE_2026-10-06.md. Aucun module vidéo ni règle SQL n'a été modifié par ce commit.
+
+La qualification de sécurité a repris par un relevé actuel de **17 fonctions privilégiées exécutables par anon et 87 par authenticated**, et la lecture des politiques administratives générales. L'inventaire SECURITY_RESERVES distingue ce relevé du tableau historique. Les contrôles réussis ne prouvent pas l'isolation exhaustive des rôles internes. Les huit blocs encore ouverts dans la décision ci-dessous ne sont pas clos par cette correction visuelle : **C — NON PRÊT** demeure la décision globale.
+
 Ce document complète la recette Partie 3. Il distingue les contrôles exécutés, les défauts corrigés et les réserves encore ouvertes. Le domaine de référence est **https://mata-beauty.com**. Les comptes et prestations de recette sont isolés ; aucune adresse de test ni secret n’est publié ici.
 
 ## Anomalies reproduites et corrections

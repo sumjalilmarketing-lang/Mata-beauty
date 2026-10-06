@@ -1,5 +1,28 @@
 # MATA Beauty — inventaire des réserves SECURITY DEFINER
 
+## Reprise après la correction des images, commit 106b2dd
+
+Un nouveau relevé en lecture seule du catalogue PostgreSQL de production confirme **17 fonctions SECURITY DEFINER exécutables par anon et 87 par authenticated**, avec recouvrement. Le tableau historique ci-dessous conserve volontairement le relevé antérieur aux révocations ; il ne décrit pas les grants actuels. Le déploiement des carrousels n'a modifié aucune règle SQL.
+
+Fonctions encore exécutables par anon : `calculate_service_quote`, `get_admin_context`, `get_available_slots`, `get_provider_follower_counts`, `has_admin_permission`, `has_business_commercial_permission`, `has_conversation_access`, `is_admin`, `is_conversation_member`, `is_super_admin`, `nearby_providers`, `record_post_booking_click`, `record_post_share`, `record_product_event`, `record_social_profile_visit`, `record_video_view`, `social_post_not_strongly_reported`.
+
+La lecture actuelle des définitions montre les contrôles suivants, sans les requalifier en examen complet PASS :
+
+| Fonction | Contrôle constaté dans la définition actuelle | Qualification restante | Statut complet |
+|---|---|---|---|
+| attach_payment_provider | Identité obligatoire, paiement pending appartenant au client, référence encore vide | Tester appels directs et valeurs provider/is_test fournies par le client ; le mode mock reste imposé | NOT TESTED |
+| fail_payment_initialization | Identité obligatoire, paiement du client verrouillé, état pending et référence vide | Tester propriétaire / autre client / répétition et effets sur l'audit | NOT TESTED |
+| initialize_payment | Identité, propriétaire de réservation, devise XOF, état pending, méthode et idempotence | Qualifier l'ancien chemin et ses paramètres par rapport au chemin v2 | NOT TESTED |
+| confirm_service_and_release | Identité client ou prestataire, réservation completed, appel du libérateur de fonds | Qualifier tous les états et contraintes du libérateur ; aucun paiement réel activé | NOT TESTED |
+| write_admin_audit | Identité administrative active avec contrôle MFA via is_admin, justification minimale | Qualifier l'exposition directe et le contenu libre des événements | NOT TESTED |
+| compute_provider_launch_completeness | Calcul scalaire sur un professionnel fourni en argument | Déterminer et tester le périmètre de visibilité des profils non publics | NOT TESTED |
+
+La lecture de pg_policies confirme aussi que plusieurs politiques utilisent encore le prédicat administratif général is_admin : businesses, business_hours, business_closures, business_media, business_invitations, collaborators, collaborator_services, posts, social_post_media, social_profile_visits, payment_events, refunds et wallet_ledger. C'est la réserve inter-rôles SEC-R02 déjà documentée, pas une nouvelle exploitation démontrée. Un refus Client/Pro ne prouve pas l'isolation Support/Finance/Onboarding/Modération. Il faut encore tester les opérations autorisées et refusées avec des fixtures isolées pour chaque rôle, puis corriger les permissions trop larges constatées.
+
+Référence de méthode : [RLS Supabase — grants et politiques](https://supabase.com/docs/guides/database/postgres/row-level-security). Ces constats de schéma ne sont pas des tests utilisateur exécutés et ne lèvent pas la décision C — NON PRÊT.
+
+## Relevé historique avant durcissement
+
 Relevé production du 6 octobre 2026, avant le correctif `822ea08` : 40 surfaces exécutables par `anon`, 99 par `authenticated`, avec recouvrement. Une autorisation EXECUTE ne prouve pas une faille : les contrôles internes doivent être examinés et éprouvés pour chaque fonction. Le correctif ajoute `admin_mfa_required`, réservé à authenticated/service_role.
 
 **Problème :** fonctions à privilèges élevés exposées par l’API. **Risque :** contournement RLS si un contrôle interne manque. **Correction nécessaire :** qualifier chaque exposition, retirer les grants inutiles, tester refus et accès légitimes. **Bloquant avant lancement public : OUI tant que cet examen complet n’est pas terminé.** Le test des rôles et de deux failles ne constitue pas un audit exhaustif de toutes ces fonctions.
