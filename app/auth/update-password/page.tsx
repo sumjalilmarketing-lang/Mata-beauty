@@ -25,6 +25,7 @@ export default function UpdatePasswordPage() {
   const [ready, setReady] = useState(false);
   const [checking, setChecking] = useState(true);
   const [invitation, setInvitation] = useState(false);
+  const [internalInvitation, setInternalInvitation] = useState(false);
   const initialization = useRef<Promise<void> | null>(null);
   const submitting = useRef(false);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({
@@ -35,6 +36,7 @@ export default function UpdatePasswordPage() {
     let active = true;
     if (!initialization.current) {
       const url = new URL(window.location.href);
+      setInternalInvitation(url.searchParams.get("team") === "1");
       const result = readPasswordReturn(url);
       setInvitation(result.kind === "tokens" ? result.invitation : url.searchParams.get("mode") === "invite");
       // Remove credentials before initializing the PKCE client, which would
@@ -71,6 +73,13 @@ export default function UpdatePasswordPage() {
         setFeedback(authErrorMessage(error));
         return;
       }
+      if (internalInvitation) {
+        const activation = await fetch("/api/admin/team/activate", { method: "POST" });
+        if (!activation.ok) {
+          setFeedback("Mot de passe créé, mais l’accès interne n’a pas pu être activé. Contactez la personne qui vous a invité.");
+          return;
+        }
+      }
       const { error: signOutError } = await supabase.auth.signOut();
       setComplete(true);
       setFeedback(signOutError
@@ -98,7 +107,7 @@ export default function UpdatePasswordPage() {
           <button className="primary-button full" disabled={!ready || isSubmitting || complete}>{isSubmitting ? "Mise à jour…" : "Mettre à jour"}</button>
         </form>
         {!checking && !ready && <Link className="outline-button return-home" href="/?auth=reset">Demander un nouveau lien</Link>}
-        {complete && <Link className="outline-button return-home" href="/?connexion=requise">Se connecter</Link>}
+        {complete && <Link className="outline-button return-home" href={internalInvitation ? "/admin" : "/?connexion=requise"}>{internalInvitation ? "Se connecter et configurer le MFA" : "Se connecter"}</Link>}
         <Link className="outline-button return-home" href="/">Retour à Mata Beauty</Link>
       </section>
     </main>

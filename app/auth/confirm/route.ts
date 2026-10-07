@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applicationOrigin } from "@/lib/payments/server";
+import { applicationOrigin, serviceSupabase } from "@/lib/payments/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
 
@@ -36,7 +36,8 @@ export async function GET(request: Request) {
       return redirect(request, "/?auth_error=profile_creation_failed");
     }
     if (type === "recovery" || type === "invite") {
-      return redirect(request, `/auth/update-password?mode=${type}`);
+      const internal = type === "invite" ? await serviceSupabase().from("internal_invitations").select("id").eq("user_id", data.user.id).eq("status", "pending").maybeSingle() : null;
+      return redirect(request, `/auth/update-password?mode=${type}${internal?.data ? "&team=1" : ""}`);
     }
     try { await sendWelcomeEmail(data.user.id); }
     catch { console.error("welcome_email_delivery_failed"); }

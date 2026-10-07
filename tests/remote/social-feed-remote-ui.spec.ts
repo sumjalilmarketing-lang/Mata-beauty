@@ -411,7 +411,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   test.setTimeout(180_000);
   await preparePage(page);
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
   await page.getByLabel("Adresse e-mail").fill(clientEmail);
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
@@ -622,7 +622,7 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   test.setTimeout(120_000);
   await preparePage(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Profil" }).click();
+  await page.getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
   await page.getByLabel("Adresse e-mail").fill(clientEmail);
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
@@ -685,7 +685,7 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   });
   await preparePage(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Profil" }).click();
+  await page.getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
   await page.getByLabel("Adresse e-mail").fill(clientEmail);
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
@@ -717,7 +717,7 @@ test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async (
     const page = await context.newPage();
     await preparePage(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Profil" }).click();
+    await page.getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
     await page.getByLabel("Adresse e-mail").fill(clientEmail);
     await page.getByLabel("Mot de passe").fill(password);
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
@@ -755,7 +755,7 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
     await preparePage(page);
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
     await page.getByLabel("Adresse e-mail").fill(clientEmail);
     await page.getByLabel("Mot de passe").fill(password);
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();

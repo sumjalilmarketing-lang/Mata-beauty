@@ -10,6 +10,7 @@ import { NotificationCenter, NotificationBadge } from "./notification-center";
 import { LaunchAdmin } from "./launch-admin";
 import { SupportInbox } from "./support-inbox";
 import { ModerationInbox } from "./moderation-inbox";
+import { InternalTeam } from "./internal-team";
 
 type AdminContext = {
   is_super_admin: boolean;
@@ -181,7 +182,7 @@ const navigation = [
   { key: "notifications", label: "Notifications", icon: "◌", permission: "notifications.send" },
   { key: "support", label: "Support", icon: "?", permission: "support.manage" },
   { key: "content", label: "Contenu social", icon: "▶", permission: "content.manage" },
-  { key: "administrators", label: "Administrateurs", icon: "♜", permission: "roles.manage" },
+  { key: "administrators", label: "Équipe & accès", icon: "♜", permission: "roles.manage" },
   { key: "roles", label: "Rôles et permissions", icon: "⌘", permission: "roles.manage" },
   { key: "statistics", label: "Statistiques", icon: "↗", permission: "users.read" },
   { key: "audit", label: "Journaux d’audit", icon: "≣", permission: "audit.read" },
@@ -298,11 +299,11 @@ function ConfirmationModal({
   </div>;
 }
 
-export function SuperAdminApp({ supabaseUrl, supabaseAnonKey }: { supabaseUrl: string; supabaseAnonKey: string }) {
+export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "overview" }: { supabaseUrl: string; supabaseAnonKey: string; initialModule?: ModuleKey }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const [context, setContext] = useState<AdminContext | null>(null);
   const [sessionState, setSessionState] = useState<"loading" | "anonymous" | "unauthorized" | "mfa" | "ready">("loading");
-  const [activeModule, setActiveModule] = useState<ModuleKey>("overview");
+  const [activeModule, setActiveModule] = useState<ModuleKey>(initialModule);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [globalQuery, setGlobalQuery] = useState("");
@@ -495,6 +496,7 @@ function AdminModule({
   if (module === "payments" || module === "commissions" || module === "payouts") return <FinanceModule section={module} />;
   if (module === "content") return <SocialContentModule context={context} notify={notify} />;
   if (module === "audit") return <AuditModule context={context} />;
+  if (module === "administrators" || module === "roles") return <InternalTeam matrixOnly={module === "roles"} />;
   if (module === "settings" || module === "maintenance") return <SettingsModule maintenance={module === "maintenance"} notify={notify} />;
   return <OperationalModule module={module} context={context} />;
 }

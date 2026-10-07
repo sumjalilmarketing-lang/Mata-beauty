@@ -12,7 +12,7 @@ async function login(page:Page,role:string) {
   const bypass=process.env.VERCEL_AUTOMATION_BYPASS_SECRET,base=process.env.REMOTE_APP_URL;
   if(bypass&&base) await page.route(`${new URL(base).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
   await page.goto("/");
-  await page.getByRole("navigation",{name:"Navigation de l’application"}).getByRole("button",{name:"Profil"}).click();
+  await page.getByRole("navigation",{name:"Navigation de l’application"}).getByRole("button",{name:/^(Profil|Se connecter à MATA Beauty)$/}).click();
   await page.getByLabel("Adresse e-mail").fill(accounts.get(role)!.email);await page.getByLabel("Mot de passe",{exact:true}).fill(password);
   await page.getByRole("button",{name:"Se connecter",exact:true}).click();await expect(page).toHaveURL(/\/app/,{timeout:30000});
 }

@@ -214,7 +214,7 @@ Dans la gestion des contenus connectée, une décision de modération peut retir
 
 Dans **Santé plateforme**, les compteurs d’e-mails distinguent les envois en attente, acceptés par le service d’envoi, à reprendre automatiquement et à vérifier par l’équipe technique. Un e-mail « envoyé » n’est pas une preuve de lecture. Un état « à vérifier » ne doit pas provoquer un renvoi manuel aveugle, qui pourrait créer un doublon.
 
-Les menus **Administrateurs**, **Rôles et permissions** et **Sécurité** existent, mais toutes leurs opérations ne disposent pas d’un écran de gestion connecté. L’attribution d’un rôle n’est donc pas décrite ici comme une action disponible. Ne partagez pas votre session pour donner un accès à un autre agent.
+**Équipe & accès** gère les invitations et les accès internes (voir section 9). **Rôles et permissions** est une consultation des permissions serveur. Certaines opérations de **Sécurité** restent informatives : ne les interprétez pas comme des réglages connectés. Ne partagez pas votre session pour donner un accès à un autre agent.
 
 **Maintenance** a un effet global : son activation limite l’accès des utilisateurs. Ne confirmez cette action que si cette interruption est réellement souhaitée. Les paramètres indiqués **Lecture seule** ne sont pas modifiables depuis ces cartes.
 
@@ -228,3 +228,31 @@ Les menus **Administrateurs**, **Rôles et permissions** et **Sécurité** exist
 - **Session fermée** : reconnectez-vous puis ouvrez de nouveau l’espace souhaité.
 
 Pour signaler un problème, indiquez l’écran, l’action effectuée et le message affiché. Ne transmettez ni mot de passe, ni lien privé contenant un jeton, ni pièce d’identité dans une conversation publique.
+
+## 9. Super Admin — gérer l’équipe
+
+Cette rubrique est en qualification avant publication. Connectez-vous à `/admin`, validez votre second facteur puis ouvrez **Équipe & accès**.
+
+Pour inviter un membre, choisissez **Inviter un membre**, saisissez son prénom, son nom et son e-mail professionnel, puis sélectionnez un rôle existant. **Envoyer l’invitation** envoie un lien sécurisé : le membre choisit lui-même son mot de passe et configure le MFA. Aucun mot de passe n’est affiché au Super Admin. Un compte public existant n’est pas réinitialisé par ce formulaire.
+
+**Invitations en attente** indique si l’envoi a été confirmé et la date limite d’activation. **Renvoyer l’invitation** est disponible après le délai anti-répétition d’une minute. Le destinataire doit utiliser le dernier lien reçu. Le lien est à usage unique ; une invitation expirée exige un renvoi.
+
+Sur une fiche active, **Modifier le rôle** remplace les anciennes permissions. Saisissez une justification et confirmez. **Suspendre l’accès** bloque immédiatement les autorisations et les nouvelles connexions ; **Réactiver** restaure le rôle courant. **Révoquer l’accès** désactive les appartenances internes tout en conservant l’audit. Après révocation, une réattribution de rôle explicite précède la réactivation. Vous ne pouvez pas modifier votre propre accès.
+
+L’indication MFA distingue un facteur configuré d’un facteur à configurer. Elle n’est pas une preuve que toutes les sessions ont terminé leur second facteur : cette vérification est effectuée côté serveur à chaque demande protégée. Aucun outil de réinitialisation MFA n’est proposé dans cette rubrique.
+
+**Journal d’activité** présente les actions, dates, acteurs et cibles. **Rôles et permissions** affiche la matrice serveur en lecture seule. Les membres ne peuvent pas effacer ce journal depuis l’interface.
+
+### Prise en main par rôle interne
+
+| Rôle | Espace | Usage autorisé |
+|---|---|---|
+| Finance | `/finance` | Paiements, commissions, versements et audit autorisés ; les paiements restent en mode mock. |
+| Support | `/support-agent` | Tickets, utilisateurs et problèmes de réservation autorisés. |
+| Onboarding | `/onboarding` | Dossiers, documents privés, compléments et décisions selon permissions. |
+| Modération | `/moderation` | Signalements et décisions de modération autorisées. |
+| Administrateur | `/operations` | Pilotage opérationnel, sans gestion des accès Super Admin. |
+| Responsable contenu | `/operations` | Catalogue, contenu et communication selon permissions. |
+| Super Admin | `/admin` | Supervision et gestion contrôlée de l’équipe. |
+
+Pour activer un accès : ouvrez l’e-mail **MATA Beauty vous invite à rejoindre son équipe**, sélectionnez **Activer mon accès**, choisissez votre mot de passe puis utilisez **Se connecter et configurer le MFA**. Scannez le QR avec votre application d’authentification et saisissez son code. Une URL copiée ne donne jamais de permissions supplémentaires.
