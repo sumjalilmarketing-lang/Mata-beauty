@@ -496,7 +496,7 @@ function AdminModule({
   if (module === "providers") return <ProvidersModule context={context} verificationOnly={false} notify={notify} />;
   if (module === "bookings" || module === "calendar") return <BookingsModule context={context} calendar={module === "calendar"} notify={notify} />;
   if (module === "categories" || module === "services") return <CatalogModule services={module === "services"} notify={notify} />;
-  if (module === "payments" || module === "commissions" || module === "payouts") return <FinanceModule section={module} />;
+  if (module === "payments" || module === "commissions") return <FinanceModule section={module} />;
   if (module === "content") return <SocialContentModule context={context} notify={notify} />;
   if (module === "audit") return <AuditModule context={context} />;
   if (module === "administrators" || module === "roles") return <InternalTeam matrixOnly={module === "roles"} />;
@@ -677,7 +677,7 @@ export function CatalogModule({ services, notify }: { services: boolean; notify:
   </>;
 }
 
-function FinanceModule({ section }: { section: "payments" | "commissions" | "payouts" }) {
+function FinanceModule({ section }: { section: "payments" | "commissions" }) {
   const [payments, setPayments] = useState<FinanceRow[]>([]);
   useEffect(() => {
     if (section === "payments") void getSupabaseBrowserClient()!.from("payments").select("id,booking_id,payment_status,payment_method,amount,currency,is_test,created_at").order("created_at", { ascending: false }).limit(200).then(({ data }) => setPayments((data ?? []) as FinanceRow[]));
@@ -686,7 +686,7 @@ function FinanceModule({ section }: { section: "payments" | "commissions" | "pay
   return <><div className="admin-filter-bar"><span>{payments.length} paiements · lecture sécurisée</span></div><div className="admin-table-wrap"><table className="admin-data-table"><thead><tr><th>Référence</th><th>Réservation</th><th>Méthode</th><th>Montant</th><th>Date</th><th>Statut</th></tr></thead><tbody>{payments.map((row) => <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code>{row.is_test && <small>Mode test</small>}</td><td><code>{row.booking_id.slice(0, 8)}</code></td><td>{row.payment_method}</td><td><strong>{formatCurrency(row.amount)}</strong></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.payment_status} /></td></tr>)}</tbody></table></div></>;
 }
 
-function OperationalFinance({ section }: { section: "commissions" | "payouts" }) {
+function OperationalFinance({ section }: { section: "commissions" }) {
   const [rules, setRules] = useState<CommissionRuleRow[]>([]);
   const [entries, setEntries] = useState<CommissionEntryRow[]>([]);
   useEffect(() => {
@@ -700,7 +700,6 @@ function OperationalFinance({ section }: { section: "commissions" | "payouts" })
       setEntries((entryResult.data ?? []) as CommissionEntryRow[]);
     });
   }, [section]);
-  if (section === "payouts") return <section className="admin-dashboard-grid"><article className="admin-panel"><p>Reversements</p><h2>Validation à quatre yeux</h2><p>La préparation du registre existe, mais aucun fournisseur de reversement réel n’est configuré. Aucune action financière fictive n’est exposée.</p></article></section>;
   const total = entries.reduce((sum, row) => sum + row.amount, 0);
   return <><section className="admin-metric-grid"><article><span>Commissions enregistrées</span><strong>{entries.length}</strong><small>Écritures réelles</small></article><article><span>Total Mata Beauty</span><strong>{formatCurrency(total)}</strong><small>Registre Supabase</small></article><article><span>Règles actives</span><strong>{rules.filter((row) => row.is_active).length}</strong><small>Calcul serveur</small></article></section><div className="admin-table-wrap"><table className="admin-data-table"><thead><tr><th>Règle</th><th>Taux</th><th>Validité</th><th>Statut</th></tr></thead><tbody>{rules.map((row) => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td>{formatDate(row.valid_from)}<small>{row.valid_until ? `jusqu’au ${formatDate(row.valid_until)}` : "Sans échéance"}</small></td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div><div className="admin-table-wrap commission-entries"><table className="admin-data-table"><thead><tr><th>Écriture</th><th>Paiement</th><th>Taux</th><th>Commission</th><th>Date</th></tr></thead><tbody>{entries.map((row) => <tr key={row.id}><td><code>{row.id.slice(0,8)}</code></td><td><code>{row.payment_id.slice(0,8)}</code></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td><strong>{formatCurrency(row.amount)}</strong></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div></>;
 }
@@ -832,6 +831,7 @@ function SettingsModule({ maintenance, notify }: { maintenance: boolean; notify:
 
 type OperationalRow = Record<string, unknown>;
 const operationalSources: Partial<Record<ModuleKey, { table: string; select: string; description: string; title: (row: OperationalRow) => string; detail: (row: OperationalRow) => string }>> = {
+  payouts: { table: "payouts", select: "id,provider_id,amount,currency,status,created_at", description: "Versements enregistrés, en lecture seule. Aucun transfert réel n’est activé en mode mock.", title: row => `${formatCurrency(Number(row.amount))} · ${String(row.status)}`, detail: row => `Professionnel ${String(row.provider_id).slice(0, 8)} · ${formatDate(String(row.created_at))}` },
   salons: { table: "businesses", select: "id,name,city,status,created_at", description: "Salons enregistrés et leur statut.", title: row => String(row.name), detail: row => `${row.city ?? ""} · ${row.status}` },
   reviews: { table: "reviews", select: "id,rating,comment,is_visible,created_at", description: "Avis liés aux réservations terminées. Le texte de l’auteur est conservé.", title: row => `${row.rating}/5 · ${row.comment ?? "Sans commentaire"}`, detail: row => row.is_visible ? "Visible" : "Masqué" },
   disputes: { table: "disputes", select: "id,reason,status,priority,created_at", description: "Registre des litiges enregistrés, en lecture seule.", title: row => String(row.reason), detail: row => `${row.status} · ${row.priority}` },
