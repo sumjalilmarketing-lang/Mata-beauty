@@ -31,7 +31,7 @@ export function CreatorStudio({ userId, providerApproved }: { userId: string; pr
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setState("loading");
-    const { data, error } = await supabase.from("posts").select("id,post_type,title,caption,status,thumbnail_url,view_count,like_count,comment_count,published_at,created_at").eq("author_id", userId).order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("posts").select("id,post_type,title,caption,status,thumbnail_url,view_count,like_count,comment_count,published_at,created_at").eq("author_id", userId).is("deleted_at", null).neq("status", "deleted").order("created_at", { ascending: false });
     if (error) { setState("error"); return; }
     const rows = await Promise.all(((data ?? []) as CreatorPost[]).map(async (post) => {
       if (!post.thumbnail_url?.includes("/provider-social-media/")) return post;

@@ -887,6 +887,10 @@ test("le Studio refuse les fichiers invalides et récupère après interruption"
   const title=`Upload validation ${run}`;
   try {
     await prepareFaultPage(page);
+    if (!qaVideoBuffer) {
+      const sample=await page.request.get('https://samplelib.com/mp4/sample-5s-360p.mp4');
+      expect(sample.ok()).toBe(true);qaVideoBuffer=await sample.body();
+    }
     await page.goto(remoteAppUrl ?? 'http://localhost:3100');
     await page.getByRole('button',{name:'Publier une vidéo'}).click();
     await page.getByLabel('Adresse e-mail').fill(providerEmail);await page.getByLabel('Mot de passe').fill(password);
@@ -934,7 +938,8 @@ test("le Studio refuse les fichiers invalides et récupère après interruption"
     await expect.poll(()=>portrait.locator('video').evaluate(node=>(node as HTMLVideoElement).currentTime),{timeout:20000}).toBeGreaterThan(0);
     expect(await portrait.locator('video').evaluate(node=>{const v=node as HTMLVideoElement;return {width:v.videoWidth,height:v.videoHeight,fit:getComputedStyle(v).objectFit};})).toEqual({width:180,height:320,fit:'cover'});
     const portraitRecord=await admin.from('posts').select('id').eq('author_id',providerId).eq('title',`Portrait WebM ${run}`).single();expect(portraitRecord.error).toBeNull();
-    await page.goto('/pro/videos');const row=page.locator('.studio-post-grid article').filter({hasText:`Portrait WebM ${run}`});
+    await page.goto('/pro/videos');await page.getByRole('button',{name:'Mes vidéos',exact:true}).click();
+    const row=page.locator('.studio-post-grid article').filter({hasText:`Portrait WebM ${run}`});
     for (const [action,status] of [['Masquer','hidden'],['Republier','published'],['Archiver','archived'],['Republier','published']] as const) {
       await row.getByRole('button',{name:action,exact:true}).click();
       await expect.poll(async()=> (await admin.from('posts').select('status').eq('id',portraitRecord.data!.id).single()).data?.status).toBe(status);
@@ -943,5 +948,10 @@ test("le Studio refuse les fichiers invalides et récupère après interruption"
     page.once('dialog',dialog=>dialog.accept());await row.getByRole('button',{name:'Supprimer',exact:true}).click();
     await expect(row).toHaveCount(0);
     expect((await clientApi.from('social_feed').select('id').eq('id',portraitRecord.data!.id)).data).toHaveLength(0);
+    const deleted=await admin.from('posts').select('status,deleted_at').eq('id',portraitRecord.data!.id).single();
+    expect(deleted.data?.status).toBe('deleted');expect(deleted.data?.deleted_at).toBeTruthy();
+    await page.reload();await page.getByRole('button',{name:'Mes vidéos',exact:true}).click();
+    await expect(page.getByText('Chargement de vos publications…')).toHaveCount(0);
+    await expect(row).toHaveCount(0);
   } finally {await context.close();}
 });
