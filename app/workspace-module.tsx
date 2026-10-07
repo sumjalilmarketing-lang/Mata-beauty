@@ -22,6 +22,7 @@ import { SupportInbox } from "./support-inbox";
 import { ModerationInbox } from "./moderation-inbox";
 import { CommentModeration } from "./comment-moderation";
 import { CatalogModule } from "./super-admin";
+import { RefundReview } from "./refund-review";
 
 type Row = Record<string, unknown>;
 type ResourceDefinition = { table: string; select: string; title: (row: Row) => string; meta: (row: Row) => string };
@@ -66,9 +67,10 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const onboardingInbox = (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "operations" && module.key === "onboarding");
   const commentModeration = ["moderation", "admin"].includes(space) && module.key === "comments";
   const categoryManagement = space === "operations" && module.key === "categories";
+  const refundReview = ["finance", "admin"].includes(space) && module.key === "refunds";
   const [notice, setNotice] = useState("");
   const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue"].includes(module.key));
-  const definition = custom || commentModeration || categoryManagement || onboardingInbox ? undefined
+  const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview ? undefined
     : space === "onboarding" && module.key === "history" ? onboardingHistory
     : space === "moderation" && module.key === "history" ? moderationHistory
     : (space === "finance" && module.key === "audit") || (space === "admin" && module.key === "financial-reports") ? financialHistory
@@ -106,6 +108,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
 
   if (moderationInbox) return <ModerationInbox />;
   if (commentModeration) return <CommentModeration />;
+  if (refundReview) return <RefundReview />;
   if (categoryManagement) return <section>{notice && <p role="status">{notice}</p>}<CatalogModule services={false} notify={setNotice} /></section>;
   if (supportInbox) return <SupportInbox key={module.key} filter={module.key} userId={userId} />;
   if (module.key === "notifications") return <NotificationCenter userId={userId} />;

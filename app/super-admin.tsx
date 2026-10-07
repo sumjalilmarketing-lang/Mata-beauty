@@ -828,23 +828,45 @@ function SettingsModule({ maintenance, notify }: { maintenance: boolean; notify:
   }} />}</>;
 }
 
-function OperationalModule({ module, context }: { module: ModuleKey; context: AdminContext }) {
-  const descriptions: Partial<Record<ModuleKey, string>> = {
-    salons: "Validation, équipes, coordonnées, prestations, revenus et incidents des salons.",
-    reviews: "Modération des avis vérifiés liés aux réservations terminées.",
-    reports: "File des signalements, priorités, assignations et décisions.",
-    disputes: "Investigation des litiges et conservation complète des événements.",
-    promotions: "Ciblage, limites, périodes et performances des promotions.",
-    notifications: "Campagnes internes, e-mail, SMS et push avec prévisualisation.",
-    support: "Tickets, priorités, assignations, messages et notes internes.",
-    content: "Blocs éditoriaux, versions, brouillons et publications.",
-    administrators: "Attribution contrôlée des rôles, MFA et sessions administratives.",
-    roles: "Matrice des permissions granulaires et rôles système.",
-    security: "Sessions, MFA, contrôles d’accès et alertes de sécurité.",
-  };
-  return <section className="admin-dashboard-grid"><article className="admin-panel span-two"><p>Rubrique administrative</p><h2>{navigation.find((item) => item.key === module)?.label}</h2><p>{descriptions[module] || "Informations réservées à votre rôle."}</p><p>Cette rubrique ne dispose pas encore d’un écran de gestion connecté. Elle ne permet pas de conclure qu’aucune demande ou alerte n’est en attente.</p><div className="module-capabilities"><StatusBadge value={context.is_super_admin ? "Super Admin" : "Permission limitée"} /></div></article></section>;
-}
+type OperationalRow = Record<string, unknown>;
+const operationalSources: Partial<Record<ModuleKey, { table: string; select: string; description: string; title: (row: OperationalRow) => string; detail: (row: OperationalRow) => string }>> = {
+  salons: { table: "businesses", select: "id,name,city,status,created_at", description: "Salons enregistrés et leur statut.", title: row => String(row.name), detail: row => `${row.city ?? ""} · ${row.status}` },
+  reviews: { table: "reviews", select: "id,rating,comment,is_visible,created_at", description: "Avis liés aux réservations terminées. Le texte de l’auteur est conservé.", title: row => `${row.rating}/5 · ${row.comment ?? "Sans commentaire"}`, detail: row => row.is_visible ? "Visible" : "Masqué" },
+  disputes: { table: "disputes", select: "id,reason,status,priority,created_at", description: "Registre des litiges enregistrés, en lecture seule.", title: row => String(row.reason), detail: row => `${row.status} · ${row.priority}` },
+  promotions: { table: "promotions", select: "id,title,status,is_active,created_at", description: "Promotions enregistrées, en lecture seule. Les brouillons se préparent dans Lancement.", title: row => String(row.title), detail: row => `${row.status} · ${row.is_active ? "Active" : "Inactive"}` },
+  security: { table: "admin_sessions", select: "id,user_id,mfa_verified,revoked_at,signed_in_at,last_seen_at", description: "Sessions administratives enregistrées. Les révocations se gèrent dans Équipe & accès.", title: row => `Compte ${String(row.user_id).slice(0, 8)}`, detail: row => `${row.revoked_at ? "Révoquée" : "Enregistrée"} · MFA ${row.mfa_verified ? "vérifié" : "non vérifié"}` },
+};
 
+function OperationalModule({ module, context }: { module: ModuleKey; context: AdminContext }) {
+  const source = operationalSources[module];
+  const [rows, setRows] = useState<OperationalRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    setLoading(true); setNotice("");
+    try {
+      const client = getSupabaseBrowserClient(); if (!client || !source) throw new Error("Source indisponible");
+      const result = await client.from(source.table).select(source.select).order(module === "security" ? "signed_in_at" : "created_at", { ascending: false }).limit(100).abortSignal(AbortSignal.timeout(10000));
+      if (result.error) throw result.error;
+      setRows((result.data ?? []) as unknown as OperationalRow[]);
+    } catch (error) { setRows([]); setNotice(publicErrorMessage(error, "Les données sont indisponibles.")); }
+    finally { setLoading(false); }
+  }, [source, module]);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  async function moderate(row: OperationalRow) {
+    if (busy || !window.confirm(`${row.is_visible ? "Masquer" : "Restaurer"} cet avis ?`)) return;
+    setBusy(true);
+    try {
+      const result = await getSupabaseBrowserClient()!.from("reviews").update({ is_visible: !row.is_visible }).eq("id", String(row.id)).eq("is_visible", Boolean(row.is_visible)).select("id").abortSignal(AbortSignal.timeout(10000));
+      if (result.error) throw result.error;
+      if (result.data.length !== 1) throw new Error("L’avis ou vos droits ont changé. Actualisez la liste.");
+      await load(); setNotice("Visibilité de l’avis mise à jour.");
+    } catch (error) { setNotice(publicErrorMessage(error, "La visibilité de l’avis n’a pas été modifiée.")); }
+    finally { setBusy(false); }
+  }
+  return <section className="admin-panel"><h2>{navigation.find(item => item.key === module)?.label}</h2><p>{source?.description}</p><button disabled={loading || busy} onClick={() => void load()}>Actualiser le registre</button>{notice && <p role="status">{notice}</p>}{loading ? <p>Chargement…</p> : rows.length ? rows.map(row => <article className="control-list-row" key={String(row.id)}><div><strong>{source?.title(row)}</strong><p>{source?.detail(row)}</p></div>{module === "reviews" && (context.is_super_admin || context.permissions.includes("reviews.moderate")) && <button disabled={busy} onClick={() => void moderate(row)}>{row.is_visible ? "Masquer l’avis" : "Restaurer l’avis"}</button>}</article>) : !notice && <p>Aucun élément dans le périmètre autorisé.</p>}</section>;
+}
 function AdminMfa({ onVerified, onSignOut }: { onVerified: () => Promise<void>; onSignOut: () => Promise<void> }) {
   const [factorId, setFactorId] = useState("");
   const [qrCode, setQrCode] = useState("");
@@ -896,3 +918,4 @@ function AdminMfa({ onVerified, onSignOut }: { onVerified: () => Promise<void>; 
     <button className="secondary" disabled={busy} onClick={() => void onSignOut()}>Se déconnecter</button>
   </section></main>;
 }
+
