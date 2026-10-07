@@ -1,0 +1,1546 @@
+[
+  {
+    "source": "work/team-audit/production-rpc-results.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "AAL1 Super Admin cannot list or invite",
+        "status": "PASS"
+      },
+      {
+        "name": "AAL2 Super Admin can list team",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: dashboard financial aggregates follow permissions",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: expected permissions, no team management or self-promotion",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: cannot archive another user's salon",
+        "status": "PASS"
+      },
+      {
+        "name": "support: dashboard financial aggregates follow permissions",
+        "status": "PASS"
+      },
+      {
+        "name": "support: expected permissions, no team management or self-promotion",
+        "status": "PASS"
+      },
+      {
+        "name": "support: cannot archive another user's salon",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: dashboard financial aggregates follow permissions",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: expected permissions, no team management or self-promotion",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: cannot archive another user's salon",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: dashboard financial aggregates follow permissions",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: expected permissions, no team management or self-promotion",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: cannot archive another user's salon",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager: dashboard financial aggregates follow permissions",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager: expected permissions, no team management or self-promotion",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager: cannot archive another user's salon",
+        "status": "PASS"
+      },
+      {
+        "name": "admin: dashboard financial aggregates follow permissions",
+        "status": "PASS"
+      },
+      {
+        "name": "admin: expected permissions, no team management or self-promotion",
+        "status": "PASS"
+      },
+      {
+        "name": "admin: cannot archive another user's salon",
+        "status": "PASS"
+      },
+      {
+        "name": "Client cannot read invitations or assign any internal role",
+        "status": "PASS"
+      },
+      {
+        "name": "Duplicate invitation rejected",
+        "status": "PASS"
+      },
+      {
+        "name": "Pending invite grants no role",
+        "status": "PASS"
+      },
+      {
+        "name": "Expired invitation cannot activate a confirmed account",
+        "status": "PASS"
+      },
+      {
+        "name": "Confirmed recipient activates once",
+        "status": "PASS"
+      },
+      {
+        "name": "Activated Finance still denied before MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "MFA activation recorded without a secret",
+        "status": "PASS"
+      },
+      {
+        "name": "Finance allowed, role management denied",
+        "status": "PASS"
+      },
+      {
+        "name": "Finance to Support removes old permission from same session",
+        "status": "PASS"
+      },
+      {
+        "name": "Suspension rejects old session and new login",
+        "status": "PASS"
+      },
+      {
+        "name": "Reactivation restores login and keeps MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "Revocation removes memberships and refuses reactivation shortcut",
+        "status": "PASS"
+      },
+      {
+        "name": "Self modification and NULL actions rejected",
+        "status": "PASS"
+      },
+      {
+        "name": "Audit retains role and lifecycle events",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/team-audit/production-ui-results.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Super Admin UI login, MFA, team screen and direct notification destination",
+        "status": "PASS"
+      },
+      {
+        "name": "Invitation sent from actual form",
+        "status": "PASS"
+      },
+      {
+        "name": "Real Resend invitation, correct recipient and Preview link",
+        "status": "PASS"
+      },
+      {
+        "name": "Immediate resend respects anti-abuse cooldown",
+        "status": "PASS"
+      },
+      {
+        "name": "Expired QA invitation resent through UI with a new delivery and renewed deadline",
+        "status": "PASS"
+      },
+      {
+        "name": "Invitation email activates member through password form",
+        "status": "PASS"
+      },
+      {
+        "name": "Finance member completes MFA and enters Finance",
+        "status": "PASS"
+      },
+      {
+        "name": "Finance denied team HTTP API",
+        "status": "PASS"
+      },
+      {
+        "name": "Team screen responsive at seven required sizes",
+        "status": "PASS"
+      },
+      {
+        "name": "Role changed in UI: same session denied Finance, allowed Support",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "support: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "UI suspension removes access from open session",
+        "status": "PASS"
+      },
+      {
+        "name": "Reactivation through confirmation dialog",
+        "status": "PASS"
+      },
+      {
+        "name": "Revocation UI, revoked member visible, all memberships removed",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/team-audit/production-ui-support-results.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Super Admin UI login, MFA, team screen and direct notification destination",
+        "status": "PASS"
+      },
+      {
+        "name": "Invitation sent from actual form",
+        "status": "PASS"
+      },
+      {
+        "name": "Real Resend invitation, correct recipient and Preview link",
+        "status": "PASS"
+      },
+      {
+        "name": "Immediate resend respects anti-abuse cooldown",
+        "status": "PASS"
+      },
+      {
+        "name": "Expired QA invitation resent through UI with a new delivery and renewed deadline",
+        "status": "PASS"
+      },
+      {
+        "name": "Invitation email activates member through password form",
+        "status": "PASS"
+      },
+      {
+        "name": "support: invited member completes MFA and enters assigned workspace",
+        "status": "PASS"
+      },
+      {
+        "name": "support: denied team HTTP API",
+        "status": "PASS"
+      },
+      {
+        "name": "Team screen responsive at seven required sizes",
+        "status": "PASS"
+      },
+      {
+        "name": "support: original permissions removed after UI change to Finance",
+        "status": "PASS"
+      },
+      {
+        "name": "Role changed in UI: same session denied Finance, allowed Support",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "support: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "UI suspension removes access from open session",
+        "status": "PASS"
+      },
+      {
+        "name": "Reactivation through confirmation dialog",
+        "status": "PASS"
+      },
+      {
+        "name": "Revocation UI, revoked member visible, all memberships removed",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/team-audit/production-ui-verification_agent-results.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Super Admin UI login, MFA, team screen and direct notification destination",
+        "status": "PASS"
+      },
+      {
+        "name": "Invitation sent from actual form",
+        "status": "PASS"
+      },
+      {
+        "name": "Real Resend invitation, correct recipient and Preview link",
+        "status": "PASS"
+      },
+      {
+        "name": "Immediate resend respects anti-abuse cooldown",
+        "status": "PASS"
+      },
+      {
+        "name": "Expired QA invitation resent through UI with a new delivery and renewed deadline",
+        "status": "PASS"
+      },
+      {
+        "name": "Invitation email activates member through password form",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: invited member completes MFA and enters assigned workspace",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: denied team HTTP API",
+        "status": "PASS"
+      },
+      {
+        "name": "Team screen responsive at seven required sizes",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: original permissions removed after UI change to Finance",
+        "status": "PASS"
+      },
+      {
+        "name": "Role changed in UI: same session denied Finance, allowed Support",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "support: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "UI suspension removes access from open session",
+        "status": "PASS"
+      },
+      {
+        "name": "Reactivation through confirmation dialog",
+        "status": "PASS"
+      },
+      {
+        "name": "Revocation UI, revoked member visible, all memberships removed",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/team-audit/production-ui-moderator-results.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Super Admin UI login, MFA, team screen and direct notification destination",
+        "status": "PASS"
+      },
+      {
+        "name": "Invitation sent from actual form",
+        "status": "PASS"
+      },
+      {
+        "name": "Real Resend invitation, correct recipient and Preview link",
+        "status": "PASS"
+      },
+      {
+        "name": "Immediate resend respects anti-abuse cooldown",
+        "status": "PASS"
+      },
+      {
+        "name": "Expired QA invitation resent through UI with a new delivery and renewed deadline",
+        "status": "PASS"
+      },
+      {
+        "name": "Invitation email activates member through password form",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: invited member completes MFA and enters assigned workspace",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: denied team HTTP API",
+        "status": "PASS"
+      },
+      {
+        "name": "Team screen responsive at seven required sizes",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: original permissions removed after UI change to Finance",
+        "status": "PASS"
+      },
+      {
+        "name": "Role changed in UI: same session denied Finance, allowed Support",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "support: UI role assignment, allowed workspace, five other spaces and team API refused",
+        "status": "PASS"
+      },
+      {
+        "name": "UI suspension removes access from open session",
+        "status": "PASS"
+      },
+      {
+        "name": "Reactivation through confirmation dialog",
+        "status": "PASS"
+      },
+      {
+        "name": "Revocation UI, revoked member visible, all memberships removed",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/legacy-mfa-production.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "super_admin legacy flag does not waive MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "super_admin legacy AAL1 has no privileged permission",
+        "status": "PASS"
+      },
+      {
+        "name": "super_admin gains intended permission only after MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "admin legacy flag does not waive MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "admin legacy AAL1 has no privileged permission",
+        "status": "PASS"
+      },
+      {
+        "name": "admin gains intended permission only after MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "support legacy flag does not waive MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "support legacy AAL1 has no privileged permission",
+        "status": "PASS"
+      },
+      {
+        "name": "support gains intended permission only after MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "finance legacy flag does not waive MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "finance legacy AAL1 has no privileged permission",
+        "status": "PASS"
+      },
+      {
+        "name": "finance gains intended permission only after MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent legacy flag does not waive MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent legacy AAL1 has no privileged permission",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent gains intended permission only after MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator legacy flag does not waive MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator legacy AAL1 has no privileged permission",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator gains intended permission only after MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager legacy flag does not waive MFA",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager legacy AAL1 has no privileged permission",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager gains intended permission only after MFA",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/social-integrity-production.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Document owner can sign own private KYC file",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator cannot sign another professional private KYC file",
+        "status": "PASS"
+      },
+      {
+        "name": "finance cannot sign another professional private KYC file",
+        "status": "PASS"
+      },
+      {
+        "name": "support cannot sign another professional private KYC file",
+        "status": "PASS"
+      },
+      {
+        "name": "Onboarding reviewer can sign private KYC file",
+        "status": "PASS"
+      },
+      {
+        "name": "Support cannot moderate a publication through the direct RPC",
+        "status": "PASS"
+      },
+      {
+        "name": "Owner cannot relink a publication to another professional service",
+        "status": "PASS"
+      },
+      {
+        "name": "Published primary service cannot be removed",
+        "status": "PASS"
+      },
+      {
+        "name": "Author can edit own comment body",
+        "status": "PASS"
+      },
+      {
+        "name": "Author cannot move a comment to another publication",
+        "status": "PASS"
+      },
+      {
+        "name": "Moderator cannot rewrite the author text",
+        "status": "PASS"
+      },
+      {
+        "name": "Moderator can hide a comment",
+        "status": "PASS"
+      },
+      {
+        "name": "Hidden comment is absent for an ordinary user",
+        "status": "PASS"
+      },
+      {
+        "name": "Moderator can read and restore a hidden comment",
+        "status": "PASS"
+      },
+      {
+        "name": "Hide and restore decisions have server audit events",
+        "status": "PASS"
+      },
+      {
+        "name": "Abuse detector creates one high alert at threshold",
+        "status": "PASS"
+      },
+      {
+        "name": "Existing alert escalates to critical without duplicates",
+        "status": "PASS"
+      },
+      {
+        "name": "client cannot read fraud alerts",
+        "status": "PASS"
+      },
+      {
+        "name": "finance cannot read fraud alerts",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent cannot read fraud alerts",
+        "status": "PASS"
+      },
+      {
+        "name": "Moderator can read the generated alert",
+        "status": "PASS"
+      },
+      {
+        "name": "Moderator cannot forge an alert through Data API",
+        "status": "PASS"
+      },
+      {
+        "name": "Moderator cannot rewrite or delete detector evidence",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/profile-privacy-production.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "anonymous cannot read private professional profile fields",
+        "status": "PASS"
+      },
+      {
+        "name": "anonymous can still read public professional identity",
+        "status": "PASS"
+      },
+      {
+        "name": "unrelated client cannot read private professional profile fields",
+        "status": "PASS"
+      },
+      {
+        "name": "unrelated client can still read public professional identity",
+        "status": "PASS"
+      },
+      {
+        "name": "Disabled client cannot reactivate own account through Data API",
+        "status": "PASS"
+      },
+      {
+        "name": "Owner private profile endpoint returns only session owner",
+        "status": "PASS"
+      },
+      {
+        "name": "Anonymous cannot call private profile endpoint",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/launch-boundaries-production.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Super Admin CREATE cohort through API",
+        "status": "PASS"
+      },
+      {
+        "name": "Super Admin READ dashboard and private cohort",
+        "status": "PASS"
+      },
+      {
+        "name": "Super Admin UPDATE cohort and eligibility badge",
+        "status": "PASS"
+      },
+      {
+        "name": "anonymous: READ cohort and settings denied",
+        "status": "PASS"
+      },
+      {
+        "name": "anonymous: CREATE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "anonymous: UPDATE and DELETE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "anonymous: sensitive launch RPCs denied",
+        "status": "PASS"
+      },
+      {
+        "name": "client: READ cohort and settings denied",
+        "status": "PASS"
+      },
+      {
+        "name": "client: CREATE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "client: UPDATE and DELETE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "client: sensitive launch RPCs denied",
+        "status": "PASS"
+      },
+      {
+        "name": "professional: READ cohort and settings denied",
+        "status": "PASS"
+      },
+      {
+        "name": "professional: CREATE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "professional: UPDATE and DELETE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "professional: sensitive launch RPCs denied",
+        "status": "PASS"
+      },
+      {
+        "name": "support: READ cohort and settings denied",
+        "status": "PASS"
+      },
+      {
+        "name": "support: CREATE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "support: UPDATE and DELETE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "support: sensitive launch RPCs denied",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: READ cohort and settings denied",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: CREATE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: UPDATE and DELETE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "finance: sensitive launch RPCs denied",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: READ cohort and settings denied",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: CREATE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: UPDATE and DELETE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent: sensitive launch RPCs denied",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: READ cohort and settings denied",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: CREATE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: UPDATE and DELETE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator: sensitive launch RPCs denied",
+        "status": "PASS"
+      },
+      {
+        "name": "admin: READ cohort and settings denied",
+        "status": "PASS"
+      },
+      {
+        "name": "admin: CREATE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "admin: UPDATE and DELETE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "admin: sensitive launch RPCs denied",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager: READ cohort and settings denied",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager: CREATE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager: UPDATE and DELETE cohort denied",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager: sensitive launch RPCs denied",
+        "status": "PASS"
+      },
+      {
+        "name": "Professional cannot self-assign founder badge",
+        "status": "PASS"
+      },
+      {
+        "name": "Super Admin DELETE cohort through API",
+        "status": "PASS"
+      },
+      {
+        "name": "Booking creates exactly two scheduled reminder jobs",
+        "status": "PASS"
+      },
+      {
+        "name": "Client cannot create or alter reminder jobs",
+        "status": "PASS"
+      },
+      {
+        "name": "Confirmation does not requeue an already sent reminder",
+        "status": "PASS"
+      },
+      {
+        "name": "Cancelled booking has no pending reminders",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/deletion-workflow-production.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Client cannot forge a completed deletion request through table INSERT",
+        "status": "PASS"
+      },
+      {
+        "name": "Repeated request reuses the same pending request",
+        "status": "PASS"
+      },
+      {
+        "name": "Other client cannot read the request",
+        "status": "PASS"
+      },
+      {
+        "name": "client cannot deactivate a user via deletion queue",
+        "status": "PASS"
+      },
+      {
+        "name": "admin cannot deactivate a user via deletion queue",
+        "status": "PASS"
+      },
+      {
+        "name": "support cannot deactivate a user via deletion queue",
+        "status": "PASS"
+      },
+      {
+        "name": "finance cannot deactivate a user via deletion queue",
+        "status": "PASS"
+      },
+      {
+        "name": "verification_agent cannot deactivate a user via deletion queue",
+        "status": "PASS"
+      },
+      {
+        "name": "moderator cannot deactivate a user via deletion queue",
+        "status": "PASS"
+      },
+      {
+        "name": "content_manager cannot deactivate a user via deletion queue",
+        "status": "PASS"
+      },
+      {
+        "name": "Super Admin MFA deactivates requested account and keeps request pending manual erasure",
+        "status": "PASS"
+      },
+      {
+        "name": "Old refresh session is invalidated",
+        "status": "PASS"
+      },
+      {
+        "name": "Repeated processing is idempotent and audited once",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/deletion-ui-production.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Super Admin processes synthetic deletion request through UI",
+        "status": "PASS"
+      },
+      {
+        "name": "Client old session is invalidated",
+        "status": "PASS"
+      },
+      {
+        "name": "Manual erasure remains explicitly pending",
+        "status": "PASS"
+      },
+      {
+        "name": "No uncaught JavaScript error",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/catalog-actions-production.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Content manager CREATE category through authorized UI and API",
+        "status": "PASS"
+      },
+      {
+        "name": "Content manager UPDATE category through UI",
+        "status": "PASS"
+      },
+      {
+        "name": "Content manager DELETE unused category through UI",
+        "status": "PASS"
+      },
+      {
+        "name": "Catalog actions produce no uncaught browser error",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/payout-register-production.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Super Admin payout register reads the authorized production API",
+        "status": "PASS"
+      },
+      {
+        "name": "Payout register refresh succeeds without browser errors",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/verification-production-f212471.json",
+    "date": "2026-10-07T17:17:22.370Z",
+    "checks": [
+      {
+        "name": "Document without an actual private upload denied",
+        "status": "PASS"
+      },
+      {
+        "name": "Document insert cannot self-approve",
+        "status": "PASS"
+      },
+      {
+        "name": "Document owner cannot alter review decision",
+        "status": "PASS"
+      },
+      {
+        "name": "anon cannot directly call write_admin_audit",
+        "status": "PASS"
+      },
+      {
+        "name": "anon cannot directly call compute_provider_launch_completeness",
+        "status": "PASS"
+      },
+      {
+        "name": "anon cannot directly call attach_payment_provider",
+        "status": "PASS"
+      },
+      {
+        "name": "anon cannot directly call initialize_payment",
+        "status": "PASS"
+      },
+      {
+        "name": "anon cannot directly call manage_provider_onboarding",
+        "status": "PASS"
+      },
+      {
+        "name": "anon cannot directly call complete_provider_onboarding_information",
+        "status": "PASS"
+      },
+      {
+        "name": "anon cannot directly call request_payment_refund",
+        "status": "PASS"
+      },
+      {
+        "name": "anon cannot directly call attach_payment_provider_server",
+        "status": "PASS"
+      },
+      {
+        "name": "client cannot directly call write_admin_audit",
+        "status": "PASS"
+      },
+      {
+        "name": "client cannot directly call compute_provider_launch_completeness",
+        "status": "PASS"
+      },
+      {
+        "name": "client cannot directly call attach_payment_provider",
+        "status": "PASS"
+      },
+      {
+        "name": "client cannot directly call initialize_payment",
+        "status": "PASS"
+      },
+      {
+        "name": "client cannot directly call manage_provider_onboarding",
+        "status": "PASS"
+      },
+      {
+        "name": "client cannot directly call complete_provider_onboarding_information",
+        "status": "PASS"
+      },
+      {
+        "name": "client cannot directly call request_payment_refund",
+        "status": "PASS"
+      },
+      {
+        "name": "client cannot directly call attach_payment_provider_server",
+        "status": "PASS"
+      },
+      {
+        "name": "support cannot directly call write_admin_audit",
+        "status": "PASS"
+      },
+      {
+        "name": "support cannot directly call compute_provider_launch_completeness",
+        "status": "PASS"
+      },
+      {
+        "name": "support cannot directly call attach_payment_provider",
+        "status": "PASS"
+      },
+      {
+        "name": "support cannot directly call initialize_payment",
+        "status": "PASS"
+      },
+      {
+        "name": "support cannot directly call manage_provider_onboarding",
+        "status": "PASS"
+      },
+      {
+        "name": "support cannot directly call complete_provider_onboarding_information",
+        "status": "PASS"
+      },
+      {
+        "name": "support cannot directly call request_payment_refund",
+        "status": "PASS"
+      },
+      {
+        "name": "support cannot directly call attach_payment_provider_server",
+        "status": "PASS"
+      },
+      {
+        "name": "Provider checklist still works through authorized wrapper",
+        "status": "PASS"
+      },
+      {
+        "name": "Foreign checklist denied",
+        "status": "PASS"
+      },
+      {
+        "name": "Support action retains internal audit writer",
+        "status": "PASS"
+      },
+      {
+        "name": "Support can create and read internal note",
+        "status": "PASS"
+      },
+      {
+        "name": "Client sees public reply but not internal note",
+        "status": "PASS"
+      },
+      {
+        "name": "Client cannot mark own reply internal",
+        "status": "PASS"
+      },
+      {
+        "name": "Unrelated client cannot read ticket messages",
+        "status": "PASS"
+      },
+      {
+        "name": "Server refuses wrong payment owner",
+        "status": "PASS"
+      },
+      {
+        "name": "Server refuses live payment flag",
+        "status": "PASS"
+      },
+      {
+        "name": "Server attaches mock payment for verified owner",
+        "status": "PASS"
+      },
+      {
+        "name": "Server refuses replacing attached reference",
+        "status": "PASS"
+      },
+      {
+        "name": "Review cannot target a different professional",
+        "status": "PASS"
+      },
+      {
+        "name": "Professional cannot rewrite client rating",
+        "status": "PASS"
+      },
+      {
+        "name": "Client cannot forge professional reply",
+        "status": "PASS"
+      },
+      {
+        "name": "Client cannot moderate visibility",
+        "status": "PASS"
+      },
+      {
+        "name": "Professional can reply without rewriting review",
+        "status": "PASS"
+      },
+      {
+        "name": "Client can amend own comment",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/module-actions-production-super_admin.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Comment hidden through real UI and persisted",
+        "status": "PASS"
+      },
+      {
+        "name": "Comment restored through UI without rewriting author text",
+        "status": "PASS"
+      },
+      {
+        "name": "Both UI decisions have server audit entries",
+        "status": "PASS"
+      },
+      {
+        "name": "Health refresh returns measured values without missing API",
+        "status": "PASS"
+      },
+      {
+        "name": "Settings refresh displays actual stored non-sensitive configuration",
+        "status": "PASS"
+      },
+      {
+        "name": "Launch dashboard loads actual production aggregates",
+        "status": "PASS"
+      },
+      {
+        "name": "Cohort UI add and toggle persist; ineligible public badge remains disabled",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /onboarding/assignments",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /onboarding/settings",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /support-agent/knowledge",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /support-agent/reports",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /support-agent/settings",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /moderation/messages",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /moderation/appeals",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /moderation/sanctions",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /moderation/rules",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /moderation/settings",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /finance/reports",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /finance/settings",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /operations/areas",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /operations/reports",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /admin/availability",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /admin/areas",
+        "status": "PASS"
+      },
+      {
+        "name": "Retired route returns 404: /admin/integrations",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/module-actions-production-moderator.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Comment hidden through real UI and persisted",
+        "status": "PASS"
+      },
+      {
+        "name": "Comment restored through UI without rewriting author text",
+        "status": "PASS"
+      },
+      {
+        "name": "Both UI decisions have server audit entries",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/decision-actions-production-finance.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Finance opens and rejects synthetic mock refund through UI; API state and audit match",
+        "status": "PASS"
+      },
+      {
+        "name": "No uncaught JavaScript error during internal decision",
+        "status": "PASS"
+      },
+      {
+        "name": "Immutable financial audit retained with banned synthetic actors",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/decision-actions-production-moderator.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "Moderator hides review through UI",
+        "status": "PASS"
+      },
+      {
+        "name": "Moderator restores review without modifying author rating or text",
+        "status": "PASS"
+      },
+      {
+        "name": "Review UI decisions are audited",
+        "status": "PASS"
+      },
+      {
+        "name": "No uncaught JavaScript error during internal decision",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/refund-concurrency-qa.json",
+    "date": "2026-10-07T16:34:03.171Z",
+    "checks": [
+      {
+        "name": "Two concurrent requests cannot reserve more than paid amount",
+        "status": "PASS"
+      },
+      {
+        "name": "Retry returns original request without duplicate",
+        "status": "PASS"
+      },
+      {
+        "name": "Unrelated client cannot request a refund",
+        "status": "PASS"
+      },
+      {
+        "name": "Client cannot approve own refund",
+        "status": "PASS"
+      },
+      {
+        "name": "Finance can reject a request",
+        "status": "PASS"
+      },
+      {
+        "name": "Rejected amount becomes available to a new request",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/permission-audit/maintenance-ui-qa.json",
+    "date": null,
+    "checks": [
+      {
+        "name": "/ blocked with 503 in QA maintenance",
+        "status": "PASS"
+      },
+      {
+        "name": "/app/profile blocked with 503 in QA maintenance",
+        "status": "PASS"
+      },
+      {
+        "name": "/pro/services blocked with 503 in QA maintenance",
+        "status": "PASS"
+      },
+      {
+        "name": "/api/payments/create blocked with 503 in QA maintenance",
+        "status": "PASS"
+      },
+      {
+        "name": "Maintenance message rendered as text",
+        "status": "PASS"
+      },
+      {
+        "name": "Admin retains access and refreshed state is correct",
+        "status": "PASS"
+      },
+      {
+        "name": "Public access restored after disable",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "source": "work/final-audit/final-role-security.json",
+    "date": "2026-10-07T17:17:45.148Z",
+    "checks": [
+      {
+        "name": "Contexte administratif refusé",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "Auto-attribution profiles.role=provider",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "Auto-attribution profiles.role=professional",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "Auto-attribution profiles.role=admin",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "Auto-attribution profiles.role=super_admin",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "Insertion account_roles=professional",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "Insertion account_roles=admin",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "Insertion account_roles=super_admin",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "RPC attribution Super Admin refusée",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "Métadonnées utilisateur ne confèrent pas de droits",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "Auto-approbation professionnelle refusée",
+        "status": "PASS",
+        "actorRole": "client"
+      },
+      {
+        "name": "Contexte administratif refusé",
+        "status": "PASS",
+        "actorRole": "provider"
+      },
+      {
+        "name": "Auto-attribution profiles.role=provider",
+        "status": "PASS",
+        "actorRole": "provider"
+      },
+      {
+        "name": "Auto-attribution profiles.role=professional",
+        "status": "PASS",
+        "actorRole": "provider"
+      },
+      {
+        "name": "Auto-attribution profiles.role=admin",
+        "status": "PASS",
+        "actorRole": "provider"
+      },
+      {
+        "name": "Auto-attribution profiles.role=super_admin",
+        "status": "PASS",
+        "actorRole": "provider"
+      },
+      {
+        "name": "Insertion account_roles=professional",
+        "status": "PASS",
+        "actorRole": "provider"
+      },
+      {
+        "name": "Insertion account_roles=admin",
+        "status": "PASS",
+        "actorRole": "provider"
+      },
+      {
+        "name": "Insertion account_roles=super_admin",
+        "status": "PASS",
+        "actorRole": "provider"
+      },
+      {
+        "name": "RPC attribution Super Admin refusée",
+        "status": "PASS",
+        "actorRole": "provider"
+      },
+      {
+        "name": "Métadonnées utilisateur ne confèrent pas de droits",
+        "status": "PASS",
+        "actorRole": "provider"
+      },
+      {
+        "name": "MFA exigé : refuser permission roles.manage à AAL1",
+        "status": "PASS",
+        "actorRole": "super_admin"
+      },
+      {
+        "name": "Session existante : permissions retirees apres revocation",
+        "status": "PASS",
+        "actorRole": "revoked_admin"
+      },
+      {
+        "name": "Moderation ne contourne pas protection Super Admin",
+        "status": "PASS",
+        "actorRole": "ordinary_admin"
+      }
+    ]
+  },
+  {
+    "source": "work/final-audit/booking-concurrency.json",
+    "date": "2026-10-07T17:15:34.111Z",
+    "checks": [
+      {
+        "name": "visitor ne modifie pas le prix",
+        "status": "PASS"
+      },
+      {
+        "name": "visitor ne modifie pas le statut",
+        "status": "PASS"
+      },
+      {
+        "name": "other_client ne modifie pas le prix",
+        "status": "PASS"
+      },
+      {
+        "name": "other_client ne modifie pas le statut",
+        "status": "PASS"
+      },
+      {
+        "name": "proprietaire conserve gestion prix et publication",
+        "status": "PASS"
+      },
+      {
+        "name": "deux clients concurrents",
+        "status": "PASS"
+      },
+      {
+        "name": "double requete du meme client",
+        "status": "PASS"
+      },
+      {
+        "name": "paiement simule exclu du chiffre affaires et commissions",
+        "status": "PASS"
+      }
+    ]
+  }
+]

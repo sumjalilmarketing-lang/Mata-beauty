@@ -1,0 +1,462 @@
+{
+  "date": "2026-10-07",
+  "project": "qjdwxdbvrxedyfolnpol",
+  "scope": "Metadata inventory only; not a passed authorization test",
+  "functions": [
+    {
+      "name": "admin_assign_role",
+      "arguments": "target_user_id uuid, target_role_key text, reason text",
+      "anon": false
+    },
+    {
+      "name": "admin_begin_account_deletion",
+      "arguments": "target_request_id uuid, target_reason text",
+      "anon": false
+    },
+    {
+      "name": "admin_bind_invitation",
+      "arguments": "target_invitation_id uuid, target_user_id uuid",
+      "anon": false
+    },
+    {
+      "name": "admin_change_internal_access",
+      "arguments": "target_user_id uuid, target_action text, reason text",
+      "anon": false
+    },
+    {
+      "name": "admin_feature_social_post",
+      "arguments": "target_post_id uuid, target_feature_type text, target_starts_at timestamp with time zone, target_ends_at timestamp with time zone, target_position integer, target_audience jsonb, target_geographic_zone text, reason text",
+      "anon": false
+    },
+    {
+      "name": "admin_global_search",
+      "arguments": "search_term text",
+      "anon": false
+    },
+    {
+      "name": "admin_list_team",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "admin_list_users",
+      "arguments": "search_term text",
+      "anon": false
+    },
+    {
+      "name": "admin_manage_category",
+      "arguments": "target_action text, target_category_id uuid, target_name text, target_slug text, target_description text, target_icon text, target_image_url text, target_parent_id uuid, target_sort_order integer, target_is_active boolean",
+      "anon": false
+    },
+    {
+      "name": "admin_mfa_required",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "admin_moderate_social_post",
+      "arguments": "target_post_id uuid, decision text, reason text",
+      "anon": false
+    },
+    {
+      "name": "admin_prepare_invitation",
+      "arguments": "target_email text, given_name text, family_name text, target_role_key text",
+      "anon": false
+    },
+    {
+      "name": "admin_resend_invitation",
+      "arguments": "target_invitation_id uuid",
+      "anon": false
+    },
+    {
+      "name": "admin_set_provider_status",
+      "arguments": "target_provider_id uuid, next_status provider_status, reason text",
+      "anon": false
+    },
+    {
+      "name": "admin_set_user_suspension",
+      "arguments": "target_user_id uuid, suspended boolean, reason text",
+      "anon": false
+    },
+    {
+      "name": "admin_update_booking_status",
+      "arguments": "target_booking_id uuid, next_status booking_status, reason text",
+      "anon": false
+    },
+    {
+      "name": "admin_update_setting",
+      "arguments": "setting_key text, setting_value jsonb, reason text",
+      "anon": false
+    },
+    {
+      "name": "archive_owned_business",
+      "arguments": "target_business_id uuid",
+      "anon": false
+    },
+    {
+      "name": "calculate_service_quote",
+      "arguments": "target_provider_service_id uuid, target_option_ids uuid[], target_promotion_id uuid, target_location_mode text",
+      "anon": true
+    },
+    {
+      "name": "close_admin_session",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "confirm_service_and_release",
+      "arguments": "target_booking_id uuid",
+      "anon": false
+    },
+    {
+      "name": "create_provider_video_post",
+      "arguments": "target_post_id uuid, target_title text, target_caption text, target_video_path text, target_video_url text, target_thumbnail_path text, target_thumbnail_url text, target_duration_seconds numeric, target_aspect_ratio numeric, target_provider_service_id uuid, target_status text, target_allow_comments boolean, target_client_consent boolean, target_scheduled_for timestamp with time zone, target_visibility text, target_hashtags text[], target_location text, target_available_at timestamp with time zone",
+      "anon": false
+    },
+    {
+      "name": "create_social_media_post",
+      "arguments": "target_post_type text, target_title text, target_caption text, target_media_urls text[], target_provider_service_id uuid, target_status text, target_allow_comments boolean, target_client_consent boolean, target_scheduled_for timestamp with time zone, target_visibility text, target_hashtags text[], target_location text, target_available_at timestamp with time zone, target_discount numeric, target_promotion_ends_at timestamp with time zone, target_promotion_slots integer",
+      "anon": false
+    },
+    {
+      "name": "create_video_post",
+      "arguments": "target_caption text, target_video_url text, target_thumbnail_url text, target_duration_seconds numeric, target_aspect_ratio numeric, target_provider_service_id uuid, target_status text, target_allow_comments boolean, target_client_consent boolean, target_scheduled_for timestamp with time zone, target_visibility text, target_hashtags text[]",
+      "anon": false
+    },
+    {
+      "name": "ensure_authenticated_profile",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "ensure_booking_conversation",
+      "arguments": "target_booking_id uuid",
+      "anon": false
+    },
+    {
+      "name": "fail_payment_initialization",
+      "arguments": "target_payment_id uuid, target_failure_code text, target_source_ip_hash text",
+      "anon": false
+    },
+    {
+      "name": "get_admin_context",
+      "arguments": "",
+      "anon": true
+    },
+    {
+      "name": "get_admin_dashboard",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "get_available_slots",
+      "arguments": "target_provider_id uuid, target_provider_service_id uuid, from_date date, days integer",
+      "anon": true
+    },
+    {
+      "name": "get_launch_dashboard",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "get_launch_provider_cohort",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "get_my_private_profile",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "get_provider_follower_counts",
+      "arguments": "target_provider_ids uuid[]",
+      "anon": true
+    },
+    {
+      "name": "get_provider_launch_checklist",
+      "arguments": "target_provider_id uuid",
+      "anon": false
+    },
+    {
+      "name": "get_public_maintenance_state",
+      "arguments": "",
+      "anon": true
+    },
+    {
+      "name": "get_social_admin_dashboard",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "grant_support_conversation_access",
+      "arguments": "target_conversation_id uuid, target_support_agent_id uuid, target_reason text, target_expires_at timestamp with time zone",
+      "anon": false
+    },
+    {
+      "name": "has_admin_permission",
+      "arguments": "required_permission text",
+      "anon": true
+    },
+    {
+      "name": "has_business_commercial_permission",
+      "arguments": "target_business_id uuid, required_permission text",
+      "anon": true
+    },
+    {
+      "name": "has_conversation_access",
+      "arguments": "target_conversation_id uuid",
+      "anon": true
+    },
+    {
+      "name": "initialize_client_control_center",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "initialize_payment_v2",
+      "arguments": "target_booking_id uuid, target_method text, target_attempt text, target_internal_reference text, target_request_fingerprint text, target_source_ip_hash text",
+      "anon": false
+    },
+    {
+      "name": "is_admin",
+      "arguments": "",
+      "anon": true
+    },
+    {
+      "name": "is_conversation_member",
+      "arguments": "target_conversation_id uuid",
+      "anon": true
+    },
+    {
+      "name": "is_super_admin",
+      "arguments": "",
+      "anon": true
+    },
+    {
+      "name": "list_my_booking_conversations",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "manage_moderation_report",
+      "arguments": "target_report_id uuid, target_action text, target_reason text",
+      "anon": false
+    },
+    {
+      "name": "manage_own_social_post",
+      "arguments": "target_post_id uuid, target_action text",
+      "anon": false
+    },
+    {
+      "name": "manage_refund_request",
+      "arguments": "target_refund_id uuid, target_action text, target_reason text",
+      "anon": false
+    },
+    {
+      "name": "manage_support_ticket",
+      "arguments": "target_ticket_id uuid, target_action text, target_value text, target_message text",
+      "anon": false
+    },
+    {
+      "name": "mark_conversation_read",
+      "arguments": "target_conversation_id uuid",
+      "anon": false
+    },
+    {
+      "name": "nearby_providers",
+      "arguments": "target_latitude double precision, target_longitude double precision, target_radius_km double precision, target_query text, target_category_slug text",
+      "anon": true
+    },
+    {
+      "name": "notification_delivery_health",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "owns_business",
+      "arguments": "target_business_id uuid",
+      "anon": false
+    },
+    {
+      "name": "professional_application_detail",
+      "arguments": "target_provider_id uuid",
+      "anon": false
+    },
+    {
+      "name": "professional_application_history",
+      "arguments": "target_provider_id uuid",
+      "anon": false
+    },
+    {
+      "name": "provider_creator_statistics",
+      "arguments": "target_from timestamp with time zone, target_to timestamp with time zone",
+      "anon": false
+    },
+    {
+      "name": "provider_social_conversion_summary",
+      "arguments": "target_from timestamp with time zone, target_to timestamp with time zone",
+      "anon": false
+    },
+    {
+      "name": "record_admin_session",
+      "arguments": "client_user_agent text",
+      "anon": false
+    },
+    {
+      "name": "record_post_booking_click",
+      "arguments": "target_post_id uuid, target_session_hash text",
+      "anon": true
+    },
+    {
+      "name": "record_post_share",
+      "arguments": "target_post_id uuid, target_session_hash text",
+      "anon": true
+    },
+    {
+      "name": "record_product_event",
+      "arguments": "target_event_name text, target_properties jsonb, target_session_hash text",
+      "anon": true
+    },
+    {
+      "name": "record_social_profile_visit",
+      "arguments": "target_provider_id uuid, target_post_id uuid, target_session_hash text",
+      "anon": true
+    },
+    {
+      "name": "record_video_view",
+      "arguments": "target_post_id uuid, target_session_hash text, target_watched_ms integer, target_completed boolean",
+      "anon": true
+    },
+    {
+      "name": "report_post_comment",
+      "arguments": "target_comment_id uuid, target_reason text",
+      "anon": false
+    },
+    {
+      "name": "report_social_post",
+      "arguments": "target_post_id uuid, target_reason text, target_details text",
+      "anon": false
+    },
+    {
+      "name": "request_account_deletion",
+      "arguments": "target_reason text",
+      "anon": false
+    },
+    {
+      "name": "request_payment_refund_v2",
+      "arguments": "target_payment_id uuid, target_amount integer, target_reason text, target_attempt text, target_source_ip_hash text",
+      "anon": false
+    },
+    {
+      "name": "request_professional_document_update",
+      "arguments": "target_document_id uuid, public_message text",
+      "anon": false
+    },
+    {
+      "name": "request_professional_profile",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "request_provider_onboarding",
+      "arguments": "target_business_name text",
+      "anon": false
+    },
+    {
+      "name": "review_professional_application",
+      "arguments": "target_provider_id uuid, decision text, public_message text",
+      "anon": false
+    },
+    {
+      "name": "revoke_support_conversation_access",
+      "arguments": "target_conversation_id uuid, target_support_agent_id uuid",
+      "anon": false
+    },
+    {
+      "name": "save_client_location",
+      "arguments": "target_address text, target_city text, target_place_id text, target_latitude double precision, target_longitude double precision",
+      "anon": false
+    },
+    {
+      "name": "save_client_profile",
+      "arguments": "target_first_name text, target_last_name text, target_phone text, target_city text, target_address text, target_preferences jsonb, target_marketing_consent boolean",
+      "anon": false
+    },
+    {
+      "name": "save_professional_onboarding",
+      "arguments": "target_business_name text, target_bio text, target_city text, target_service_mode text, target_activity_type text, target_years_experience integer, target_base_address text, target_languages text[], target_cancellation_policy text",
+      "anon": false
+    },
+    {
+      "name": "save_provider_location",
+      "arguments": "target_address text, target_city text, target_area text, target_place_id text, target_latitude double precision, target_longitude double precision, target_radius_km integer, target_fee_per_km integer, target_free_radius_km numeric",
+      "anon": false
+    },
+    {
+      "name": "send_conversation_message",
+      "arguments": "target_conversation_id uuid, target_body text, target_client_nonce uuid",
+      "anon": false
+    },
+    {
+      "name": "set_conversation_archived",
+      "arguments": "target_conversation_id uuid, target_archived boolean",
+      "anon": false
+    },
+    {
+      "name": "set_owned_service_status",
+      "arguments": "target_service_id uuid, next_status text",
+      "anon": false
+    },
+    {
+      "name": "social_post_not_strongly_reported",
+      "arguments": "target_post_id uuid",
+      "anon": true
+    },
+    {
+      "name": "submit_provider_for_review",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "sync_founder_badge",
+      "arguments": "target_provider_id uuid",
+      "anon": false
+    },
+    {
+      "name": "synchronize_account_status",
+      "arguments": "",
+      "anon": false
+    },
+    {
+      "name": "toggle_follow_provider",
+      "arguments": "target_provider_id uuid",
+      "anon": false
+    },
+    {
+      "name": "toggle_follow_provider_from_post",
+      "arguments": "target_provider_id uuid, target_source_post_id uuid",
+      "anon": false
+    },
+    {
+      "name": "toggle_post_like",
+      "arguments": "target_post_id uuid",
+      "anon": false
+    },
+    {
+      "name": "toggle_post_save",
+      "arguments": "target_post_id uuid",
+      "anon": false
+    },
+    {
+      "name": "update_client_identity",
+      "arguments": "target_first_name text, target_last_name text, target_username text, target_phone text, target_bio text, target_city text, target_neighborhood text, target_locale text",
+      "anon": false
+    },
+    {
+      "name": "update_owned_service_pricing",
+      "arguments": "target_service_id uuid, target_price_amount integer, target_pricing_mode text, target_price_from_amount integer, target_home_price_amount integer, target_travel_fee_amount integer, target_deposit_amount integer",
+      "anon": false
+    }
+  ]
+}

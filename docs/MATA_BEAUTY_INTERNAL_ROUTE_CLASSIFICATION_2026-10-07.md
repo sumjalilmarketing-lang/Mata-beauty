@@ -2,7 +2,7 @@
 
 ## Méthode et limites
 
-Base : les 48 échecs du parcours Super Admin AAL2 sur la version 491db45. **31 A, 0 B, 17 C**. Les A restent dans le périmètre à corriger ; leur classement ne signifie pas que la correction est validée.
+Base : les 48 échecs du parcours Super Admin AAL2 sur la version 491db45. **31 A, 0 B, 17 C**. Les A restent dans le périmètre du produit ; leur classement décrit le défaut initial.
 
 A : nécessaire ou annoncée et cassée/incomplète. B : refus attendu pour le rôle testé. C : ancienne entrée inutilisée retirée. Les refus Finance/Support/Onboarding/Modération sont testés séparément ; ils ne reclassent pas rétroactivement un écran cassé pour Super Admin en PASS.
 
@@ -17,7 +17,7 @@ Les corrections de code listées ci-dessous ne sont **pas** des PASS de recette.
 | /support-agent/reports | C | Ancien écran de reporting sans source métier distincte ; suivi conservé dans les files de tickets. |
 | /support-agent/settings | C | Ancien écran vide de préférences agent ; sécurité et MFA conservés. |
 | /moderation/videos | A | Le sélecteur de composants considérait vidéos comme un composant personnalisé même sans composant pour ce rôle. |
-| /moderation/comments | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
+| /moderation/comments | A | Composant CommentModeration raccordé ; masquage/restauration sous RLS et audit, testés avec Modération et Super Admin. |
 | /moderation/messages | C | Aucun workflow de signalement des conversations privées dans le produit. Retrait ; ne pas exposer les conversations à la modération par défaut. |
 | /moderation/appeals | C | Ancienne entrée de navigation seule : aucun parcours de contestation exposé ni workflow de traitement. Retirée du catalogue. |
 | /moderation/sanctions | C | Ancienne entrée dupliquant les décisions de modération et leur historique existant. |
@@ -32,43 +32,39 @@ Les corrections de code listées ci-dessous ne sont **pas** des PASS de recette.
 | /finance/audit | A | Source incorrecte admin_audit_logs ; raccordement au journal financier append-only financial_audit_log. |
 | /finance/settings | C | Ancien écran de préférences Finance sans réglage propre ; aucun fournisseur réel activé. |
 | /operations/areas | C | Aucun référentiel de zones administrées ; localisation conservée dans les profils professionnels. |
-| /operations/promotions | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
+| /operations/promotions | A | Registre promotions raccordé, lecture seule ; aucun moteur de campagne ajouté. |
 | /operations/reports | C | Ancien écran de reporting sans workflow distinct. |
 | /operations/audit | A | Source incorrecte admin_audit_logs ; table réelle audit_logs sous RLS audit.read. |
-| /operations/settings | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
-| /admin/alerts | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
+| /operations/settings | A | Lecture des réglages non sensibles sous settings.read ; les valeurs sensibles restent exclues. |
+| /admin/alerts | A | Registre fraud_alerts restauré avec RLS reports.manage ; contrôle des doublons et agrégats santé. |
 | /admin/activity | A | Activité journalisée existante dans audit_logs mais route secondaire incorrecte. |
 | /admin/health | A | Écran plateforme existant dans le menu principal mais route secondaire non raccordée. |
 | /admin/roles | A | Matrice Équipe & Accès existante mais route secondaire non raccordée. |
 | /admin/permissions | A | Matrice Équipe & Accès existante mais route secondaire non raccordée. |
-| /admin/sessions | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
+| /admin/sessions | A | Registre admin_sessions raccordé sous audit.read ; ne remplace pas les sessions Auth réelles testées par Équipe & Accès. |
 | /admin/availability | C | Ancienne entrée globale inutilisée ; disponibilités gérées dans chaque espace professionnel. |
 | /admin/areas | C | Aucun référentiel global de zones administrées utilisé par la recherche. |
-| /admin/promotions | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
+| /admin/promotions | A | Registre promotions raccordé ; brouillons et cohorte restent dans Lancement. |
 | /admin/videos | A | Gestion de contenu existante dans le menu principal mais route secondaire non raccordée. |
-| /admin/comments | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
+| /admin/comments | A | Composant de modération des commentaires partagé ; auteur et texte protégés, visibilité auditée. |
 | /admin/commissions | A | Écran des règles et écritures existant mais route secondaire non raccordée. |
-| /admin/payouts | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
-| /admin/financial-reports | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
+| /admin/payouts | A | Registre payouts partagé avec les sources Finance, en lecture seule ; aucun transfert réel activé. |
+| /admin/financial-reports | A | Lecture du journal financial_audit_log append-only ; aucun rapport fournisseur fictif. |
 | /admin/kyc | A | Examen réel des dossiers/documents existant mais route secondaire non raccordée. |
-| /admin/campaigns | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
-| /admin/platform-settings | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
+| /admin/campaigns | A | Registre notification_campaigns raccordé en lecture seule ; aucune campagne envoyée pendant la recette. |
+| /admin/platform-settings | A | Réglages non sensibles chargés réellement ; maintenance traitée séparément, avec test QA activation/désactivation. |
 | /admin/integrations | C | Ancien écran inutilisé ; intégrations et secrets restent configurés côté serveur et fournisseur. |
-| /admin/system-logs | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
+| /admin/system-logs | A | Journal audit_logs raccordé ; ne constitue pas un agrégateur de tous les logs fournisseurs. |
 | /admin/audit | A | Journal existant dans le menu principal mais route secondaire non raccordée. |
-| /admin/security | A | Rubrique annoncée sans écran métier raccordé. Conservée comme défaut à qualifier/corriger ; aucun refus de permission ne justifie le résultat Super Admin. |
-| /admin/deletion-requests | A | Les clients peuvent demander la suppression ; le traitement interne reste nécessaire et ne peut pas être retiré comme obsolète. |
+| /admin/security | A | Registre des sessions administratives raccordé ; gestion effective des accès via Équipe & Accès. |
+| /admin/deletion-requests | A | File raccordée à admin_begin_account_deletion : désactivation, révocation des sessions, audit et revue manuelle, sans fausse suppression. 13 API + 4 UI PASS production. |
 
-## Vérifications déjà exécutées pendant cette reprise
+## Preuves et limites actuelles
 
-- 34 contrôles API Équipe & Accès : PASS sur QA, puis production ; invitation, MFA, changement de rôle, suspension, réactivation, révocation, audit et restriction des agrégats.
-- 17 contrôles navigateur Équipe & Accès : PASS sur production ; invitation Finance par formulaire et e-mail Resend de test, activation, MFA, changements vers Onboarding/Modération/Finance/Support, refus des cinq autres espaces et de l'API de gestion d'équipe, suspension, réactivation, révocation.
-- Invitations initiales distinctes Support, Onboarding et Modération : 18 contrôles navigateur PASS pour chaque rôle, en production, avec activation, MFA, restrictions, changement de rôle, suspension, réactivation et révocation. Ces suites se recouvrent et ne représentent pas 54 fonctions différentes.
-- 22 contrôles API d’intégrité sociale, accès aux documents privés et alertes anti-abus : PASS sur QA et production après migrations ciblées.
-- PHYSICAL TRACKPAD : NOT TESTED — PHYSICAL TRACKPAD REQUIRED.
+Les 31 routes A ont été raccordées ou corrigées. Leur ouverture et leurs requêtes sont inventoriées dans la matrice ; les opérations métier sont qualifiées par des suites distinctes. Les 17 routes C ont été ouvertes directement avec Super Admin : 404 attendue, PASS. Les refus des autres rôles ne sont jamais convertis en anomalies.
 
-## Sécurité
+Voir [rapport actuel](MATA_BEAUTY_PERMISSIONS_MODULES_HARDWARE_2026-10-07.md) et [matrice détaillée](MATA_BEAUTY_ROLE_MATRIX_2026-10-07.csv). Ces documents distinguent les preuves de lecture, les mutations réellement exécutées et les limites des registres en lecture seule. Le classement A décrit le défaut initial, pas un FAIL actuel.
 
-Fuite reproduite : Support AAL2 pouvait recevoir les agrégats administratifs financiers via get_admin_dashboard. Migration 20261007144455 appliquée et retestée sur QA et production. Le tableau de bord général exige désormais les permissions des domaines agrégés ; les métriques sociales financières sont nulles sans payments.read. Aucun droit supplémentaire accordé.
+Équipe & Accès : 34 contrôles API production ; invitations initiales distinctes Finance, Support, Onboarding, Modération et cycle activation/MFA/changement/suspension/réactivation/révocation. Les suites se recouvrent, elles ne sont pas additionnées comme autant de fonctionnalités.
 
-La matrice CRUD exhaustive et les actions des modules secondaires restent en cours. Les chiffres ci-dessus ne sont pas une certification de l'ensemble de l'application.
+Trackpad : NOT TESTED — PHYSICAL TRACKPAD REQUIRED.

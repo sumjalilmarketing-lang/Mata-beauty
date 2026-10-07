@@ -1,0 +1,75 @@
+{
+  "generatedAt": "2026-10-07T17:42:12.841Z",
+  "total": 1302,
+  "counts": {
+    "PASS": 1134,
+    "FAIL": 0,
+    "NOT TESTED": 168,
+    "BLOCKED": 0
+  },
+  "grouped": [
+    {
+      "role": "client",
+      "routes": 88,
+      "rendered": 0,
+      "gates": 24,
+      "operations": 14
+    },
+    {
+      "role": "professional",
+      "routes": 88,
+      "rendered": 0,
+      "gates": 24,
+      "operations": 14
+    },
+    {
+      "role": "verification_agent",
+      "routes": 78,
+      "rendered": 10,
+      "gates": 48,
+      "operations": 14
+    },
+    {
+      "role": "support",
+      "routes": 78,
+      "rendered": 10,
+      "gates": 48,
+      "operations": 14
+    },
+    {
+      "role": "finance",
+      "routes": 76,
+      "rendered": 12,
+      "gates": 48,
+      "operations": 14
+    },
+    {
+      "role": "moderator",
+      "routes": 80,
+      "rendered": 8,
+      "gates": 48,
+      "operations": 14
+    },
+    {
+      "role": "content_manager",
+      "routes": 79,
+      "rendered": 9,
+      "gates": 48,
+      "operations": 14
+    },
+    {
+      "role": "admin",
+      "routes": 57,
+      "rendered": 31,
+      "gates": 48,
+      "operations": 14
+    },
+    {
+      "role": "super_admin",
+      "routes": 0,
+      "rendered": 88,
+      "gates": 48,
+      "operations": 14
+    }
+  ]
+}
