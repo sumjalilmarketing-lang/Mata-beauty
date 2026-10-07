@@ -15,7 +15,7 @@ Cette recette distingue inventaire, examen du code, exécution d’une requête,
 - Comparaison des déclencheurs QA / production : protections des documents et avis absentes en production malgré la présence de migrations historiques locales. Les tests QA ne prouvaient pas leur présence en production.
 - 105 routes/modules internes ouverts dans Chromium sur le domaine réel avec un Super Admin temporaire et MFA réel : 48 écrans indisponibles, 57 écrans rendus dont les actions métier ne sont pas toutes exécutées. Les liens visibles sont cliqués ; les routes secondaires masquées sont ouvertes directement. Le tableau détaillé ci-dessous distingue ces cas.
 - 24 contrôles d’auto-attribution de rôle, métadonnées, révocation et MFA rejoués en production : PASS.
-- 44 contrôles ciblés après correction sur QA : PASS. Ils incluent les refus et les usages légitimes, via Auth, REST et Storage réels. Ce résultat ne vaut pas validation de l’ensemble des 92 RPC.
+- 44 contrôles ciblés après correction sur QA puis production : PASS sur les deux environnements. Ils incluent les refus et les usages légitimes, via Auth, REST et Storage réels. Ce résultat ne vaut pas validation de l’ensemble des 92 RPC.
 - Scripts conservés : `scripts/verify-permission-audit.mjs`, `scripts/verify-internal-modules.mjs`, `scripts/verify-production-role-security.mjs`.
 - Éléments de travail locaux : `work/permission-audit/` (inventaire SQL, reproduction initiale, JSON de vérification et navigation). Aucun secret n’est inclus dans ce rapport.
 
@@ -23,13 +23,13 @@ Cette recette distingue inventaire, examen du code, exécution d’une requête,
 
 | ID | Problème et reproduction | Risque | Correction | Bloquant avant lancement | État |
 |---|---|---|---|---|---|
-| SEC-01 | Un rôle Finance AAL2 appelle directement `write_admin_audit` avec un événement fabriqué ; insertion réussie sur QA | Falsification du journal des opérations | EXECUTE retiré aux rôles API ; les opérations autorisées continuent à écrire leur audit en interne | OUI | PASS QA ; production à retester |
-| SEC-02 | Un client appelle `compute_provider_launch_completeness` pour un brouillon étranger ; score renvoyé sur QA | Lecture d’informations d’un profil non public | Calcul interne uniquement ; wrapper propriétaire/agent conservé et retesté | OUI | PASS QA ; production à retester |
-| SEC-03 | Un client rattache son paiement à `wave` avec `is_test=false` et une référence arbitraire ; valeurs persistées sur QA | Intégrité des données de paiement ; cela ne prouve aucun débit réel | Ancienne RPC révoquée ; nouvelle entrée réservée au serveur, propriétaire vérifié, test obligatoire, rattachement unique | OUI | PASS QA ; production à retester |
-| SEC-04 | Le demandeur d’un ticket lit une note `is_internal=true` dans une transaction QA annulée | Divulgation de notes internes au client | RLS distingue réponses publiques et notes internes ; lecture/écriture internes réservées au support | OUI | PASS QA ; production à retester |
-| SEC-05 | Aucun déclencheur de protection sur `provider_documents` dans le catalogue SQL de production | Champs de revue et chemins de documents insuffisamment protégés | Rattachement de la fonction de contrôle existante ; upload réel exigé ; auto-approbation refusée | OUI | PASS QA ; production à retester |
-| SEC-06 | Protection des modifications d’avis absente de production ; politique d’insertion compare `b.provider_id` à lui-même | Avis attribué au mauvais professionnel ; note ou réponse falsifiée | Comparaison au professionnel de l’avis ; champs client, réponse pro et visibilité contrôlés séparément | OUI | PASS QA ; production à retester |
-| SEC-07 | Anciennes entrées d’approbation et de remboursement encore exposées et sans appel applicatif actuel | Contrôles métier divergents, idempotence et dossier incomplet | Retrait des entrées héritées ; parcours actuel de candidature et remboursement v2 conservés | OUI | PASS QA ; production à retester |
+| SEC-01 | Un rôle Finance AAL2 appelle directement `write_admin_audit` avec un événement fabriqué ; insertion réussie sur QA | Falsification du journal des opérations | EXECUTE retiré aux rôles API ; les opérations autorisées continuent à écrire leur audit en interne | OUI | PASS QA et production (contrôles ciblés) |
+| SEC-02 | Un client appelle `compute_provider_launch_completeness` pour un brouillon étranger ; score renvoyé sur QA | Lecture d’informations d’un profil non public | Calcul interne uniquement ; wrapper propriétaire/agent conservé et retesté | OUI | PASS QA et production (contrôles ciblés) |
+| SEC-03 | Un client rattache son paiement à `wave` avec `is_test=false` et une référence arbitraire ; valeurs persistées sur QA | Intégrité des données de paiement ; cela ne prouve aucun débit réel | Ancienne RPC révoquée ; nouvelle entrée réservée au serveur, propriétaire vérifié, test obligatoire, rattachement unique | OUI | PASS QA et production (contrôles ciblés) |
+| SEC-04 | Le demandeur d’un ticket lit une note `is_internal=true` dans une transaction QA annulée | Divulgation de notes internes au client | RLS distingue réponses publiques et notes internes ; lecture/écriture internes réservées au support | OUI | PASS QA et production (contrôles ciblés) |
+| SEC-05 | Aucun déclencheur de protection sur `provider_documents` dans le catalogue SQL de production | Champs de revue et chemins de documents insuffisamment protégés | Rattachement de la fonction de contrôle existante ; upload réel exigé ; auto-approbation refusée | OUI | PASS QA et production (contrôles ciblés) |
+| SEC-06 | Protection des modifications d’avis absente de production ; politique d’insertion compare `b.provider_id` à lui-même | Avis attribué au mauvais professionnel ; note ou réponse falsifiée | Comparaison au professionnel de l’avis ; champs client, réponse pro et visibilité contrôlés séparément | OUI | PASS QA et production (contrôles ciblés) |
+| SEC-07 | Anciennes entrées d’approbation et de remboursement encore exposées et sans appel applicatif actuel | Contrôles métier divergents, idempotence et dossier incomplet | Retrait des entrées héritées ; parcours actuel de candidature et remboursement v2 conservés | OUI | PASS QA et production (contrôles ciblés) |
 
 Les fichiers modifiés sont la route serveur de création de paiement, trois migrations versionnées et les scripts de recette. Aucun code de lecture vidéo ou de GPS n’a été modifié. Aucun paiement réel ni nouveau fournisseur n’a été activé.
 
@@ -68,7 +68,11 @@ Références techniques : [sécurité des fonctions Supabase](https://supabase.c
 
 `pnpm lint`, `pnpm typecheck`, `pnpm test` (90 tests) et `pnpm build` passent. Les validations unitaires et de build ne remplacent pas les preuves REST/Storage, navigateur et matérielles ci-dessus.
 
-Publication et retest production : en cours, à consigner après exécution.
+Publication : commit `491db452a93c0b260807c577eb974a30c3c60af5`, déploiement `dpl_6N3jGwPuxGV4av74U3Eyf3jvSMFN`, URL immuable `https://mata-beauty-1wzcg0281-africrm.vercel.app`. À 12:12 CEST, les 15 chemins de ressources JavaScript du domaine public sont identiques à ceux du déploiement immuable authentifié, zéro différence. Les trois migrations sont appliquées en production ; les déclencheurs documents/avis sont actifs. Les 44 contrôles ciblés passent également sur la base de production, fixtures nettoyées. Après retrait de sept anciennes entrées, 85 fonctions SECURITY DEFINER restent exécutables par authenticated, dont 17 par anon.
+
+Après déploiement, sept scénarios navigateur passent directement sur mata-beauty.com : dossier complet avec quatre documents/examen/approbation, MFA, catégories vers prestations/créneaux, CRUD salon puis réservation/message/avis/statistiques, profil client, interactions publiques et responsive de l’authentification. Le contrôle du scroll desktop inclus dans la recette MFA utilise la molette simulée aux tailles 1366×768, 1440×900 et 1920×1080 ; ce n’est pas un test physique de trackpad.
+
+Quatre autres scénarios navigateur après déploiement passent : publication MP4 réelle, publication photo/avant-après, interactions feed vers profil/réservation, signalement puis examen/masquage/audit/restauration avec les rôles attendus. Le démarrage vidéo mesuré pendant ce scénario est de 992 ms ; ce n’est pas une garantie pour tous les appareils/réseaux. Le module vidéo n’a pas été modifié. Zéro compte synthétique `qa-team-*` restant en production après les tests de permissions et de navigation.
 
 ## Inventaire des routes internes réellement ouvertes
 
@@ -181,3 +185,104 @@ La colonne Action distingue un clic de navigation d’un accès direct à une ro
 | admin | `/admin/audit` | Clic | Indisponible | FAIL |
 | admin | `/admin/security` | Clic | Indisponible | FAIL |
 | admin | `/admin/deletion-requests` | URL directe | Indisponible | FAIL |
+
+
+## Annexe : inventaire des RPC privilégiées
+
+Inventaire des 92 fonctions exposées avant correction. « PASS — refus direct » ne valide que la fermeture de l’entrée héritée. Les autres RPC restent indiquées NOT TESTED pour leur qualification exhaustive, même lorsqu’un parcours fonctionnel précédent en a exercé une partie. Les contrôles internes et les dépendances de trigger doivent être testés avec des données appartenant à plusieurs comptes.
+
+| Fonction | Accès API après correction | Qualification exhaustive / contrôle ciblé |
+|---|---|---|
+| `admin_assign_role` | authenticated | NOT TESTED exhaustivement |
+| `admin_bind_invitation` | authenticated | NOT TESTED exhaustivement |
+| `admin_change_internal_access` | authenticated | NOT TESTED exhaustivement |
+| `admin_feature_social_post` | authenticated | NOT TESTED exhaustivement |
+| `admin_global_search` | authenticated | NOT TESTED exhaustivement |
+| `admin_list_team` | authenticated | NOT TESTED exhaustivement |
+| `admin_list_users` | authenticated | NOT TESTED exhaustivement |
+| `admin_manage_category` | authenticated | NOT TESTED exhaustivement |
+| `admin_mfa_required` | authenticated | NOT TESTED exhaustivement |
+| `admin_moderate_social_post` | authenticated | NOT TESTED exhaustivement |
+| `admin_prepare_invitation` | authenticated | NOT TESTED exhaustivement |
+| `admin_resend_invitation` | authenticated | NOT TESTED exhaustivement |
+| `admin_set_provider_status` | authenticated | NOT TESTED exhaustivement |
+| `admin_set_user_suspension` | authenticated | NOT TESTED exhaustivement |
+| `admin_update_booking_status` | authenticated | NOT TESTED exhaustivement |
+| `admin_update_setting` | authenticated | NOT TESTED exhaustivement |
+| `archive_owned_business` | authenticated | NOT TESTED exhaustivement |
+| `attach_payment_provider` | Entrée API révoquée | PASS — refus direct après correction |
+| `calculate_service_quote` | anon, authenticated | NOT TESTED exhaustivement |
+| `close_admin_session` | authenticated | NOT TESTED exhaustivement |
+| `complete_provider_onboarding_information` | Entrée API révoquée | PASS — refus direct après correction |
+| `compute_provider_launch_completeness` | Entrée API révoquée | PASS — refus direct après correction |
+| `confirm_service_and_release` | authenticated | NOT TESTED exhaustivement |
+| `create_provider_video_post` | authenticated | NOT TESTED exhaustivement |
+| `create_social_media_post` | authenticated | NOT TESTED exhaustivement |
+| `create_video_post` | authenticated | NOT TESTED exhaustivement |
+| `ensure_authenticated_profile` | authenticated | NOT TESTED exhaustivement |
+| `ensure_booking_conversation` | authenticated | NOT TESTED exhaustivement |
+| `fail_payment_initialization` | authenticated | NOT TESTED exhaustivement |
+| `get_admin_context` | anon, authenticated | NOT TESTED exhaustivement |
+| `get_admin_dashboard` | authenticated | NOT TESTED exhaustivement |
+| `get_available_slots` | anon, authenticated | NOT TESTED exhaustivement |
+| `get_provider_follower_counts` | anon, authenticated | NOT TESTED exhaustivement |
+| `get_provider_launch_checklist` | authenticated | PASS sur les contrôles ciblés ; NOT TESTED exhaustivement |
+| `get_social_admin_dashboard` | authenticated | NOT TESTED exhaustivement |
+| `grant_support_conversation_access` | authenticated | NOT TESTED exhaustivement |
+| `has_admin_permission` | anon, authenticated | NOT TESTED exhaustivement |
+| `has_business_commercial_permission` | anon, authenticated | NOT TESTED exhaustivement |
+| `has_conversation_access` | anon, authenticated | NOT TESTED exhaustivement |
+| `initialize_client_control_center` | authenticated | NOT TESTED exhaustivement |
+| `initialize_payment` | Entrée API révoquée | PASS — refus direct après correction |
+| `initialize_payment_v2` | authenticated | NOT TESTED exhaustivement |
+| `is_admin` | anon, authenticated | NOT TESTED exhaustivement |
+| `is_conversation_member` | anon, authenticated | NOT TESTED exhaustivement |
+| `is_super_admin` | anon, authenticated | NOT TESTED exhaustivement |
+| `list_my_booking_conversations` | authenticated | NOT TESTED exhaustivement |
+| `manage_moderation_report` | authenticated | NOT TESTED exhaustivement |
+| `manage_own_social_post` | authenticated | NOT TESTED exhaustivement |
+| `manage_provider_onboarding` | Entrée API révoquée | PASS — refus direct après correction |
+| `manage_refund_request` | authenticated | NOT TESTED exhaustivement |
+| `manage_support_ticket` | authenticated | PASS sur les contrôles ciblés ; NOT TESTED exhaustivement |
+| `mark_conversation_read` | authenticated | NOT TESTED exhaustivement |
+| `nearby_providers` | anon, authenticated | NOT TESTED exhaustivement |
+| `notification_delivery_health` | authenticated | NOT TESTED exhaustivement |
+| `owns_business` | authenticated | NOT TESTED exhaustivement |
+| `professional_application_detail` | authenticated | NOT TESTED exhaustivement |
+| `professional_application_history` | authenticated | NOT TESTED exhaustivement |
+| `provider_creator_statistics` | authenticated | NOT TESTED exhaustivement |
+| `provider_social_conversion_summary` | authenticated | NOT TESTED exhaustivement |
+| `record_admin_session` | authenticated | NOT TESTED exhaustivement |
+| `record_post_booking_click` | anon, authenticated | NOT TESTED exhaustivement |
+| `record_post_share` | anon, authenticated | NOT TESTED exhaustivement |
+| `record_product_event` | anon, authenticated | NOT TESTED exhaustivement |
+| `record_social_profile_visit` | anon, authenticated | NOT TESTED exhaustivement |
+| `record_video_view` | anon, authenticated | NOT TESTED exhaustivement |
+| `report_post_comment` | authenticated | NOT TESTED exhaustivement |
+| `report_social_post` | authenticated | NOT TESTED exhaustivement |
+| `request_account_deletion` | authenticated | NOT TESTED exhaustivement |
+| `request_payment_refund` | Entrée API révoquée | PASS — refus direct après correction |
+| `request_payment_refund_v2` | authenticated | NOT TESTED exhaustivement |
+| `request_professional_document_update` | authenticated | NOT TESTED exhaustivement |
+| `request_professional_profile` | authenticated | NOT TESTED exhaustivement |
+| `request_provider_onboarding` | authenticated | NOT TESTED exhaustivement |
+| `review_professional_application` | authenticated | NOT TESTED exhaustivement |
+| `revoke_support_conversation_access` | authenticated | NOT TESTED exhaustivement |
+| `save_client_location` | authenticated | NOT TESTED exhaustivement |
+| `save_client_profile` | authenticated | NOT TESTED exhaustivement |
+| `save_professional_onboarding` | authenticated | NOT TESTED exhaustivement |
+| `save_provider_location` | authenticated | NOT TESTED exhaustivement |
+| `send_conversation_message` | authenticated | NOT TESTED exhaustivement |
+| `set_conversation_archived` | authenticated | NOT TESTED exhaustivement |
+| `set_owned_service_status` | authenticated | NOT TESTED exhaustivement |
+| `social_post_not_strongly_reported` | anon, authenticated | NOT TESTED exhaustivement |
+| `submit_provider_for_review` | authenticated | NOT TESTED exhaustivement |
+| `synchronize_account_status` | authenticated | NOT TESTED exhaustivement |
+| `toggle_follow_provider` | authenticated | NOT TESTED exhaustivement |
+| `toggle_follow_provider_from_post` | authenticated | NOT TESTED exhaustivement |
+| `toggle_post_like` | authenticated | NOT TESTED exhaustivement |
+| `toggle_post_save` | authenticated | NOT TESTED exhaustivement |
+| `update_client_identity` | authenticated | NOT TESTED exhaustivement |
+| `update_owned_service_pricing` | authenticated | NOT TESTED exhaustivement |
+| `write_admin_audit` | Entrée API révoquée | PASS — refus direct après correction |
+| `attach_payment_provider_server` (nouvelle entrée technique) | service_role uniquement | PASS : client refusé, propriétaire vérifié, mode test, rattachement unique |

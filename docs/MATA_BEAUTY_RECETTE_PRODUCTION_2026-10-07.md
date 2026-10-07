@@ -1,5 +1,7 @@
 # MATA Beauty — recette de production du 7 octobre 2026
 
+> Mise à jour après cette recette : les corrections de permissions du commit **491db45** sont déployées sur mata-beauty.com. Le GPS est confirmé par l’utilisateur sur iPhone 15 Pro Max / Chrome. Le nouvel audit détaille 105 routes internes, les défauts corrigés et les réserves toujours ouvertes : [permissions, modules et matériel réel](MATA_BEAUTY_PERMISSIONS_MODULES_HARDWARE_2026-10-07.md). Les résultats ci-dessous restent l’historique de la version c8331a7 ; ils ne valident pas tous les modules secondaires ni le trackpad physique.
+
 ## Décision : C — NON PRÊT pour un lancement public sans réserve
 
 La gestion **Équipe & accès est déployée et qualifiée**. Les parcours critiques détaillés ci-dessous passent réellement sur https://mata-beauty.com. La recette exhaustive de tous les contrôles de toutes les pages et l’examen de toutes les fonctions SQL privilégiées restent incomplets. Les sous-modules historiques non connectés ne sont pas transformés en PASS par une navigation réussie. La décision porte sur le lancement général, pas sur un échec des parcours qualifiés.
