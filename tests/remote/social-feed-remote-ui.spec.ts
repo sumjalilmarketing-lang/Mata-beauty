@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { writeFile } from "node:fs/promises";
 import { expect, test, webkit, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { fetchPublishedProviders } from "../../lib/supabase/catalog";
@@ -829,12 +830,19 @@ test("la navigation professionnelle reste simple sur mobile", async ({ browser }
   }
 });
 
+async function prepareFaultPage(page: Page) {
+  page.on('pageerror',error=>browserConsoleErrors.push(`Fault scenario JavaScript error: ${error.message}`));
+  await page.addInitScript(() => window.localStorage.setItem('mata-launch-welcome','done'));
+  if (remoteAppUrl && bypass) await page.route(`${new URL(remoteAppUrl).origin}/**`, route => route.continue({headers:{...route.request().headers(),'x-vercel-protection-bypass':bypass,'x-vercel-set-bypass-cookie':'true'}}));
+}
+
 test("le lecteur récupère après erreur réseau et borne le chargement bloqué", async ({ browser }) => {
   test.setTimeout(150_000);
   const mediaPattern = '**/storage/v1/object/sign/provider-social-media/**/*.mp4*';
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
+    await prepareFaultPage(page);
     await page.route(mediaPattern, route => route.request().method()==='GET' ? route.fulfill({status:404,body:'QA unavailable'}) : route.continue());
     await page.goto(remoteAppUrl ?? 'http://localhost:3100');
     const card = page.locator('.social-video-card').filter({hasText:studioCaption});
@@ -863,6 +871,7 @@ test("le lecteur récupère après erreur réseau et borne le chargement bloqué
   const stalledContext = await browser.newContext();
   const stalled = await stalledContext.newPage();
   try {
+    await prepareFaultPage(stalled);
     await stalled.route(mediaPattern,route=>route.request().method()==='GET'?new Promise<void>(()=>{}):route.continue());
     await stalled.goto(remoteAppUrl ?? 'http://localhost:3100');
     const card = stalled.locator('.social-video-card').filter({hasText:studioCaption});
@@ -877,6 +886,7 @@ test("le Studio refuse les fichiers invalides et récupère après interruption"
   const context = await browser.newContext();const page=await context.newPage();
   const title=`Upload validation ${run}`;
   try {
+    await prepareFaultPage(page);
     await page.goto(remoteAppUrl ?? 'http://localhost:3100');
     await page.getByRole('button',{name:'Publier une vidéo'}).click();
     await page.getByLabel('Adresse e-mail').fill(providerEmail);await page.getByLabel('Mot de passe').fill(password);
@@ -887,7 +897,9 @@ test("le Studio refuse les fichiers invalides et récupère après interruption"
     const input=page.locator('input[name="video"]'),submit=page.getByRole('button',{name:'Publier la vidéo',exact:true});
     await input.setInputFiles({name:'invalid.txt',mimeType:'text/plain',buffer:Buffer.from('invalid')});await submit.click();
     await expect(page.getByText('Format accepté : MP4, WebM ou MOV.',{exact:true})).toBeVisible();
-    await input.setInputFiles({name:'oversize.mp4',mimeType:'video/mp4',buffer:Buffer.alloc(100*1024*1024+1)});await submit.click();
+    const oversizedPath=test.info().outputPath('oversize.mp4');
+    await writeFile(oversizedPath,Buffer.alloc(100*1024*1024+1));
+    await input.setInputFiles(oversizedPath);await submit.click();
     await expect(page.getByText('La vidéo dépasse 100 Mo.',{exact:true})).toBeVisible();
     await input.setInputFiles({name:'corrupt.mp4',mimeType:'video/mp4',buffer:Buffer.from('invalid mp4')});await submit.click();
     await expect(page.getByText('La publication a échoué. Vérifiez le fichier et réessayez.',{exact:true})).toBeVisible({timeout:15000});
@@ -921,5 +933,15 @@ test("le Studio refuse les fichiers invalides et récupère après interruption"
     await portrait.evaluate(node=>node.scrollIntoView({block:'start'}));
     await expect.poll(()=>portrait.locator('video').evaluate(node=>(node as HTMLVideoElement).currentTime),{timeout:20000}).toBeGreaterThan(0);
     expect(await portrait.locator('video').evaluate(node=>{const v=node as HTMLVideoElement;return {width:v.videoWidth,height:v.videoHeight,fit:getComputedStyle(v).objectFit};})).toEqual({width:180,height:320,fit:'cover'});
+    const portraitRecord=await admin.from('posts').select('id').eq('author_id',providerId).eq('title',`Portrait WebM ${run}`).single();expect(portraitRecord.error).toBeNull();
+    await page.goto('/pro/videos');const row=page.locator('.studio-post-grid article').filter({hasText:`Portrait WebM ${run}`});
+    for (const [action,status] of [['Masquer','hidden'],['Republier','published'],['Archiver','archived'],['Republier','published']] as const) {
+      await row.getByRole('button',{name:action,exact:true}).click();
+      await expect.poll(async()=> (await admin.from('posts').select('status').eq('id',portraitRecord.data!.id).single()).data?.status).toBe(status);
+      expect((await clientApi.from('social_feed').select('id').eq('id',portraitRecord.data!.id)).data).toHaveLength(status==='published'?1:0);
+    }
+    page.once('dialog',dialog=>dialog.accept());await row.getByRole('button',{name:'Supprimer',exact:true}).click();
+    await expect(row).toHaveCount(0);
+    expect((await clientApi.from('social_feed').select('id').eq('id',portraitRecord.data!.id)).data).toHaveLength(0);
   } finally {await context.close();}
 });

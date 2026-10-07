@@ -1,5 +1,13 @@
 # MATA Beauty — permissions, modules internes et matériel réel
 
+## Complément Google Client — 7 octobre 2026, 21:02 heure de Paris
+
+Cette observation remplace le NOT TESTED de première inscription Google Client ci-dessous. L’utilisateur a exécuté la première inscription puis la reconnexion avec le même nouveau compte Google. Vérification directe en production : compte créé à 20:58:47, dernière connexion à 21:02:25, même identifiant Auth avant/après, un seul utilisateur, un seul profil, une seule identité Google, rôle `client`. **Première inscription et reconnexion Google Client : PASS** dans ce périmètre humain + vérification serveur.
+
+Un seul enregistrement d’e-mail de bienvenue, même identifiant fournisseur avant/après reconnexion, statut `sent` ; Resend a confirmé `delivered` à 21:01. Une seule notification de bienvenue vers `/app/profile`. Aucun doublon utilisateur/profil/bienvenue observé. La lecture humaine de l’e-mail et le clic sur la notification ne sont pas attestés par ces contrôles.
+
+Deux lignes de session existent après la reconnexion : elles ne sont pas des comptes dupliqués. La révocation de la première session après déconnexion n’a pas été contrôlée avec son ancien jeton et n’est donc pas déclarée PASS sur ce compte réel. Aucun jeton utilisateur n’a été demandé ou extrait. Les réserves de permissions, workflows, plan fournisseur et matériel restent distinctes et inchangées.
+
 Recette du 7 octobre 2026. Domaine : https://mata-beauty.com. Ce rapport remplace le bilan initial de `491db45`, conservé dans Git ; il ne transforme pas les anciens échecs en PASS sans retest.
 
 ## Actualisation Auth et lecture des routes — 7 octobre, après 18:43 UTC
