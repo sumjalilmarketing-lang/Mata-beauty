@@ -11,6 +11,7 @@ import { LaunchAdmin } from "./launch-admin";
 import { SupportInbox } from "./support-inbox";
 import { ModerationInbox } from "./moderation-inbox";
 import { InternalTeam } from "./internal-team";
+import { CommentModeration } from "./comment-moderation";
 
 type AdminContext = {
   is_super_admin: boolean;
@@ -176,6 +177,7 @@ const navigation = [
   { key: "commissions", label: "Commissions", icon: "%", permission: "commissions.manage" },
   { key: "payouts", label: "Reversements", icon: "↗", permission: "payouts.manage" },
   { key: "reviews", label: "Avis", icon: "★", permission: "reviews.moderate" },
+  { key: "comments", label: "Commentaires", icon: "✉", permission: "reviews.moderate" },
   { key: "reports", label: "Signalements", icon: "!", permission: "reports.manage" },
   { key: "disputes", label: "Litiges", icon: "⚖", permission: "reports.manage" },
   { key: "promotions", label: "Promotions", icon: "◈", permission: "content.manage" },
@@ -486,6 +488,7 @@ function AdminModule({
   if (module === "overview" || module === "statistics") return <Overview context={context} setModule={setModule} />;
   if (module === "launch" || module === "cohort" || module === "platform-health") return <LaunchAdmin mode={module} />;
   if (module === "reports") return <ModerationInbox />;
+  if (module === "comments") return <CommentModeration />;
   if (module === "support") return <SupportInbox />;
   if (module === "users") return <UsersModule context={context} notify={notify} />;
   if (module === "notifications") return <NotificationCenter />;
@@ -789,14 +792,27 @@ function SettingsModule({ maintenance, notify }: { maintenance: boolean; notify:
   const [enabled, setEnabled] = useState(false);
   const [message, setMessage] = useState("Mata Beauty revient très vite.");
   const [confirmation, setConfirmation] = useState(false);
+  const [settings, setSettings] = useState<{ key: string; description: string | null; value: unknown }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
-    void getSupabaseBrowserClient()!.from("app_settings").select("value").eq("key", "maintenance").maybeSingle().then(({ data }) => {
-      const value = data?.value as { enabled?: boolean; message?: string } | undefined;
+    const controller = new AbortController();
+    queueMicrotask(() => { setLoading(true); setError(""); });
+    void getSupabaseBrowserClient()!.from("app_settings").select("key,description,value").eq("is_sensitive", false).order("key").abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).then(({ data, error: failure }) => {
+      if (controller.signal.aborted) return;
+      setLoading(false);
+      if (failure) { setSettings([]); setError(publicErrorMessage(failure, "Les paramètres sont indisponibles.")); return; }
+      setSettings(data ?? []);
+      const value = data?.find(row => row.key === "maintenance")?.value as { enabled?: boolean; message?: string } | undefined;
       setEnabled(Boolean(value?.enabled));
       if (value?.message) setMessage(value.message);
     });
-  }, []);
-  if (!maintenance) return <div className="settings-grid">{["Application", "Réservations", "Commission globale", "Paiements", "Notifications", "Support", "Uploads", "Localisation"].map((title) => <article className="admin-panel" key={title}><p>Configuration</p><h2>{title}</h2><p>Lecture seule — édition non connectée dans cet écran.</p></article>)}</div>;
+    return () => controller.abort();
+  }, [revision]);
+  if (loading) return <p role="status">Chargement des paramètres…</p>;
+  if (error) return <section><p role="alert">{error}</p><button onClick={() => setRevision(value => value + 1)}>Réessayer</button></section>;
+  if (!maintenance) return <section><button onClick={() => setRevision(value => value + 1)}>Actualiser les paramètres</button><div className="settings-grid">{settings.length ? settings.map(setting => <article className="admin-panel" key={setting.key}><p>Configuration enregistrée · lecture seule</p><h2>{setting.description || setting.key}</h2><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(setting.value, null, 2)}</pre></article>) : <p>Aucun paramètre non sensible enregistré.</p>}</div></section>;
   return <><section className={`maintenance-control ${enabled ? "enabled" : ""}`}><span>△</span><div><p>Contrôle global</p><h2>Mode maintenance {enabled ? "actif" : "inactif"}</h2><p>Bloque temporairement les espaces clients et prestataires tout en laissant l’administration accessible.</p></div><button className={enabled ? "danger" : "primary"} onClick={() => setConfirmation(true)}>{enabled ? "Désactiver" : "Activer"}</button></section><article className="admin-panel maintenance-form"><label>Message public<textarea value={message} onChange={(event) => setMessage(event.target.value)} /></label><p>Administrateurs autorisés ; clients et prestataires bloqués pendant la maintenance.</p></article>{confirmation && <ConfirmationModal title={`${enabled ? "Désactiver" : "Activer"} le mode maintenance ?`} description="L’impact sur les utilisateurs est immédiat. Cette action sera journalisée." dangerous={!enabled} onCancel={() => setConfirmation(false)} onConfirm={async (reason) => {
     const next = { enabled: !enabled, message, allow_admins: true, allow_clients: false, allow_providers: false };
     const { error } = await getSupabaseBrowserClient()!.rpc("admin_update_setting", { setting_key: "maintenance", setting_value: next, reason });

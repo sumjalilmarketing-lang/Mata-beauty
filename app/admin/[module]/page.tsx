@@ -18,6 +18,7 @@ const connectedModules = {
   categories: "categories",
   bookings: "bookings",
   videos: "content",
+  comments: "comments",
   "social-reports": "reports",
   tickets: "support",
   transactions: "payments",

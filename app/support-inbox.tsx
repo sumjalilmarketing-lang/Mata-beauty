@@ -61,6 +61,7 @@ export function SupportInbox({ filter = "tickets", userId }: { filter?: string; 
       if (filter === "unassigned") query = query.is("assigned_to", null);
       if (filter === "mine") { if (!userId) throw new Error("Session indisponible"); query = query.eq("assigned_to", userId); }
       if (filter === "priority") query = query.in("priority", ["high", "urgent"]);
+      if (filter === "escalations") query = query.eq("status", "pending").eq("priority", "urgent");
       const result = await query.order("updated_at",{ascending:false}).limit(100).abortSignal(AbortSignal.timeout(10000));
       if (result.error) throw result.error;
       setTickets(result.data as Ticket[]);

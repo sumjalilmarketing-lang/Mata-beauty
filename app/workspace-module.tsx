@@ -20,6 +20,7 @@ import { ClientFavorites } from "./client-favorites";
 import { NotificationCenter } from "./notification-center";
 import { SupportInbox } from "./support-inbox";
 import { ModerationInbox } from "./moderation-inbox";
+import { CommentModeration } from "./comment-moderation";
 
 type Row = Record<string, unknown>;
 type ResourceDefinition = { table: string; select: string; title: (row: Row) => string; meta: (row: Row) => string };
@@ -44,6 +45,11 @@ const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, Resour
   "financial-events": { table: "financial_security_events", select: "id,event_type,severity,transaction_reference,created_at", title: (row) => `${label(row.event_type)} · ${label(row.severity)}`, meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` },
   commissions: { table: "platform_commissions", select: "id,payment_id,rate,amount,currency,created_at", title: (row) => `${money(row.amount)} · ${Number(row.rate)} %`, meta: (row) => `Paiement ${shortId(row.payment_id)} · ${date(row.created_at)}` },
   disputes: { table: "disputes", select: "id,booking_id,priority,status,reason,created_at", title: (row) => `${text(row.reason, "Litige")} · ${label(row.status)}`, meta: (row) => `${label(row.priority)} · ${date(row.created_at)}` },
+  sessions: { table: "admin_sessions", select: "id,user_id,signed_in_at,last_seen_at,mfa_verified,revoked_at", title: (row) => `Compte ${shortId(row.user_id)} · ${row.revoked_at ? "Révoquée" : "Enregistrée"}`, meta: (row) => `MFA ${row.mfa_verified ? "vérifié" : "non vérifié"} · Dernière activité ${date(row.last_seen_at)}` },
+  promotions: { table: "promotions", select: "id,title,status,is_active,starts_at,ends_at", title: (row) => text(row.title, "Promotion"), meta: (row) => `${label(row.status)} · ${row.is_active ? "Active" : "Inactive"} · ${date(row.starts_at)} → ${date(row.ends_at)}` },
+  campaigns: { table: "notification_campaigns", select: "id,title,channel,status,scheduled_at,sent_at,created_at", title: (row) => text(row.title, "Campagne"), meta: (row) => `${label(row.channel)} · ${label(row.status)} · ${row.sent_at ? date(row.sent_at) : "Non envoyée"}` },
+  settings: { table: "app_settings", select: "key,description,value,is_sensitive", title: (row) => text(row.description, text(row.key, "Paramètre")), meta: (row) => JSON.stringify(row.value) ?? "Non renseigné" },
+  "deletion-requests": { table: "account_deletion_requests", select: "id,profile_id,reason,status,requested_at", title: (row) => `Compte ${shortId(row.profile_id)} · ${label(row.status)}`, meta: (row) => `${text(row.reason, "Sans motif")} · ${date(row.requested_at)}` },
 };
 
 const onboardingHistory: ResourceDefinition = { table: "onboarding_events", select: "id,provider_id,action,reason,created_at", title: (row) => `${label(row.action)} · ${shortId(row.provider_id)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
@@ -54,8 +60,10 @@ const refunds: ResourceDefinition = { table: "refunds", select: "id,payment_id,a
 export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const focused = (space === "pro" && ["dashboard", "services", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
-  const supportInbox = space === "support" && ["dashboard", "tickets", "unassigned", "mine", "priority"].includes(module.key);
-  const moderationInbox = space === "moderation" && ["dashboard", "reports"].includes(module.key);
+  const supportInbox = (space === "support" && ["dashboard", "tickets", "unassigned", "mine", "priority", "escalations"].includes(module.key)) || (space === "operations" && module.key === "support") || (space === "admin" && module.key === "escalations");
+  const moderationInbox = (space === "moderation" && ["dashboard", "reports"].includes(module.key)) || (space === "operations" && module.key === "moderation");
+  const onboardingInbox = (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "operations" && module.key === "onboarding");
+  const commentModeration = ["moderation", "admin"].includes(space) && module.key === "comments";
   const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue"].includes(module.key));
   const definition = custom ? undefined
     : space === "onboarding" && module.key === "history" ? onboardingHistory
@@ -79,6 +87,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
     queueMicrotask(() => { if (active) { setRows([]); setState("loading"); } });
     let request = client.from(definition.table).select(definition.select).limit(100).abortSignal(controller.signal);
     if (paymentStatus) request = request.eq("payment_status", paymentStatus);
+    if (definition.table === "app_settings") request = request.eq("is_sensitive", false);
     if (definition.select.includes("created_at")) request = request.order("created_at", { ascending: false });
     request.then(({ data, error }) => {
       window.clearTimeout(timeout);
@@ -92,10 +101,11 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
   if (moderationInbox) return <ModerationInbox />;
+  if (commentModeration) return <CommentModeration />;
   if (supportInbox) return <SupportInbox key={module.key} filter={module.key} userId={userId} />;
   if (module.key === "notifications") return <NotificationCenter userId={userId} />;
   if (focused) return <LiveDashboard role={space === "client" ? "client" : "provider"} userId={userId} displayName="" moduleKey={module.key} onBack={() => window.location.assign("/")} onSignOut={async () => { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/"); }} />;
-  if (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) return <OnboardingQueue moduleKey={module.key} />;
+  if (onboardingInbox) return <OnboardingQueue moduleKey={module.key === "onboarding" ? "dashboard" : module.key} />;
   if (space === "pro" && module.key === "agenda") return <ProviderAgenda userId={userId} />;
   if (space === "pro" && module.key === "revenue") return <ProviderRevenue userId={userId} />;
   if (space === "client" && module.key === "favorites") return <ClientFavorites userId={userId} />;

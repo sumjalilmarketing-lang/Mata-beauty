@@ -8,6 +8,20 @@ const obsolete=new Map([
  ['/support-agent/knowledge','Ancienne entrée de navigation seule : aucun écran, appel applicatif, table ou workflow de base de connaissances. Retirée du catalogue.'],
  ['/moderation/appeals','Ancienne entrée de navigation seule : aucun parcours de contestation exposé ni workflow de traitement. Retirée du catalogue.'],
  ['/moderation/rules','Ancienne entrée de navigation seule : aucun référentiel géré par le produit. Retirée du catalogue.'],
+ ['/onboarding/assignments','Entrée séparée sans workflow distinct ; prise en charge déjà intégrée à la file des dossiers.'],
+ ['/onboarding/settings','Ancien écran vide de préférences agent ; sécurité et MFA déjà gérés par Équipe & Accès.'],
+ ['/support-agent/reports','Ancien écran de reporting sans source métier distincte ; suivi conservé dans les files de tickets.'],
+ ['/support-agent/settings','Ancien écran vide de préférences agent ; sécurité et MFA conservés.'],
+ ['/moderation/messages','Aucun workflow de signalement des conversations privées dans le produit. Retrait ; ne pas exposer les conversations à la modération par défaut.'],
+ ['/moderation/sanctions','Ancienne entrée dupliquant les décisions de modération et leur historique existant.'],
+ ['/moderation/settings','Ancien écran vide de préférences de modération.'],
+ ['/finance/reports','Ancien écran sans rapport distinct ; transactions et journal financier conservés.'],
+ ['/finance/settings','Ancien écran de préférences Finance sans réglage propre ; aucun fournisseur réel activé.'],
+ ['/operations/areas','Aucun référentiel de zones administrées ; localisation conservée dans les profils professionnels.'],
+ ['/operations/reports','Ancien écran de reporting sans workflow distinct.'],
+ ['/admin/availability','Ancienne entrée globale inutilisée ; disponibilités gérées dans chaque espace professionnel.'],
+ ['/admin/areas','Aucun référentiel global de zones administrées utilisé par la recherche.'],
+ ['/admin/integrations','Ancien écran inutilisé ; intégrations et secrets restent configurés côté serveur et fournisseur.'],
 ]);
 const causes=new Map([
  ['/onboarding/history','Source incorrecte admin_audit_logs ; raccordement à onboarding_events sous RLS documents.review.'],
@@ -35,11 +49,11 @@ const report=`# Classification des 48 routes internes — 7 octobre 2026
 
 ## Méthode et limites
 
-Base : les 48 échecs du parcours Super Admin AAL2 sur la version 491db45. **45 A, 0 B, 3 C** à ce stade. Les A sont conservées par prudence dans le périmètre à corriger ; l'absence d'implémentation ne suffit pas à les retirer.
+Base : les 48 échecs du parcours Super Admin AAL2 sur la version 491db45. **${rows.filter(row=>row.category==='A').length} A, 0 B, ${rows.filter(row=>row.category==='C').length} C**. Les A restent dans le périmètre à corriger ; leur classement ne signifie pas que la correction est validée.
 
 A : nécessaire ou annoncée et cassée/incomplète. B : refus attendu pour le rôle testé. C : ancienne entrée inutilisée retirée. Les refus Finance/Support/Onboarding/Modération sont testés séparément ; ils ne reclassent pas rétroactivement un écran cassé pour Super Admin en PASS.
 
-Les corrections de code listées ci-dessous ne sont **pas** des PASS de recette. Une source de données raccordée ou une liste vide ne valide pas ses opérations métier. Les trois retraits C doivent aussi être vérifiés par URL directe après déploiement (404 pour un rôle habilité, refus d'accès conservé pour un rôle non habilité).
+Les corrections de code listées ci-dessous ne sont **pas** des PASS de recette. Une source de données raccordée ou une liste vide ne valide pas ses opérations métier. Les retraits C doivent aussi être vérifiés par URL directe après déploiement (404 pour un rôle habilité, refus d'accès conservé pour un rôle non habilité).
 
 | Route | Classe | Cause / traitement |
 |---|---|---|
@@ -49,7 +63,8 @@ ${rows.map(row=>`| ${row.path} | ${row.category} | ${row.reason} |`).join('\n')}
 
 - 34 contrôles API Équipe & Accès : PASS sur QA, puis production ; invitation, MFA, changement de rôle, suspension, réactivation, révocation, audit et restriction des agrégats.
 - 17 contrôles navigateur Équipe & Accès : PASS sur production ; invitation Finance par formulaire et e-mail Resend de test, activation, MFA, changements vers Onboarding/Modération/Finance/Support, refus des cinq autres espaces et de l'API de gestion d'équipe, suspension, réactivation, révocation.
-- Les invitations initiales distinctes Support/Onboarding/Modération ne sont pas couvertes par ces changements de rôle : NOT TESTED.
+- Invitations initiales distinctes Support, Onboarding et Modération : 18 contrôles navigateur PASS pour chaque rôle, en production, avec activation, MFA, restrictions, changement de rôle, suspension, réactivation et révocation. Ces suites se recouvrent et ne représentent pas 54 fonctions différentes.
+- 22 contrôles API d’intégrité sociale, accès aux documents privés et alertes anti-abus : PASS sur QA et production après migrations ciblées.
 - PHYSICAL TRACKPAD : NOT TESTED — PHYSICAL TRACKPAD REQUIRED.
 
 ## Sécurité
@@ -59,4 +74,4 @@ Fuite reproduite : Support AAL2 pouvait recevoir les agrégats administratifs fi
 La matrice CRUD exhaustive et les actions des modules secondaires restent en cours. Les chiffres ci-dessus ne sont pas une certification de l'ensemble de l'application.
 `;
 await writeFile('docs/MATA_BEAUTY_INTERNAL_ROUTE_CLASSIFICATION_2026-10-07.md',report);
-console.log(JSON.stringify({A:45,B:0,C:3,total:rows.length}));
+console.log(JSON.stringify({A:rows.filter(row=>row.category==='A').length,B:0,C:rows.filter(row=>row.category==='C').length,total:rows.length}));

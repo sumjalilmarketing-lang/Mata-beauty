@@ -10,7 +10,7 @@ export type WorkspaceModule = {
   description: string;
   permission?: AdminPermissionKey;
   primary?: boolean;
-  resource?: "bookings" | "payments" | "notifications" | "messages" | "profiles" | "providers" | "businesses" | "collaborators" | "services" | "videos" | "reviews" | "reports" | "audit" | "wallets" | "payouts" | "reconciliation" | "financial-events" | "commissions" | "disputes";
+  resource?: "bookings" | "payments" | "notifications" | "messages" | "profiles" | "providers" | "businesses" | "collaborators" | "services" | "videos" | "reviews" | "reports" | "audit" | "wallets" | "payouts" | "reconciliation" | "financial-events" | "commissions" | "disputes" | "comments" | "sessions" | "promotions" | "campaigns" | "settings" | "deletion-requests";
 };
 
 export type WorkspaceSpace = {
@@ -101,10 +101,8 @@ const onboardingModules = [
   module("approved", "Dossiers validés", "✓", "Historique", "Professionnels approuvés.", { permission: "providers.read", resource: "providers" }),
   module("rejected", "Dossiers refusés", "×", "Historique", "Décisions négatives et justifications.", { permission: "providers.read", resource: "providers" }),
   module("documents", "Documents", "◇", "Conformité", "Documents KYC soumis à revue.", { permission: "documents.review" }),
-  module("assignments", "Affectations", "◎", "Traitement", "Répartition des dossiers entre agents.", { permission: "documents.review" }),
   module("history", "Historique", "≣", "Conformité", "Décisions et événements de conformité.", { permission: "documents.review", resource: "audit" }),
   module("notifications", "Notifications", "◌", "Compte", "Alertes liées aux dossiers.", { resource: "notifications" }),
-  module("settings", "Paramètres", "⚙", "Compte", "Préférences et sécurité de l’agent.", { permission: "settings.read" }),
 ] as const;
 
 const supportModules = [
@@ -113,25 +111,20 @@ const supportModules = [
   module("unassigned", "Non assignés", "+", "Files", "Tickets à prendre en charge.", { primary: true, permission: "support.manage", resource: "reports" }),
   module("mine", "Mes tickets", "◎", "Files", "Tickets affectés à votre compte.", { primary: true, permission: "support.manage", resource: "reports" }),
   module("priority", "Prioritaires", "!", "Files", "Tickets urgents ou en dépassement.", { primary: true, permission: "support.manage", resource: "reports" }),
-  module("escalations", "Escalades", "↗", "Assistance", "Dossiers transmis à une autre équipe.", { permission: "reports.manage", resource: "reports" }),
+  module("escalations", "Escalades", "↗", "Assistance", "Tickets urgents en attente de traitement.", { permission: "support.manage", resource: "reports" }),
   module("users", "Utilisateurs", "♙", "Contexte", "Informations utiles sans gestion des rôles.", { permission: "users.read", resource: "profiles" }),
   module("bookings", "Réservations", "□", "Contexte", "Réservations liées aux demandes.", { permission: "bookings.read", resource: "bookings" }),
-  module("reports", "Rapports", "%", "Pilotage", "Volume, délais et satisfaction."),
   module("notifications", "Notifications", "◌", "Compte", "Alertes et affectations.", { resource: "notifications" }),
-  module("settings", "Paramètres", "⚙", "Compte", "Préférences et sécurité de l’agent."),
 ] as const;
 
 const moderationModules = [
   module("dashboard", "Dashboard", "⌂", "Modération", "Files, urgences, récidives et activité.", { primary: true, permission: "reports.manage" }),
   module("reports", "Signalements", "!", "Modération", "Signalements ouverts et contexte.", { primary: true, permission: "reports.manage", resource: "reports" }),
   module("videos", "Vidéos", "▶", "Contenus", "Vidéos signalées ou masquées.", { primary: true, permission: "reports.manage", resource: "videos" }),
-  module("comments", "Commentaires", "✉", "Contenus", "Commentaires signalés.", { primary: true, permission: "reviews.moderate" }),
+  module("comments", "Commentaires", "✉", "Contenus", "Commentaires visibles ou masqués et décisions de modération.", { primary: true, permission: "reviews.moderate", resource: "comments" }),
   module("profiles", "Profils", "◎", "Contenus", "Profils signalés et antécédents.", { primary: true, permission: "providers.read", resource: "profiles" }),
-  module("messages", "Messages signalés", "◇", "Contenus", "Messages remontés à la modération.", { permission: "reports.manage", resource: "messages" }),
-  module("sanctions", "Sanctions", "×", "Décisions", "Mesures appliquées et durée."),
   module("history", "Historique", "≣", "Décisions", "Décisions, justifications et audit.", { permission: "reports.manage", resource: "audit" }),
   module("notifications", "Notifications", "◌", "Compte", "Nouveaux signalements et appels.", { resource: "notifications" }),
-  module("settings", "Paramètres", "⚙", "Compte", "Préférences et sécurité."),
 ] as const;
 
 const financeModules = [
@@ -145,10 +138,8 @@ const financeModules = [
   module("wallets", "Wallets", "▣", "Trésorerie", "Soldes dérivés des écritures autorisées.", { permission: "payments.read", resource: "wallets" }),
   module("payouts", "Versements", "↗", "Trésorerie", "État des versements enregistrés. Aucun versement réel ne peut être déclenché en mode mock.", { permission: "payouts.manage", resource: "payouts" }),
   module("reconciliation", "Rapprochement", "≋", "Contrôle", "Résultats de rapprochement enregistrés ; aucun fournisseur réel n’est activé.", { permission: "payments.read", resource: "reconciliation" }),
-  module("reports", "Rapports", "¶", "Pilotage", "Rapports financiers exportables.", { permission: "audit.read", resource: "audit" }),
   module("anomalies", "Anomalies", "!", "Contrôle", "Événements financiers de sécurité enregistrés.", { permission: "audit.read", resource: "financial-events" }),
   module("audit", "Audit financier", "≣", "Contrôle", "Journal non modifiable des actions financières.", { permission: "audit.read", resource: "audit" }),
-  module("settings", "Paramètres autorisés", "⚙", "Compte", "Préférences sans secrets ni configuration critique.", { permission: "settings.read" }),
 ] as const;
 
 const operationsModules = [
@@ -158,16 +149,14 @@ const operationsModules = [
   module("salons", "Salons", "⌑", "Marketplace", "Salons et instituts.", { primary: true, permission: "providers.read", resource: "businesses" }),
   module("bookings", "Réservations", "▣", "Marketplace", "Réservations de la plateforme.", { primary: true, permission: "bookings.read", resource: "bookings" }),
   module("categories", "Catégories", "◇", "Catalogue", "Catégories et prestations.", { permission: "categories.manage", resource: "services" }),
-  module("areas", "Villes et zones", "⌖", "Catalogue", "Zones desservies et référentiel géographique."),
-  module("promotions", "Promotions", "%", "Catalogue", "Promotions actives et programmées.", { permission: "content.manage" }),
+  module("promotions", "Promotions", "%", "Catalogue", "Promotions actives et programmées.", { permission: "content.manage", resource: "promotions" }),
   module("support", "Support", "?", "Équipes", "Suivi opérationnel du support.", { permission: "support.manage", resource: "reports" }),
   module("onboarding", "Onboarding", "✓", "Équipes", "Suivi des validations professionnelles.", { permission: "documents.review", resource: "providers" }),
   module("moderation", "Modération", "!", "Équipes", "Signalements et décisions.", { permission: "reports.manage", resource: "reports" }),
   module("content", "Contenus", "▶", "Communication", "Contenus et publications.", { permission: "content.manage", resource: "videos" }),
   module("notifications", "Notifications", "◌", "Communication", "Notifications ciblées.", { permission: "notifications.send", resource: "notifications" }),
-  module("reports", "Rapports", "¶", "Pilotage", "Rapports opérationnels."),
   module("audit", "Audit", "≣", "Contrôle", "Actions opérationnelles journalisées.", { permission: "audit.read", resource: "audit" }),
-  module("settings", "Paramètres opérationnels", "⚙", "Contrôle", "Réglages non sensibles.", { permission: "settings.read" }),
+  module("settings", "Paramètres opérationnels", "⚙", "Contrôle", "Lecture des réglages non sensibles.", { permission: "settings.read", resource: "settings" }),
 ] as const;
 
 const superAdminModules = [
@@ -182,16 +171,14 @@ const superAdminModules = [
   module("agents", "Agents internes", "♜", "Utilisateurs et accès", "Agents et rôles internes.", { permission: "roles.manage", resource: "profiles" }),
   module("roles", "Rôles", "⌘", "Utilisateurs et accès", "Rôles système et affectations.", { permission: "roles.manage" }),
   module("permissions", "Permissions", "⊕", "Utilisateurs et accès", "Matrice des permissions.", { permission: "roles.manage" }),
-  module("sessions", "Sessions", "◌", "Utilisateurs et accès", "Sessions administratives actives.", { permission: "roles.manage" }),
+  module("sessions", "Sessions", "◌", "Utilisateurs et accès", "Sessions administratives enregistrées. La suspension et la révocation se gèrent dans Équipe & accès.", { permission: "roles.manage", resource: "sessions" }),
   module("suspended", "Comptes suspendus", "×", "Utilisateurs et accès", "Comptes suspendus et motifs.", { permission: "users.suspend", resource: "profiles" }),
   module("services", "Prestations", "≡", "Marketplace", "Catalogue des prestations.", { permission: "categories.manage", resource: "services" }),
   module("categories", "Catégories", "◇", "Marketplace", "Taxonomie de la marketplace.", { permission: "categories.manage", resource: "services" }),
   module("bookings", "Réservations", "▣", "Marketplace", "Réservations globales.", { permission: "bookings.read", resource: "bookings" }),
-  module("availability", "Disponibilités", "□", "Marketplace", "Disponibilités et exceptions."),
-  module("areas", "Villes et zones", "⌖", "Marketplace", "Référentiel géographique."),
-  module("promotions", "Promotions", "%", "Marketplace", "Promotions et campagnes.", { permission: "content.manage" }),
+  module("promotions", "Promotions", "%", "Marketplace", "Promotions enregistrées et leur statut.", { permission: "content.manage", resource: "promotions" }),
   module("videos", "Contenu social", "▶", "Réseau social", "Publications, créateurs, tendances et modération.", { permission: "content.manage", resource: "videos" }),
-  module("comments", "Commentaires", "✉", "Réseau social", "Commentaires et réponses.", { permission: "reviews.moderate" }),
+  module("comments", "Commentaires", "✉", "Réseau social", "Commentaires et réponses.", { permission: "reviews.moderate", resource: "comments" }),
   module("social-reports", "Signalements", "!", "Réseau social", "Signalements sociaux.", { permission: "reports.manage", resource: "reports" }),
   module("tickets", "Tickets", "?", "Relation client", "Tickets et conversations.", { permission: "support.manage", resource: "reports" }),
   module("escalations", "Escalades", "↗", "Relation client", "Escalades inter-équipes.", { permission: "support.manage", resource: "reports" }),
@@ -204,13 +191,12 @@ const superAdminModules = [
   module("kyc", "Documents KYC", "◇", "Onboarding et conformité", "Documents et validations.", { permission: "documents.review" }),
   module("validations", "Validations", "✓", "Onboarding et conformité", "Décisions professionnelles.", { permission: "providers.verify", resource: "providers" }),
   module("notifications", "Notifications", "◌", "Communication", "Notifications système.", { permission: "notifications.send", resource: "notifications" }),
-  module("campaigns", "Campagnes", "✦", "Communication", "Campagnes et modèles.", { permission: "content.manage" }),
+  module("campaigns", "Campagnes", "✦", "Communication", "Campagnes de notification enregistrées et état d’envoi.", { permission: "notifications.send", resource: "campaigns" }),
   module("platform-settings", "Paramètres généraux", "⚙", "Plateforme", "Réglages généraux sans affichage de secrets.", { permission: "settings.update" }),
-  module("integrations", "Intégrations", "⌘", "Plateforme", "Intégrations et webhooks masqués.", { permission: "settings.update" }),
   module("system-logs", "Journaux système", "≣", "Plateforme", "Événements techniques autorisés.", { permission: "audit.read", resource: "audit" }),
   module("audit", "Journaux d’audit", "≣", "Sécurité et audit", "Actions sensibles non modifiables.", { permission: "audit.read", resource: "audit" }),
   module("security", "Événements de sécurité", "⌾", "Sécurité et audit", "Accès privilégiés et tentatives refusées.", { permission: "roles.manage", resource: "audit" }),
-  module("deletion-requests", "Demandes de suppression", "×", "Sécurité et audit", "Demandes RGPD et suivi.", { permission: "users.delete" }),
+  module("deletion-requests", "Demandes de suppression", "×", "Sécurité et audit", "Demandes reçues et statut de traitement. Aucune suppression automatique n’est effectuée depuis cette liste.", { permission: "users.delete", resource: "deletion-requests" }),
 ] as const;
 
 export const workspaceSpaces: Record<WorkspaceSpaceKey, WorkspaceSpace> = {
