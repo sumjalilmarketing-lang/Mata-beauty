@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { calculatePaymentQuote } from "@/lib/domain/payments";
 import { getPaymentGateway, paymentCapabilities } from "@/lib/payments/gateway";
-import { applicationOrigin, authenticatedSupabase, consumeRateLimit, hasTrustedOrigin, jsonError, requestContext, requestFingerprint } from "@/lib/payments/server";
+import { applicationOrigin, authenticatedSupabase, consumeRateLimit, hasTrustedOrigin, jsonError, requestContext, requestFingerprint, serviceSupabase } from "@/lib/payments/server";
 
 const schema = z.object({ bookingId: z.uuid(), method: z.enum(["orange_money", "wave", "card"]), attempt: z.string().min(8).max(80) });
 
@@ -59,8 +59,8 @@ export async function POST(request: Request) {
       method: parsed.data.method, successUrl: `${appUrl}/?payment=return&paymentId=${initialized.id}`, cancelUrl: `${appUrl}/?payment=cancelled&paymentId=${initialized.id}`,
       webhookUrl: `${appUrl}/api/payments/webhook`,
     });
-    const { error: attachError } = await auth.client.rpc("attach_payment_provider", {
-      target_payment_id: initialized.id, target_provider: session.provider,
+    const { error: attachError } = await serviceSupabase().rpc("attach_payment_provider_server", {
+      target_payment_id: initialized.id, target_customer_id: auth.user.id, target_provider: session.provider,
       target_provider_reference: session.providerReference, target_is_test: session.isTest,
     });
     if (attachError) {
