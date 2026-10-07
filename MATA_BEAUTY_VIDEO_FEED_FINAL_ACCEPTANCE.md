@@ -1,5 +1,76 @@
 # Mata Beauty — recette vidéo et feed
 
+## Audit production du 7 octobre 2026
+
+Cette section prévaut sur la recette Preview de septembre conservée plus bas. Domaine audité : **https://mata-beauty.com**. Aucun changement de design, nouveau module ou changement de permissions de base de données pendant cet audit.
+
+Version publique vérifiée le 7 octobre à **19:56:44 UTC** : **b3b888dcacc0493744d65aaf4ac1b1b63e45a3bd**, déploiement **dpl_HpeuiymB7UsaRPWHjNPpWBZ7RxPq**. HTTP 200 ; les 15 chemins JavaScript publics correspondent à ceux du déploiement immuable `mata-beauty-jirvailji-africrm.vercel.app` ; backend production présent, backend QA absent. Preuve locale : `work/final-audit/production-version-b3b888d.json`.
+
+### Défauts reproduits et corrigés
+
+| BUG-ID | Écran et reproduction | Observé / attendu | Cause et correction | Preview | Production |
+|---|---|---|---|---|---|
+| VID-001 | Feed, média GET 404, puis clic Réessayer après rétablissement | Clic intercepté / relance de la vidéo | La commande lecture recouvrait le fallback. Retrait des commandes lecture/son en état d’erreur dans `app/social-feed.tsx`, commit `94cbdee` | PASS | PASS `b3b888d` |
+| VID-002 | Lecture puis événement de document masqué | Lecture continuait / pause puis reprise au retour | Suivi de visibilité, arrêt des lecteurs et du comptage de vue hors page visible, `app/social-feed.tsx`, `94cbdee` | PASS, signal simulé | PASS `b3b888d` |
+| VID-003 | GET vidéo retenu sans réponse | Chargement encore affiché après 35 s / erreur récupérable | Watchdog de 20 s du lecteur actif, libération de sa source et bouton Réessayer, `app/social-feed.tsx`, `94cbdee` | PASS | PASS `b3b888d` |
+| VID-004 | Studio → Mes vidéos → Supprimer → actualiser | Vidéo supprimée toujours listée / disparition du Studio et du feed | La requête incluait les lignes supprimées logiquement. Filtrage `deleted_at` et `status`, `app/creator-studio.tsx`, `e12d0d8` | NOT TESTED | PASS sur `e12d0d8`, PASS `b3b888d` |
+| VID-005 | Client connecté, ouverture du feed puis interaction avant chargement du profil | Modale de connexion injustifiée / attente de la session | Distinction entre authentification en cours et visiteur ; commandes protégées désactivées pendant l’attente, chargement du profil borné. `app/mata-beauty-app.tsx`, `app/social-feed.tsx`, `lib/auth/profile.ts`, `b3b888d` | NOT TESTED | PASS `b3b888d` |
+
+Tests de régression ajoutés dans `tests/remote/social-feed-remote-ui.spec.ts`. La suppression reste logique : aucune purge irréversible du contenu historique n’a été ajoutée. Les erreurs réseau sont injectées dans les navigateurs de test, pas sur le service utilisé par les visiteurs.
+
+### Exécutions et preuves
+
+- Production `94cbdee` : **11 scénarios PASS**, puis échec du douzième dû à une navigation de fixture manquante. Ce résultat n’est pas présenté comme une suite de 12 PASS. Preuve : `work/final-audit/video-full-94cbdee`.
+- Après correction de cette fixture, le scénario a reproduit VID-004. Son parcours complet a passé sur `e12d0d8` : `work/final-audit/video-upload-e12d0d8/.last-run.json`.
+- La recette finale sur `e12d0d8` a ensuite reproduit VID-005 ; trois scénarios suivants non exécutés ne sont pas comptés PASS.
+- Production `b3b888d` : **6 scénarios PASS en une exécution de 5 minutes, nettoyage compris**, preuve `work/final-audit/video-final-b3b888d/.last-run.json`. Publication MP4, photo/avant-après, interactions et réservation, signalement/modération, résilience réseau et upload/gestion. Les cinq régressions corrigées passent sur ce dernier build.
+- Non-régression Auth sur `b3b888d` : **11 PASS**, nettoyage confirmé ; connexion, actualisation, routes Client protégées, session révoquée, liens inscription/invitation/reset à usage unique, session expirée et formulaire mobile. Preuve : `work/auth-audit/post-b3b888d-returns/results.json`. Liens générés pour la recette : ce contrôle ne prouve pas une nouvelle livraison SMTP ni une nouvelle connexion Google humaine.
+- Avant les commits de code : `pnpm lint`, `pnpm typecheck`, `pnpm test` (**97 tests**) et `pnpm build` PASS. Ces contrôles ne remplacent pas les parcours navigateur.
+
+### Couverture fonctionnelle observée
+
+| Zone | Action et résultat attendu | Résultat observé | Statut / version |
+|---|---|---|---|
+| Publication | MP4 → service du Pro → Storage → feed Client | Média réel, auteur et service liés, lecture possible | PASS `94cbdee`, PASS `b3b888d` |
+| Lecteur | Lecture, pause, reprise, mute/unmute, scroll, retour | Temps vidéo avance, pause et état muted contrôlés ; au plus un lecteur actif | PASS `94cbdee`, PASS `b3b888d` |
+| Desktop | Molette à 1366×768, 1440×900, 1920×1080 | Cartes suivantes/précédentes accessibles | PASS navigateur `94cbdee`, pas matériel physique |
+| Interactions | Like/favori/suivi, commentaire, profil et prestation | Actions et écritures réelles ; retrait like/favori/suivi contrôlé | PASS `94cbdee`, PASS `b3b888d` |
+| Partage | Action de partage → événement serveur | Événement enregistré ; API native simulée | PASS partie applicative ; partage OS NOT TESTED |
+| Réservation | Vidéo → prestation → créneau → confirmation → Client et Pro | Même professionnel, prix 18 000 XOF, durée 60 min, source vidéo, notification, créneau retiré | PASS `94cbdee`, PASS `b3b888d` |
+| Réservation en erreur | API 503 → aucune fausse confirmation → réessayer | Échec explicite puis réservation réelle | PASS `94cbdee`, PASS `b3b888d` |
+| Modération | Signaler → Admin avec MFA → masquer → audit → restaurer | Visibilité publique et opérations autorisées contrôlées | PASS `94cbdee`, PASS `b3b888d` |
+| RLS | Brouillon/rejet caché, modification par Client ou autre Pro refusée | Refus et absence du feed contrôlés | PASS `94cbdee` |
+| URLs signées | Lien expiré remplacé depuis le chemin Storage | Nouvelle signature exploitable | PASS API `94cbdee`, session UI longue NOT TESTED |
+| Catalogue | Filtres, proximité Dakar, tendances et pagination | Curseur unique, pas de publications dupliquées | PASS `94cbdee` |
+| Responsive | 320, 360, 375, 390, 430, 768, 1024 et 1440 px | Profil et réservation accessibles, pas de débordement horizontal | PASS `94cbdee`, viewports simulés |
+| WebKit | Émulation iPhone 390×844, lecture et retour/avance | Lecture réelle et navigation fonctionnelles | PASS `94cbdee`, pas un iPhone physique |
+| Studio mobile | 360, 375, 390 et 430 px | Navigation publication/messages accessible | PASS `94cbdee`, viewports simulés |
+| Upload | Mauvais format, fichier corrompu, >100 MiB | Rejet avant publication | PASS `e12d0d8`, PASS `b3b888d` |
+| Upload interrompu | Coupure Storage puis reprise et double clic | Pas de publication fantôme ; une seule publication après reprise | PASS `e12d0d8`, PASS `b3b888d` |
+| Formats et gestion | MP4 paysage, WebM VP8 portrait, masquer/republier/archiver/supprimer | Lecture et dimensions contrôlées ; statut et feed cohérents | PASS `e12d0d8`, PASS `b3b888d` |
+| Réseau lent/public | 512 kbit/s, latence 250 ms, visiteur puis actualisation | Lecture réelle, aucune erreur JS non interceptée dans cet échantillon | PASS rejoué sur `b3b888d`, `work/final-audit/video-public-refresh.json` |
+| Feed indisponible | API feed 503 puis rétablissement | Message explicite, clic Réessayer, lecture retrouvée | PASS rejoué sur `b3b888d`, `work/final-audit/video-feed-error.json` |
+
+Les comptes, publications, fichiers et réservations synthétiques sont nettoyés par les suites avec vérification des résultats. Les parcours normaux contrôlent les erreurs console/réseau ; les erreurs injectées attendues sont isolées des régressions inattendues.
+
+### Limites explicites et décision
+
+- **NOT TESTED — PHYSICAL TRACKPAD REQUIRED**. Molette navigateur et scroll programmatique ne prouvent pas le trackpad physique.
+- **NOT TESTED** : lecture sur vrais iPhone/Android, son entendu, changement d’application matériel, caméra et rotation réelle. Le GPS précédemment validé humainement ne valide pas ces usages vidéo.
+- **NOT TESTED** : MOV/HEVC/HDR iPhone, métadonnées de rotation, toutes combinaisons codec/navigateur. Formats réellement couverts : MP4 et WebM VP8.
+- **NOT TESTED** : partage natif OS ; réponses/suppression/signalement des commentaires ; tous les cas de données manquantes.
+- **NOT TESTED** : profilage mémoire prolongé et charge simultanée. Vingt changements rapides vérifient un nombre stable de lecteurs DOM, au plus deux sources attachées et un lecteur actif ; ce n’est pas une preuve d’absence de fuite mémoire sur plusieurs heures.
+- **NOT TESTED** : expiration en session UI prolongée et révocation d’une URL média déjà délivrée après suppression ; fichier valide proche de 100 MiB/90 s ; dépassement de durée réel ; timeout d’API feed ou de signature sans réponse. Les tests couvrent le média bloqué et le feed en erreur 503.
+- L’avancement d’upload affiche des étapes, pas une mesure qualifiée d’octets transmis.
+
+**Bilan vidéo final : 5 défauts reproduits corrigés, 0 échec dans les 6 scénarios finaux et les 5 contrôles publics complémentaires sur b3b888d.** Les six autres scénarios de la suite étendue ont passé sur `94cbdee` et ne sont pas présentés comme rejoués sur le dernier build. Aucune vulnérabilité HIGH/CRITICAL reproduite non résolue dans ce périmètre ; ce n’est pas une certification des surfaces non testées. Latence de démarrage observée dans le scénario final : 1 089 ms, échantillon unique, pas un benchmark général.
+
+**Verdict global maintenu : B — BÊTA CONTRÔLÉE.** L’audit vidéo ne lève pas les réserves de permissions exhaustives, des quatre workflows internes incomplets et du matériel du rapport général. **HaveIBeenPwned leaked-password protection — BLOCKED BY PLAN — activation possible après upgrade Pro** : fonction externe indisponible, distincte des défauts applicatifs ; aucune activation ou imitation effectuée.
+
+## Historique — recette Preview du 7 septembre 2026
+
+Les mentions de livraison et d’absence de déploiement production ci-dessous concernent exclusivement cette ancienne recette.
+
 Date : 7 septembre 2026. Branche : `codex/launch-phase-2`.
 
 ## État de livraison

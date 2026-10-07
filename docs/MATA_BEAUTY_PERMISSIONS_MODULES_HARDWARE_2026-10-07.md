@@ -1,5 +1,15 @@
 # MATA Beauty — permissions, modules internes et matériel réel
 
+## Actualisation vidéo — 7 octobre 2026, après 20:02 UTC
+
+Production vérifiée sur **b3b888dcacc0493744d65aaf4ac1b1b63e45a3bd**, déploiement **dpl_HpeuiymB7UsaRPWHjNPpWBZ7RxPq** : HTTP 200, mêmes 15 ressources JavaScript que le déploiement immuable, backend production confirmé. Cinq défauts vidéo reproduits puis corrigés : bouton Réessayer recouvert, lecture en document masqué, chargement média sans limite, contenu supprimé encore listé dans Studio et demande de connexion intempestive pendant le chargement du profil Client.
+
+Sur ce dernier build : **6 scénarios vidéo réels PASS en 5 minutes**, **5 contrôles publics complémentaires PASS** (réseau lent, refresh, erreurs JS de l’échantillon, erreur API et récupération), **11 contrôles de non-régression Auth PASS**. Preuves locales : `work/final-audit/video-final-b3b888d/.last-run.json`, `work/final-audit/video-public-refresh.json`, `work/final-audit/video-feed-error.json`, `work/auth-audit/post-b3b888d-returns/results.json`. Nettoyage des fixtures confirmé. Les liens Auth générés ne constituent pas un nouveau test de livraison SMTP ni de consentement Google humain.
+
+La suite vidéo étendue avait couvert six autres scénarios sur `94cbdee` : RLS, renouvellement de signature, filtres/pagination, responsive, WebKit et navigation Pro mobile. Ils ne sont pas déclarés rejoués sur `b3b888d`. Voir [rapport vidéo détaillé et limites](../MATA_BEAUTY_VIDEO_FEED_FINAL_ACCEPTANCE.md).
+
+**B — BÊTA CONTRÔLÉE maintenu.** L’audit vidéo ne lève ni les qualifications de permissions manquantes ni les quatre workflows incomplets ci-dessous. Trackpad physique, vidéo sur vrais téléphones, MOV/HEVC et test mémoire prolongé restent NOT TESTED. La protection HaveIBeenPwned reste **BLOCKED — EXTERNAL PLAN REQUIREMENT**, distincte des défauts applicatifs. Les comptages historiques de réserves ci-dessous restent ceux de leur périmètre, pas un total fusionné avec les limites vidéo.
+
 ## Complément Google Client — 7 octobre 2026, 21:02 heure de Paris
 
 Cette observation remplace le NOT TESTED de première inscription Google Client ci-dessous. L’utilisateur a exécuté la première inscription puis la reconnexion avec le même nouveau compte Google. Vérification directe en production : compte créé à 20:58:47, dernière connexion à 21:02:25, même identifiant Auth avant/après, un seul utilisateur, un seul profil, une seule identité Google, rôle `client`. **Première inscription et reconnexion Google Client : PASS** dans ce périmètre humain + vérification serveur.
