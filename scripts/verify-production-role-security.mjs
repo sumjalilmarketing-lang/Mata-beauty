@@ -1,6 +1,7 @@
 import {createClient} from '@supabase/supabase-js';
 import {randomUUID} from 'node:crypto';
 import {writeFile} from 'node:fs/promises';
+import {verifyQaMfa} from './qa-mfa.mjs';
 const url=process.env.REMOTE_SUPABASE_URL, key=process.env.REMOTE_SUPABASE_ANON_KEY;
 if(url!=='https://kazlvtxkbsdhbfvtqqdp.supabase.co' && !(url==='https://qjdwxdbvrxedyfolnpol.supabase.co' && process.env.ALLOW_PRODUCTION_QA==='mata-beauty.com')) throw new Error('Explicit production acceptance authorization required');
 const admin=createClient(url,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}});
@@ -17,6 +18,7 @@ for(const kind of ['client','provider','super_admin','revoked_admin','ordinary_a
  if(kind==='revoked_admin') {const r=await admin.from('admin_roles').select('id').eq('key','super_admin').single();await admin.from('profiles').update({role:'admin'}).eq('id',id);const m=await admin.from('admin_user_roles').insert({user_id:id,role_id:r.data.id,assigned_by:id,requires_mfa:false,is_active:true});if(m.error)throw m.error;}
  if(kind==='ordinary_admin') {const role=await admin.from('admin_roles').select('id').eq('key','admin').single();if(role.error)throw role.error;await admin.from('profiles').update({role:'admin'}).eq('id',id);const m=await admin.from('admin_user_roles').insert({user_id:id,role_id:role.data.id,assigned_by:id,requires_mfa:false,is_active:true});if(m.error)throw m.error;}
  const login=await api.auth.signInWithPassword({email,password});if(login.error)throw login.error;
+ if(['ordinary_admin','revoked_admin'].includes(kind)) await verifyQaMfa(api);
  if(kind==='ordinary_admin') {
   for(const permission of ['reports.manage','users.suspend']) if((await api.rpc('has_admin_permission',{required_permission:permission})).data!==true)throw new Error('Fixture missing required permission');
   const target=accounts.find(account=>account.kind==='super_admin').id;

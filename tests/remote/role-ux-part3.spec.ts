@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHmac } from "node:crypto";
 import { checkWheel } from "./scroll-acceptance";
 import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
@@ -7,14 +7,34 @@ const admin=createClient(url,process.env.SUPABASE_SERVICE_ROLE_KEY??"",{auth:{pe
 const password=`QA-${randomUUID()}!`,run=randomUUID();
 const roles=["client","provider","verification_agent","support","moderator","admin","super_admin"];
 const accounts=new Map<string,{id:string;email:string}>();
+const factorSecrets=new Map<string,string>();
+function totp(secret:string) {
+  const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits='';
+  for(const char of secret.replace(/=/g,''))bits+=alphabet.indexOf(char).toString(2).padStart(5,'0');
+  const bytes=[];for(let i=0;i+8<=bits.length;i+=8)bytes.push(parseInt(bits.slice(i,i+8),2));
+  const counter=Buffer.alloc(8);counter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
+  const hash=createHmac('sha1',Buffer.from(bytes)).update(counter).digest();
+  return ((hash.readUInt32BE(hash[19]&15)&0x7fffffff)%1000000).toString().padStart(6,'0');
+}
 test.use({trace:'off',video:'off',screenshot:'off'});
-async function login(page:Page,role:string) {
+async function login(page:Page,role:string,leaveMfaPending=false) {
   const bypass=process.env.VERCEL_AUTOMATION_BYPASS_SECRET,base=process.env.REMOTE_APP_URL;
   if(bypass&&base) await page.route(`${new URL(base).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
   await page.goto("/");
   await page.getByRole("navigation",{name:"Navigation de l’application"}).getByRole("button",{name:/^(Profil|Se connecter à MATA Beauty)$/}).click();
   await page.getByLabel("Adresse e-mail").fill(accounts.get(role)!.email);await page.getByLabel("Mot de passe",{exact:true}).fill(password);
   await page.getByRole("button",{name:"Se connecter",exact:true}).click();await expect(page).toHaveURL(/\/app/,{timeout:30000});
+  if(!['client','provider'].includes(role)&&!leaveMfaPending){
+    await page.goto('/admin');await expect(page.getByRole('heading',{name:'Vérification en deux étapes'})).toBeVisible();
+    let secret=factorSecrets.get(role);
+    if(!secret){
+      const response=page.waitForResponse(r=>r.url().endsWith('/auth/v1/factors')&&r.request().method()==='POST');
+      await page.getByRole('button',{name:'Préparer la vérification'}).click();
+      const factor=await(await response).json() as {totp:{secret:string}};secret=factor.totp.secret;factorSecrets.set(role,secret);
+    }else await page.getByRole('button',{name:'Préparer la vérification'}).click();
+    await page.getByLabel('Code d’authentification').fill(totp(secret));await page.getByRole('button',{name:'Vérifier le code'}).click();
+    await expect(page.getByRole('navigation',{name:'Navigation Super Admin'})).toBeVisible();
+  }
 }
 test.beforeAll(async()=>{
   const productionAllowed=process.env.ALLOW_PRODUCTION_QA==="mata-beauty.com"&&process.env.REMOTE_APP_URL==="https://mata-beauty.com"&&url==="https://qjdwxdbvrxedyfolnpol.supabase.co";
@@ -91,12 +111,16 @@ test.describe('MFA obligatoire',()=>{
     test.setTimeout(120000);
     const account=accounts.get('super_admin')!;
     expect((await admin.from('admin_user_roles').update({requires_mfa:true}).eq('user_id',account.id)).error).toBeNull();
-    await login(page,'super_admin');await page.goto('/admin');
+    const factors=await admin.auth.admin.mfa.listFactors({userId:account.id});expect(factors.error).toBeNull();
+    for(const factor of factors.data!.factors)expect((await admin.auth.admin.mfa.deleteFactor({userId:account.id,id:factor.id})).error).toBeNull();
+    factorSecrets.delete('super_admin');
+    await login(page,'super_admin',true);await page.goto('/admin');
     await expect(page.getByRole('heading',{name:'Vérification en deux étapes'})).toBeVisible();
     await expect(page.getByRole('navigation',{name:'Navigation Super Admin'})).toHaveCount(0);
     const enrollment=page.waitForResponse(response=>response.url().endsWith('/auth/v1/factors')&&response.request().method()==='POST');
     await page.getByRole('button',{name:'Préparer la vérification'}).click();
     const factor=await (await enrollment).json() as {totp:{secret:string}};
+    factorSecrets.set('super_admin',factor.totp.secret);
     await expect(page.getByAltText('Code QR de configuration du second facteur')).toBeVisible();
     await page.getByLabel('Code d’authentification').fill('000000');await page.getByRole('button',{name:'Vérifier le code'}).click();
     await expect(page.getByText('Code invalide ou expiré. Saisissez le code actuel.',{exact:true})).toBeVisible();
