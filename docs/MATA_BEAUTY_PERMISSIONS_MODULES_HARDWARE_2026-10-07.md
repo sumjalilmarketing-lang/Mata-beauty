@@ -2,7 +2,47 @@
 
 Recette du 7 octobre 2026. Domaine : https://mata-beauty.com. Ce rapport remplace le bilan initial de `491db45`, conservé dans Git ; il ne transforme pas les anciens échecs en PASS sans retest.
 
-## Version réellement servie
+## Actualisation Auth et lecture des routes — 7 octobre, après 18:43 UTC
+
+Cette actualisation prévaut sur les comptages historiques ci-dessous. Production applicative **8cc80c55730c10af10b1ae4252edb5c71a90f254**, déploiement **dpl_5pZJytPSNEWviJTot6JC4PXamreS**. Vérification réelle à 18:42:59 UTC : HTTP 200, 15 chemins JavaScript identiques au déploiement immuable, backend production confirmé (`work/final-audit/production-version-8cc80c5.json`).
+
+### Fonction premium fournisseur
+
+**HaveIBeenPwned leaked-password protection — BLOCKED BY PLAN — activation possible après upgrade Pro**. Classification : **BLOCKED — EXTERNAL PLAN REQUIREMENT**, pas FAIL applicatif. La fonction reste désactivée. Aucune imitation, aucun contournement, aucun achat ou upgrade effectué. Les trois anciens essais acceptant un mot de passe compromis documentent cette absence de protection ; ils ne constituent pas trois nouveaux défauts applicatifs. Risque résiduel : un mot de passe respectant la politique de complexité peut néanmoins être déjà compromis.
+
+### Protections disponibles et régression Auth
+
+La configuration native était réellement de six caractères, sans exigence de composition. Elle est maintenant de **12 caractères, minuscule, majuscule, chiffre et symbole**, validée sur QA puis appliquée en production. Seules ces deux propriétés ont changé. Aucun changement aux limites anti-abus, au MFA, aux sessions, aux callbacks ou à Google OAuth. L’interface inscription/reset/invitation explique la même règle ; les connexions existantes restent compatibles.
+
+- Politique native : **16 PASS QA + 16 PASS production**, inscription/changement/reset et reconnexion au même Client.
+- Ancien compte avec mot de passe de huit caractères : connexion après durcissement **PASS** ; contrôle de portée de la configuration **PASS**.
+- Parcours navigateur de production : **7 PASS**, inscription par double clic (une seule requête), confirmation dans un autre navigateur, rôle/profil Client, logout/login, bienvenue unique, reset via e-mail puis connexion. Réception humaine **NOT TESTED** : destinataire simulé Resend. Le dernier événement reset observé était `queued`, pas une preuve de livraison dans une vraie boîte.
+- Équipe et accès : **18 PASS navigateur** après déploiement, invitation réelle, activation, MFA, bons espaces/refus API, changement de rôle et retrait des anciens droits, suspension de session, réactivation, révocation. Le libellé historique du test parle de « Preview link » ; son assertion compare réellement le domaine à `https://mata-beauty.com`.
+- Google OAuth : **PASS pour la reconnexion du compte administrateur existant**, effectuée par l’utilisateur puis vérifiée en base à 18:53 UTC : dernier sign-in 18:48:34 UTC, compte créé le 25 juillet, un utilisateur, un profil, une identité Google et une session. Aucune nouvelle création. **Première inscription Google Client après ce déploiement : NOT TESTED** ; le compte testé a le rôle admin, pas Client. Aucun nouvel e-mail de bienvenue n’est attendu lors de cette reconnexion.
+- Pré-commit : lint, typecheck, **97 tests**, build **PASS**.
+- Retest supplémentaire : **11 PASS Auth navigateur** sur la production 8cc80c5, liens signup/invitation/reset à usage unique entre navigateurs, mauvais mot de passe rejeté, refresh de session Client, refus des routes internes au Client, session révoquée refusée, session de reset absente/expirée incapable de changer le mot de passe, inscription mobile et bouton Google accessible. Liens générés pour ces essais, donc aucune preuve SMTP supplémentaire déduite. Preuve : `work/auth-audit/post-8cc80c5-returns`.
+
+Preuves locales : `work/auth-audit/password-policy-production.json`, `native-policy-production.json`, `post-plan-smtp-flow.json`, `work/team-audit/production-ui-support-results.json`. Aucun secret dans ce rapport.
+
+### Problèmes applicatifs et lecture des routes
+
+Deux défauts reproduits : `/admin/alerts` et `/admin/security` chargeaient `audit_logs` au lieu de `fraud_alerts` et `admin_sessions`. Cause : résolution générique de la ressource dans `app/workspace-module.tsx`. Corrigés dans 8cc80c5 et retestés en production avec Super Admin et MFA. Aucun élargissement des permissions.
+
+Les **168 contrôles READ sont PASS** (88 Super Admin retestés après correction ; 80 autres rôles testés avant ce déploiement). Chaque ligne est classée **TESTABLE AUTOMATIQUEMENT** dans [l’annexe CSV](MATA_BEAUTY_READ_CONTRACTS_2026-10-07.csv), avec source, date et portée. La lecture inclut navigation et réponse API réelle attendue. Les deux défauts initiaux restent conservés dans `work/permission-audit/read-contract-before-fix`.
+
+La matrice historique conserve ses **168 NOT TESTED pour qualification complète des actions** : ces contrôles READ supplémentaires ne certifient pas tous les CREATE/UPDATE/DELETE ni toutes les RPC. Aucun changement cosmétique des statuts pour revendiquer une recette exhaustive.
+
+### Risques et workflows distincts
+
+L’audit adverse exhaustif des RPC reste **NOT TESTED** au-delà des scénarios nommés. Aucune vulnérabilité HIGH/CRITICAL reproduite ne reste ouverte dans le périmètre testé ; cela ne garantit pas les surfaces non testées. Versements et rapprochement réels restent hors périmètre V1 paiement mock/sur place ; campagnes non bloquantes tant qu’aucun envoi n’est proposé ; registre de litiges sans workflow financier autonome, traitement humain via Support à qualifier séparément. Ces réserves ne sont pas masquées par le blocage Pro.
+
+Matériel : **NOT TESTED — PHYSICAL TRACKPAD REQUIRED** ; boutons physiques téléphone et autres appareils non qualifiés. GPS iPhone : PASS déclaré précédemment par l’utilisateur, sans nouvel essai matériel.
+
+Complément de recette après déploiement : **12 scénarios navigateur PASS** (profils Client/Pro/interne, notifications, sessions, MFA, santé, Support) dans `work/final-audit/post-8cc80c5-roles`. Puis **1 scénario Support étendu PASS** : demande Client, assignation réelle à l’agent vérifiée en base, mise en attente, réouverture, échanges des deux côtés, résolution, réouverture après résolution et nouvelle résolution. Preuve : `work/final-audit/post-8cc80c5-support-extended`. Cela qualifie ce traitement manuel existant ; pas le workflow financier autonome du registre Litiges ni une escalade par interface (aucun bouton d’escalade présent).
+
+Verdict maintenu **B — BÊTA CONTRÔLÉE** ; pas de validation exhaustive du lancement public. Le blocage premium n’est ni un défaut applicatif ni la preuve que toutes les autres réserves sont levées.
+
+## État historique avant cette actualisation — version servie
 
 Code applicatif : `252955691d581e8ae42e905cec521d8fdf83cd81`. Déploiement : `dpl_6FXu9yuK2UjR2oiaooDiiQbzHvA3`, URL immuable https://mata-beauty-ntu6ys8eb-africrm.vercel.app.
 
@@ -111,7 +151,7 @@ La fin de l’effacement est une opération manuelle à documenter par demande. 
 | Rapprochement fournisseur non exécuté | Écarts financiers non réconciliés automatiquement | Reconciliation | OUI pour finance réelle ; NON pour bêta mock | Valider un fournisseur puis qualifier le traitement de ses données | Workflow incomplet ; registre seul |
 | Litiges : registre sans chaîne de décision complète | Traitement non autonome des litiges financiers | Disputes | OUI avant promesse de traitement automatisé ; traitement humain nécessaire en bêta | Définir et qualifier les transitions autorisées ; pas de décision fictive | Workflow incomplet ; registre seul |
 | Campagnes : registre sans envoi qualifié | Envoi massif non validé | Notification campaigns | NON si aucune campagne n’est lancée | Qualification dédiée destinataires/consentement/idempotence avant usage | Workflow incomplet ; registre seul |
-| Protection contre mots de passe compromis désactivée chez le fournisseur | Mot de passe connu comme compromis accepté | Supabase Auth | À lever avant lancement public sans réserve | Réglages Auth → protection des mots de passe compromis ; offre Pro ou supérieure selon la documentation fournisseur, aucun achat autorisé implicitement | BLOCKED : console authentifiée non pilotable dans cet environnement |
+| Protection contre mots de passe compromis désactivée chez le fournisseur | Mot de passe connu comme compromis accepté | Supabase Auth | À lever avant lancement public sans réserve | Réglages Auth → protection des mots de passe compromis ; offre Pro ou supérieure selon la documentation fournisseur, aucun achat autorisé implicitement | BLOCKED — EXTERNAL PLAN REQUIREMENT (abonnement Pro nécessaire) |
 | `pg_net` signalé dans public | Avertissement d’extension | Extension non relocalisable ; fonctions dans net, schéma non exposé REST | NON sur les contrôles effectués | Suivre la maintenance fournisseur ; ne pas supprimer/recréer l’extension pour masquer l’avertissement | Réserve documentée |
 | Trackpad physique | Comportement matériel non observé | Pages longues/feed/modales/back-office | NON seul pour bêta ; requis avant affirmation matérielle | Test physique | NOT TESTED — PHYSICAL TRACKPAD REQUIRED |
 | Boutons connexion/déconnexion sur téléphone physique | Simulation différente du geste réel | iPhone/Chrome | NON pour bêta accompagnée | Retour humain explicite sur les deux boutons | NOT TESTED |

@@ -1,0 +1,3445 @@
+{
+  "total": 168,
+  "pass": 168,
+  "fail": 0,
+  "rows": [
+    {
+      "role": "admin",
+      "path": "/support-agent",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/support-agent/tickets",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/support-agent/unassigned",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/support-agent/mine",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/support-agent/priority",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/support-agent/escalations",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/support-agent/users",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 34,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/support-agent/bookings",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/bookings",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/support-agent/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        },
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/moderation",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reports",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/moderation/reports",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reports",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/moderation/videos",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/posts",
+          "status": 200,
+          "shape": "array",
+          "count": 2,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/moderation/comments",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/post_comments",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/moderation/profiles",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 34,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/moderation/history",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/moderation_actions",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/moderation/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        },
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/bookings",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/users",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 34,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/providers",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/provider_profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 5,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/salons",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/businesses",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/bookings",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/bookings",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/categories",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/categories",
+          "status": 200,
+          "shape": "array",
+          "count": 11,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/promotions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/promotions",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/support",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/onboarding",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/moderation",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reports",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/content",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/posts",
+          "status": 200,
+          "shape": "array",
+          "count": 2,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        },
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/audit",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/audit_logs",
+          "status": 200,
+          "shape": "array",
+          "count": 100,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/operations/settings",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/app_settings",
+          "status": 200,
+          "shape": "array",
+          "count": 3,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "path": "/admin",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:25.210Z",
+      "source": "work/permission-audit/read-contract-admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/rpc/get_admin_context",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "content_manager",
+      "path": "/operations",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:35.915Z",
+      "source": "work/permission-audit/read-contract-content_manager.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/bookings",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "content_manager",
+      "path": "/operations/providers",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:35.915Z",
+      "source": "work/permission-audit/read-contract-content_manager.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/provider_profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 5,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "content_manager",
+      "path": "/operations/salons",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:35.915Z",
+      "source": "work/permission-audit/read-contract-content_manager.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/businesses",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "content_manager",
+      "path": "/operations/categories",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:35.915Z",
+      "source": "work/permission-audit/read-contract-content_manager.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/categories",
+          "status": 200,
+          "shape": "array",
+          "count": 11,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "content_manager",
+      "path": "/operations/promotions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:35.915Z",
+      "source": "work/permission-audit/read-contract-content_manager.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/promotions",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "content_manager",
+      "path": "/operations/content",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:35.915Z",
+      "source": "work/permission-audit/read-contract-content_manager.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/posts",
+          "status": 200,
+          "shape": "array",
+          "count": 2,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "content_manager",
+      "path": "/operations/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:35.915Z",
+      "source": "work/permission-audit/read-contract-content_manager.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        },
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "content_manager",
+      "path": "/operations/settings",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:35.915Z",
+      "source": "work/permission-audit/read-contract-content_manager.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/app_settings",
+          "status": 200,
+          "shape": "array",
+          "count": 3,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "content_manager",
+      "path": "/admin",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:35.915Z",
+      "source": "work/permission-audit/read-contract-content_manager.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/rpc/get_admin_context",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payments",
+          "status": 200,
+          "shape": "non-json"
+        },
+        {
+          "path": "/rest/v1/payments",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance/transactions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payments",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance/pending",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payments",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance/failed",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payments",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance/refunds",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/refunds",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance/commissions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/platform_commissions",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance/wallets",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/wallet_balances",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance/payouts",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payouts",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance/reconciliation",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reconciliation_runs",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance/anomalies",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/financial_security_events",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/finance/audit",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/financial_audit_log",
+          "status": 200,
+          "shape": "array",
+          "count": 18,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "finance",
+      "path": "/admin",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:14.245Z",
+      "source": "work/permission-audit/read-contract-finance.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/rpc/get_admin_context",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "moderator",
+      "path": "/moderation",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:57.983Z",
+      "source": "work/permission-audit/read-contract-moderator.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reports",
+          "status": 200,
+          "shape": "non-json"
+        },
+        {
+          "path": "/rest/v1/reports",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "moderator",
+      "path": "/moderation/reports",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:57.983Z",
+      "source": "work/permission-audit/read-contract-moderator.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reports",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "moderator",
+      "path": "/moderation/videos",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:57.983Z",
+      "source": "work/permission-audit/read-contract-moderator.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/posts",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "moderator",
+      "path": "/moderation/comments",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:57.983Z",
+      "source": "work/permission-audit/read-contract-moderator.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/post_comments",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "moderator",
+      "path": "/moderation/profiles",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:57.983Z",
+      "source": "work/permission-audit/read-contract-moderator.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 34,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "moderator",
+      "path": "/moderation/history",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:57.983Z",
+      "source": "work/permission-audit/read-contract-moderator.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/moderation_actions",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "moderator",
+      "path": "/moderation/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:57.983Z",
+      "source": "work/permission-audit/read-contract-moderator.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        },
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "moderator",
+      "path": "/admin",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:28:57.983Z",
+      "source": "work/permission-audit/read-contract-moderator.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/rpc/get_admin_context",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/onboarding",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/onboarding/new",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/onboarding/in-progress",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/onboarding/requests",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/onboarding/approved",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/onboarding/rejected",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/onboarding/documents",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/onboarding/history",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/onboarding_events",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/onboarding/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/support-agent",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/support-agent/tickets",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/support-agent/unassigned",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/support-agent/mine",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/support-agent/priority",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/support-agent/escalations",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/support-agent/users",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 36,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/support-agent/bookings",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/bookings",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/support-agent/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        },
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/moderation",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reports",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/moderation/reports",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reports",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/moderation/videos",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/posts",
+          "status": 200,
+          "shape": "array",
+          "count": 2,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/moderation/comments",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/post_comments",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/moderation/profiles",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 36,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/moderation/history",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/moderation_actions",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/moderation/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        },
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payments",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/transactions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payments",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/pending",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payments",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/failed",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payments",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/refunds",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/refunds",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/disputes",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/disputes",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/commissions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/platform_commissions",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/wallets",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/wallet_balances",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/payouts",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payouts",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/reconciliation",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reconciliation_runs",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/anomalies",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/financial_security_events",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/finance/audit",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/financial_audit_log",
+          "status": 200,
+          "shape": "array",
+          "count": 18,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/bookings",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/users",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 36,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/providers",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/provider_profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 5,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/salons",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/businesses",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/bookings",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/bookings",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/categories",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/categories",
+          "status": 200,
+          "shape": "array",
+          "count": 11,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/promotions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/promotions",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/support",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/onboarding",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/moderation",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reports",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/content",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/posts",
+          "status": 200,
+          "shape": "array",
+          "count": 2,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        },
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/audit",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/audit_logs",
+          "status": 200,
+          "shape": "array",
+          "count": 100,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/operations/settings",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/app_settings",
+          "status": 200,
+          "shape": "array",
+          "count": 3,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/rpc/get_admin_dashboard",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/alerts",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/fraud_alerts",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/activity",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/audit_logs",
+          "status": 200,
+          "shape": "array",
+          "count": 250,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/health",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/rpc/notification_delivery_health",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/clients",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/rpc/admin_list_users",
+          "status": 200,
+          "shape": "array",
+          "count": 34,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/providers",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/provider_profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 5,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/salons",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/businesses",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/staff",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/collaborators",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/agents",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/api/admin/team",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/roles",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/api/admin/team",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/permissions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/api/admin/team",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/sessions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/admin_sessions",
+          "status": 200,
+          "shape": "array",
+          "count": 15,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/suspended",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 3,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/services",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/provider_services",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/categories",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/categories",
+          "status": 200,
+          "shape": "array",
+          "count": 11,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/bookings",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/bookings",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/promotions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/promotions",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/videos",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/posts",
+          "status": 200,
+          "shape": "array",
+          "count": 2,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/comments",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/post_comments",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/social-reports",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/reports",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/tickets",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/escalations",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/disputes",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/disputes",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/transactions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payments",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/commissions",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/platform_commissions",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/refunds",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/refunds",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/payouts",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/payouts",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/financial-reports",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/financial_audit_log",
+          "status": 200,
+          "shape": "array",
+          "count": 18,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/kyc",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/validations",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/campaigns",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notification_campaigns",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/platform-settings",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/app_settings",
+          "status": 200,
+          "shape": "array",
+          "count": 3,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/system-logs",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/audit_logs",
+          "status": 200,
+          "shape": "array",
+          "count": 100,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/audit",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/audit_logs",
+          "status": 200,
+          "shape": "array",
+          "count": 250,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/security",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/admin_sessions",
+          "status": 200,
+          "shape": "array",
+          "count": 15,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/deletion-requests",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:46:24.138Z",
+      "source": "work/permission-audit/read-contract-super_admin.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/account_deletion_requests",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "support",
+      "path": "/support-agent",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:48.575Z",
+      "source": "work/permission-audit/read-contract-support.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "support",
+      "path": "/support-agent/tickets",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:48.575Z",
+      "source": "work/permission-audit/read-contract-support.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "support",
+      "path": "/support-agent/unassigned",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:48.575Z",
+      "source": "work/permission-audit/read-contract-support.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "support",
+      "path": "/support-agent/mine",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:48.575Z",
+      "source": "work/permission-audit/read-contract-support.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "support",
+      "path": "/support-agent/priority",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:48.575Z",
+      "source": "work/permission-audit/read-contract-support.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "support",
+      "path": "/support-agent/escalations",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:48.575Z",
+      "source": "work/permission-audit/read-contract-support.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/support_tickets",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "support",
+      "path": "/support-agent/users",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:48.575Z",
+      "source": "work/permission-audit/read-contract-support.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/profiles",
+          "status": 200,
+          "shape": "array",
+          "count": 34,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "support",
+      "path": "/support-agent/bookings",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:48.575Z",
+      "source": "work/permission-audit/read-contract-support.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/bookings",
+          "status": 200,
+          "shape": "array",
+          "count": 1,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "support",
+      "path": "/support-agent/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:48.575Z",
+      "source": "work/permission-audit/read-contract-support.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        },
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "support",
+      "path": "/admin",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:27:48.575Z",
+      "source": "work/permission-audit/read-contract-support.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/rpc/get_admin_context",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "verification_agent",
+      "path": "/onboarding",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:29:23.196Z",
+      "source": "work/permission-audit/read-contract-verification_agent.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "non-json"
+        },
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "verification_agent",
+      "path": "/onboarding/new",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:29:23.196Z",
+      "source": "work/permission-audit/read-contract-verification_agent.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "verification_agent",
+      "path": "/onboarding/in-progress",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:29:23.196Z",
+      "source": "work/permission-audit/read-contract-verification_agent.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "verification_agent",
+      "path": "/onboarding/requests",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:29:23.196Z",
+      "source": "work/permission-audit/read-contract-verification_agent.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "verification_agent",
+      "path": "/onboarding/approved",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:29:23.196Z",
+      "source": "work/permission-audit/read-contract-verification_agent.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "verification_agent",
+      "path": "/onboarding/rejected",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:29:23.196Z",
+      "source": "work/permission-audit/read-contract-verification_agent.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "verification_agent",
+      "path": "/onboarding/documents",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:29:23.196Z",
+      "source": "work/permission-audit/read-contract-verification_agent.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/professional_onboarding",
+          "status": 200,
+          "shape": "array",
+          "count": 4,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "verification_agent",
+      "path": "/onboarding/history",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:29:23.196Z",
+      "source": "work/permission-audit/read-contract-verification_agent.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/onboarding_events",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "verification_agent",
+      "path": "/onboarding/notifications",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:29:23.196Z",
+      "source": "work/permission-audit/read-contract-verification_agent.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/notifications",
+          "status": 200,
+          "shape": "array",
+          "count": 0,
+          "hasError": false
+        }
+      ]
+    },
+    {
+      "role": "verification_agent",
+      "path": "/admin",
+      "classification": "TESTABLE AUTOMATIQUEMENT",
+      "action": "READ",
+      "status": "PASS",
+      "date": "2026-10-07T18:29:23.196Z",
+      "source": "work/permission-audit/read-contract-verification_agent.json",
+      "scope": "UI navigation + explicit live data source; CREATE/UPDATE/DELETE not inferred",
+      "otherActions": "NOT TESTED by this READ-only suite",
+      "sources": [
+        {
+          "path": "/rest/v1/rpc/get_admin_context",
+          "status": 200,
+          "shape": "object",
+          "count": null,
+          "hasError": false
+        }
+      ]
+    }
+  ]
+}

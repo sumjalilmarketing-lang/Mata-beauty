@@ -181,6 +181,14 @@ test('support : demande client, reponse agent et resolution', async ({page, brow
   try {
     await login(staffPage,'support'); await staffPage.goto('/support-agent/tickets');
     await staffPage.getByRole('button',{name:subject,exact:true}).click();
+    await staffPage.getByRole('button',{name:'M’assigner',exact:true}).click();
+    await expect(staffPage.getByText('Demande mise à jour.',{exact:true})).toBeVisible();
+    const assigned = await admin.from('support_tickets').select('assigned_to').eq('requester_id',accounts.get('client')!.id).eq('subject',subject).single();
+    expect(assigned.error).toBeNull();expect(assigned.data?.assigned_to).toBe(accounts.get('support')!.id);
+    await staffPage.getByRole('button',{name:'Mettre en attente',exact:true}).click();
+    await expect(staffPage.locator('.control-list-row').filter({hasText:subject})).toContainText('pending');
+    await staffPage.getByRole('button',{name:'Rouvrir',exact:true}).click();
+    await expect(staffPage.locator('.control-list-row').filter({hasText:subject})).toContainText('open');
     await staffPage.getByLabel('Réponse au support').fill('Votre demande de recette a bien été reçue.');
     await staffPage.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();
     await expect(staffPage.getByText('Demande mise à jour.',{exact:true})).toBeVisible();
@@ -196,6 +204,10 @@ test('support : demande client, reponse agent et resolution', async ({page, brow
     const ticket = await admin.from('support_tickets').select('status').eq('requester_id',accounts.get('client')!.id).eq('subject',subject).single();
     expect(ticket.data?.status).toBe('resolved');
     await page.reload(); await expect(page.locator('.control-list-row').filter({hasText:subject})).toContainText('resolved');
+    await staffPage.getByRole('button',{name:'Rouvrir',exact:true}).click();
+    await expect(staffPage.locator('.control-list-row').filter({hasText:subject})).toContainText('open');
+    await staffPage.getByRole('button',{name:'Résoudre',exact:true}).click();
+    await expect(staffPage.locator('.control-list-row').filter({hasText:subject})).toContainText('resolved');
     await staffPage.getByRole('button',{name:'Se déconnecter',exact:true}).click(); await expect(staffPage).toHaveURL(/\/$/);
   } finally { await context.close(); }
   await page.getByRole('button',{name:'Se déconnecter',exact:true}).click(); await expect(page).toHaveURL(/\/$/);
