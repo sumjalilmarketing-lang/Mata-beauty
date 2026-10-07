@@ -10,7 +10,7 @@ export type WorkspaceModule = {
   description: string;
   permission?: AdminPermissionKey;
   primary?: boolean;
-  resource?: "bookings" | "payments" | "notifications" | "messages" | "profiles" | "providers" | "businesses" | "collaborators" | "services" | "videos" | "reviews" | "reports" | "audit";
+  resource?: "bookings" | "payments" | "notifications" | "messages" | "profiles" | "providers" | "businesses" | "collaborators" | "services" | "videos" | "reviews" | "reports" | "audit" | "wallets" | "payouts" | "reconciliation" | "financial-events" | "commissions" | "disputes";
 };
 
 export type WorkspaceSpace = {
@@ -116,7 +116,6 @@ const supportModules = [
   module("escalations", "Escalades", "↗", "Assistance", "Dossiers transmis à une autre équipe.", { permission: "reports.manage", resource: "reports" }),
   module("users", "Utilisateurs", "♙", "Contexte", "Informations utiles sans gestion des rôles.", { permission: "users.read", resource: "profiles" }),
   module("bookings", "Réservations", "□", "Contexte", "Réservations liées aux demandes.", { permission: "bookings.read", resource: "bookings" }),
-  module("knowledge", "Base de connaissances", "¶", "Assistance", "Procédures et réponses validées."),
   module("reports", "Rapports", "%", "Pilotage", "Volume, délais et satisfaction."),
   module("notifications", "Notifications", "◌", "Compte", "Alertes et affectations.", { resource: "notifications" }),
   module("settings", "Paramètres", "⚙", "Compte", "Préférences et sécurité de l’agent."),
@@ -129,10 +128,8 @@ const moderationModules = [
   module("comments", "Commentaires", "✉", "Contenus", "Commentaires signalés.", { primary: true, permission: "reviews.moderate" }),
   module("profiles", "Profils", "◎", "Contenus", "Profils signalés et antécédents.", { primary: true, permission: "providers.read", resource: "profiles" }),
   module("messages", "Messages signalés", "◇", "Contenus", "Messages remontés à la modération.", { permission: "reports.manage", resource: "messages" }),
-  module("appeals", "Appels", "↺", "Décisions", "Contestations des décisions."),
   module("sanctions", "Sanctions", "×", "Décisions", "Mesures appliquées et durée."),
   module("history", "Historique", "≣", "Décisions", "Décisions, justifications et audit.", { permission: "reports.manage", resource: "audit" }),
-  module("rules", "Règles de modération", "¶", "Référentiel", "Règles et procédures applicables."),
   module("notifications", "Notifications", "◌", "Compte", "Nouveaux signalements et appels.", { resource: "notifications" }),
   module("settings", "Paramètres", "⚙", "Compte", "Préférences et sécurité."),
 ] as const;
@@ -143,13 +140,13 @@ const financeModules = [
   module("pending", "Paiements en attente", "…", "Paiements", "Paiements non finalisés.", { primary: true, permission: "payments.read", resource: "payments" }),
   module("failed", "Paiements échoués", "×", "Paiements", "Échecs et motifs disponibles.", { primary: true, permission: "payments.read", resource: "payments" }),
   module("refunds", "Remboursements", "↺", "Paiements", "Demandes, décisions et audit.", { primary: true, permission: "payments.refund", resource: "payments" }),
-  module("disputes", "Litiges", "⚖", "Contrôle", "Litiges financiers et pièces liées.", { permission: "payments.read", resource: "reports" }),
-  module("commissions", "Commissions", "%", "Contrôle", "Règles et écritures de commission.", { permission: "commissions.manage", resource: "payments" }),
-  module("wallets", "Wallets", "▣", "Trésorerie", "Soldes dérivés des écritures autorisées.", { permission: "payments.read" }),
-  module("payouts", "Versements", "↗", "Trésorerie", "Lots et état des versements.", { permission: "payouts.manage" }),
-  module("reconciliation", "Rapprochement", "≋", "Contrôle", "Écarts entre paiements et écritures."),
+  module("disputes", "Litiges", "⚖", "Contrôle", "Litiges réservés aux agents habilités au traitement des signalements.", { permission: "reports.manage", resource: "disputes" }),
+  module("commissions", "Commissions", "%", "Contrôle", "Écritures de commission enregistrées.", { permission: "commissions.manage", resource: "commissions" }),
+  module("wallets", "Wallets", "▣", "Trésorerie", "Soldes dérivés des écritures autorisées.", { permission: "payments.read", resource: "wallets" }),
+  module("payouts", "Versements", "↗", "Trésorerie", "État des versements enregistrés. Aucun versement réel ne peut être déclenché en mode mock.", { permission: "payouts.manage", resource: "payouts" }),
+  module("reconciliation", "Rapprochement", "≋", "Contrôle", "Résultats de rapprochement enregistrés ; aucun fournisseur réel n’est activé.", { permission: "payments.read", resource: "reconciliation" }),
   module("reports", "Rapports", "¶", "Pilotage", "Rapports financiers exportables.", { permission: "audit.read", resource: "audit" }),
-  module("anomalies", "Anomalies", "!", "Contrôle", "Écarts et événements à examiner."),
+  module("anomalies", "Anomalies", "!", "Contrôle", "Événements financiers de sécurité enregistrés.", { permission: "audit.read", resource: "financial-events" }),
   module("audit", "Audit financier", "≣", "Contrôle", "Journal non modifiable des actions financières.", { permission: "audit.read", resource: "audit" }),
   module("settings", "Paramètres autorisés", "⚙", "Compte", "Préférences sans secrets ni configuration critique.", { permission: "settings.read" }),
 ] as const;

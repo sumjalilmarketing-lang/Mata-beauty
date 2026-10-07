@@ -125,8 +125,8 @@ type SocialMetrics = {
   comments: number;
   shares: number;
   booking_clicks: number;
-  bookings: number;
-  gross_amount: number;
+  bookings: number | null;
+  gross_amount: number | null;
 };
 
 type SocialPostRow = {
@@ -746,8 +746,8 @@ function SocialContentModule({ context, notify }: { context: AdminContext; notif
       {[
         ["Publications aujourd’hui", metrics.posts_today], ["Publiées", metrics.published], ["À contrôler", metrics.pending],
         ["Signalées", metrics.reported], ["Vues", metrics.views], ["Réservations générées", metrics.bookings],
-        ["Clics Réserver", metrics.booking_clicks], ["CA généré", formatCurrency(metrics.gross_amount)],
-      ].map(([labelValue, value]) => <article key={String(labelValue)}><span>{labelValue}</span><strong>{typeof value === "number" ? value.toLocaleString("fr-FR") : value}</strong><small>Données Supabase</small></article>)}
+        ["Clics Réserver", metrics.booking_clicks], ["CA généré", metrics.gross_amount === null ? null : formatCurrency(metrics.gross_amount)],
+      ].filter(([, value]) => value !== null).map(([labelValue, value]) => <article key={String(labelValue)}><span>{labelValue}</span><strong>{typeof value === "number" ? value.toLocaleString("fr-FR") : value}</strong><small>Données Supabase</small></article>)}
     </section>}
     <div className="admin-filter-bar">
       <select aria-label="Filtrer par statut" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tous les statuts</option><option value="published">Publiées</option><option value="draft">Brouillons</option><option value="scheduled">Programmées</option><option value="hidden">Masquées</option><option value="deleted">Retirées</option></select>

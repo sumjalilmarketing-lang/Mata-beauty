@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ensureAuthenticatedProfile } from "@/lib/auth/profile";
 import type { AdminRoleKey } from "@/lib/domain/admin";
-import { workspaceModule, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
+import { workspaceModule, workspaceSpaces, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import { createSupabasePageClient } from "@/lib/supabase/server";
 import { availableWorkspaces, canAccessWorkspace, canAccessWorkspaceModule, type WorkspaceIdentity } from "./workspace-access";
 
@@ -31,6 +31,7 @@ export async function requireWorkspace(space: WorkspaceSpaceKey, moduleKey: stri
   };
   if (["pro", "salon"].includes(space) && providerResult.data?.status !== "approved") redirect("/app/application");
   if (!canAccessWorkspace(space, identity)) redirect(`/?acces=refuse&returnTo=${encodeURIComponent(requestedPath)}`);
+  if (!workspaceSpaces[space].modules.some((item) => item.key === moduleKey)) notFound();
   const currentModule = workspaceModule(space, moduleKey);
   if (!canAccessWorkspaceModule(identity, currentModule.permission)) redirect(workspaceModule(space, "dashboard").key === currentModule.key ? "/" : workspacePath(space));
   return { identity, module: currentModule, availableSpaces: availableWorkspaces(identity), userEmail: user.email ?? "Compte Mata Beauty", userId: user.id, providerApproved: providerResult.data?.status === "approved" };

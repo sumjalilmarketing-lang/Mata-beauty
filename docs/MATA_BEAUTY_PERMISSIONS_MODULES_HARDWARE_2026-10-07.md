@@ -2,6 +2,18 @@
 
 Date : 7 octobre 2026. Domaine : https://mata-beauty.com.
 
+## Reprise de finalisation — en cours
+
+La classification individuelle des 48 routes est conservée dans [MATA_BEAUTY_INTERNAL_ROUTE_CLASSIFICATION_2026-10-07.md](MATA_BEAUTY_INTERNAL_ROUTE_CLASSIFICATION_2026-10-07.md). Le bilan initial ci-dessous reste historique ; une correction de code n'est pas comptée comme un PASS navigateur.
+
+- Fuite d'agrégats financiers reproduite avec Support AAL2, corrigée par `20261007144455_scope_internal_dashboard_aggregates.sql` sur QA et production.
+- Suite Équipe & Accès/API élargie : **34 PASS QA et 34 PASS production**, sans les additionner comme 68 contrôles distincts.
+- Suite navigateur élargie : **17 PASS production**, dont attribution des quatre rôles demandés, cinq autres espaces refusés pour chacun, API d'équipe refusée, suspension et révocation. L'invitation initiale de ce passage était Finance ; les invitations initiales des autres rôles restent à rejouer séparément.
+- Routes secondaires Admin raccordées aux écrans existants après contrôle serveur Super Admin ; historiques Onboarding, Modération et Finance raccordés à leurs sources respectives ; filtres Finance et source des remboursements corrigés. Recette distante de ces corrections d'interface en cours.
+- Aucun lecteur vidéo, GPS ou design modifié. Aucun paiement réel activé.
+
+La revue automatique a refusé de monter le tableau de bord administratif complet depuis Finance/Opérations, pour risque d'exposition d'actions hors périmètre. Cette approche n'a pas été appliquée : les corrections de ces espaces utilisent leurs propres sources sous RLS.
+
 ## Conclusion de recette
 
 **C — NON PRÊT pour une ouverture publique sans réserves.** Le GPS est confirmé fonctionnel par l’utilisateur sur iPhone 15 Pro Max / Chrome après autorisation. Les modules internes secondaires restent partiellement non opérationnels ; les contrôles physiques de trackpad et la qualification adverse de toutes les opérations métier ne sont pas terminés.

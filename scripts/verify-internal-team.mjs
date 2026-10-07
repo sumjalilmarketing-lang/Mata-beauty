@@ -20,6 +20,12 @@ await mfa(manager.api);
 await check('AAL2 Super Admin can list team',async()=>assert.ifError((await manager.api.rpc('admin_list_team')).error));
 for(const [role,allowed,denied] of [['finance','payments.read','support.manage'],['support','support.manage','payments.read'],['verification_agent','documents.review','payments.read'],['moderator','reports.manage','payments.read'],['content_manager','content.manage','documents.review'],['admin','users.read','roles.manage']]){
  const actor=await account(role);await mfa(actor.api);
+ await check(`${role}: dashboard financial aggregates follow permissions`,async()=>{
+  const dashboard=await actor.api.rpc('get_admin_dashboard');assert.ifError(dashboard.error);
+  if(role!=='admin')assert.equal(dashboard.data,null,'Operational dashboard exposed outside admin role');
+  const social=await actor.api.rpc('get_social_admin_dashboard');assert.ifError(social.error);
+  if(!['finance','admin'].includes(role))assert(social.data?.gross_amount==null,'Financial aggregate exposed without payments.read');
+ });
  await check(`${role}: expected permissions, no team management or self-promotion`,async()=>{
   assert.equal((await actor.api.rpc('has_admin_permission',{required_permission:allowed})).data,true);
   assert.equal((await actor.api.rpc('has_admin_permission',{required_permission:denied})).data,false);

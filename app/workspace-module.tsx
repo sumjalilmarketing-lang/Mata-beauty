@@ -37,16 +37,34 @@ const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, Resour
   videos: { table: "posts", select: "id,caption,status,created_at", title: (row) => text(row.caption, "Publication"), meta: (row) => `${label(row.status)} · ${date(row.created_at)}` },
   reviews: { table: "reviews", select: "id,rating,comment,is_visible,created_at", title: (row) => `${text(row.rating, "–")}/5 · ${text(row.comment, "Avis")}`, meta: (row) => `${row.is_visible ? "Visible" : "Masqué"} · ${date(row.created_at)}` },
   reports: { table: "reports", select: "id,reason,status,created_at", title: (row) => text(row.reason, "Demande"), meta: (row) => `${label(row.status)} · ${date(row.created_at)}` },
-  audit: { table: "admin_audit_logs", select: "id,action,created_at", title: (row) => label(row.action), meta: (row) => date(row.created_at) },
+  audit: { table: "audit_logs", select: "id,action,created_at", title: (row) => label(row.action), meta: (row) => date(row.created_at) },
+  wallets: { table: "wallet_balances", select: "wallet_id,professional_id,currency,pending_balance,available_balance,total_earned,total_paid_out", title: (row) => `Professionnel ${shortId(row.professional_id)}`, meta: (row) => `Disponible ${money(row.available_balance)} · En attente ${money(row.pending_balance)} · Versé ${money(row.total_paid_out)}` },
+  payouts: { table: "payouts", select: "id,provider_id,amount,currency,status,created_at", title: (row) => `${money(row.amount)} · ${label(row.status)}`, meta: (row) => `Professionnel ${shortId(row.provider_id)} · ${date(row.created_at)}` },
+  reconciliation: { table: "reconciliation_runs", select: "id,provider,environment,status,matched_count,mismatch_count,missing_count,started_at", title: (row) => `${text(row.provider, "Fournisseur")} · ${label(row.status)}`, meta: (row) => `${text(row.environment, "")} · Écarts ${Number(row.mismatch_count)} · Manquants ${Number(row.missing_count)} · ${date(row.started_at)}` },
+  "financial-events": { table: "financial_security_events", select: "id,event_type,severity,transaction_reference,created_at", title: (row) => `${label(row.event_type)} · ${label(row.severity)}`, meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` },
+  commissions: { table: "platform_commissions", select: "id,payment_id,rate,amount,currency,created_at", title: (row) => `${money(row.amount)} · ${Number(row.rate)} %`, meta: (row) => `Paiement ${shortId(row.payment_id)} · ${date(row.created_at)}` },
+  disputes: { table: "disputes", select: "id,booking_id,priority,status,reason,created_at", title: (row) => `${text(row.reason, "Litige")} · ${label(row.status)}`, meta: (row) => `${label(row.priority)} · ${date(row.created_at)}` },
 };
+
+const onboardingHistory: ResourceDefinition = { table: "onboarding_events", select: "id,provider_id,action,reason,created_at", title: (row) => `${label(row.action)} · ${shortId(row.provider_id)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
+const moderationHistory: ResourceDefinition = { table: "moderation_actions", select: "id,target_id,action,reason,created_at", title: (row) => `${label(row.action)} · ${shortId(row.target_id)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
+const financialHistory: ResourceDefinition = { table: "financial_audit_log", select: "id,action,transaction_reference,created_at", title: (row) => label(row.action), meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` };
+const refunds: ResourceDefinition = { table: "refunds", select: "id,payment_id,amount,status,reason,created_at", title: (row) => `${money(row.amount)} · ${label(row.status)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
 
 export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const focused = (space === "pro" && ["dashboard", "services", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
   const supportInbox = space === "support" && ["dashboard", "tickets", "unassigned", "mine", "priority"].includes(module.key);
   const moderationInbox = space === "moderation" && ["dashboard", "reports"].includes(module.key);
-  const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || ["messages", "profile", "videos", "inspirations"].includes(module.key) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue"].includes(module.key));
-  const definition = custom ? undefined : module.resource ? resources[module.resource] : module.key === "dashboard" ? resources.bookings : undefined;
+  const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue"].includes(module.key));
+  const definition = custom ? undefined
+    : space === "onboarding" && module.key === "history" ? onboardingHistory
+    : space === "moderation" && module.key === "history" ? moderationHistory
+    : space === "finance" && module.key === "audit" ? financialHistory
+    : ["finance", "admin"].includes(space) && module.key === "refunds" ? refunds
+    : space === "finance" && module.key === "dashboard" ? resources.payments
+    : module.resource ? resources[module.resource] : module.key === "dashboard" ? resources.bookings : undefined;
+  const paymentStatus = space === "finance" && ["pending", "failed"].includes(module.key) ? module.key : null;
   const searchParams = useSearchParams();
   const query = (searchParams.get("q") ?? "").trim().toLocaleLowerCase("fr");
   const [rows, setRows] = useState<Row[]>([]);
@@ -54,16 +72,23 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   useEffect(() => {
     if (!definition) return;
     let active = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
     const client = getSupabaseBrowserClient();
-    if (!client) { queueMicrotask(() => setState("unavailable")); return; }
-    client.from(definition.table).select(definition.select).limit(100).then(({ data, error }) => {
+    if (!client) { window.clearTimeout(timeout); queueMicrotask(() => setState("unavailable")); return; }
+    queueMicrotask(() => { if (active) { setRows([]); setState("loading"); } });
+    let request = client.from(definition.table).select(definition.select).limit(100).abortSignal(controller.signal);
+    if (paymentStatus) request = request.eq("payment_status", paymentStatus);
+    if (definition.select.includes("created_at")) request = request.order("created_at", { ascending: false });
+    request.then(({ data, error }) => {
+      window.clearTimeout(timeout);
       if (!active) return;
       if (error) { setState("unavailable"); return; }
       const next = (data ?? []) as unknown as Row[];
       setRows(next); setState(next.length ? "ready" : "empty");
     });
-    return () => { active = false; };
-  }, [definition, supabaseAnonKey, supabaseUrl]);
+    return () => { active = false; window.clearTimeout(timeout); controller.abort(); };
+  }, [definition, paymentStatus, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
   if (moderationInbox) return <ModerationInbox />;

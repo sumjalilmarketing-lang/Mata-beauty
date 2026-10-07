@@ -6,12 +6,16 @@ import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const base=process.env.REMOTE_APP_URL,url=process.env.REMOTE_SUPABASE_URL;
 const production=process.env.ALLOW_PRODUCTION_QA==='mata-beauty.com'&&url==='https://qjdwxdbvrxedyfolnpol.supabase.co'&&base==='https://mata-beauty.com';
+const auditRole=process.env.AUDIT_ROLE??'super_admin';
+assert(['super_admin','admin','finance','support','verification_agent','moderator','content_manager'].includes(auditRole));
 if(!production&&(url!=='https://kazlvtxkbsdhbfvtqqdp.supabase.co'||!base?.endsWith('.vercel.app')))throw Error('Explicit isolated QA target required');
 const service=createClient(url,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}});
 const run=randomUUID(),email=`qa-team-ui-${run}@example.test`,password=`QA-${randomUUID()}!`;
 const made=await service.auth.admin.createUser({email,password,email_confirm:true,app_metadata:{qa_suppress_email:true},user_metadata:{legal_accepted:true}});assert.ifError(made.error);const managerId=made.data.user.id;
 await service.from('welcome_email_deliveries').update({status:'needs_review'}).eq('user_id',managerId);
-const role=await service.from('admin_roles').select('id').eq('key','super_admin').single();assert.ifError(role.error);
+const role=await service.from('admin_roles').select('id').eq('key',auditRole).single();assert.ifError(role.error);
+const grants=await service.from('admin_role_permissions').select('permission_key').eq('role_id',role.data.id);assert.ifError(grants.error);
+const permissions=new Set(grants.data.map(row=>row.permission_key));
 assert.ifError((await service.from('profiles').update({role:'admin'}).eq('id',managerId)).error);
 assert.ifError((await service.from('admin_user_roles').insert({user_id:managerId,role_id:role.data.id,requires_mfa:true})).error);
 const browser=await chromium.launch(),results=[];
@@ -36,23 +40,29 @@ try{
   const space=workspaceSpaces[key];
   for(const mod of space.modules){
    network=[];errors=[];const path=workspaceHref(key,mod.key);let clicked=false;
+   const expectedAccess=(key==='admin'&&mod.key==='dashboard')||(space.allowedAdminRoles.includes(auditRole)&&(auditRole==='super_admin'||!mod.permission||permissions.has(mod.permission)));
    try{
     const candidates=await page.locator('a[href="'+path+'"]').count();
     if(candidates&&await page.locator('a[href="'+path+'"]').first().isVisible()){await page.locator('a[href="'+path+'"]').first().click();clicked=true;}else await page.goto(base+path);
+    if(!expectedAccess){
+     await page.waitForURL(location=>location.pathname!==path);
+     results.push({space:key,module:mod.key,path,role:auditRole,action:'READ',expected:'DENIED',clicked,observation:'Refus de route attendu',status:'PASS',network:[...network],errors:[...errors]});
+     console.log(auditRole+' '+path+': refus attendu PASS');continue;
+    }
     await page.waitForURL(base+path);
     await page.locator('.workspace-topbar h1, .admin-page h1').first().waitFor();
     await page.waitForLoadState('networkidle',{timeout:10000}).catch(()=>{});
     await page.getByText('Chargement…',{exact:true}).waitFor({state:'hidden',timeout:12000}).catch(()=>{});
     const text=await page.locator('main').innerText().catch(()=>page.locator('body').innerText());
-    const unavailable=/Données momentanément indisponibles|Impossible de charger|sont indisponibles/.test(text);
+    const unavailable=/Données momentanément indisponibles|Impossible de charger|sont indisponibles|ne dispose pas encore d’un écran/.test(text);
     const loading=/Chargement…/.test(text);
-    results.push({space:key,module:mod.key,label:mod.label,path,clicked,observation:unavailable?'Indisponible':loading?'Chargement persistant':'Écran rendu',status:unavailable||loading||errors.length?'FAIL':'NOT TESTED',network:[...network],errors:[...errors]});
+    results.push({space:key,module:mod.key,label:mod.label,path,role:auditRole,action:'READ',expected:'ALLOWED',clicked,observation:unavailable?'Indisponible':loading?'Chargement persistant':'Écran rendu ; actions métier non qualifiées',status:unavailable||loading||errors.length||network.length?'FAIL':'NOT TESTED',network:[...network],errors:[...errors]});
    }catch(e){results.push({space:key,module:mod.key,path,clicked,status:'FAIL',observation:e.message.slice(0,200),network:[...network],errors:[...errors]});}
    console.log(key+'/'+mod.key+': '+results.at(-1).observation);
   }
  }
 }finally{
  await browser.close();assert.ifError((await service.auth.admin.deleteUser(managerId)).error);
- await writeFile('work/permission-audit/modules-production.json',JSON.stringify({date:new Date().toISOString(),base,role:'super_admin',results},null,2));
+ await writeFile(`work/permission-audit/modules-${production?'production':'qa'}-${auditRole}.json`,JSON.stringify({date:new Date().toISOString(),base,role:auditRole,results},null,2));
 }
 
