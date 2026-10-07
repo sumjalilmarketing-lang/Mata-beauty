@@ -598,6 +598,16 @@ test("le feed social distant relie les interactions au profil et à la réservat
     admin.from("post_comments").select("id", { count: "exact", head: true }).eq("post_id", studioPostId).eq("author_id", clientId),
   ]);
   expect([like.count, save.count, follow.count, comment.count]).toEqual([1, 1, 1, 1]);
+  await page.goto('/');
+  await mainCard.evaluate(node=>node.scrollIntoView({block:'start'}));
+  await mainCard.getByRole('button',{name:'J’aime',exact:true}).click();
+  await expect(page.getByText('J’aime retiré.',{exact:true})).toBeVisible();
+  await mainCard.getByRole('button',{name:'Enregistrer',exact:true}).click();
+  await expect(page.getByText('Retirée de Mes inspirations.',{exact:true})).toBeVisible();
+  await mainCard.getByRole('button',{name:'Se désabonner',exact:true}).click();
+  await expect.poll(async()=> (await admin.from('follows').select('follower_id').eq('followed_provider_id',providerId).eq('follower_id',clientId)).data?.length).toBe(0);
+  expect((await admin.from('post_likes').select('post_id').eq('post_id',studioPostId).eq('profile_id',clientId)).data).toHaveLength(0);
+  expect((await admin.from('post_saves').select('post_id').eq('post_id',studioPostId).eq('profile_id',clientId)).data).toHaveLength(0);
 
   const conversation = await clientApi.rpc("ensure_booking_conversation", { target_booking_id: bookingId });
   expect(conversation.error).toBeNull();
@@ -817,4 +827,99 @@ test("la navigation professionnelle reste simple sur mobile", async ({ browser }
     await page.screenshot({ path: `work/ultra-simple/messages-${width}.png` });
     await context.close();
   }
+});
+
+test("le lecteur récupère après erreur réseau et borne le chargement bloqué", async ({ browser }) => {
+  test.setTimeout(150_000);
+  const mediaPattern = '**/storage/v1/object/sign/provider-social-media/**/*.mp4*';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.route(mediaPattern, route => route.request().method()==='GET' ? route.fulfill({status:404,body:'QA unavailable'}) : route.continue());
+    await page.goto(remoteAppUrl ?? 'http://localhost:3100');
+    const card = page.locator('.social-video-card').filter({hasText:studioCaption});
+    await card.evaluate(node => node.scrollIntoView({block:'start'}));
+    await expect(card.getByText('Cette vidéo ne peut pas être lue.')).toBeVisible({timeout:20_000});
+    await page.unroute(mediaPattern);
+    let retryFailure = '';
+    try { await card.getByRole('button',{name:'Réessayer',exact:true}).click({timeout:5000}); }
+    catch (error) { retryFailure = error instanceof Error ? error.message : String(error); }
+    expect.soft(retryFailure,'Retry must be reachable by a real click').toBe('');
+    if (retryFailure) { await page.reload();await card.evaluate(node=>node.scrollIntoView({block:'start'})); }
+    await expect.poll(()=>card.locator('video').evaluate(node=>(node as HTMLVideoElement).currentTime),{timeout:20_000}).toBeGreaterThan(0);
+    await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'hidden'});document.dispatchEvent(new Event('visibilitychange'));});
+    await expect.soft.poll(()=>card.locator('video').evaluate(node=>(node as HTMLVideoElement).paused),{timeout:3000,message:'Hidden document must pause playback'}).toBe(true);
+    await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'visible'});document.dispatchEvent(new Event('visibilitychange'));});
+    await expect.poll(()=>card.locator('video').evaluate(node=>(node as HTMLVideoElement).paused)).toBe(false);
+    const count=await page.locator('.social-video-card video').count();
+    for(let step=0;step<20;step++){
+      await page.locator('.social-video-card').nth(step%4).evaluate(node=>node.scrollIntoView({block:'start',behavior:'instant'}));
+      await page.waitForTimeout(100);
+      expect(await page.locator('.social-video-card video[src]').count()).toBeLessThanOrEqual(2);
+      expect(await page.locator('.social-video-card video').evaluateAll(nodes=>nodes.filter(node=>!(node as HTMLVideoElement).paused).length)).toBeLessThanOrEqual(1);
+    }
+    expect(await page.locator('.social-video-card video').count()).toBe(count);
+  } finally { await context.close(); }
+  const stalledContext = await browser.newContext();
+  const stalled = await stalledContext.newPage();
+  try {
+    await stalled.route(mediaPattern,route=>route.request().method()==='GET'?new Promise<void>(()=>{}):route.continue());
+    await stalled.goto(remoteAppUrl ?? 'http://localhost:3100');
+    const card = stalled.locator('.social-video-card').filter({hasText:studioCaption});
+    await card.evaluate(node=>node.scrollIntoView({block:'start'}));
+    await expect(card.getByText('Chargement…',{exact:true})).toBeVisible();
+    await expect.soft(card.getByText('Cette vidéo ne peut pas être lue.')).toBeVisible({timeout:35_000});
+  } finally { await stalled.unrouteAll({behavior:'ignoreErrors'});await stalledContext.close(); }
+});
+
+test("le Studio refuse les fichiers invalides et récupère après interruption", async ({ browser }) => {
+  test.setTimeout(150_000);
+  const context = await browser.newContext();const page=await context.newPage();
+  const title=`Upload validation ${run}`;
+  try {
+    await page.goto(remoteAppUrl ?? 'http://localhost:3100');
+    await page.getByRole('button',{name:'Publier une vidéo'}).click();
+    await page.getByLabel('Adresse e-mail').fill(providerEmail);await page.getByLabel('Mot de passe').fill(password);
+    await page.getByRole('button',{name:'Se connecter',exact:true}).click();await page.waitForURL(/\/pro/);
+    await page.goto('/pro/videos');await page.getByRole('button',{name:'Créer une publication'}).click();
+    await page.locator('input[name="title"]').fill(title);await page.locator('textarea[name="caption"]').fill(title);
+    await page.locator('select[name="serviceId"]').selectOption(providerServiceId);await page.locator('input[name="consent"]').check();
+    const input=page.locator('input[name="video"]'),submit=page.getByRole('button',{name:'Publier la vidéo',exact:true});
+    await input.setInputFiles({name:'invalid.txt',mimeType:'text/plain',buffer:Buffer.from('invalid')});await submit.click();
+    await expect(page.getByText('Format accepté : MP4, WebM ou MOV.',{exact:true})).toBeVisible();
+    await input.setInputFiles({name:'oversize.mp4',mimeType:'video/mp4',buffer:Buffer.alloc(100*1024*1024+1)});await submit.click();
+    await expect(page.getByText('La vidéo dépasse 100 Mo.',{exact:true})).toBeVisible();
+    await input.setInputFiles({name:'corrupt.mp4',mimeType:'video/mp4',buffer:Buffer.from('invalid mp4')});await submit.click();
+    await expect(page.getByText('La publication a échoué. Vérifiez le fichier et réessayez.',{exact:true})).toBeVisible({timeout:15000});
+    const upload='**/storage/v1/object/provider-social-media/**';
+    await page.route(upload,route=>route.request().method()==='POST'?route.abort('internetdisconnected'):route.continue());
+    await input.setInputFiles({name:'valid.mp4',mimeType:'video/mp4',buffer:qaVideoBuffer});await submit.click();
+    await expect(page.getByText(/Connexion indisponible|La publication a échoué/)).toBeVisible({timeout:20000});
+    await expect(submit).toBeEnabled();
+    expect((await admin.from('posts').select('id').eq('author_id',providerId).eq('title',title)).data).toHaveLength(0);
+    await page.unroute(upload);await submit.dblclick();
+    await expect(page.getByText(title,{exact:true}).first()).toBeVisible({timeout:30000});
+    await expect.poll(async()=> (await admin.from('posts').select('id').eq('author_id',providerId).eq('title',title)).data?.length).toBe(1);
+    const webm = await page.evaluate(async()=>{
+      const canvas=document.createElement('canvas');canvas.width=180;canvas.height=320;
+      const ctx=canvas.getContext('2d')!;const stream=canvas.captureStream(15);
+      const recorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8'}),chunks:Blob[]=[];
+      recorder.ondataavailable=e=>chunks.push(e.data);
+      const done=new Promise<void>(resolve=>{recorder.onstop=()=>resolve();});
+      let frame=0;const timer=setInterval(()=>{ctx.fillStyle=frame++%2?'#ff0080':'#202040';ctx.fillRect(0,0,180,320);},70);
+      recorder.start();await new Promise(resolve=>setTimeout(resolve,2200));recorder.stop();await done;
+      clearInterval(timer);stream.getTracks().forEach(track=>track.stop());
+      return Array.from(new Uint8Array(await new Blob(chunks,{type:'video/webm'}).arrayBuffer()));
+    });
+    await page.getByRole('button',{name:'Créer une publication'}).click();
+    await page.locator('input[name="video"]').setInputFiles({name:'portrait.webm',mimeType:'video/webm',buffer:Buffer.from(webm)});
+    await page.locator('input[name="title"]').fill(`Portrait WebM ${run}`);await page.locator('textarea[name="caption"]').fill(`Portrait WebM ${run}`);
+    await page.locator('select[name="serviceId"]').selectOption(providerServiceId);await page.locator('input[name="consent"]').check();
+    await page.getByRole('button',{name:'Publier la vidéo',exact:true}).click();
+    await expect(page.getByText(`Portrait WebM ${run}`,{exact:true}).first()).toBeVisible({timeout:30000});
+    await page.goto('/');const portrait=page.locator('.social-video-card').filter({hasText:`Portrait WebM ${run}`});
+    await portrait.evaluate(node=>node.scrollIntoView({block:'start'}));
+    await expect.poll(()=>portrait.locator('video').evaluate(node=>(node as HTMLVideoElement).currentTime),{timeout:20000}).toBeGreaterThan(0);
+    expect(await portrait.locator('video').evaluate(node=>{const v=node as HTMLVideoElement;return {width:v.videoWidth,height:v.videoHeight,fit:getComputedStyle(v).objectFit};})).toEqual({width:180,height:320,fit:'cover'});
+  } finally {await context.close();}
 });
