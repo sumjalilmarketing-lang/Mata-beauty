@@ -20,7 +20,7 @@ test("le profil personnel gère réellement identité préférences support et c
   test.setTimeout(120_000);
   if(remoteAppUrl&&bypass)await page.route(`${new URL(remoteAppUrl).origin}/**`,route=>route.continue({headers:{...route.request().headers(),"x-vercel-protection-bypass":bypass,"x-vercel-set-bypass-cookie":"true"}}));
   await page.goto("/");
-  await page.getByRole("navigation",{name:"Navigation de l’application"}).getByRole("button",{name:"Profil"}).click();
+  await page.getByRole("navigation",{name:"Navigation de l’application"}).getByRole("button",{name:/^(Profil|Se connecter à MATA Beauty)$/}).click();
   await page.getByLabel("Adresse e-mail").fill(email);await page.getByLabel("Mot de passe").fill(password);await page.getByRole("button",{name:"Se connecter",exact:true}).click();
   await page.getByRole("navigation",{name:"Navigation Espace client"}).getByRole("link",{name:"Profil",exact:true}).click();
   await expect(page.getByRole("region", { name: "Mon profil client" })).toBeVisible();

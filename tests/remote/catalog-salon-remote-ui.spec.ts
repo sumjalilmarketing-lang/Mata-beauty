@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHmac } from "node:crypto";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -54,7 +54,7 @@ async function enablePreview(page: Page) {
 async function signIn(page: Page, email: string) {
   await enablePreview(page);
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
   await page.getByLabel("Adresse e-mail").fill(email);
   await page.getByLabel("Mot de passe").fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
@@ -171,9 +171,27 @@ test("le Salon réalise son CRUD navigateur puis reçoit réservation, message, 
   await expect(salonPage.getByText("Informations du salon enregistrées.")).toBeVisible();
   const business = await admin.from("businesses").select("id").eq("owner_id", salonId).single();
   expect(business.error).toBeNull(); salonBusinessId = business.data!.id;
-  // Le compte de recette représente ici un Salon déjà contrôlé et autorisé.
+  // An ordinary internal account cannot approve a salon through a direct table update.
+  const deniedApproval = await moderatorApi.from("businesses").update({ status: "approved" }).eq("id", salonBusinessId).select("id");
+  expect(deniedApproval.data ?? []).toHaveLength(0);
+  const draftBusiness = await admin.from("businesses").select("status").eq("id", salonBusinessId).single();
+  expect(draftBusiness.data?.status).toBe("draft");
+  // Fixture setup only: this scenario starts from an already-approved salon.
+  // It does not qualify a real administrative salon-approval workflow.
+  const managerRole = await admin.from("admin_roles").select("id").eq("key", "super_admin").single();
+  expect(managerRole.error).toBeNull();
+  expect((await admin.from("admin_user_roles").insert({ user_id: moderatorId, role_id: managerRole.data!.id, requires_mfa: true })).error).toBeNull();
+  const factor = await moderatorApi.auth.mfa.enroll({ factorType: "totp" });
+  expect(factor.error).toBeNull();
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const bits = [...factor.data!.totp.secret.replace(/=/g, "")].map(character => alphabet.indexOf(character).toString(2).padStart(5, "0")).join("");
+  const bytes = Buffer.from((bits.match(/.{8}/g) ?? []).map(byte => parseInt(byte, 2)));
+  const counter = Buffer.alloc(8); counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+  const hash = createHmac("sha1", bytes).update(counter).digest();
+  const code = ((hash.readUInt32BE(hash[19] & 15) & 0x7fffffff) % 1000000).toString().padStart(6, "0");
+  expect((await moderatorApi.auth.mfa.challengeAndVerify({ factorId: factor.data!.id, code })).error).toBeNull();
   expect((await moderatorApi.from("businesses").update({ status: "approved" }).eq("id", salonBusinessId)).error).toBeNull();
-  const approvedBusiness = await moderatorApi.from("businesses").select("status").eq("id", salonBusinessId).single();
+  const approvedBusiness = await admin.from("businesses").select("status").eq("id", salonBusinessId).single();
   expect(approvedBusiness.error).toBeNull();
   expect(approvedBusiness.data?.status).toBe("approved");
 

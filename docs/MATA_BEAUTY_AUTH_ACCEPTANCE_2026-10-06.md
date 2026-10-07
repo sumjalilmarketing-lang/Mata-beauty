@@ -1,5 +1,17 @@
 # MATA Beauty — correctif Auth et recette du 6 octobre 2026
 
+## Actualisation du 7 octobre 2026 — production c8331a7
+
+Sur mata-beauty.com : inscription réelle par formulaire mobile, confirmation SMTP dans un autre navigateur, rôle Client, connexion/déconnexion, bienvenue unique et reset avec nouveau mot de passe puis reconnexion : **7 contrôles PASS**. Resend confirme ensuite `delivered` pour confirmation, bienvenue et reset (destinataire de simulation). Preuves : `work/team-audit/production-smtp.json`, `production-smtp-delivery.json`. Les deux demandes SMTP ont répondu sans 429 ; la limite Supabase avait été portée à 30/h, sans désactivation des protections.
+
+Google : première inscription et réception de bienvenue confirmées par l’utilisateur le 6 octobre ; reconnexion confirmée par l’utilisateur le 7 octobre. Contrôle DB après son action : même identifiant créé le 6 octobre, nouvelle connexion le 7 octobre à 09:00:28 UTC, un seul utilisateur pour cette adresse, une identité Google, un profil Client actif, un seul envoi de bienvenue. Aucune duplication constatée. Le consentement a été effectué par l’utilisateur, pas automatisé.
+
+Événements candidature, complément, nouvelle soumission, approbation, réservation et confirmation : sept e-mails de recette envoyés automatiquement via Resend, une tentative par événement/destinataire, liens canoniques. Les deux confirmations de dossier correspondent à deux soumissions distinctes ; les deux confirmations de réservation concernent deux destinataires. Ce ne sont pas des doublons d’un même événement. Preuve : `work/team-audit/production-transactional-emails.json`. Réception dans une boîte humaine de ces e-mails transactionnels : NOT TESTED.
+
+Le premier essai transactionnel utilisait des adresses de fixture dont la partie locale dépassait 64 caractères ; Resend les a refusées (422). Après correction des seules adresses de test, le parcours passe sans modification de l’application. Ces comptes invalides et leurs données ont été nettoyés.
+
+Le relevé de version et les blocages ci-dessous sont historiques ; le rapport du 7 octobre est la référence actuelle.
+
 ## Version réellement servie
 
 - Domaine : https://mata-beauty.com.

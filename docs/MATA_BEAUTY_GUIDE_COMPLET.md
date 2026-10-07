@@ -231,7 +231,7 @@ Pour signaler un problème, indiquez l’écran, l’action effectuée et le mes
 
 ## 9. Super Admin — gérer l’équipe
 
-Cette rubrique est en qualification avant publication. Connectez-vous à `/admin`, validez votre second facteur puis ouvrez **Équipe & accès**.
+Cette rubrique est déployée sur mata-beauty.com depuis le 7 octobre 2026 (version applicative `c8331a7`). Connectez-vous à `/admin`, validez votre second facteur puis ouvrez **Équipe & accès**.
 
 Pour inviter un membre, choisissez **Inviter un membre**, saisissez son prénom, son nom et son e-mail professionnel, puis sélectionnez un rôle existant. **Envoyer l’invitation** envoie un lien sécurisé : le membre choisit lui-même son mot de passe et configure le MFA. Aucun mot de passe n’est affiché au Super Admin. Un compte public existant n’est pas réinitialisé par ce formulaire.
 

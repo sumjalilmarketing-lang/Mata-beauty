@@ -44,7 +44,7 @@ test("public navigation and interaction inventory on the deployed application", 
     await expect(page.getByLabel("Chargement du feed")).toHaveCount(0, { timeout: 30_000 });
     await inventory(page, "Inspiration");
     for (const label of ["Rendez-vous", "Messages", "Profil"]) {
-      await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: label }).click();
+      await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: label === "Profil" ? /^(Profil|Se connecter à MATA Beauty)$/ : label }).click();
       await expect(page.getByRole("heading", { name: "Se connecter", exact: true })).toBeVisible();
       passed("Inspiration", label, "Clic hors session → connexion demandée");
       await inventory(page, "Connexion");
@@ -52,7 +52,7 @@ test("public navigation and interaction inventory on the deployed application", 
       await expect(page.getByRole("dialog")).toHaveCount(0);
       passed("Connexion", "Fermer", "Clic → modale fermée");
     }
-    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
     await page.getByRole("button", { name: "Créer un compte", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Créer votre compte" })).toBeVisible();
     passed("Connexion", "Créer un compte", "Clic → inscription");

@@ -1,4 +1,32 @@
-# Équipe & accès — qualification en cours
+# Équipe & accès — qualification et déploiement
+
+## Résultat production du 7 octobre 2026
+
+Commit `c8331a7052877305fa48d42d996f25fa80a7dc59`, déploiement `dpl_FXY8g7KstvgZfisHRWk8KnbmzF79`, domaine https://mata-beauty.com. Les six migrations de cette mission sont appliquées en production. Comparaison du 7 octobre à 10:52 CEST : 14 fichiers JavaScript identiques entre le domaine et le déploiement immuable authentifié. Le premier essai non authentifié sur l’URL immuable affichait la connexion Vercel ; il n’a pas été retenu comme preuve de version.
+
+**41 contrôles ciblés exécutés en production : 41 PASS, 0 FAIL, 0 BLOCKED.** Ils correspondent à 28 scénarios serveur et 13 contrôles navigateur, également passés en QA/Preview. Ces nombres ne représentent pas une couverture exhaustive de toute l’application. **1 contrôle complémentaire NOT TESTED : réception de l’invitation dans la boîte humaine d’un collaborateur** ; les envois ont utilisé les destinataires de simulation Resend.
+
+| Zone demandée | Résultat production | Preuve / périmètre |
+|---|---|---|
+| Équipe & accès | PASS | Connexion Super Admin, MFA, écran et route directe |
+| Invitation / e-mail / activation | PASS | Formulaire réel, Resend, lien canonique, mot de passe choisi par le membre |
+| Renvoi | PASS | Refus avant délai ; expiration de fixture ; nouveau lien et activation |
+| MFA | PASS | Permissions refusées avant AAL2, accordées après facteur, événement audité |
+| Finance / Support / Onboarding / Modération RBAC | PASS | Permissions positives et négatives, refus de gestion d’équipe et d’archivage étranger |
+| Admin / Responsable contenu RBAC | PASS | Contrôles serveur par permission ; pas de gestion d’équipe |
+| Super Admin | PASS | Gestion autorisée avec MFA ; auto-modification interdite |
+| Changement de rôle | PASS | Finance → Support ; ancienne permission retirée dans la même session |
+| Suspension / invalidation | PASS | Ancienne session et nouvelle connexion refusées |
+| Réactivation | PASS | Réouverture explicite avec MFA conservé |
+| Révocation | PASS | UI réelle, appartenances désactivées, raccourci de réactivation refusé |
+| Anti auto-promotion / protection API | PASS | Client, Pro et rôles internes ; HTTP 403 Finance sur API équipe |
+| Audit | PASS | Invitation, activation, rôle, MFA et statuts ; suppression Client refusée |
+| Client → back-office | PASS — accès bloqué | URLs directes et API exécutées |
+| Pro → back-office | PASS — accès bloqué | URLs directes et API exécutées |
+
+Preuves locales : `work/team-audit/production-rpc-results.json`, `production-ui-results.json`, `production-version.json` et `work/final-audit/final-role-security.json`. Aucune de ces validations n’affirme que les sous-modules Finance/Support/Modération historiquement non connectés sont opérationnels.
+
+Les paragraphes suivants conservent la chronologie QA antérieure au déploiement ; leurs mentions « non déployée » ne décrivent plus l’état actuel. Le bilan global et ses réserves figurent dans `MATA_BEAUTY_RECETTE_PRODUCTION_2026-10-07.md`.
 
 Dernière Preview qualifiée : `qsxraezfg`, `dpl_DHr7f9WxZnB7ynJPoeRQ2YYK6kj9`. **28 scénarios RPC PASS et 13 contrôles navigateur PASS**, dont renvoi d’une invitation expirée (horloge de fixture), délai anti-abus, révocation UI, audit MFA et route directe `/admin/administrators`. L’expiration simulée concerne uniquement une invitation de test. Aucun collaborateur réel n’a reçu ces invitations.
 
