@@ -1,3 +1,5 @@
+import { passwordPolicyMessage } from "./password-policy";
+
 type AuthErrorLike = { code?: string; message?: string; status?: number; name?: string };
 
 export function authErrorMessage(error: unknown) {
@@ -10,7 +12,7 @@ export function authErrorMessage(error: unknown) {
     return "Ce lien est expiré, déjà utilisé ou ne permet pas de retrouver votre session. Demandez un nouveau lien et ouvrez-le dans le même navigateur.";
   }
   if (code === "same_password") return "Choisissez un mot de passe différent de votre mot de passe actuel.";
-  if (code === "weak_password") return "Ce mot de passe est trop faible. Choisissez un mot de passe plus long et unique.";
+  if (code === "weak_password") return `Ce mot de passe est trop faible. ${passwordPolicyMessage}`;
 
   if (code === "email_not_confirmed" || message.includes("email not confirmed")) {
     return "Votre adresse e-mail doit être confirmée avant la connexion.";

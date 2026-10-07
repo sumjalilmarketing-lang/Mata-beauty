@@ -8,9 +8,10 @@ import { z } from "zod";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { authErrorMessage } from "@/lib/auth/errors";
 import { readPasswordReturn, restorePasswordSession } from "@/lib/auth/password-session";
+import { meetsPasswordPolicy, passwordPolicyMessage } from "@/lib/auth/password-policy";
 
 const schema = z.object({
-  password: z.string().min(8, "Utilisez au moins 8 caractères."),
+  password: z.string().refine(meetsPasswordPolicy, passwordPolicyMessage),
   confirmation: z.string(),
 }).refine((values) => values.password === values.confirmation, {
   path: ["confirmation"],

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { authErrorMessage } from "@/lib/auth/errors";
+import { meetsPasswordPolicy, passwordPolicyMessage } from "@/lib/auth/password-policy";
 import { ensureAuthenticatedProfile, type AuthenticatedProfile } from "@/lib/auth/profile";
 import { safeOAuthDestination } from "@/lib/auth/redirect";
 import { isGoogleAuthEnabled } from "@/lib/auth/providers";
@@ -76,8 +77,8 @@ export function AuthModal({
           setFeedback("Saisissez votre nom complet.");
           return;
         }
-        if (!values.password || values.password.length < 8) {
-          setFeedback("Le mot de passe doit contenir au moins 8 caractères.");
+        if (!values.password || !meetsPasswordPolicy(values.password)) {
+          setFeedback(passwordPolicyMessage);
           return;
         }
         if (!values.acceptLegal) {

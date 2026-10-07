@@ -55,6 +55,7 @@ const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, Resour
   "deletion-requests": { table: "account_deletion_requests", select: "id,profile_id,reason,status,requested_at", title: (row) => `Compte ${shortId(row.profile_id)} · ${label(row.status)}`, meta: (row) => `${text(row.reason, "Sans motif")} · ${date(row.requested_at)}` },
 };
 
+const fraudAlerts: ResourceDefinition = { table: "fraud_alerts", select: "id,alert_type,severity,status,created_at", title: row => `${label(row.alert_type)} · ${label(row.severity)}`, meta: row => `${label(row.status)} · ${date(row.created_at)}` };
 const onboardingHistory: ResourceDefinition = { table: "onboarding_events", select: "id,provider_id,action,reason,created_at", title: (row) => `${label(row.action)} · ${shortId(row.provider_id)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
 const moderationHistory: ResourceDefinition = { table: "moderation_actions", select: "id,target_id,action,reason,created_at", title: (row) => `${label(row.action)} · ${shortId(row.target_id)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
 const financialHistory: ResourceDefinition = { table: "financial_audit_log", select: "id,action,transaction_reference,created_at", title: (row) => label(row.action), meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` };
@@ -73,6 +74,8 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const [notice, setNotice] = useState("");
   const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
+    : space === "admin" && module.key === "alerts" ? fraudAlerts
+    : space === "admin" && module.key === "security" ? resources.sessions
     : space === "onboarding" && module.key === "history" ? onboardingHistory
     : space === "moderation" && module.key === "history" ? moderationHistory
     : (space === "finance" && module.key === "audit") || (space === "admin" && module.key === "financial-reports") ? financialHistory
