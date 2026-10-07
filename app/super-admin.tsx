@@ -805,7 +805,9 @@ function SettingsModule({ maintenance, notify }: { maintenance: boolean; notify:
   useEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => { setLoading(true); setError(""); });
-    void getSupabaseBrowserClient()!.from("app_settings").select("key,description,value").eq("is_sensitive", false).order("key").abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).then(({ data, error: failure }) => {
+    let query = getSupabaseBrowserClient()!.from("app_settings").select("key,description,value");
+    query = maintenance ? query.eq("key", "maintenance") : query.eq("is_sensitive", false);
+    void query.order("key").abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).then(({ data, error: failure }) => {
       if (controller.signal.aborted) return;
       setLoading(false);
       if (failure) { setSettings([]); setError(publicErrorMessage(failure, "Les paramètres sont indisponibles.")); return; }
@@ -815,7 +817,7 @@ function SettingsModule({ maintenance, notify }: { maintenance: boolean; notify:
       if (value?.message) setMessage(value.message);
     });
     return () => controller.abort();
-  }, [revision]);
+  }, [revision, maintenance]);
   if (loading) return <p role="status">Chargement des paramètres…</p>;
   if (error) return <section><p role="alert">{error}</p><button onClick={() => setRevision(value => value + 1)}>Réessayer</button></section>;
   if (!maintenance) return <section><button onClick={() => setRevision(value => value + 1)}>Actualiser les paramètres</button><div className="settings-grid">{settings.length ? settings.map(setting => <article className="admin-panel" key={setting.key}><p>Configuration enregistrée · lecture seule</p><h2>{setting.description || setting.key}</h2><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(setting.value, null, 2)}</pre></article>) : <p>Aucun paramètre non sensible enregistré.</p>}</div></section>;

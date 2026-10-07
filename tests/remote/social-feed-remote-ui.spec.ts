@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, test, webkit, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { fetchPublishedProviders } from "../../lib/supabase/catalog";
+import { enrollQaMfa, completeQaMfa } from "./qa-mfa";
 
 const supabaseUrl = process.env.REMOTE_SUPABASE_URL ?? "";
 const anonKey = process.env.REMOTE_SUPABASE_ANON_KEY ?? "";
@@ -34,6 +35,7 @@ let providerApi: SupabaseClient;
 let clientApi: SupabaseClient;
 let moderatorApi: SupabaseClient;
 let superApi: SupabaseClient;
+let moderatorMfaSecret = "";
 let studioPostId = "";
 let photoPostId = "";
 let beforeAfterPostId = "";
@@ -139,8 +141,10 @@ test.beforeAll(async () => {
   expect((await clientApi.auth.signInWithPassword({ email: clientEmail, password })).error).toBeNull();
   moderatorApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   expect((await moderatorApi.auth.signInWithPassword({ email: moderatorEmail, password })).error).toBeNull();
+  moderatorMfaSecret = await enrollQaMfa(moderatorApi);
   superApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   expect((await superApi.auth.signInWithPassword({ email: superEmail, password })).error).toBeNull();
+  await enrollQaMfa(superApi);
   const approval = await superApi.rpc("admin_set_provider_status", { target_provider_id: providerId, next_status: "approved", reason: "Validation réelle du compte professionnel QA vidéo" });
   expect(approval.error).toBeNull();
   expect(approval.data).toBe(true);
@@ -646,6 +650,7 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   await adminPage.getByLabel("Adresse administrateur").fill(moderatorEmail);
   await adminPage.getByLabel("Mot de passe").fill(password);
   await adminPage.getByRole("button", { name: "Accéder à l’administration" }).click();
+  await completeQaMfa(adminPage, moderatorMfaSecret);
   await expect(adminPage.getByRole("heading", { name: "Vue d’ensemble", level: 1 })).toBeVisible({ timeout: 20_000 });
   await adminPage.getByRole("navigation", { name: "Navigation Super Admin" }).getByRole("button", { name: "Contenu social" }).click();
   const postRow = adminPage.getByRole("row").filter({ hasText: studioCaption });

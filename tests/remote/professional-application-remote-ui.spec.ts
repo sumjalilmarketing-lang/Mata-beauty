@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { checkWheel } from "./scroll-acceptance";
 import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { completeQaMfa } from "./qa-mfa";
 
 const url = process.env.REMOTE_SUPABASE_URL ?? "";
 const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY ?? "", { auth: { persistSession: false } });
@@ -23,6 +24,7 @@ async function login(page: Page, email: string) {
   await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await expect(page.getByRole("navigation", { name: "Navigation Espace client" })).toBeVisible({ timeout: 30_000 });
+  if (email === accounts[1]?.email) { await page.goto("/admin"); await completeQaMfa(page); }
 }
 test.beforeAll(async () => {
   const productionAuthorized = process.env.ALLOW_PRODUCTION_QA === "mata-beauty.com" && url === "https://qjdwxdbvrxedyfolnpol.supabase.co" && process.env.REMOTE_APP_URL === "https://mata-beauty.com";
