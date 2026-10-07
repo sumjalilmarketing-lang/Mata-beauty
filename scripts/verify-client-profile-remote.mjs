@@ -15,8 +15,8 @@ async function main(){
   assert.ifError((await outsider.api.rpc("initialize_client_control_center")).error);
   const identity=await owner.api.rpc("update_client_identity",{target_first_name:"Aminata",target_last_name:"Fall",target_username:`aminata_${run.replaceAll('-','_')}`.slice(0,30),target_phone:"+221770000000",target_bio:"Passionnée de coiffures protectrices.",target_city:"Dakar",target_neighborhood:"Mermoz",target_locale:"fr-SN"});
   assert.ifError(identity.error);
-  const own=await owner.api.from("profiles").select("username,phone,bio,role").eq("id",owner.id).single();assert.ifError(own.error);assert.equal(own.data.role,"client");
-  const privateProfile=await outsider.api.from("profiles").select("phone,bio").eq("id",owner.id);assert.ifError(privateProfile.error);assert.equal(privateProfile.data.length,0);
+  const own=await owner.api.rpc("get_my_private_profile");assert.ifError(own.error);assert.equal(own.data.id,owner.id);assert.equal(own.data.role,"client");
+  const privateProfile=await outsider.api.from("profiles").select("phone,bio").eq("id",owner.id);assert.ok(privateProfile.error||privateProfile.data.length===0);
   const duplicate=await outsider.api.rpc("update_client_identity",{target_first_name:"Autre",target_last_name:"Compte",target_username:own.data.username,target_phone:"",target_bio:"",target_city:"Dakar",target_neighborhood:"",target_locale:"fr-SN"});assert.ok(duplicate.error);
   const prefs=await owner.api.from("profile_preferences").upsert({profile_id:owner.id,favorite_categories:["Tresses","Locks"],budget_min:10000,budget_max:30000,radius_km:20,location_mode:"both"});assert.ifError(prefs.error);
   const privacy=await owner.api.from("profile_privacy_settings").upsert({profile_id:owner.id,profile_visibility:"limited",show_collections:false,show_follows:false});assert.ifError(privacy.error);

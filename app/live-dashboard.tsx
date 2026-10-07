@@ -155,7 +155,7 @@ export function LiveDashboard({
 
         if (role === "client") {
           const [accountResult, clientResult] = await Promise.all([
-            supabase.from("profiles").select("first_name,last_name,phone,marketing_consent").eq("id", userId).single(),
+            supabase.rpc("get_my_private_profile"),
             supabase.from("client_profiles").select("city,default_address,preferences").eq("profile_id", userId).single(),
           ]);
           if (accountResult.error) throw accountResult.error;

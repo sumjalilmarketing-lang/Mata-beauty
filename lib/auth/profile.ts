@@ -20,7 +20,7 @@ type ProfileRow = {
 
 export async function loadAuthenticatedProfile(supabase: SupabaseClient, userId: string): Promise<AuthenticatedProfile> {
   const [{ data: profile, error: profileError }, { data: accountRoles, error: rolesError }, provider] = await Promise.all([
-    supabase.from("profiles").select("role,is_suspended,account_status,first_name,last_name,phone").eq("id", userId).single(),
+    supabase.rpc("get_my_private_profile"),
     supabase.from("account_roles").select("role").eq("profile_id", userId),
     supabase.from("provider_profiles").select("status").eq("profile_id", userId).maybeSingle(),
   ]);

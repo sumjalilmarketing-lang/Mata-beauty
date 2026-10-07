@@ -31,7 +31,7 @@ export function ClientControlCenter({ userId, section = "settings" }: { userId: 
     const supabase=getSupabaseBrowserClient(); if(!supabase)return;
     await supabase.rpc("initialize_client_control_center");
     const [profile,client,followCount,saveCount,bookingCount,paymentRows,reviewRows,ticketRows,privacyRow,preferenceRow]=await Promise.all([
-      supabase.from("profiles").select("first_name,last_name,username,phone,bio,avatar_url,locale").eq("id",userId).single(),
+      supabase.rpc("get_my_private_profile"),
       supabase.from("client_profiles").select("city,neighborhood").eq("profile_id",userId).single(),
       supabase.from("follows").select("follower_id",{count:"exact",head:true}).eq("follower_id",userId),
       supabase.from("post_saves").select("post_id",{count:"exact",head:true}).eq("profile_id",userId),
