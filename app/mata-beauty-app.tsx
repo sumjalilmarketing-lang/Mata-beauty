@@ -145,6 +145,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     return () => window.clearTimeout(timer);
   }, [notice]);
   const [authenticated, setAuthenticated] = useState<AuthenticatedProfile | null>(null);
+  const [authPending, setAuthPending] = useState(true);
   const [authRequest, setAuthRequest] = useState<{ role: "client" | "provider" | "admin"; mode: "login" | "register" | "reset"; returnTo?: string } | null>(null);
   const [paymentReturn, setPaymentReturn] = useState<{ id: string; mode: "return" | "cancelled" } | null>(null);
   const [showLaunchWelcome, setShowLaunchWelcome] = useState(false);
@@ -292,7 +293,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      void Promise.resolve().then(() => setCatalogState("error"));
+      void Promise.resolve().then(() => { setCatalogState("error"); setAuthPending(false); });
       return;
     }
     let active = true;
@@ -325,7 +326,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     void supabase.auth.getSession().then(async ({ data }) => {
       const user = data.session?.user;
       if (!active || !user) return;
-      const signedIn = await loadAuthenticatedProfile(supabase, user.id).catch(() => null);
+      const signedIn = await loadAuthenticatedProfile(supabase, user.id, AbortSignal.timeout(10_000)).catch(() => null);
       if (!active || !signedIn) return;
       setAuthenticated(signedIn);
       if (!readBookingDraft() && oauthIntent === "professional" && signedIn.roles.includes("provider")) setView("provider");
@@ -338,7 +339,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
         if (active && favoriteData) setFavorites(favoriteData.map((item) => item.provider_id));
         if (active && bookingData) setUpcomingBookings(bookingData);
       }
-    });
+    }).catch(() => null).finally(() => { if (active) setAuthPending(false); });
     return () => {
       active = false;
       cancelCatalog();
@@ -603,6 +604,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
         {screen === "feed" ? <SocialFeed
           location={feedLocation}
           authenticated={authenticated}
+          authPending={authPending && !authenticated}
           onRequireAuth={() => setAuthRequest({ role: "client", mode: "login" })}
           onDiscover={() => setScreen("home")}
           onPublish={() => openAccount("provider")}

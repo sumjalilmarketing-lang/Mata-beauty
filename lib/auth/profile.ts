@@ -18,11 +18,14 @@ type ProfileRow = {
   phone: string | null;
 };
 
-export async function loadAuthenticatedProfile(supabase: SupabaseClient, userId: string): Promise<AuthenticatedProfile> {
+export async function loadAuthenticatedProfile(supabase: SupabaseClient, userId: string, signal?: AbortSignal): Promise<AuthenticatedProfile> {
+  const profileQuery = supabase.rpc("get_my_private_profile");
+  const rolesQuery = supabase.from("account_roles").select("role").eq("profile_id", userId);
+  const providerQuery = supabase.from("provider_profiles").select("status").eq("profile_id", userId);
   const [{ data: profile, error: profileError }, { data: accountRoles, error: rolesError }, provider] = await Promise.all([
-    supabase.rpc("get_my_private_profile"),
-    supabase.from("account_roles").select("role").eq("profile_id", userId),
-    supabase.from("provider_profiles").select("status").eq("profile_id", userId).maybeSingle(),
+    signal ? profileQuery.abortSignal(signal) : profileQuery,
+    signal ? rolesQuery.abortSignal(signal) : rolesQuery,
+    (signal ? providerQuery.abortSignal(signal) : providerQuery).maybeSingle(),
   ]);
   if (profileError || !profile) throw profileError ?? new Error("Profil introuvable.");
   const row = profile as ProfileRow;

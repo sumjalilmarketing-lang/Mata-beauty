@@ -599,10 +599,16 @@ test("le feed social distant relie les interactions au profil et à la réservat
     admin.from("post_comments").select("id", { count: "exact", head: true }).eq("post_id", studioPostId).eq("author_id", clientId),
   ]);
   expect([like.count, save.count, follow.count, comment.count]).toEqual([1, 1, 1, 1]);
+  let releaseProfile: () => void = () => {};
+  const profileGate = new Promise<void>(resolve => { releaseProfile = resolve; });
+  await page.route('**/rest/v1/rpc/get_my_private_profile',async route=>{await profileGate;await route.continue();});
   await page.goto('/');
   await mainCard.evaluate(node=>node.scrollIntoView({block:'start'}));
+  await expect(mainCard.getByRole('button',{name:'J’aime',exact:true})).toBeDisabled();
+  releaseProfile();
   await mainCard.getByRole('button',{name:'J’aime',exact:true}).click();
   await expect(page.getByText('J’aime retiré.',{exact:true})).toBeVisible();
+  await page.unroute('**/rest/v1/rpc/get_my_private_profile');
   await mainCard.getByRole('button',{name:'Enregistrer',exact:true}).click();
   await expect(page.getByText('Retirée de Mes inspirations.',{exact:true})).toBeVisible();
   await mainCard.getByRole('button',{name:'Se désabonner',exact:true}).click();
