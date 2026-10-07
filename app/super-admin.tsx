@@ -608,21 +608,26 @@ function BookingsModule({ context, calendar, notify }: { context: AdminContext; 
   }} />}</>;
 }
 
-function CatalogModule({ services, notify }: { services: boolean; notify: (message: string) => void }) {
+export function CatalogModule({ services, notify }: { services: boolean; notify: (message: string) => void }) {
   const [rows, setRows] = useState<CatalogRow[]>([]);
   const [editing, setEditing] = useState<CatalogRow | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const load = useCallback(() => {
     const request = services
       ? getSupabaseBrowserClient()!.from("provider_services").select("id,title,is_active,duration_minutes,price_amount").order("created_at", { ascending: false }).limit(200)
       : getSupabaseBrowserClient()!.from("categories").select("id,name,slug,description,icon,image_url,parent_id,is_active,sort_order").order("sort_order");
-    void request.then(({ data }) => setRows((data ?? []) as CatalogRow[]));
+    void request.abortSignal(AbortSignal.timeout(10000)).then(({ data, error }) => {
+      setLoadError(error ? publicErrorMessage(error, "Le catalogue est indisponible.") : "");
+      setRows((data ?? []) as CatalogRow[]);
+    });
   }, [services]);
   useEffect(() => { load(); }, [load]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true);
-    const values = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const values = new FormData(form);
     const name = String(values.get("name") ?? "").trim();
     const slug = String(values.get("slug") ?? "").trim().toLowerCase();
     const { error } = await getSupabaseBrowserClient()!.rpc("admin_manage_category", {
@@ -635,7 +640,7 @@ function CatalogModule({ services, notify }: { services: boolean; notify: (messa
     setBusy(false);
     if (error) { notify(publicErrorMessage(error, "La catégorie n’a pas pu être enregistrée.")); return; }
     notify(editing ? "Catégorie modifiée et journalisée." : "Catégorie créée et disponible dans l’application.");
-    setEditing(null); event.currentTarget.reset(); load();
+    form.reset(); setEditing(null); load();
   }
 
   async function action(row: CatalogRow, kind: "set_active" | "delete") {
@@ -651,6 +656,7 @@ function CatalogModule({ services, notify }: { services: boolean; notify: (messa
     if (!error) { setEditing(null); load(); }
   }
 
+  if (loadError) return <section><p role="alert">{loadError}</p><button onClick={load}>Réessayer</button></section>;
   if (services) return <><div className="admin-filter-bar"><span>{rows.length} prestations réelles · modification depuis l’espace prestataire</span></div><div className="admin-table-wrap"><table className="admin-data-table"><thead><tr><th>Prestation</th><th>Durée</th><th>Prix</th><th>Statut</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.title}</strong></td><td>{row.duration_minutes} min</td><td>{formatCurrency(row.price_amount || 0)}</td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div></>;
 
   const topLevel = rows.filter((row) => !row.parent_id && row.id !== editing?.id);

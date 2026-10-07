@@ -25,12 +25,13 @@ export function LaunchAdmin({ mode }: { mode: Mode }) {
   const [health, setHealth] = useState(unavailableHealth);
   const [measuredAt, setMeasuredAt] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [loadError, setLoadError] = useState("");
   const deliveryHealth = health.deliveries;
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     const client = getSupabaseBrowserClient();
-    setLoading(true); setNotice("");
+    setLoading(true); setNotice(""); setLoadError("");
     setHealth(unavailableHealth); setMeasuredAt(null);
     if (!client) { setNotice("Connexion aux données indisponible."); setLoading(false); return; }
     try {
@@ -58,7 +59,7 @@ export function LaunchAdmin({ mode }: { mode: Mode }) {
       if (providerRows.error) throw providerRows.error;
       setProviders(providerRows.data as Provider[]);
       if (mode === "cohort") {
-        const cohortRows = await client.from("launch_provider_cohort_overview").select("*").order("added_at");
+        const cohortRows = await client.rpc("get_launch_provider_cohort").abortSignal(AbortSignal.timeout(10000));
         if (cohortRows.error) throw cohortRows.error;
         setCohort(cohortRows.data as unknown as CohortRow[]);
       } else {
@@ -66,7 +67,7 @@ export function LaunchAdmin({ mode }: { mode: Mode }) {
         if (dashboard.error || !dashboard.data) throw dashboard.error ?? new Error("Mesures absentes");
         setMetrics(dashboard.data as LaunchMetrics);
       }
-    } catch (error) { setNotice(publicErrorMessage(error, "Données indisponibles. Le chargement a échoué ; aucune mesure ne peut être affichée.")); }
+    } catch (error) { const message = publicErrorMessage(error, "Données indisponibles. Le chargement a échoué ; aucune mesure ne peut être affichée."); setNotice(message); setLoadError(message); }
     finally { setLoading(false); }
   }, [mode]);
 
@@ -79,14 +80,15 @@ export function LaunchAdmin({ mode }: { mode: Mode }) {
     const client = getSupabaseBrowserClient(); if (!client || !providerId) return;
     const user = await client.auth.getUser();
     const { error } = await client.from("launch_provider_cohort").insert({ provider_id: providerId, is_founder: data.get("founder") === "on", internal_note: String(data.get("note") ?? "").trim() || null, added_by: user.data.user?.id });
-    if (error) setNotice(publicErrorMessage(error, "Ajout impossible.")); else { await client.rpc("sync_founder_badge", { target_provider_id: providerId }); setNotice("Prestataire ajouté à la cohorte lancement."); form.reset(); await load(); }
+    if (error) setNotice(publicErrorMessage(error, "Ajout impossible.")); else { const badge = await client.rpc("sync_founder_badge", { target_provider_id: providerId }); form.reset(); await load(); setNotice(badge.error ? "Prestataire ajouté, mais le badge n’a pas pu être vérifié. Actualisez avant de réessayer." : "Prestataire ajouté à la cohorte lancement."); }
   }
 
   async function toggleFounder(row: CohortRow) {
     const client = getSupabaseBrowserClient(); if (!client) return;
     const { error } = await client.from("launch_provider_cohort").update({ is_founder: !row.is_founder, updated_at: new Date().toISOString() }).eq("provider_id", row.provider_id);
-    if (!error) await client.rpc("sync_founder_badge", { target_provider_id: row.provider_id });
-    setNotice(error ? "Le badge n’a pas été modifié." : "Statut fondateur mis à jour."); if (!error) await load();
+    if (error) { setNotice("Le statut fondateur n’a pas été modifié."); return; }
+    const badge = await client.rpc("sync_founder_badge", { target_provider_id: row.provider_id });
+    await load(); setNotice(badge.error ? "Le statut est enregistré, mais le badge n’a pas pu être vérifié." : "Statut fondateur mis à jour. Le badge public dépend des critères d’éligibilité.");
   }
 
   async function createLaunchCampaign(event: FormEvent<HTMLFormElement>) {
@@ -105,7 +107,7 @@ export function LaunchAdmin({ mode }: { mode: Mode }) {
     <><article><span>E-mails en attente</span><strong>{deliveryHealth?.pending ?? "Indisponible"}</strong><small>Transactionnels, traitement automatique</small></article><article><span>E-mails envoyés</span><strong>{deliveryHealth?.sent ?? "Indisponible"}</strong><small>Acceptés par le service d’envoi</small></article><article><span>E-mails à reprendre</span><strong className={deliveryHealth?.failed ? "critical" : "healthy"}>{deliveryHealth?.failed ?? "Indisponible"}</strong><small>Nouvelle tentative automatique</small></article><article><span>E-mails à vérifier</span><strong className={deliveryHealth?.needsReview ? "critical" : "healthy"}>{deliveryHealth?.needsReview ?? "Indisponible"}</strong><small>Intervention technique requise ; aucun renvoi aveugle</small></article></>
   </div>{measuredAt && mode === "platform-health" && <p>Dernière mesure : {measuredAt}</p>}</section>;
 
-  if (notice || (mode === "launch" && !metrics)) return <section className="admin-panel"><h2>{mode === "cohort" ? "Cohorte lancement" : "Lancement"}</h2><p role="alert">{notice || "Indisponible"}</p><button onClick={() => void load()}>Réessayer</button></section>;
+  if (loadError || (mode === "launch" && !metrics)) return <section className="admin-panel"><h2>{mode === "cohort" ? "Cohorte lancement" : "Lancement"}</h2><p role="alert">{loadError || "Indisponible"}</p><button onClick={() => void load()}>Réessayer</button></section>;
 
   if (mode === "cohort") return <section className="admin-module launch-admin"><header><div><span>20 PROFESSIONNELS FONDATEURS</span><h2>Cohorte lancement</h2><p>Accompagnez les premiers professionnels sans exposer de données inutiles.</p></div></header>{notice && <p className="admin-feedback">{notice}</p>}<form className="launch-cohort-form" onSubmit={(event) => void addToCohort(event)}><select name="providerId" required defaultValue=""><option value="">Choisir un prestataire</option>{providers.filter((item) => !cohortIds.has(item.profile_id)).map((item) => <option key={item.profile_id} value={item.profile_id}>{item.business_name} · {item.status}</option>)}</select><input name="note" maxLength={2000} placeholder="Note interne de suivi"/><label><input name="founder" type="checkbox"/> Professionnel fondateur</label><button>Ajouter</button></form><div className="cohort-list">{cohort.map((row) => <article key={row.provider_id}><div><strong>{row.business_name}</strong><small>{row.status} · {row.verified_at ? "Vérifié" : "Vérification en attente"} · {row.completeness}%</small><small>{row.onboarding_status ?? "onboarding inconnu"} · {row.services_count} prestations · {row.published_content} contenus</small><small>Première réservation : {row.first_booking_at ? new Date(row.first_booking_at).toLocaleDateString("fr-FR") : "—"} · Dernière activité : {row.last_activity_at ? new Date(row.last_activity_at).toLocaleDateString("fr-FR") : "—"}</small>{row.internal_note && <p>{row.internal_note}</p>}</div><button onClick={() => void toggleFounder(row)}>{row.is_founder ? "★ Fondateur" : "Activer le badge"}</button></article>)}{cohort.length === 0 && <div className="compact-empty">Aucun professionnel dans la cohorte.</div>}</div></section>;
 

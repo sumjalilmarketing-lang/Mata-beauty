@@ -30,7 +30,7 @@ export const defaultRolePermissions: Record<AdminRoleKey, readonly AdminPermissi
     "categories.manage", "content.manage", "notifications.send", "settings.read", "audit.read",
     "support.manage", "documents.review",
   ],
-  support: ["users.read", "bookings.read", "bookings.update", "reports.manage", "support.manage"],
+  support: ["users.read", "bookings.read", "bookings.update", "support.manage"],
   moderator: ["users.read", "providers.read", "bookings.read", "reviews.moderate", "reports.manage"],
   verification_agent: ["users.read", "providers.read", "providers.verify", "documents.review"],
   finance: ["bookings.read", "payments.read", "payments.refund", "commissions.manage", "payouts.manage", "audit.read"],

@@ -21,6 +21,7 @@ import { NotificationCenter } from "./notification-center";
 import { SupportInbox } from "./support-inbox";
 import { ModerationInbox } from "./moderation-inbox";
 import { CommentModeration } from "./comment-moderation";
+import { CatalogModule } from "./super-admin";
 
 type Row = Record<string, unknown>;
 type ResourceDefinition = { table: string; select: string; title: (row: Row) => string; meta: (row: Row) => string };
@@ -64,11 +65,13 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const moderationInbox = (space === "moderation" && ["dashboard", "reports"].includes(module.key)) || (space === "operations" && module.key === "moderation");
   const onboardingInbox = (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "operations" && module.key === "onboarding");
   const commentModeration = ["moderation", "admin"].includes(space) && module.key === "comments";
+  const categoryManagement = space === "operations" && module.key === "categories";
+  const [notice, setNotice] = useState("");
   const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue"].includes(module.key));
-  const definition = custom ? undefined
+  const definition = custom || commentModeration || categoryManagement || onboardingInbox ? undefined
     : space === "onboarding" && module.key === "history" ? onboardingHistory
     : space === "moderation" && module.key === "history" ? moderationHistory
-    : space === "finance" && module.key === "audit" ? financialHistory
+    : (space === "finance" && module.key === "audit") || (space === "admin" && module.key === "financial-reports") ? financialHistory
     : ["finance", "admin"].includes(space) && module.key === "refunds" ? refunds
     : space === "finance" && module.key === "dashboard" ? resources.payments
     : module.resource ? resources[module.resource] : module.key === "dashboard" ? resources.bookings : undefined;
@@ -88,6 +91,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
     let request = client.from(definition.table).select(definition.select).limit(100).abortSignal(controller.signal);
     if (paymentStatus) request = request.eq("payment_status", paymentStatus);
     if (definition.table === "app_settings") request = request.eq("is_sensitive", false);
+    if (space === "admin" && module.key === "suspended") request = request.eq("is_suspended", true);
     if (definition.select.includes("created_at")) request = request.order("created_at", { ascending: false });
     request.then(({ data, error }) => {
       window.clearTimeout(timeout);
@@ -97,11 +101,12 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
       setRows(next); setState(next.length ? "ready" : "empty");
     });
     return () => { active = false; window.clearTimeout(timeout); controller.abort(); };
-  }, [definition, paymentStatus, supabaseAnonKey, supabaseUrl]);
+  }, [definition, paymentStatus, space, module.key, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
   if (moderationInbox) return <ModerationInbox />;
   if (commentModeration) return <CommentModeration />;
+  if (categoryManagement) return <section>{notice && <p role="status">{notice}</p>}<CatalogModule services={false} notify={setNotice} /></section>;
   if (supportInbox) return <SupportInbox key={module.key} filter={module.key} userId={userId} />;
   if (module.key === "notifications") return <NotificationCenter userId={userId} />;
   if (focused) return <LiveDashboard role={space === "client" ? "client" : "provider"} userId={userId} displayName="" moduleKey={module.key} onBack={() => window.location.assign("/")} onSignOut={async () => { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/"); }} />;

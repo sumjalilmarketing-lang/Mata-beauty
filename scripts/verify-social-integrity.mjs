@@ -9,6 +9,7 @@ assert(production||url==='https://kazlvtxkbsdhbfvtqqdp.supabase.co','Explicit QA
 const options={auth:{persistSession:false,autoRefreshToken:false}};
 const service=createClient(url,process.env.SUPABASE_SERVICE_ROLE_KEY,options);
 const accounts=[],postIds=[],results=[],storageObjects=[];
+let reportId;
 async function check(name,run){try{await run();results.push({name,status:'PASS'});}catch(error){results.push({name,status:'FAIL',detail:error.message});}console.log(results.at(-1).status+' '+name);}
 function otp(secret){const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits='';for(const c of secret.replace(/=/g,''))bits+=alphabet.indexOf(c).toString(2).padStart(5,'0');const bytes=[];for(let i=0;i+8<=bits.length;i+=8)bytes.push(parseInt(bits.slice(i,i+8),2));const counter=Buffer.alloc(8);counter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));const hash=createHmac('sha1',Buffer.from(bytes)).update(counter).digest();return ((hash.readUInt32BE(hash[19]&15)&0x7fffffff)%1000000).toString().padStart(6,'0');}
 async function account(role){
@@ -48,6 +49,14 @@ try{
  // provider from public discovery before adversarial mutations are attempted.
  assert.ifError((await service.from('provider_profiles').update({status:'draft'}).eq('profile_id',owner.id)).error);
  const postId=postIds[0];
+ const report=await service.from('reports').insert({reporter_id:other.id,reported_profile_id:owner.id,post_id:postId,reason:'autre',details:'QA role boundary'}).select('id').single();assert.ifError(report.error);reportId=report.data.id;
+ await check('Support cannot moderate a publication through the direct RPC',async()=>{
+  const actor=accounts.find(a=>a.role==='support');
+  await actor.api.rpc('manage_moderation_report',{target_report_id:report.data.id,target_action:'hide',target_reason:'QA forbidden moderation'});
+  const actual=await service.from('posts').select('status').eq('id',postId).single();assert.ifError(actual.error);assert.equal(actual.data.status,'published');
+ });
+ assert.ifError((await service.from('reports').delete().eq('id',report.data.id)).error);
+ reportId=undefined;
  await check('Owner cannot relink a publication to another professional service',async()=>{
   await owner.api.from('post_services').update({provider_service_id:services[1]}).eq('post_id',postId);
   const actual=await service.from('post_services').select('provider_service_id').eq('post_id',postId).single();assert.ifError(actual.error);assert.equal(actual.data.provider_service_id,services[0]);
@@ -83,6 +92,7 @@ try{
  }
 }catch(error){results.push({name:'Fixture setup',status:'FAIL',detail:error.message});}
 finally{
+ if(reportId)assert.ifError((await service.from('reports').delete().eq('id',reportId)).error);
  if(process.env.INCLUDE_HEALTH_AUDIT==='1'&&accounts.length)assert.ifError((await service.from('fraud_alerts').delete().in('profile_id',accounts.map(actor=>actor.id))).error);
  for(const object of storageObjects)assert.ifError((await service.storage.from(object.bucket).remove([object.path])).error);
  if(postIds.length)assert.ifError((await service.from('posts').delete().in('id',postIds)).error);

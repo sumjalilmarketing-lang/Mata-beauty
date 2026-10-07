@@ -182,7 +182,7 @@ const superAdminModules = [
   module("social-reports", "Signalements", "!", "Réseau social", "Signalements sociaux.", { permission: "reports.manage", resource: "reports" }),
   module("tickets", "Tickets", "?", "Relation client", "Tickets et conversations.", { permission: "support.manage", resource: "reports" }),
   module("escalations", "Escalades", "↗", "Relation client", "Escalades inter-équipes.", { permission: "support.manage", resource: "reports" }),
-  module("disputes", "Litiges", "⚖", "Relation client", "Litiges et réclamations.", { permission: "reports.manage", resource: "reports" }),
+  module("disputes", "Litiges", "⚖", "Relation client", "Litiges et réclamations.", { permission: "reports.manage", resource: "disputes" }),
   module("transactions", "Transactions", "¤", "Finance", "Transactions financières.", { permission: "payments.read", resource: "payments" }),
   module("commissions", "Commissions", "%", "Finance", "Règles de commission.", { permission: "commissions.manage" }),
   module("refunds", "Remboursements", "↺", "Finance", "Remboursements et audit.", { permission: "payments.refund", resource: "payments" }),
