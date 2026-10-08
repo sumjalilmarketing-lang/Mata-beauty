@@ -7,14 +7,16 @@ import assert from 'node:assert/strict';
 const base=process.env.REMOTE_APP_URL,url=process.env.REMOTE_SUPABASE_URL;
 const production=process.env.ALLOW_PRODUCTION_QA==='mata-beauty.com'&&url==='https://qjdwxdbvrxedyfolnpol.supabase.co'&&base==='https://mata-beauty.com';
 const auditRole=process.env.AUDIT_ROLE??'super_admin';
-assert(['super_admin','admin','finance','support','verification_agent','moderator','content_manager','client','professional'].includes(auditRole));
-const internal=!['client','professional'].includes(auditRole);
+assert(['super_admin','admin','finance','support','verification_agent','moderator','content_manager','client','professional','staff'].includes(auditRole));
+const internal=!['client','professional','staff'].includes(auditRole);
 if(!production&&(url!=='https://kazlvtxkbsdhbfvtqqdp.supabase.co'||!base?.endsWith('.vercel.app')))throw Error('Explicit isolated QA target required');
 const service=createClient(url,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}});
 const run=randomUUID(),email=`qa-team-ui-${run}@example.test`,password=`QA-${randomUUID()}!`;
 const made=await service.auth.admin.createUser({email,password,email_confirm:true,app_metadata:{qa_suppress_email:true},user_metadata:{legal_accepted:true}});assert.ifError(made.error);const managerId=made.data.user.id;
 await service.from('welcome_email_deliveries').update({status:'needs_review'}).eq('user_id',managerId);
 const permissions=new Set();
+let staffOwnerId;
+try {
 if(internal){
  const role=await service.from('admin_roles').select('id').eq('key',auditRole).single();assert.ifError(role.error);
  const grants=await service.from('admin_role_permissions').select('permission_key').eq('role_id',role.data.id);assert.ifError(grants.error);
@@ -25,6 +27,29 @@ if(internal){
  assert.ifError((await service.from('provider_profiles').insert({profile_id:managerId,business_name:'QA role matrix',slug:'qa-matrix-'+run,city:'Dakar',status:'approved'})).error);
  assert.ifError((await service.from('profiles').update({role:'provider'}).eq('id',managerId)).error);
  assert.ifError((await service.from('account_roles').upsert({profile_id:managerId,role:'professional'},{onConflict:'profile_id,role'})).error);
+}
+if(auditRole==='staff'){
+ const owner=await service.auth.admin.createUser({email:`qa-ux-owner-${run}@example.test`,password,email_confirm:true,app_metadata:{qa_suppress_email:true},user_metadata:{legal_accepted:true}});assert.ifError(owner.error);staffOwnerId=owner.data.user.id;
+ assert.ifError((await service.from('provider_profiles').insert({profile_id:staffOwnerId,business_name:'QA accessibility salon',slug:'qa-ux-'+run,city:'Dakar',status:'approved'})).error);
+ const business=await service.from('businesses').insert({owner_id:staffOwnerId,name:'QA accessibility salon',slug:'qa-ux-'+run,address:'Adresse de recette',city:'Dakar',status:'approved'}).select('id').single();assert.ifError(business.error);
+ const approverRole=await service.from('admin_roles').select('id').eq('key','admin').single();assert.ifError(approverRole.error);
+ assert.ifError((await service.from('admin_user_roles').insert({user_id:staffOwnerId,role_id:approverRole.data.id,requires_mfa:true})).error);
+ const approver=createClient(url,process.env.REMOTE_SUPABASE_ANON_KEY,{auth:{persistSession:false}});
+ assert.ifError((await approver.auth.signInWithPassword({email:`qa-ux-owner-${run}@example.test`,password})).error);
+ const factor=await approver.auth.mfa.enroll({factorType:'totp',friendlyName:'Accessibility QA'});assert.ifError(factor.error);
+ assert.ifError((await approver.auth.mfa.challengeAndVerify({factorId:factor.data.id,code:otp(factor.data.totp.secret)})).error);
+ assert.ifError((await approver.from('businesses').update({status:'approved'}).eq('id',business.data.id)).error);
+ assert.ifError((await service.from('collaborators').insert({business_id:business.data.id,profile_id:managerId,display_name:'QA employee',is_active:true})).error);
+ const staffApi=createClient(url,process.env.REMOTE_SUPABASE_ANON_KEY,{auth:{persistSession:false}});
+ assert.ifError((await staffApi.auth.signInWithPassword({email,password})).error);
+ const visible=await staffApi.from('collaborators').select('id',{count:'exact',head:true}).eq('profile_id',managerId).eq('is_active',true);
+ console.log('Staff fixture RLS visibility',JSON.stringify({count:visible.count,error:visible.error?.message}));
+ assert.ifError(visible.error);assert.equal(visible.count,1,'Staff fixture must be visible to its own session');
+}
+} catch(error) {
+ assert.ifError((await service.auth.admin.deleteUser(managerId)).error);
+ if(staffOwnerId)assert.ifError((await service.auth.admin.deleteUser(staffOwnerId)).error);
+ throw error;
 }
 const browser=await chromium.launch({channel:'chromium'}),results=[];
 const headers=production?{}:{'x-vercel-protection-bypass':process.env.VERCEL_AUTOMATION_BYPASS_SECRET};
@@ -70,9 +95,9 @@ try{
   await page.goto(base+'/');await page.getByRole('navigation',{name:'Navigation de l’application'}).getByRole('button',{name:/^(Profil|Se connecter à MATA Beauty)$/}).click();
   await page.getByLabel('Adresse e-mail').fill(email);await page.getByLabel('Mot de passe',{exact:true}).fill(password);await page.getByRole('button',{name:'Se connecter',exact:true}).click();await page.waitForURL(/\/app/);
  }
- const paths=!internal?Object.entries(workspaceSpaces).filter(([k])=>(auditRole==='client'?['client']:['pro','salon']).includes(k)).flatMap(([k,s])=>s.modules.map(m=>workspaceHref(k,m.key))):process.env.UX_ALL==='1'?Object.entries(workspaceSpaces).filter(([k])=>['onboarding','support','moderation','finance','operations','admin'].includes(k)).flatMap(([k,s])=>s.modules.filter(m=>s.allowedAdminRoles.includes(auditRole)&&(auditRole==='super_admin'||!m.permission||permissions.has(m.permission))).map(m=>workspaceHref(k,m.key))):['/admin/administrators','/admin','/onboarding','/support-agent','/finance','/moderation','/operations'];
+ const paths=!internal?Object.entries(workspaceSpaces).filter(([k])=>(auditRole==='client'?['client']:auditRole==='staff'?['staff']:['pro','salon']).includes(k)).flatMap(([k,s])=>s.modules.map(m=>workspaceHref(k,m.key))):process.env.UX_ALL==='1'?Object.entries(workspaceSpaces).filter(([k])=>['onboarding','support','moderation','finance','operations','admin'].includes(k)).flatMap(([k,s])=>s.modules.filter(m=>s.allowedAdminRoles.includes(auditRole)&&(auditRole==='super_admin'||!m.permission||permissions.has(m.permission))).map(m=>workspaceHref(k,m.key))):['/admin/administrators','/admin','/onboarding','/support-agent','/finance','/moderation','/operations'];
  for(const path of [...new Set(paths)].filter(path=>!process.env.UX_PATHS||process.env.UX_PATHS.split(',').includes(path))){
-  await page.goto(base+path);assert.equal(new URL(page.url()).pathname,path,`Unexpected redirect for ${path}`);await page.locator('.workspace-topbar h1,.admin-page h1,.premium-bottom-nav').first().waitFor();
+  await page.goto(base+path);assert.equal(new URL(page.url()).pathname,path,`Unexpected redirect for ${path}: ${page.url()}`);await page.locator('.workspace-topbar h1,.admin-page h1,.premium-bottom-nav').first().waitFor();
   await page.getByText('Chargement…',{exact:true}).waitFor({state:'hidden'}).catch(()=>{});
   for(const theme of ['light','dark']){
    await page.emulateMedia({colorScheme:theme});await page.setViewportSize({width:1440,height:900});await capture(path.replaceAll('/','-')+'-'+theme);
@@ -95,6 +120,7 @@ try{
  }
 }catch(e){console.log('AUDIT ERROR '+e.message);process.exitCode=1;}finally{
  await browser.close();assert.ifError((await service.auth.admin.deleteUser(managerId)).error);
+ if(staffOwnerId)assert.ifError((await service.auth.admin.deleteUser(staffOwnerId)).error);
  await writeFile(`${output}/results-${auditRole}.json`,JSON.stringify(results,null,2));
  await writeFile(`${output}/interactions-${auditRole}.json`,JSON.stringify(interactions,null,2));
  console.log('Cleanup confirmed; observations='+results.length);

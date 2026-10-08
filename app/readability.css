@@ -63,6 +63,13 @@
 .super-admin-shell .admin-kpi-list dd,
 .super-admin-shell .admin-data-table code,
 .super-admin-shell .admin-empty h3 { color: var(--ui-text); }
+.super-admin-shell .admin-page-heading p,
+.super-admin-shell .admin-kicker,
+.super-admin-shell .admin-panel > p:first-child,
+.super-admin-shell .launch-admin > header span { color: var(--ui-accent); }
+.super-admin-shell .launch-admin > header p { color: var(--ui-muted); }
+.super-admin-shell :is(.health-grid,.launch-metrics,.launch-goal,.launch-rankings) { color: #fff8fc; }
+.super-admin-shell :is(.health-grid,.launch-metrics) strong:not(.healthy):not(.critical) { color: #fff8fc; }
 .super-admin-shell :is(.admin-panel,.admin-modal,.admin-catalog-form) label {
   color: var(--ui-text);
   font-size: 14px;
@@ -132,6 +139,11 @@
 .workspace-layout select option { background: var(--ui-field); color: var(--ui-text); }
 .workspace-layout :is(button,a,input,select,textarea,summary):focus-visible { outline: 3px solid var(--ui-focus); outline-offset: 3px; }
 .workspace-layout .compact-empty { color: var(--ui-muted); }
+.workspace-layout .admin-panel > p { color: var(--ui-muted); }
+.workspace-layout .dashboard-top p { color: var(--ui-muted); font-size: 14px; line-height: 1.5; }
+.workspace-layout .dashboard-top .eyebrow { color: #ffadd5; }
+.workspace-layout .metric-grid :is(p,small) { font-size: 14px; line-height: 1.5; }
+.workspace-layout .compact-empty { font-size: 14px; line-height: 1.6; }
 .workspace-layout .panel-heading > button { color: #ffadd5; min-height: 44px; font-size: 14px; }
 .workspace-layout .panel a.primary-button { color: #fff; }
 .workspace-layout .danger-button { color: #ffadbc; border-color: #ffadbc; }
@@ -145,6 +157,8 @@
 :is(.workspace-layout,.super-admin-shell) .admin-catalog-form input[type="checkbox"] { min-width: 24px; width: 24px; height: 24px; min-height: 24px; }
 .premium-mobile-app .provider-name-row h3 .provider-profile-link { width: auto; height: auto; padding: 0; border: 0; border-radius: 0; color: inherit; background: none; font: inherit; text-align: left; }
 .premium-mobile-app .launch-inspiration-cta button { color: #fff; background: #a51b5c; }
+.premium-mobile-app .auth-divider { color: #c9bfce; font-size: 13px; }
+.premium-mobile-app footer a { display: inline-flex; align-items: center; min-height: 32px; padding-block: 5px; }
 @media (max-width: 640px) {
   .super-admin-shell .internal-team .modal { padding: 18px; }
   .super-admin-shell .admin-modal { padding: 20px; }
