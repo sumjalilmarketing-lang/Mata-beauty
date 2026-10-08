@@ -139,7 +139,7 @@
 .workspace-layout select option { background: var(--ui-field); color: var(--ui-text); }
 .workspace-layout :is(button,a,input,select,textarea,summary):focus-visible { outline: 3px solid var(--ui-focus); outline-offset: 3px; }
 .workspace-layout .compact-empty { color: var(--ui-muted); }
-.workspace-layout .admin-panel > p { color: var(--ui-muted); }
+.workspace-layout .admin-panel > p:not(:first-child) { color: var(--ui-muted); }
 .workspace-layout .dashboard-top p { color: var(--ui-muted); font-size: 14px; line-height: 1.5; }
 .workspace-layout .dashboard-top .eyebrow { color: #ffadd5; }
 .workspace-layout .metric-grid :is(p,small) { font-size: 14px; line-height: 1.5; }
