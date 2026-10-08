@@ -1,0 +1,212 @@
+{
+  "production_version": {
+    "checkedAt": "2026-10-08T15:28:24.627Z",
+    "domain": "https://mata-beauty.com/",
+    "status": 200,
+    "deployment": "dpl_FX9dGrn3vFecYGm3N3P6sLktZoXQ",
+    "commit": "9ec04f70b69390ad1cc89f51de67cadce3c557f9",
+    "immutableFinalUrl": "https://mata-beauty-50ynb0oae-africrm.vercel.app/",
+    "publicStyleCount": 2,
+    "identicalStyleLists": true,
+    "publicAssetCount": 15,
+    "immutableAssetCount": 15,
+    "identicalAssetLists": true,
+    "productionBackendPresent": true,
+    "qaBackendPresent": false
+  },
+  "production_browser": [
+    {
+      "width": 390,
+      "height": 844,
+      "status": "PASS",
+      "caption": "Coiffeuse\nVaulx en Velin\nFatoutoch2\n15 000 XOF\nVoir les disponibilités\nRÉSERVER",
+      "availability": "Fatoutoch2\nCoiffeuse · 45 min\n15 000 FCFA\nQuand êtes-vous disponible ?\nAujourd’hui\n8\nOCT\nVen\n9\nOCT\nSam\n10\nOCT\nDim\n11\nOCT\nLun\n12\nOCT\nMar\n13\nOCT\nAutre\n＋\nCréneaux disponibles\nMis à jour en direct\nAucun créneau publié ce jour. Essayez une autre date.",
+      "checks": [
+        "lecture",
+        "pause/reprise",
+        "son",
+        "commentaires lecture",
+        "menu secondaire",
+        "partage presse-papiers",
+        "disponibilités",
+        "profil/retour",
+        "réservation ouverture",
+        "retour position",
+        "absence débordement"
+      ],
+      "errors": []
+    },
+    {
+      "width": 412,
+      "height": 915,
+      "status": "PASS",
+      "caption": "Coiffeuse\nVaulx en Velin\nFatoutoch2\n15 000 XOF\nVoir les disponibilités\nRÉSERVER",
+      "availability": "Fatoutoch2\nCoiffeuse · 45 min\n15 000 FCFA\nQuand êtes-vous disponible ?\nAujourd’hui\n8\nOCT\nVen\n9\nOCT\nSam\n10\nOCT\nDim\n11\nOCT\nLun\n12\nOCT\nMar\n13\nOCT\nAutre\n＋\nCréneaux disponibles\nMis à jour en direct\nAucun créneau publié ce jour. Essayez une autre date.",
+      "checks": [
+        "lecture",
+        "pause/reprise",
+        "son",
+        "commentaires lecture",
+        "menu secondaire",
+        "partage presse-papiers",
+        "disponibilités",
+        "profil/retour",
+        "réservation ouverture",
+        "retour position",
+        "absence débordement"
+      ],
+      "errors": []
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "status": "PASS",
+      "caption": "Coiffeuse\nVaulx en Velin\nFatoutoch2\n15 000 XOF\nVoir les disponibilités\nRÉSERVER",
+      "availability": "Fatoutoch2\nCoiffeuse · 45 min\n15 000 FCFA\nQuand êtes-vous disponible ?\nAujourd’hui\n8\nOCT\nVen\n9\nOCT\nSam\n10\nOCT\nDim\n11\nOCT\nLun\n12\nOCT\nMar\n13\nOCT\nAutre\n＋\nCréneaux disponibles\nMis à jour en direct\nAucun créneau publié ce jour. Essayez une autre date.",
+      "checks": [
+        "lecture",
+        "pause/reprise",
+        "son",
+        "commentaires lecture",
+        "menu secondaire",
+        "partage presse-papiers",
+        "disponibilités",
+        "profil/retour",
+        "réservation ouverture",
+        "retour position",
+        "absence débordement"
+      ],
+      "errors": []
+    }
+  ],
+  "production_dates": [
+    {
+      "date": "2026-10-08",
+      "slots": 0,
+      "error": 0
+    },
+    {
+      "date": "2026-10-09",
+      "slots": 0,
+      "error": 0
+    },
+    {
+      "date": "2026-10-10",
+      "slots": 17,
+      "error": 0
+    },
+    {
+      "date": "2026-10-11",
+      "slots": 14,
+      "error": 0
+    },
+    {
+      "date": "2026-10-12",
+      "slots": 0,
+      "error": 0
+    },
+    {
+      "date": "2026-10-13",
+      "slots": 0,
+      "error": 0
+    }
+  ],
+  "production_booking_visitor": {
+    "slot": "09:00",
+    "price": "Confirmer · 15 000 FCFA",
+    "status": "PASS",
+    "date": "2026-10-10",
+    "outcome": "Créneau réel sélectionné, confirmation demande une connexion au visiteur. Aucune réservation créée."
+  },
+  "qa_server": [
+    {
+      "name": "Document owner can sign own private KYC file",
+      "status": "PASS"
+    },
+    {
+      "name": "moderator cannot sign another professional private KYC file",
+      "status": "PASS"
+    },
+    {
+      "name": "finance cannot sign another professional private KYC file",
+      "status": "PASS"
+    },
+    {
+      "name": "support cannot sign another professional private KYC file",
+      "status": "PASS"
+    },
+    {
+      "name": "Onboarding reviewer can sign private KYC file",
+      "status": "PASS"
+    },
+    {
+      "name": "Support cannot moderate a publication through the direct RPC",
+      "status": "PASS"
+    },
+    {
+      "name": "Owner cannot relink a publication to another professional service",
+      "status": "PASS"
+    },
+    {
+      "name": "Published primary service cannot be removed",
+      "status": "PASS"
+    },
+    {
+      "name": "Author can edit own comment body",
+      "status": "PASS"
+    },
+    {
+      "name": "Author cannot move a comment to another publication",
+      "status": "PASS"
+    },
+    {
+      "name": "Moderator cannot rewrite the author text",
+      "status": "PASS"
+    },
+    {
+      "name": "Moderator can hide a comment",
+      "status": "PASS"
+    },
+    {
+      "name": "Hidden comment is absent for an ordinary user",
+      "status": "PASS"
+    },
+    {
+      "name": "Moderator can read and restore a hidden comment",
+      "status": "PASS"
+    },
+    {
+      "name": "Hide and restore decisions have server audit events",
+      "status": "PASS"
+    },
+    {
+      "name": "Three comment reports do not suppress their parent video",
+      "status": "PASS"
+    },
+    {
+      "name": "Three video reports still suppress the video and duplicates stay idempotent",
+      "status": "PASS"
+    }
+  ],
+  "qa_webkit": {
+    "engine": "WebKit",
+    "emulation": "iPhone 390x844",
+    "physicalDevice": false,
+    "status": "PASS",
+    "checks": [
+      "lecture réelle",
+      "commentaires ouverture/fermeture",
+      "disponibilités ouverture/retour",
+      "snap tactile conservé",
+      "absence débordement"
+    ]
+  },
+  "qa_language": {
+    "status": "PASS",
+    "caption": "Mata Feed Pro\nDakar\nTresses Preview 1791471337178-cc65c1\nXOF 18,000\nSee availability\nBOOK",
+    "checks": [
+      "English availability/book",
+      "English comments dialog"
+    ]
+  }
+}
