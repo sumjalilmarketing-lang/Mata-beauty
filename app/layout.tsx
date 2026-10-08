@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { PwaRegister } from "./pwa-register";
 import "./globals.css";
+import "./readability.css";
 
 export const metadata: Metadata = {
   title: { default: "Mata Beauty — Réservez votre beauté à Dakar", template: "%s · Mata Beauty" },

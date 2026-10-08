@@ -361,7 +361,7 @@ export function LiveDashboard({
         {feedback && <p className="dashboard-feedback" role="status">{feedback}</p>}
         {error && <div className="dashboard-error" role="alert"><p>{error}</p><button className="outline-button" onClick={() => void load()}>Réessayer</button></div>}
         {show("dashboard") && (loading ? (
-          <div className="metric-grid" aria-label="Chargement"><article className="skeleton-card" /><article className="skeleton-card" /><article className="skeleton-card" /></div>
+          <div className="metric-grid" role="status" aria-label="Chargement"><article className="skeleton-card" /><article className="skeleton-card" /><article className="skeleton-card" /></div>
         ) : (
           <div className="metric-grid">{metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
         ))}

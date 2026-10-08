@@ -753,7 +753,7 @@ function ResultsScreen({
 }
 
 function CatalogBlock({ providers, fallbackProviders = [], catalogState, favorites, nextAvailability, onView, onBook, onFavorite, onProviderRegister }: { providers: Provider[]; fallbackProviders?: Provider[]; catalogState: "loading" | "live" | "empty" | "error"; favorites: string[]; nextAvailability: Record<string, string>; onView: (provider: Provider) => void; onBook: (provider: Provider) => void; onFavorite: (provider: Provider) => void; onProviderRegister: () => void }) {
-  if (catalogState === "loading") return <div className="mobile-skeletons" aria-label="Chargement"><i /><i /><i /></div>;
+  if (catalogState === "loading") return <div className="mobile-skeletons" role="status" aria-label="Chargement"><i /><i /><i /></div>;
   if (catalogState === "empty" || catalogState === "error") return <div className="premium-empty"><span>✦</span><h3>{catalogState === "error" ? "Catalogue indisponible" : "Les premiers talents arrivent"}</h3><p>{catalogState === "error" ? "Vérifiez votre connexion puis réessayez." : "Aucun professionnel approuvé n’est encore publié dans cette zone."}</p><button onClick={onProviderRegister}>Devenir prestataire</button></div>;
   const displayedProviders = providers.length ? providers : fallbackProviders;
   if (!displayedProviders.length) return <div className="premium-empty compact"><span>⌕</span><h3>Aucun résultat</h3><p>Essayez une autre catégorie ou élargissez vos filtres.</p></div>;
@@ -761,9 +761,9 @@ function CatalogBlock({ providers, fallbackProviders = [], catalogState, favorit
 }
 
 function ProviderCard({ provider, nextSlot, favorite, onFavorite, onView, onBook }: { provider: Provider; nextSlot?: string; favorite: boolean; onFavorite: () => void; onView: () => void; onBook: () => void }) {
-  return <article className="premium-provider-card" onClick={onView} onKeyDown={(event) => { if (event.key === "Enter") onView(); }} role="button" tabIndex={0}>
+  return <article className="premium-provider-card" onClick={onView}>
     <div className="premium-provider-photo">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={provider.specialty} sizes="120px" caption /> : <span>{provider.initials}</span>}</div>
-    <div><div className="provider-name-row"><h3>{provider.name}</h3><button aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"} onClick={(event) => { event.stopPropagation(); onFavorite(); }}>{favorite ? "♥" : "♡"}</button></div>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}<p>★ {provider.rating.toFixed(1)} ({provider.reviews} avis) · {provider.area}</p>{nextSlot && <p className="next-slot-badge">● {formatSlotLabel(nextSlot)}</p>}<div className="provider-booking-line"><span><strong>{formatPrice(provider.price)}</strong><small>{formatDuration(provider.durationMinutes)}</small></span><button onClick={(event) => { event.stopPropagation(); onBook(); }}>Voir les créneaux</button></div></div>
+    <div><div className="provider-name-row"><h3><button className="provider-profile-link" onClick={(event) => { event.stopPropagation(); onView(); }}>{provider.name}</button></h3><button aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"} onClick={(event) => { event.stopPropagation(); onFavorite(); }}>{favorite ? "♥" : "♡"}</button></div>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}<p>★ {provider.rating.toFixed(1)} ({provider.reviews} avis) · {provider.area}</p>{nextSlot && <p className="next-slot-badge">● {formatSlotLabel(nextSlot)}</p>}<div className="provider-booking-line"><span><strong>{formatPrice(provider.price)}</strong><small>{formatDuration(provider.durationMinutes)}</small></span><button onClick={(event) => { event.stopPropagation(); onBook(); }}>Voir les créneaux</button></div></div>
   </article>;
 }
 

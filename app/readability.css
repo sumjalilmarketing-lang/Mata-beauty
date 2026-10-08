@@ -1,0 +1,151 @@
+/* Surface tokens own both foreground and background: OS dark mode must never
+   turn inherited text white while leaving a shared form surface white. */
+.super-admin-shell, .admin-auth-shell {
+  --ui-surface: #fffefd;
+  --ui-field: #ffffff;
+  --ui-text: #24131f;
+  --ui-muted: #65535f;
+  --ui-border: #8b7482;
+  --ui-accent: #74114f;
+  --ui-action: #74114f;
+  --ui-success: #22643e;
+  --ui-danger: #9c243c;
+  --ui-focus: #74114f;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  .super-admin-shell {
+    --ui-surface: #2d1226;
+    --ui-field: #1b0c18;
+    --ui-text: #fff8fc;
+    --ui-muted: #d7c5d1;
+    --ui-border: #a18899;
+    --ui-accent: #ffadd5;
+    --ui-success: #8fe4b1;
+    --ui-danger: #ffadbc;
+    --ui-focus: #ffd078;
+    --g: #efc371;
+    color-scheme: dark;
+  }
+}
+.super-admin-shell .admin-panel,
+.super-admin-shell .panel,
+.super-admin-shell .admin-metric-grid article,
+.super-admin-shell .admin-filter-bar,
+.super-admin-shell .admin-catalog-form,
+.super-admin-shell .admin-modal,
+.super-admin-shell .internal-team .modal {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+.super-admin-shell .professional-dossier { color: var(--ui-text); }
+.super-admin-shell .dossier-section { background: var(--ui-surface); color: var(--ui-text); border-color: var(--ui-border); }
+.super-admin-shell .dossier-section :is(h3,dd) { color: var(--ui-text); }
+.super-admin-shell .dossier-section dt,
+.super-admin-shell .dossier-history :is(time,small),
+.super-admin-shell .dossier-heading p { color: var(--ui-muted); }
+.super-admin-shell .panel .compact-empty,
+.super-admin-shell .support-inbox > p { color: var(--ui-muted); }
+.super-admin-shell .internal-team .modal {
+  padding: clamp(18px, 4vw, 30px);
+  max-height: calc(100dvh - 40px);
+  overscroll-behavior: contain;
+}
+.super-admin-shell .admin-modal {
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.super-admin-shell .admin-modal-backdrop { overflow-y: auto; }
+.super-admin-shell .admin-panel :is(h2,h3),
+.super-admin-shell .admin-modal h2,
+.super-admin-shell .admin-metric-grid strong,
+.super-admin-shell .admin-kpi-list dd,
+.super-admin-shell .admin-data-table code,
+.super-admin-shell .admin-empty h3 { color: var(--ui-text); }
+.super-admin-shell :is(.admin-panel,.admin-modal,.admin-catalog-form) label {
+  color: var(--ui-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.super-admin-shell .dashboard-form h3 { color: var(--ui-text); }
+.super-admin-shell :is(.admin-panel,.admin-modal,.admin-catalog-form,.admin-filter-bar) :is(input,select,textarea) {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ui-text);
+  background: var(--ui-field);
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  padding: 11px;
+  min-height: 44px;
+  font-size: 16px;
+}
+.super-admin-shell :is(input[type="checkbox"],input[type="radio"]) {
+  min-height: 20px;
+  width: 20px;
+  accent-color: var(--ui-action);
+}
+.super-admin-shell :is(input,textarea)::placeholder { color: var(--ui-muted); opacity: 1; }
+.super-admin-shell select option { color: var(--ui-text); background: var(--ui-field); }
+.super-admin-shell .admin-metric-grid small,
+.super-admin-shell .admin-panel > p:not(:first-child),
+.super-admin-shell .admin-kpi-list dt { color: var(--ui-muted); }
+.super-admin-shell .admin-metric-grid :is(small,span) { font-size: 13px; line-height: 1.5; }
+.super-admin-shell .admin-metric-grid span,
+.super-admin-shell .secure-indicator { color: var(--ui-success); }
+.super-admin-shell .urgent-panel > button strong { color: var(--ui-danger); }
+.super-admin-shell button.primary { background: var(--ui-action); border-color: var(--ui-action); color: #fff; }
+.super-admin-shell button.secondary,
+.super-admin-shell .internal-team .admin-filter-bar button,
+.super-admin-shell .internal-team .dashboard-form button[type="button"] {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  color: var(--ui-text);
+  background: var(--ui-field);
+}
+.super-admin-shell .internal-team .admin-filter-bar button[aria-pressed="true"] { color: #fff; background: var(--ui-action); }
+.super-admin-shell :is(button,a,input,select,textarea):focus-visible,
+.admin-auth-shell :is(button,a,input,select,textarea):focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 3px;
+}
+.super-admin-shell button:disabled { cursor: not-allowed; }
+.workspace-layout {
+  --ui-text: #fff8fc;
+  --ui-muted: #c9bfce;
+  --ui-field: #101018;
+  --ui-border: #8d8095;
+  --ui-focus: #ffd078;
+  color-scheme: dark;
+}
+.workspace-layout .workspace-metrics small,
+.workspace-layout .workspace-breadcrumb,
+.workspace-layout .workspace-mobile-nav a { color: var(--ui-muted); }
+.workspace-layout :is(.dashboard-form,.salon-form,.hours-row,.workspace-space-picker) :is(input,select,textarea) {
+  color: var(--ui-text);
+  background: var(--ui-field);
+  border-color: var(--ui-border);
+}
+.workspace-layout :is(input,textarea)::placeholder { color: var(--ui-muted); opacity: 1; }
+.workspace-layout select option { background: var(--ui-field); color: var(--ui-text); }
+.workspace-layout :is(button,a,input,select,textarea,summary):focus-visible { outline: 3px solid var(--ui-focus); outline-offset: 3px; }
+.workspace-layout .compact-empty { color: var(--ui-muted); }
+.workspace-layout .panel-heading > button { color: #ffadd5; min-height: 44px; font-size: 14px; }
+.workspace-layout .panel a.primary-button { color: #fff; }
+.workspace-layout .danger-button { color: #ffadbc; border-color: #ffadbc; }
+.workspace-layout .collection-form { flex-wrap: wrap; align-items: end; }
+.workspace-layout .collection-form label { display: grid; flex: 1; gap: 8px; min-width: 160px; }
+.workspace-layout .collection-form :is(input,select) { width: 100%; min-height: 44px; padding: 10px; color: var(--ui-text); background: var(--ui-field); border: 1px solid var(--ui-border); border-radius: 9px; }
+.workspace-layout .collection-form button { min-height: 44px; }
+.workspace-layout .admin-catalog-form { color: var(--ui-text); background: #15151e; }
+.workspace-layout .admin-catalog-form :is(label,h2) { color: var(--ui-text); }
+.workspace-layout .admin-catalog-form :is(input,select,textarea) { color: var(--ui-text); background: var(--ui-field); border-color: var(--ui-border); }
+:is(.workspace-layout,.super-admin-shell) .admin-catalog-form input[type="checkbox"] { min-width: 24px; width: 24px; height: 24px; min-height: 24px; }
+.premium-mobile-app .provider-name-row h3 .provider-profile-link { width: auto; height: auto; padding: 0; border: 0; border-radius: 0; color: inherit; background: none; font: inherit; text-align: left; }
+.premium-mobile-app .launch-inspiration-cta button { color: #fff; background: #a51b5c; }
+@media (max-width: 640px) {
+  .super-admin-shell .internal-team .modal { padding: 18px; }
+  .super-admin-shell .admin-modal { padding: 20px; }
+}
