@@ -124,14 +124,22 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
         await reviewer.waitForTimeout(2000);
         await reviewer.screenshot({path:"work/final-audit/part3-document-pdf.png"});
         if (process.env.UX_DOSSIER_AXE === "1") {
+          const scans = [];
+          await mkdir("work/ux-audit/dossier", { recursive: true });
+          for (const theme of ["light", "dark"] as const) for (const [width, height] of [[375,812],[390,844],[768,1024],[1366,768],[1440,900],[1920,1080]]) {
+          await reviewer.emulateMedia({ colorScheme: theme });
+          await reviewer.setViewportSize({ width, height });
           await reviewer.evaluate(await readFile("node_modules/axe-core/axe.min.js", "utf8"));
           const violations = await reviewer.evaluate(async () => {
             const axe = (window as unknown as { axe: { run: (context: Document, options: { runOnly: { type: string; values: string[] } }) => Promise<{ violations: { id: string; nodes: { html: string; failureSummary: string }[] }[] }> } }).axe;
             return (await axe.run(window.document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"] } })).violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => ({ failureSummary: n.failureSummary })) }));
           });
-          await mkdir("work/ux-audit/dossier", { recursive: true });
-          await writeFile("work/ux-audit/dossier/axe.json", JSON.stringify(violations, null, 2));
+          scans.push({ theme, width, height, violations });
+          await writeFile("work/ux-audit/dossier/axe.json", JSON.stringify(scans, null, 2));
+          await reviewer.screenshot({ path: `work/ux-audit/dossier/pdf-${theme}-${width}.png` });
           expect.soft(violations.map(v => ({id:v.id,nodes:v.nodes.map(n=>n.failureSummary)}))).toEqual([]);
+          }
+          await reviewer.setViewportSize({ width: 1366, height: 768 });
         }
 
         await reviewer.getByRole("button",{name:"Document précédent"}).click();
