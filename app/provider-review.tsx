@@ -16,7 +16,7 @@ type Event = { happened_at: string; label: string; actor: string | null; detail:
 type Business = { name: string; address: string; city: string };
 const date = (value: string) => new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(value));
 
-export function ProviderReview({ providerId, onReady, onChange }: { providerId: string; onReady?: (ready: boolean) => void; onChange?: () => void }) {
+export function ProviderReview({ providerId, refreshStatus, onReady, onChange }: { providerId: string; refreshStatus?: string; onReady?: (ready: boolean) => void; onChange?: () => void }) {
   const [profile, setProfile] = useState<Dossier | null>(null);
   const [salons, setSalons] = useState<Business[]>([]);
   const [history, setHistory] = useState<Event[]>([]);
@@ -37,7 +37,7 @@ export function ProviderReview({ providerId, onReady, onChange }: { providerId: 
       setHistory((events.data ?? []) as Event[]); setState(p.error || !p.data?.length || b.error || events.error ? "error" : "ready");
     });
     return () => { active = false; };
-  }, [providerId, revision]);
+  }, [providerId, revision, refreshStatus]);
   return <section className="professional-dossier" aria-label="Dossier professionnel">
     {state === "loading" ? <p role="status">Chargement du dossier…</p> : state === "error" ? <div role="alert"><p>Dossier indisponible. Ne prenez pas de décision avant sa vérification.</p><button onClick={() => setRevision(value => value + 1)}>Réessayer</button></div> : profile && <>
       <header className="dossier-heading"><div><p>Candidature professionnelle</p><h2>{profile.business_name}</h2></div><span className="dossier-status">{applicationStatusLabels[profile.status] ?? "À vérifier"}</span></header>

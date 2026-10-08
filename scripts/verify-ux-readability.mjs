@@ -105,6 +105,16 @@ try{
    await page.emulateMedia({colorScheme:theme});await page.setViewportSize({width:1440,height:900});if(process.env.UX_ALL_SIZES!=='1')await capture(path.replaceAll('/','-')+'-'+theme);
    for(const [width,height] of sizes){await page.setViewportSize({width,height});if(process.env.UX_ALL_SIZES==='1')await capture(path.replaceAll('/','-')+'-'+theme+'-'+width);const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);interactions.push({path,theme,width,height,action:'horizontal overflow',status:overflow?'FAIL':'PASS'});if(overflow){await page.screenshot({path:`${output}/overflow-${path.replaceAll('/','-')}-${theme}-${width}.png`,fullPage:true});const nodes=await page.locator('body *').evaluateAll(nodes=>nodes.filter(n=>{const r=n.getBoundingClientRect();return r.width>0&&r.right>innerWidth+1}).map(n=>({tag:n.tagName,className:n.className,width:n.getBoundingClientRect().width,text:n.textContent?.slice(0,80)})).slice(-20));await writeFile(`${output}/overflow-${path.replaceAll('/','-')}-${theme}-${width}.json`,JSON.stringify(nodes,null,2));}}
   }
+  if(process.env.UX_SCROLL_TABLES==='1'){
+   await page.setViewportSize({width:375,height:812});
+   for(const table of await page.locator('.admin-table-wrap').all()){
+    if(await table.evaluate(n=>n.scrollWidth>n.clientWidth+1)){
+     await table.evaluate(n=>{n.scrollLeft=0;});await table.focus();await page.keyboard.press('ArrowRight');await page.waitForTimeout(300);
+     assert(await table.evaluate(n=>n.scrollLeft>0),'Administrative table must scroll by keyboard');
+     interactions.push({path,action:'Keyboard horizontal scroll: '+await table.getAttribute('aria-label'),status:'PASS'});
+    }
+   }
+  }
   if(process.env.UX_NOTIFICATIONS==='1'&&path==='/app/notifications'){
    const unread=page.getByLabel('Non lues uniquement');await unread.uncheck();await unread.check();const first=page.locator('.notification-card').first();await first.getByRole('button',{name:'Marquer comme lue',exact:true}).click();await page.getByText('Vous avez lu toutes les notifications affichées.',{exact:true}).waitFor();await unread.uncheck();await page.locator('.notification-card.read').first().waitFor();await page.getByRole('button',{name:'Actualiser',exact:true}).last().click();await page.locator('.notification-card.read').first().getByRole('button',{name:'Ouvrir',exact:true}).click();await page.waitForURL(/\/app\/profile/);interactions.push({path,action:'Filter unread, mark read, refresh, open destination',status:'PASS'});await page.goto(base+path);
   }

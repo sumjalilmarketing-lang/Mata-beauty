@@ -1,3 +1,4 @@
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { checkWheel } from "./scroll-acceptance";
 import { expect, test, type Page } from "@playwright/test";
@@ -122,6 +123,17 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
         // is only for the visual evidence; HTTP/CSP/authorization are asserted.
         await reviewer.waitForTimeout(2000);
         await reviewer.screenshot({path:"work/final-audit/part3-document-pdf.png"});
+        if (process.env.UX_DOSSIER_AXE === "1") {
+          await reviewer.evaluate(await readFile("node_modules/axe-core/axe.min.js", "utf8"));
+          const violations = await reviewer.evaluate(async () => {
+            const axe = (window as unknown as { axe: { run: (context: Document, options: { runOnly: { type: string; values: string[] } }) => Promise<{ violations: { id: string; nodes: { html: string; failureSummary: string }[] }[] }> } }).axe;
+            return (await axe.run(window.document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"] } })).violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => ({ failureSummary: n.failureSummary })) }));
+          });
+          await mkdir("work/ux-audit/dossier", { recursive: true });
+          await writeFile("work/ux-audit/dossier/axe.json", JSON.stringify(violations, null, 2));
+          expect.soft(violations.map(v => ({id:v.id,nodes:v.nodes.map(n=>n.failureSummary)}))).toEqual([]);
+        }
+
         await reviewer.getByRole("button",{name:"Document précédent"}).click();
         await expect(reviewer.getByRole("dialog").getByRole("heading",{name:"Justificatif d’adresse",exact:true})).toBeVisible();
         await reviewer.getByRole("button",{name:"Document suivant"}).click();
@@ -133,6 +145,8 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
       else await reviewer.getByRole("button", { name: "Fermer l’aperçu" }).click();
     }
     await reviewer.locator(".document-row").filter({ hasText: "Pièce d’identité" }).getByRole("button", { name: "Demander un complément" }).click();
+    await expect(reviewer.getByText("Complément demandé. Le candidat a été notifié.")).toBeVisible();
+    await expect(reviewer.locator(".dossier-status")).toHaveText("Un complément est demandé");
     await expect(reviewer.getByText("Complément demandé. Le candidat a été notifié.")).toBeVisible();
     await page.goto("/app/notifications");
     await page.locator(".notification-card").filter({ hasText: "Un complément est demandé" }).getByRole("button", { name: "Ouvrir", exact: true }).click();
