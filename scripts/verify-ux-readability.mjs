@@ -29,9 +29,11 @@ if(internal){
  assert.ifError((await service.from('account_roles').upsert({profile_id:managerId,role:'professional'},{onConflict:'profile_id,role'})).error);
 }
 if(auditRole==='staff'){
+ assert(!production,'Staff fixture provisioning is authorized only in isolated QA');
  const owner=await service.auth.admin.createUser({email:`qa-ux-owner-${run}@example.test`,password,email_confirm:true,app_metadata:{qa_suppress_email:true},user_metadata:{legal_accepted:true}});assert.ifError(owner.error);staffOwnerId=owner.data.user.id;
  assert.ifError((await service.from('provider_profiles').insert({profile_id:staffOwnerId,business_name:'QA accessibility salon',slug:'qa-ux-'+run,city:'Dakar',status:'approved'})).error);
  const business=await service.from('businesses').insert({owner_id:staffOwnerId,name:'QA accessibility salon',slug:'qa-ux-'+run,address:'Adresse de recette',city:'Dakar',status:'approved'}).select('id').single();assert.ifError(business.error);
+ assert.ifError((await service.from('profiles').update({role:'admin'}).eq('id',staffOwnerId)).error);
  const approverRole=await service.from('admin_roles').select('id').eq('key','admin').single();assert.ifError(approverRole.error);
  assert.ifError((await service.from('admin_user_roles').insert({user_id:staffOwnerId,role_id:approverRole.data.id,requires_mfa:true})).error);
  const approver=createClient(url,process.env.REMOTE_SUPABASE_ANON_KEY,{auth:{persistSession:false}});
@@ -101,7 +103,7 @@ try{
   await page.getByText('Chargement…',{exact:true}).waitFor({state:'hidden'}).catch(()=>{});
   for(const theme of ['light','dark']){
    await page.emulateMedia({colorScheme:theme});await page.setViewportSize({width:1440,height:900});await capture(path.replaceAll('/','-')+'-'+theme);
-   for(const [width,height] of sizes){await page.setViewportSize({width,height});const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);interactions.push({path,theme,width,height,action:'horizontal overflow',status:overflow?'FAIL':'PASS'});}
+   for(const [width,height] of sizes){await page.setViewportSize({width,height});const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);interactions.push({path,theme,width,height,action:'horizontal overflow',status:overflow?'FAIL':'PASS'});if(overflow){await page.screenshot({path:`${output}/overflow-${path.replaceAll('/','-')}-${theme}-${width}.png`,fullPage:true});const nodes=await page.locator('body *').evaluateAll(nodes=>nodes.filter(n=>{const r=n.getBoundingClientRect();return r.width>0&&r.right>innerWidth+1}).map(n=>({tag:n.tagName,className:n.className,width:n.getBoundingClientRect().width,text:n.textContent?.slice(0,80)})).slice(-20));await writeFile(`${output}/overflow-${path.replaceAll('/','-')}-${theme}-${width}.json`,JSON.stringify(nodes,null,2));}}
   }
  }
  if(auditRole==='super_admin'){
@@ -111,10 +113,18 @@ try{
  for(const theme of ['light','dark'])for(const [width,height] of [[375,812],[390,844],[768,1024],[1366,768],[1440,900],[1920,1080]]){await page.emulateMedia({colorScheme:theme});await page.setViewportSize({width,height});await capture(`role-dialog-${theme}-${width}`);}
  if(process.env.UX_INTERACTIONS==='1'){
   const dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:'Annuler',exact:true}).focus();await page.keyboard.press('Tab');assert(await page.getByLabel('Nouveau rôle').evaluate(n=>n===document.activeElement));await page.keyboard.press('Shift+Tab');assert(await dialog.getByRole('button',{name:'Annuler',exact:true}).evaluate(n=>n===document.activeElement));
-  await page.keyboard.press('Escape');assert.equal(await page.getByRole('dialog').count(),0);interactions.push({action:'Role dialog keyboard trap, Escape and focus return',status:'PASS'});
+  await page.keyboard.press('Escape');assert.equal(await page.getByRole('dialog').count(),0);assert(await card.getByRole('button',{name:'Modifier le rôle',exact:true}).evaluate(n=>n===document.activeElement));interactions.push({action:'Role dialog keyboard trap, Escape and focus return',status:'PASS'});
   await card.getByRole('button',{name:'Modifier le rôle',exact:true}).click();
  }
+ if(process.env.UX_ERRORS==='1'){
+  await page.route('**/api/admin/team',async route=>{if(route.request().method()!=='POST')return route.continue();await new Promise(resolve=>setTimeout(resolve,1000));await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Service temporairement indisponible. Réessayez.'})});});
+  await page.getByLabel('Justification').fill('Recette erreur réseau sans mutation');await page.getByRole('dialog').getByRole('button',{name:'Confirmer',exact:true}).click();
+  assert(await page.getByRole('button',{name:'Mise à jour…',exact:true}).isDisabled());await page.getByText('Service temporairement indisponible. Réessayez.',{exact:true}).waitFor();
+  await capture('role-error-dark');assert.equal(await page.getByRole('dialog').getByText('Service temporairement indisponible. Réessayez.',{exact:true}).count(),1,'The error must be rendered inside the open dialog');
+  interactions.push({action:'Role dialog loading and visible failure, intercepted API without mutation',status:'PASS'});await page.unroute('**/api/admin/team');
+ }
  await page.getByRole('dialog').getByRole('button',{name:'Annuler',exact:true}).click();
+ assert(await card.getByRole('button',{name:'Modifier le rôle',exact:true}).evaluate(n=>n===document.activeElement));
  await page.getByRole('button',{name:'+ Inviter un membre'}).click();await page.getByLabel('Prénom',{exact:true}).fill('Recette');await page.getByLabel('Nom',{exact:true}).fill('Lisibilité');
  for(const theme of ['light','dark']){await page.emulateMedia({colorScheme:theme});await capture(`invite-${theme}`);}
  }
@@ -123,5 +133,6 @@ try{
  if(staffOwnerId)assert.ifError((await service.auth.admin.deleteUser(staffOwnerId)).error);
  await writeFile(`${output}/results-${auditRole}.json`,JSON.stringify(results,null,2));
  await writeFile(`${output}/interactions-${auditRole}.json`,JSON.stringify(interactions,null,2));
+ await writeFile(`${output}/diagnostics-${auditRole}.json`,JSON.stringify({network,errors,observations},null,2));
  console.log('Cleanup confirmed; observations='+results.length);
 }

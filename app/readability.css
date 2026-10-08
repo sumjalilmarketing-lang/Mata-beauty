@@ -163,3 +163,31 @@
   .super-admin-shell .internal-team .modal { padding: 18px; }
   .super-admin-shell .admin-modal { padding: 20px; }
 }
+/* Shared catalog screens also render outside the Super Admin stylesheet. */
+.workspace-layout :is(.workspace-content,.workspace-grid,.workspace-panel,.workspace-list,.workspace-list > div) { min-width: 0; }
+.workspace-layout .workspace-list :is(span,small) { overflow-wrap: anywhere; }
+.workspace-layout .workspace-shortcuts > a { grid-template-columns: 34px minmax(0,1fr) auto; }
+.workspace-layout .workspace-shortcuts a > div { min-width: 0; }
+.workspace-layout .admin-catalog-form { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin-bottom: 20px; padding: 20px; border: 1px solid var(--ui-border); border-radius: 15px; }
+.workspace-layout .admin-catalog-form header,
+.workspace-layout .admin-catalog-form .wide { grid-column: 1 / -1; }
+.workspace-layout .admin-catalog-form header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.workspace-layout .admin-catalog-form label { display: grid; min-width: 0; gap: 8px; font-size: 14px; }
+.workspace-layout .admin-catalog-form :is(input,select,textarea) { width: 100%; min-width: 0; min-height: 44px; padding: 11px; border: 1px solid var(--ui-border); border-radius: 9px; font-size: 16px; }
+.workspace-layout .admin-catalog-form .catalog-checkbox { display: flex; align-items: center; }
+.workspace-layout .admin-catalog-form .catalog-checkbox input { flex: 0 0 24px; }
+.workspace-layout .admin-catalog-form > button { min-height: 44px; padding: 10px 18px; border: 1px solid #b25283; border-radius: 9px; background: #74114f; color: white; }
+.workspace-layout .admin-table-wrap { max-width: 100%; overflow: auto; border: 1px solid var(--ui-border); border-radius: 15px; }
+.workspace-layout .admin-data-table { width: 100%; min-width: 700px; border-collapse: collapse; color: var(--ui-text); background: var(--ui-field); }
+.workspace-layout .admin-data-table :is(th,td) { padding: 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--ui-border); font-size: 14px; }
+.workspace-layout .admin-data-table :is(strong,small) { display: block; }
+.workspace-layout .admin-data-table small { color: var(--ui-muted); line-height: 1.5; }
+.workspace-layout .table-action { min-height: 44px; margin: 3px; padding: 9px 12px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-text); background: var(--ui-field); }
+.workspace-layout .table-action.danger { color: #ffadbc; }
+@media (max-width: 720px) {
+  .workspace-layout .workspace-grid { grid-template-columns: minmax(0,1fr); }
+  .workspace-layout .admin-catalog-form { grid-template-columns: minmax(0,1fr); padding: 16px; }
+}
+.workspace-layout .admin-table-wrap:focus-visible { outline: 3px solid var(--ui-focus); outline-offset: 3px; }
+.workspace-layout .admin-panel > button:not([class]),
+.workspace-layout .collection-form > button { min-height: 44px; padding: 10px 16px; margin-block: 8px; border: 1px solid var(--ui-border); border-radius: 9px; color: #fff; background: #74114f; }
