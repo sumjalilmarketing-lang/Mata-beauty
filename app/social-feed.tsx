@@ -6,7 +6,9 @@ import { diversifyFeed, matchesSocialFeedFilter, socialFeedFilters, type SocialF
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AuthenticatedProfile } from "./auth-modal";
 import { LocationPicker } from "./location-picker";
-import { distanceKm, formatDistance, matchesSearch, type Coordinates } from "@/lib/domain/location";
+import { distanceKm, matchesSearch, type Coordinates } from "@/lib/domain/location";
+import { feedPrice, publicProfessionalName } from "@/lib/domain/feed-presentation";
+import { feedText } from "@/lib/domain/feed-copy";
 
 type FeedPost = {
   id: string; authorId: string; caption: string; videoUrl: string; thumbnailUrl: string | null;
@@ -33,10 +35,8 @@ type SocialFeedRow = {
 
 type CommentRow = { id: string; author_id: string; parent_id: string | null; body: string; created_at: string; profiles: { display_name: string | null; avatar_url: string | null } | null };
 
-const compact = new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 });
-const price = (value: number) => `${new Intl.NumberFormat("fr-FR").format(value)} FCFA`;
 const FEED_BATCH_SIZE = 8;
-const FEED_CACHE_KEY = "mata-social-feed-cache-v1";
+const FEED_CACHE_KEY = "mata-social-feed-cache-v2";
 const FEED_CACHE_TTL_MS = 5 * 60 * 1000;
 
 function readFeedCache(): FeedPost[] {
@@ -58,7 +58,7 @@ function mapFeedPost(row: SocialFeedRow): FeedPost {
     id: row.id, authorId: row.author_id, caption: row.caption, videoUrl: row.video_url, thumbnailUrl: row.thumbnail_url,
     durationSeconds: Number(row.duration_seconds), viewCount: Number(row.view_count), likeCount: Number(row.like_count),
     commentCount: Number(row.comment_count), saveCount: Number(row.save_count), shareCount: Number(row.share_count),
-    publishedAt: row.published_at, businessName: row.business_name, slug: row.slug, city: row.city,
+    publishedAt: row.published_at, businessName: publicProfessionalName(row.business_name), slug: row.slug, city: row.city,
     verified: Boolean(row.verified_at), avatarUrl: row.avatar_url ?? row.cover_url, isSponsored: Boolean(row.is_sponsored),
     serviceId: row.provider_service_id, serviceTitle: row.service_title, durationMinutes: row.duration_minutes,
     priceAmount: row.price_amount, currency: row.currency, averageRating: Number(row.average_rating), reviewCount: Number(row.review_count),
@@ -99,6 +99,15 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   onBook: (authorId: string, service: { id: string; title: string; duration_minutes: number; price_amount: number }, sourcePostId: string) => void;
 }) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [locale, setLocale] = useState("fr-SN");
+  const t = useCallback((text: string) => feedText(text, locale), [locale]);
+  useEffect(() => {
+    let active = true;
+    if (authenticated) void getSupabaseBrowserClient()?.from("profiles").select("locale").eq("id", authenticated.userId).maybeSingle().then(({ data }) => {
+      if (active && data?.locale) setLocale(data.locale);
+    });
+    return () => { active = false; };
+  }, [authenticated]);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
@@ -113,6 +122,17 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const [commentsPost, setCommentsPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [commentText, setCommentText] = useState("");
+  const [commentsState, setCommentsState] = useState<"loading" | "ready" | "error">("ready");
+  const [commentBusy, setCommentBusy] = useState(false);
+  const commentPending = useRef(false);
+  const commentRequest = useRef(0);
+  const commentsDialog = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!commentsPost) return;
+    const previous = document.activeElement;
+    commentsDialog.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true }); };
+  }, [commentsPost]);
   const [videoErrors, setVideoErrors] = useState<Set<string>>(new Set());
   const [videoLoading, setVideoLoading] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<Record<string, number>>({});
@@ -372,7 +392,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const { data, error } = await supabase.rpc("toggle_follow_provider_from_post", { target_provider_id: post.authorId, target_source_post_id: post.id });
     if (error) { setFeedback("L’abonnement n’a pas pu être modifié."); return; }
     setFollowed((current) => { const next = new Set(current); if (data) next.add(post.authorId); else next.delete(post.authorId); return next; });
-    setFeedback(data ? `Vous suivez ${post.businessName}.` : `Vous ne suivez plus ${post.businessName}.`);
+    setFeedback(data ? `${t("Vous suivez")} ${post.businessName}.` : `${t("Vous ne suivez plus")} ${post.businessName}.`);
   }
 
   async function share(post: FeedPost) {
@@ -380,7 +400,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     try {
       if (navigator.share) await navigator.share({ title: `${post.businessName} sur Mata Beauty`, text: post.caption, url });
       else await navigator.clipboard.writeText(url);
-    } catch { return; }
+    } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setFeedback("Le partage n’a pas pu être effectué."); return; }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const sessionHash = await getSessionHash();
@@ -391,7 +411,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
 
   async function report(post: FeedPost) {
     if (!authenticated) { onRequireAuth(); return; }
-    if (!window.confirm(`Signaler la vidéo de ${post.businessName} pour contenu inapproprié ?`)) return;
+    if (!window.confirm(t("Signaler cette vidéo pour contenu inapproprié ?"))) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const { error } = await supabase.rpc("report_social_post", { target_post_id: post.id, target_reason: "contenu_inapproprie", target_details: null });
@@ -399,32 +419,45 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   }
 
   async function openComments(post: FeedPost) {
-    setCommentsPost(post); setComments([]); setReplyTo(null);
+    const request = ++commentRequest.current;
+    setCommentsPost(post); setComments([]); setReplyTo(null); setCommentsState("loading");
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    const { data } = await supabase.from("post_comments").select("id,author_id,parent_id,body,created_at,profiles!post_comments_author_id_fkey(display_name,avatar_url)").eq("post_id", post.id).eq("is_hidden", false).order("created_at", { ascending: false }).limit(50);
+    if (!supabase) { setCommentsState("error"); return; }
+    const { data, error } = await supabase.from("post_comments").select("id,author_id,parent_id,body,created_at,profiles!post_comments_author_id_fkey(display_name,avatar_url)").eq("post_id", post.id).eq("is_hidden", false).order("created_at", { ascending: false }).limit(50).abortSignal(AbortSignal.timeout(15000));
+    if (request !== commentRequest.current) return;
+    setCommentsState(error ? "error" : "ready");
     setComments((data ?? []) as unknown as CommentRow[]);
   }
 
   async function addComment() {
     if (!authenticated) { onRequireAuth(); return; }
-    if (!commentsPost || !commentText.trim()) return;
+    if (!commentsPost || !commentText.trim() || commentPending.current) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { error } = await supabase.from("post_comments").insert({ post_id: commentsPost.id, author_id: authenticated.userId, parent_id: replyTo?.id ?? null, body: commentText.trim() });
-    if (!error) { setCommentText(""); setReplyTo(null); await openComments(commentsPost); }
+    commentPending.current = true; setCommentBusy(true);
+    try {
+      const { error } = await supabase.from("post_comments").insert({ post_id: commentsPost.id, author_id: authenticated.userId, parent_id: replyTo?.id ?? null, body: commentText.trim() });
+      if (error) { setFeedback("Commentaire non publié. Patientez avant de réessayer."); return; }
+      setCommentText(""); setReplyTo(null); await openComments(commentsPost);
+    } finally { commentPending.current = false; setCommentBusy(false); }
   }
 
   async function deleteComment(comment: CommentRow) {
     if (!authenticated || comment.author_id !== authenticated.userId || !commentsPost) return;
     const supabase = getSupabaseBrowserClient();
-    if (supabase && !((await supabase.from("post_comments").delete().eq("id", comment.id)).error)) await openComments(commentsPost);
+    if (!supabase) return;
+    const { error } = await supabase.from("post_comments").delete().eq("id", comment.id);
+    if (error) setFeedback("Le commentaire n’a pas pu être supprimé.");
+    else await openComments(commentsPost);
   }
 
   async function reportComment(comment: CommentRow) {
     if (!authenticated) { onRequireAuth(); return; }
     const supabase = getSupabaseBrowserClient();
-    if (supabase) await supabase.rpc("report_post_comment", { target_comment_id: comment.id, target_reason: "contenu_inapproprie" });
+    if (supabase) {
+      const { error } = await supabase.rpc("report_post_comment", { target_comment_id: comment.id, target_reason: "contenu_inapproprie" });
+      setFeedback(error ? "Le signalement n’a pas pu être envoyé." : "Signalement transmis à la modération.");
+    }
   }
 
   async function book(post: FeedPost) {
@@ -447,33 +480,42 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   }, [activeIndex, visiblePosts]);
 
   const activePost = visiblePosts[activeIndex];
-  const header = useMemo(() => <header className="social-feed-header"><div className="feed-title-row"><strong>MATA</strong><span>INSPIRATION</span><div className="feed-header-actions"><button disabled={authPending} aria-label="Publier une vidéo" onClick={onPublish}>＋</button><button aria-label="Rechercher" onClick={onDiscover}>⌕</button></div></div><nav className="feed-filter-strip" aria-label="Filtres du feed">{socialFeedFilters.slice(0, 3).map((filter) => <button key={filter} aria-pressed={feedFilter === filter} className={feedFilter === filter ? "active" : ""} onClick={() => selectFilter(filter)}>{filter}</button>)}</nav>{feedFilter === "Près de moi" && <button className="feed-location-toggle" onClick={() => setShowLocation((value) => !value)}>{location.position ? "Près de vous · 25 km" : location.area || "Choisir ma zone"} · Modifier</button>}{showLocation && <div className="feed-location-panel"><LocationPicker autoLocate area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} /><button onClick={() => setShowLocation(false)}>Voir les résultats</button></div>}</header>, [authPending, feedFilter, location, onDiscover, onPublish, selectFilter, showLocation]);
+  const header = useMemo(() => <header className="social-feed-header"><div className="feed-title-row"><strong>MATA</strong><span>INSPIRATION</span><div className="feed-header-actions"><button disabled={authPending} aria-label={t("Publier une vidéo")} onClick={onPublish}>＋</button><button aria-label={t("Rechercher")} onClick={onDiscover}>⌕</button></div></div><nav className="feed-filter-strip" aria-label={t("Filtres du feed")}>{socialFeedFilters.slice(0, 3).map((filter) => <button key={filter} aria-pressed={feedFilter === filter} className={feedFilter === filter ? "active" : ""} onClick={() => selectFilter(filter)}>{t(filter)}</button>)}</nav>{feedFilter === "Près de moi" && <button className="feed-location-toggle" onClick={() => setShowLocation((value) => !value)}>{location.position ? t("Près de vous · 25 km") : location.area || t("Choisir ma zone")} · {t("Modifier")}</button>}{showLocation && <div className="feed-location-panel"><LocationPicker autoLocate area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} /><button onClick={() => setShowLocation(false)}>{t("Voir les résultats")}</button></div>}</header>, [authPending, feedFilter, location, onDiscover, onPublish, selectFilter, showLocation, t]);
 
-  if (state === "loading") return <section className="social-feed-shell">{header}<div className="feed-skeleton" role="status" aria-label="Chargement du feed" /></section>;
-  if (state !== "ready") return <section className="social-feed-shell">{header}<div className="social-feed-empty"><span>▶</span><h1>{state === "error" ? "Le feed est indisponible" : "Les premières inspirations arrivent bientôt."}</h1><p>{state === "error" ? "Réessayez dans quelques instants." : "Explorez les prestations et les professionnels près de vous."}</p><button onClick={state === "error" ? () => void load() : onDiscover}>{state === "error" ? "Réessayer" : "Découvrir les professionnels"}</button></div></section>;
+  if (state === "loading") return <section className="social-feed-shell" lang={locale}>{header}<div className="feed-skeleton" role="status" aria-label={t("Chargement du feed")} /></section>;
+  if (state !== "ready") return <section className="social-feed-shell">{header}<div className="social-feed-empty"><span>▶</span><h1>{state === "error" ? t("Le feed est indisponible") : t("Les premières inspirations arrivent bientôt.")}</h1><p>{state === "error" ? t("Réessayez dans quelques instants.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={state === "error" ? () => void load() : onDiscover}>{state === "error" ? t("Réessayer") : t("Découvrir les professionnels")}</button></div></section>;
 
-  return <section className="social-feed-shell">{header}<div className="social-feed" aria-label="Vidéos beauté" onScroll={(event) => { const node=event.currentTarget; const index=Math.round(node.scrollTop/Math.max(1,node.clientHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>
-    {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{feedFilter === "Près de moi" ? "Aucun créateur proche pour le moment" : feedFilter === "Tendances" ? "Les tendances arrivent" : `Aucune inspiration ${feedFilter}`}</h1><p>{feedFilter === "Près de moi" ? "Élargissez votre recherche ou revenez bientôt : les disponibilités locales sont actualisées en continu." : "Essayez une autre catégorie pour découvrir des prestations disponibles."}</p><button onClick={() => setFeedFilter("Pour toi")}>Explorer le feed</button></div>}
-    {visiblePosts.map((post, index) => <article className="social-video-card" key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`Publication de ${post.businessName}`}>
-      {post.postType === "video" ? videoErrors.has(post.id) ? <div className="video-fallback"><span>◇</span><p>Cette vidéo ne peut pas être lue.</p><button onClick={() => setVideoErrors((current) => { const next=new Set(current); next.delete(post.id); return next; })}>Réessayer</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={index===activeIndex || index===activeIndex+1 ? post.videoUrl : undefined} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={index===activeIndex ? "auto" : index===activeIndex+1 ? "metadata" : "none"} onLoadStart={() => setVideoLoading((current) => new Set(current).add(post.id))} onWaiting={() => setVideoLoading((current) => current.has(post.id) ? current : new Set(current).add(post.id))} onPlaying={() => setVideoLoading((current) => { if (!current.has(post.id)) return current; const next = new Set(current); next.delete(post.id); return next; })} onCanPlay={() => setVideoLoading((current) => { const next=new Set(current); next.delete(post.id); return next; })} onTimeUpdate={(event) => { const video=event.currentTarget; const ratio=video.duration ? video.currentTime/video.duration : 0; setProgress((current) => ({ ...current, [post.id]: ratio })); if (ratio>=.95 && !completedViews.current.has(post.id)) { completedViews.current.add(post.id); void getSessionHash().then((hash) => { if (pageRequests.current.signal.aborted) return; return getSupabaseBrowserClient()?.rpc("record_video_view", { target_post_id: post.id, target_session_hash: hash, target_watched_ms: Math.round(video.currentTime*1000), target_completed: true }).abortSignal(pageRequests.current.signal); }); } }} onError={() => setVideoErrors((current) => new Set(current).add(post.id))} /> : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt="Avant" width={540} height={760} unoptimized /><figcaption>Avant</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt="Après" width={540} height={760} unoptimized /><figcaption>Après</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
-      {videoLoading.has(post.id) && !videoErrors.has(post.id) && <span className="video-loading" role="status">Chargement…</span>}
+  return <section className="social-feed-shell">{header}<div className="social-feed" aria-label={t("Vidéos beauté")} onScroll={(event) => { const node=event.currentTarget; const index=Math.round(node.scrollTop/Math.max(1,node.clientHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>
+    {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{feedFilter === "Près de moi" ? t("Aucun créateur proche pour le moment") : feedFilter === "Tendances" ? t("Les tendances arrivent") : `${t("Aucune inspiration")} ${t(feedFilter)}`}</h1><p>{feedFilter === "Près de moi" ? t("Élargissez votre recherche ou revenez bientôt : les disponibilités locales sont actualisées en continu.") : t("Essayez une autre catégorie pour découvrir des prestations disponibles.")}</p><button onClick={() => setFeedFilter("Pour toi")}>{t("Explorer le feed")}</button></div>}
+    {visiblePosts.map((post, index) => <article className="social-video-card" data-post-id={post.id} key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`${t("Publication de")} ${post.businessName}`}>
+      {post.postType === "video" ? videoErrors.has(post.id) ? <div className="video-fallback"><span>◇</span><p>{t("Cette vidéo ne peut pas être lue.")}</p><button onClick={() => setVideoErrors((current) => { const next=new Set(current); next.delete(post.id); return next; })}>{t("Réessayer")}</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={index===activeIndex || index===activeIndex+1 ? post.videoUrl : undefined} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={index===activeIndex ? "auto" : index===activeIndex+1 ? "metadata" : "none"} onLoadStart={() => setVideoLoading((current) => new Set(current).add(post.id))} onWaiting={() => setVideoLoading((current) => current.has(post.id) ? current : new Set(current).add(post.id))} onPlaying={() => setVideoLoading((current) => { if (!current.has(post.id)) return current; const next = new Set(current); next.delete(post.id); return next; })} onCanPlay={() => setVideoLoading((current) => { const next=new Set(current); next.delete(post.id); return next; })} onTimeUpdate={(event) => { const video=event.currentTarget; const ratio=video.duration ? video.currentTime/video.duration : 0; setProgress((current) => ({ ...current, [post.id]: ratio })); if (ratio>=.95 && !completedViews.current.has(post.id)) { completedViews.current.add(post.id); void getSessionHash().then((hash) => { if (pageRequests.current.signal.aborted) return; return getSupabaseBrowserClient()?.rpc("record_video_view", { target_post_id: post.id, target_session_hash: hash, target_watched_ms: Math.round(video.currentTime*1000), target_completed: true }).abortSignal(pageRequests.current.signal); }); } }} onError={() => setVideoErrors((current) => new Set(current).add(post.id))} /> : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt="Avant" width={540} height={760} unoptimized /><figcaption>{t("Avant")}</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt="Après" width={540} height={760} unoptimized /><figcaption>{t("Après")}</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
+      {videoLoading.has(post.id) && !videoErrors.has(post.id) && <span className="video-loading" role="status">{t("Chargement…")}</span>}
       <div className="video-shade" />
-      <div className="video-progress" role="progressbar" aria-label="Progression de la vidéo" aria-valuenow={Math.round((progress[post.id] ?? 0)*100)}><i style={{ transform: `scaleX(${progress[post.id] ?? 0})` }} /></div>
-      {post.postType === "video" && !videoErrors.has(post.id) && <><button className="play-toggle" aria-label={pausedPosts.has(post.id) ? "Lire la vidéo" : "Mettre la vidéo en pause"} onClick={() => setPausedPosts((current) => { const next=new Set(current); if(next.has(post.id)) next.delete(post.id); else next.add(post.id); return next; })}>{pausedPosts.has(post.id) && index===activeIndex ? "▶" : ""}</button><button className="sound-toggle" aria-label={muted ? "Activer le son" : "Couper le son"} onClick={() => setMuted((value) => !value)}>{muted ? "♩×" : "♩"}</button></>}
-      <aside className="social-actions">
-        <button className="creator-orb" aria-label={`Profil de ${post.businessName}`} onClick={() => void openProvider(post)}>{post.avatarUrl ? <Image src={post.avatarUrl} alt="" width={50} height={50} unoptimized /> : post.businessName.slice(0,2).toUpperCase()}</button><small className="profile-action-label">Profil</small>
-        <button disabled={authPending} className={`follow-mini ${followed.has(post.authorId) ? "active" : ""}`} aria-label={followed.has(post.authorId) ? "Se désabonner" : "Suivre"} onClick={() => void follow(post)}>{followed.has(post.authorId) ? "✓" : "+"}</button>
-        <button disabled={authPending} className={liked.has(post.id) ? "active" : ""} aria-label="J’aime" onClick={() => void toggle("like",post)}>♥<small>{compact.format(post.likeCount)}</small></button>
-        <button disabled={authPending} aria-label="Commentaires" onClick={() => void openComments(post)}>◌<small>{compact.format(post.commentCount)}</small></button>
-        <button disabled={authPending} className={saved.has(post.id) ? "active" : ""} aria-label="Enregistrer" onClick={() => void toggle("save",post)}>▱<small>{compact.format(post.saveCount)}</small></button>
-        <button disabled={authPending} aria-label="Partager" onClick={() => void share(post)}>↗<small>{compact.format(post.shareCount)}</small></button>
-        <button disabled={authPending} aria-label="Signaler" onClick={() => void report(post)}>⚑<small>Signaler</small></button>
+      <div className="video-progress" role="progressbar" aria-label={t("Progression de la vidéo")} aria-valuenow={Math.round((progress[post.id] ?? 0)*100)}><i style={{ transform: `scaleX(${progress[post.id] ?? 0})` }} /></div>
+      {post.postType === "video" && !videoErrors.has(post.id) && <><button className="play-toggle" aria-label={t(pausedPosts.has(post.id) ? "Lire la vidéo" : "Mettre la vidéo en pause")} onClick={() => setPausedPosts((current) => { const next=new Set(current); if(next.has(post.id)) next.delete(post.id); else next.add(post.id); return next; })}>{pausedPosts.has(post.id) && index===activeIndex ? "▶" : ""}</button><button className="sound-toggle" aria-label={t(muted ? "Activer le son" : "Couper le son")} onClick={() => setMuted((value) => !value)}>{muted ? "♩×" : "♩"}</button></>}
+      <aside className="social-actions" aria-label={t("Interactions de la publication")}>
+        <button className="creator-orb" aria-label={`${t("Profil de")} ${post.businessName}`} onClick={() => void openProvider(post)}>{post.avatarUrl ? <Image src={post.avatarUrl} alt="" width={50} height={50} unoptimized /> : post.businessName.slice(0,2).toUpperCase()}</button>
+        <button disabled={authPending} aria-pressed={liked.has(post.id)} className={liked.has(post.id) ? "active" : ""} aria-label={t("J’aime")} onClick={() => void toggle("like",post)}>♥</button>
+        <button disabled={authPending} aria-label={t("Commentaires")} onClick={() => void openComments(post)}>◌</button>
+        <button disabled={authPending} aria-label={t("Partager")} onClick={() => void share(post)}>↗</button>
+        <details className="feed-options"><summary aria-label={t("Plus d’options")}>•••</summary><div>
+          <button disabled={authPending} aria-pressed={followed.has(post.authorId)} onClick={() => void follow(post)}>{t(followed.has(post.authorId) ? "Se désabonner" : "Suivre")}</button>
+          <button disabled={authPending} aria-pressed={saved.has(post.id)} onClick={() => void toggle("save",post)}>{t(saved.has(post.id) ? "Retirer des inspirations" : "Enregistrer")}</button>
+          <button disabled={authPending} onClick={() => void report(post)}>{t("Signaler")}</button>
+        </div></details>
       </aside>
-      <div className="social-caption"><button className="creator-name" onClick={() => void openProvider(post)}>@{post.slug} {post.verified && <b>✓</b>}</button><span>{post.locationLabel ?? post.city}{post.distance !== null ? ` · ${formatDistance(post.distance)}` : ""} · {post.serviceTitle ?? "Beauté professionnelle"} · ★ {post.averageRating.toFixed(1)}</span>{post.title && <strong>{post.title}</strong>}<p>{post.caption}</p>{post.postType === "promotion" && post.promotionDiscount !== null && <span className="social-offer">−{post.promotionDiscount}% · {post.promotionSlots ?? "Places limitées"} place(s)</span>}<span>{(post.hashtags.length ? post.hashtags.slice(0, 3) : ["matabeauty"]).map((tag) => `#${tag}`).join(" · ")}</span>{post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service"><button className="service-profile-link" onClick={() => void openProvider(post)}><small>PRESTATION</small><strong>{post.serviceTitle}</strong><span>{post.durationMinutes} min · {price(post.priceAmount)}</span><em>{realAvailability[post.id] ? `Prochain créneau ${new Date(realAvailability[post.id] as string).toLocaleString("fr-FR", { weekday: "short", hour:"2-digit", minute:"2-digit", timeZone:"Africa/Dakar" })}` : realAvailability[post.id] === null ? "Voir les prochaines disponibilités" : "Disponibilités en cours…"}</em></button><button disabled={authPending} onClick={() => void book(post)}>Réserver</button></div>}</div>
+      <div className="social-caption">
+        <button className="creator-name" onClick={() => void openProvider(post)}>{t(post.businessName)}</button>
+        {post.city && <span className="feed-public-location">{post.city}</span>}
+        {post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service">
+          <button className="service-profile-link" onClick={() => void book(post)}><strong>{post.serviceTitle}</strong>{feedPrice(post.priceAmount, post.currency, locale) && <span>{feedPrice(post.priceAmount, post.currency, locale)}</span>}</button>
+          <div className="feed-booking-actions"><button className="feed-availability" disabled={authPending} onClick={() => void book(post)}>{t("Voir les disponibilités")}</button><button className="feed-book" disabled={authPending} onClick={() => void book(post)}>{t("Réserver")}</button></div>
+        </div>}
+      </div>
     </article>)}
-  </div>{activePost?.isSponsored && <span className="sponsored-label">Contenu sponsorisé</span>}
-  {commentsPost && <div className="comments-backdrop" onMouseDown={(event) => event.target===event.currentTarget && setCommentsPost(null)}><section className="comments-sheet" role="dialog" aria-modal="true" aria-label="Commentaires"><header><strong>Commentaires</strong><button aria-label="Fermer" onClick={() => setCommentsPost(null)}>×</button></header><div>{comments.length ? comments.map((comment) => <article className={comment.parent_id ? "comment-reply" : ""} key={comment.id}><span>{comment.profiles?.display_name?.slice(0,1) ?? "M"}</span><p><strong>{comment.profiles?.display_name ?? "Membre Mata"}</strong>{comment.body}<small><button onClick={() => setReplyTo(comment)}>Répondre</button>{authenticated?.userId===comment.author_id ? <button onClick={() => void deleteComment(comment)}>Supprimer</button> : <button onClick={() => void reportComment(comment)}>Signaler</button>}</small></p></article>) : <p className="no-comments">Soyez la première à commenter.</p>}</div><footer>{replyTo && <span className="reply-indicator">Réponse à {replyTo.profiles?.display_name ?? "un membre"} <button onClick={() => setReplyTo(null)}>×</button></span>}<input aria-label="Ajouter un commentaire" value={commentText} maxLength={1000} onChange={(event) => setCommentText(event.target.value)} placeholder={replyTo ? "Écrire une réponse…" : "Ajouter un commentaire…"} /><button disabled={authPending || !commentText.trim()} onClick={() => void addComment()}>Publier</button></footer></section></div>}
-  {feedback && <p className="feed-feedback" role="status">{feedback}</p>}
-  <button disabled={authPending} className="feed-publish-fab" aria-label="Ouvrir le Studio créateur" onClick={onPublish}>＋</button>
+  </div>{activePost?.isSponsored && <span className="sponsored-label">{t("Contenu sponsorisé")}</span>}
+  {commentsPost && <div className="comments-backdrop" onMouseDown={(event) => event.target===event.currentTarget && setCommentsPost(null)}><section ref={commentsDialog} className="comments-sheet" onKeyDown={event => { if (event.key === "Escape") { commentRequest.current++; setCommentsPost(null); } if (event.key === "Tab") { const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled)")); const first = items[0], last = items.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } } }} role="dialog" aria-modal="true" aria-label={t("Commentaires")}><header><strong>{t("Commentaires")}</strong><button aria-label={t("Fermer")} onClick={() => setCommentsPost(null)}>×</button></header><div>{commentsState === "loading" ? <p role="status">{t("Chargement des commentaires…")}</p> : commentsState === "error" ? <p role="alert">{t("Commentaires indisponibles.")} <button onClick={() => void openComments(commentsPost)}>{t("Réessayer")}</button></p> : comments.length ? comments.map((comment) => <article className={comment.parent_id ? "comment-reply" : ""} key={comment.id}><span>{comment.profiles?.display_name?.slice(0,1) ?? "M"}</span><p><strong>{comment.profiles?.display_name ?? t("Membre Mata")}</strong>{comment.body}<small><button onClick={() => setReplyTo(comment)}>{t("Répondre")}</button>{authenticated?.userId===comment.author_id ? <button onClick={() => void deleteComment(comment)}>{t("Supprimer")}</button> : <button onClick={() => void reportComment(comment)}>{t("Signaler")}</button>}</small></p></article>) : <p className="no-comments">{t("Soyez la première à commenter.")}</p>}</div><footer>{replyTo && <span className="reply-indicator">{t("Réponse à")} {replyTo.profiles?.display_name ?? t("un membre")} <button onClick={() => setReplyTo(null)}>×</button></span>}<input aria-label={t("Ajouter un commentaire")} value={commentText} maxLength={1000} onChange={(event) => setCommentText(event.target.value)} placeholder={t(replyTo ? "Écrire une réponse…" : "Ajouter un commentaire…")} /><button disabled={authPending || commentBusy || !commentText.trim()} onClick={() => void addComment()}>{t("Publier")}</button></footer></section></div>}
+  {feedback && <p className="feed-feedback" role="status">{t(feedback)}</p>}
+  <button disabled={authPending} className="feed-publish-fab" aria-label={t("Ouvrir le Studio créateur")} onClick={onPublish}>＋</button>
   </section>;
 }

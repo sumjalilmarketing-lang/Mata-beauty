@@ -38,6 +38,7 @@ let moderatorApi: SupabaseClient;
 let superApi: SupabaseClient;
 let moderatorMfaSecret = "";
 let studioPostId = "";
+let liveSecondPostId = "";
 let photoPostId = "";
 let beforeAfterPostId = "";
 let qaVideoBuffer: Buffer;
@@ -45,6 +46,7 @@ const extraVideoTitles: string[] = [];
 const extraVideoCategories = ["makeup", "makeup", "barbier", "barbier", "tresses", "ongles", "ongles", "coiffure"] as const;
 const browserConsoleErrors: string[] = [];
 const browserNetworkErrors: string[] = [];
+
 
 test.describe.configure({ mode: "serial" });
 
@@ -283,7 +285,7 @@ test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page
   expect(allVideos.data).toHaveLength(9);
   expect(allVideos.data!.every((post) => post.social_post_media.length === 1 && post.social_post_media[0].storage_path.startsWith(`${providerId}/`))).toBeTruthy();
   await page.goto("/");
-  await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(`[data-post-id="${studioPostId}"]`)).toBeVisible({ timeout: 20_000 });
 });
 
 test("le Studio publie une photo et un avant-après réels dans Storage", async ({ page }) => {
@@ -310,7 +312,7 @@ test("le Studio publie une photo et un avant-après réels dans Storage", async 
   await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
   await page.locator('input[name="consent"]').check();
   await page.getByRole("button", { name: "Publier le contenu" }).click();
-  await expect(page.getByText(photoTitle)).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(`[data-post-id="${photoPostId}"]`)).toBeVisible({ timeout: 20_000 });
 
   await page.getByRole("button", { name: "Créer une publication" }).click();
   await page.locator('select[name="contentType"]').selectOption("before_after");
@@ -325,7 +327,7 @@ test("le Studio publie une photo et un avant-après réels dans Storage", async 
   await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
   await page.locator('input[name="consent"]').check();
   await page.getByRole("button", { name: "Publier le contenu" }).click();
-  await expect(page.getByText(beforeAfterTitle)).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(`[data-post-id="${beforeAfterPostId}"]`)).toBeVisible({ timeout: 20_000 });
 
   const posts = await admin.from("posts").select("id,title,post_type,status").eq("author_id", providerId).in("title", [photoTitle, beforeAfterTitle]);
   expect(posts.error).toBeNull();
@@ -432,9 +434,9 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await expect(page.getByRole("heading", { name: "Profil", exact: true }).first()).toBeVisible({ timeout: 20_000 });
   await page.goto("/");
   await expect(page.getByRole("navigation", { name: "Navigation de l’application" })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(photoTitle)).toBeVisible();
-  const beforeAfterCard = page.locator(".social-video-card").filter({ hasText: beforeAfterTitle });
+  await expect(page.locator(`[data-post-id="${studioPostId}"]`)).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(`[data-post-id="${photoPostId}"]`)).toBeVisible();
+  const beforeAfterCard = page.locator(`[data-post-id="${beforeAfterPostId}"]`);
   await expect(beforeAfterCard.getByRole("img", { name: "Avant" })).toBeVisible();
   await expect(beforeAfterCard.getByRole("img", { name: "Après" })).toBeVisible();
 
@@ -449,12 +451,13 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await liveProviderPage.waitForURL(/\/pro/);
   await liveProviderPage.goto("/pro/videos");
   await publishStudioVideo(liveProviderPage, liveSecondTitle, liveSecondCaption, "#tresses #cache #tempsreel");
+  liveSecondPostId = (await admin.from("posts").select("id").eq("author_id", providerId).eq("title", liveSecondTitle).single()).data!.id;
   await liveProviderContext.close();
 
   const navigation = page.getByRole("navigation", { name: "Navigation de l’application" });
   await navigation.getByRole("button", { name: "Explorer", exact: true }).click();
   await navigation.getByRole("button", { name: "Inspiration" }).click();
-  await expect(page.getByText(liveSecondCaption)).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(`[data-post-id="${liveSecondPostId}"]`)).toBeVisible({ timeout: 30_000 });
   expect((await admin.from("posts").select("id").eq("author_id", providerId).eq("title", liveSecondTitle).single()).error).toBeNull();
 
   const desktopFeed = page.locator(".social-feed");
@@ -478,9 +481,9 @@ test("le feed social distant relie les interactions au profil et à la réservat
   // matrix; an in-flight wheel snap can otherwise move the target offscreen.
   await navigation.getByRole("button", { name: "Explorer", exact: true }).click();
   await navigation.getByRole("button", { name: "Inspiration" }).click();
-  await expect(page.getByText(liveSecondCaption)).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(`[data-post-id="${liveSecondPostId}"]`)).toBeVisible({ timeout: 30_000 });
 
-  const mainCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
+  const mainCard = page.locator(`[data-post-id="${studioPostId}"]`);
   const activeVideo = mainCard.locator("video");
   await expect(activeVideo).toBeVisible();
   await mainCard.evaluate((element) => element.scrollIntoView({ block: "start", behavior: "auto" }));
@@ -516,16 +519,18 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await page.evaluate(() => Object.defineProperty(navigator, "share", { configurable: true, value: async () => undefined }));
   await mainCard.getByRole("button", { name: "Partager" }).click();
   await expect(page.getByText("Partage enregistré.")).toBeVisible();
-  const nextCard = page.locator(".social-video-card").filter({ hasText: liveSecondCaption });
+  const nextCard = page.locator(`[data-post-id="${liveSecondPostId}"]`);
   await nextCard.evaluate(node => node.scrollIntoView({ block: "start", behavior: "auto" }));
   await expect.poll(() => activeVideo.evaluate((element) => (element as HTMLVideoElement).paused)).toBeTruthy();
   await expect.poll(() => page.locator(".social-video-card video").evaluateAll((elements) => (elements as HTMLVideoElement[]).filter((video) => !video.paused).length)).toBeLessThanOrEqual(1);
   await expect(activeVideo).toHaveAttribute("preload", /^(metadata|none)$/);
   await mainCard.evaluate(node => node.scrollIntoView({ block: "start", behavior: "auto" }));
-  await expect(page.getByText(studioCaption)).toBeVisible();
+  await expect(page.locator(`[data-post-id="${studioPostId}"]`)).toBeVisible();
   await mainCard.getByRole("button", { name: "J’aime" }).click();
+  await mainCard.getByLabel("Plus d’options", {exact:true}).click();
   await mainCard.getByRole("button", { name: "Enregistrer" }).click();
   await mainCard.getByRole("button", { name: "Suivre" }).click();
+  await mainCard.getByLabel("Plus d’options", {exact:true}).click();
   await mainCard.getByRole("button", { name: "Commentaires" }).click();
   await page.getByLabel("Ajouter un commentaire").fill(`Super résultat ${run}`);
   await page.getByRole("button", { name: "Publier", exact: true }).click();
@@ -534,7 +539,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await mainCard.getByRole("button", { name: "Profil de Mata Feed Pro" }).click();
   await expect(page.getByText("Mata Feed Pro").first()).toBeVisible();
   await page.getByRole("button", { name: "Retour" }).click();
-  await expect(page.getByText(studioCaption)).toBeVisible();
+  await expect(page.locator(`[data-post-id="${studioPostId}"]`)).toBeVisible();
   await mainCard.getByRole("button", { name: "Réserver" }).click();
   await expect(page.getByRole("heading", { name: "Réserver" })).toBeVisible();
   await expect(page.getByText(`Tresses Preview ${run}`).first()).toBeVisible();
@@ -618,7 +623,8 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await mainCard.getByRole('button',{name:'J’aime',exact:true}).click();
   await expect(page.getByText('J’aime retiré.',{exact:true})).toBeVisible();
   await page.unroute('**/rest/v1/rpc/get_my_private_profile');
-  await mainCard.getByRole('button',{name:'Enregistrer',exact:true}).click();
+  await mainCard.getByLabel('Plus d’options',{exact:true}).click();
+  await mainCard.getByRole('button',{name:'Retirer des inspirations',exact:true}).click();
   await expect(page.getByText('Retirée de Mes inspirations.',{exact:true})).toBeVisible();
   await mainCard.getByRole('button',{name:'Se désabonner',exact:true}).click();
   await expect.poll(async()=> (await admin.from('follows').select('follower_id').eq('followed_provider_id',providerId).eq('follower_id',clientId)).data?.length).toBe(0);
@@ -658,9 +664,10 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/app/);
   await page.goto("/");
-  const reportedCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
+  const reportedCard = page.locator(`[data-post-id="${studioPostId}"]`);
   await page.waitForLoadState("networkidle");
   page.once("dialog", (dialog) => dialog.accept());
+  await reportedCard.getByLabel("Plus d’options", {exact:true}).click();
   await reportedCard.getByRole("button", { name: "Signaler" }).click();
   await expect(page.getByText("Signalement transmis à la modération.")).toBeVisible();
   const report = await admin.from("reports").select("id,status,post_id").eq("post_id", studioPostId).eq("reporter_id", clientId).single();
@@ -754,13 +761,13 @@ test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async (
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
     await page.waitForURL(/\/app/);
     await page.goto("/");
-    await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(`[data-post-id="${studioPostId}"]`)).toBeVisible({ timeout: 20_000 });
     await page.screenshot({ path: `work/ultra-simple/feed-${width}.png` });
-    const mobileCard = page.locator(".social-video-card").filter({ hasText: studioCaption });
+    const mobileCard = page.locator(`[data-post-id="${studioPostId}"]`);
     await mobileCard.getByRole("button", { name: "Profil de Mata Feed Pro" }).click();
     await expect(page.getByText("Mata Feed Pro").first()).toBeVisible();
     await page.getByRole("button", { name: "Retour" }).click();
-    await expect(page.getByText(studioCaption)).toBeVisible();
+    await expect(page.locator(`[data-post-id="${studioPostId}"]`)).toBeVisible();
     await mobileCard.getByRole("button", { name: "Réserver", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Réserver" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
@@ -793,7 +800,7 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
     await page.waitForURL(/\/app/);
     await page.waitForLoadState("networkidle");
     await page.goto("/");
-    const card = page.locator(".social-video-card").filter({ hasText: studioCaption });
+    const card = page.locator(`[data-post-id="${studioPostId}"]`);
     const video = card.locator("video");
     await expect(video).toBeVisible({ timeout: 30_000 });
     await card.evaluate((element) => element.scrollIntoView({ block: "start" }));
@@ -811,7 +818,7 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
     await expect(page).toHaveURL(/\/app/);
     await page.waitForLoadState("networkidle");
     await page.goForward();
-    await expect(page.getByText(studioCaption)).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator(`[data-post-id="${studioPostId}"]`)).toBeVisible({ timeout: 30_000 });
     await page.waitForLoadState("networkidle");
   } finally {
     await context.close();
@@ -860,7 +867,7 @@ test("le lecteur récupère après erreur réseau et borne le chargement bloqué
     await prepareFaultPage(page);
     await page.route(mediaPattern, route => route.request().method()==='GET' ? route.fulfill({status:404,body:'QA unavailable'}) : route.continue());
     await page.goto(remoteAppUrl ?? 'http://localhost:3100');
-    const card = page.locator('.social-video-card').filter({hasText:studioCaption});
+    const card = page.locator(`[data-post-id="${studioPostId}"]`);
     await card.evaluate(node => node.scrollIntoView({block:'start'}));
     await expect(card.getByText('Cette vidéo ne peut pas être lue.')).toBeVisible({timeout:20_000});
     await page.unroute(mediaPattern);
@@ -889,7 +896,7 @@ test("le lecteur récupère après erreur réseau et borne le chargement bloqué
     await prepareFaultPage(stalled);
     await stalled.route(mediaPattern,route=>route.request().method()==='GET'?new Promise<void>(()=>{}):route.continue());
     await stalled.goto(remoteAppUrl ?? 'http://localhost:3100');
-    const card = stalled.locator('.social-video-card').filter({hasText:studioCaption});
+    const card = stalled.locator(`[data-post-id="${studioPostId}"]`);
     await card.evaluate(node=>node.scrollIntoView({block:'start'}));
     await expect(card.getByText('Chargement…',{exact:true})).toBeVisible();
     await expect.soft(card.getByText('Cette vidéo ne peut pas être lue.')).toBeVisible({timeout:35_000});
@@ -948,7 +955,8 @@ test("le Studio refuse les fichiers invalides et récupère après interruption"
     await page.locator('select[name="serviceId"]').selectOption(providerServiceId);await page.locator('input[name="consent"]').check();
     await page.getByRole('button',{name:'Publier la vidéo',exact:true}).click();
     await expect(page.getByText(`Portrait WebM ${run}`,{exact:true}).first()).toBeVisible({timeout:30000});
-    await page.goto('/');const portrait=page.locator('.social-video-card').filter({hasText:`Portrait WebM ${run}`});
+    const portraitId=(await admin.from('posts').select('id').eq('author_id',providerId).eq('title',`Portrait WebM ${run}`).single()).data!.id;
+    await page.goto('/');const portrait=page.locator(`[data-post-id="${portraitId}"]`);
     await portrait.evaluate(node=>node.scrollIntoView({block:'start'}));
     await expect.poll(()=>portrait.locator('video').evaluate(node=>(node as HTMLVideoElement).currentTime),{timeout:20000}).toBeGreaterThan(0);
     expect(await portrait.locator('video').evaluate(node=>{const v=node as HTMLVideoElement;return {width:v.videoWidth,height:v.videoHeight,fit:getComputedStyle(v).objectFit};})).toEqual({width:180,height:320,fit:'cover'});
@@ -970,3 +978,24 @@ test("le Studio refuse les fichiers invalides et récupère après interruption"
     await expect(row).toHaveCount(0);
   } finally {await context.close();}
 });
+
+test("feed interactions : anti-spam serveur et suppression de ses commentaires", async () => {
+  const email = `feed-rate-${randomUUID()}@example.test`;
+  const id = await createUser(email);
+  const api = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
+  try {
+    expect((await api.auth.signInWithPassword({ email, password })).error).toBeNull();
+    expect((await api.rpc("synchronize_account_status")).error).toBeNull();
+    // A fresh published fixture is selected after the suite setup.
+    const post = await admin.from("posts").select("id").eq("author_id", providerId).eq("status", "published").limit(1).single();
+    expect(post.error).toBeNull();
+    for (let i = 0; i < 5; i++) {
+      const comment = await api.from("post_comments").insert({ post_id: post.data!.id, author_id: id, body: `QA rate ${i}`, created_at: "2000-01-01T00:00:00Z" }).select("id,created_at").single();
+      expect(comment.error).toBeNull(); expect(new Date(comment.data!.created_at).getFullYear()).toBeGreaterThan(2000);
+      expect((await clientApi.from("post_comments").delete().eq("id", comment.data!.id).select("id")).data).toEqual([]);
+      expect((await api.from("post_comments").delete().eq("id", comment.data!.id)).error).toBeNull();
+    }
+    expect((await api.from("post_comments").insert({ post_id: post.data!.id, author_id: id, body: "QA excessive" })).error).not.toBeNull();
+  } finally { await api.auth.signOut(); expect((await admin.auth.admin.deleteUser(id)).error).toBeNull(); }
+});
+

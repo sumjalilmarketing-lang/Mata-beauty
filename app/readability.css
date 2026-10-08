@@ -233,3 +233,28 @@
 .account-action-dialog h2 { font-size: 24px; }
 .account-action-dialog h3 { font-size: 18px; }
 .account-action-dialog p, .account-action-dialog li { font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+
+/* Inspiration: keep the image dominant and reserve separate space for actions. */
+.social-video-card .video-shade { background: linear-gradient(180deg,transparent 45%,#0002 60%,#000b 100%); }
+.social-video-card .social-actions { right: 10px; bottom: 180px; gap: 10px; }
+.social-video-card .social-actions > button { width: 46px; min-width: 46px; height: 46px; min-height: 46px; border-radius: 50%; background: #0003; font-size: 28px; }
+.social-video-card .social-actions > .creator-orb { background: #681543; font-size: 15px; }
+.social-video-card .social-caption { left: 18px; right: 74px; bottom: 20px; max-width: none; color: #fff; text-shadow: 0 1px 5px #000; }
+.social-caption .creator-name { display: block; max-width: 100%; font-size: 18px; line-height: 1.25; text-align: left; overflow-wrap: anywhere; }
+.social-caption .feed-public-location { display: block; font-size: 13px; line-height: 1.4; color: #fff; }
+.social-caption .linked-service { display: block; padding: 0; margin-top: 8px; border: 0; border-radius: 0; background: transparent; backdrop-filter: none; }
+.social-caption .linked-service .service-profile-link { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 0; width: 100%; min-height: 36px; border-radius: 0; background: transparent; text-shadow: inherit; }
+.social-caption .linked-service strong, .social-caption .linked-service span { font-size: 14px; line-height: 1.4; color: #fff; }
+.feed-booking-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.feed-booking-actions .feed-availability { min-height: 44px; padding: 4px 0; background: transparent; color: #fff; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; }
+.feed-booking-actions .feed-book { min-height: 44px; padding: 10px 20px; border-radius: 10px; color: #fff; background: #ae155e; font-size: 14px; font-weight: 800; text-transform: uppercase; }
+.feed-options { position: relative; color: #fff; }
+.feed-options > summary { width: 46px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: #0005; cursor: pointer; list-style: none; }
+.feed-options > summary::-webkit-details-marker { display: none; }
+.feed-options > div { position: absolute; right: 54px; bottom: 0; width: 210px; padding: 8px; border: 1px solid #ffffff60; border-radius: 12px; background: #191019; box-shadow: 0 4px 24px #0006; }
+.social-actions .feed-options button { width: 100%; min-height: 44px; padding: 8px 12px; text-align: left; justify-items: start; border-radius: 6px; color: #fff; font-size: 14px; }
+.social-actions .feed-options button:hover { background: #ffffff20; }
+.comments-sheet article p, .comments-sheet article strong { font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.comments-sheet article small button { min-height: 44px; padding: 6px 10px; color: #fff; background: transparent; }
+.social-feed-shell :is(button,summary):focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+@media (max-height: 650px) { .social-video-card .social-actions { bottom: 155px; gap: 2px; } .social-video-card .social-caption { bottom: 10px; } }
