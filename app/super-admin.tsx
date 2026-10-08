@@ -1,4 +1,5 @@
 "use client";
+import { PasswordField } from "@/app/password-field";
 
 import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -6,6 +7,7 @@ import { configureSupabaseBrowserClient, getSupabaseBrowserClient, getSupabaseCo
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { ProviderReview } from "./provider-review";
 import { OnboardingQueue } from "./onboarding-queue";
+import { ManagedAccounts } from "./managed-accounts";
 import { NotificationCenter, NotificationBadge } from "./notification-center";
 import { LaunchAdmin } from "./launch-admin";
 import { SupportInbox } from "./support-inbox";
@@ -460,7 +462,7 @@ function AdminLogin({ onAuthenticated, configured }: { onAuthenticated: () => Pr
       {!configured && <div className="admin-auth-error">Configuration sécurisée indisponible.</div>}
       <form onSubmit={submit}>
         <label>Adresse administrateur<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
-        <label>Mot de passe<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required /></label>
+        <label>Mot de passe<PasswordField autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required /></label>
         {feedback && <p className="admin-auth-error" role="alert">{feedback}</p>}
         <button className="primary" disabled={!configured || busy}>{busy ? "Vérification…" : "Accéder à l’administration"}</button>
       </form>
@@ -490,7 +492,7 @@ function AdminModule({
   if (module === "reports") return <ModerationInbox />;
   if (module === "comments") return <CommentModeration />;
   if (module === "support") return <SupportInbox />;
-  if (module === "users") return <UsersModule context={context} notify={notify} />;
+  if (module === "users") return context.is_super_admin ? <ManagedAccounts /> : <UsersModule context={context} notify={notify} />;
   if (module === "notifications") return <NotificationCenter />;
   if (module === "verification") return <OnboardingQueue moduleKey="dashboard" />;
   if (module === "providers") return <ProvidersModule context={context} verificationOnly={false} notify={notify} />;

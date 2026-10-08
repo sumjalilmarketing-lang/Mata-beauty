@@ -1,9 +1,10 @@
 "use client";
+import { PasswordField, PasswordRequirements } from "@/app/password-field";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { authErrorMessage } from "@/lib/auth/errors";
@@ -29,9 +30,12 @@ export default function UpdatePasswordPage() {
   const [internalInvitation, setInternalInvitation] = useState(false);
   const initialization = useRef<Promise<void> | null>(null);
   const submitting = useRef(false);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({
+  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
   });
+
+  const passwordValue = useWatch({ control, name: "password" });
+  const confirmationValue = useWatch({ control, name: "confirmation" });
 
   useEffect(() => {
     let active = true;
@@ -100,10 +104,11 @@ export default function UpdatePasswordPage() {
         <h1>{invitation ? "Créer votre mot de passe" : "Nouveau mot de passe"}</h1>
         {checking && <p role="status">Vérification du lien…</p>}
         <form onSubmit={(event) => void handleSubmit(submit)(event)}>
-          <label>Nouveau mot de passe<input type="password" autoComplete="new-password" {...register("password")} /></label>
+          <label>Nouveau mot de passe<PasswordField autoComplete="new-password" {...register("password")} /></label>
           {errors.password && <small className="field-error">{errors.password.message}</small>}
-          <label>Confirmation<input type="password" autoComplete="new-password" {...register("confirmation")} /></label>
+          <label>Confirmation<PasswordField autoComplete="new-password" {...register("confirmation")} /></label>
           {errors.confirmation && <small className="field-error">{errors.confirmation.message}</small>}
+          <PasswordRequirements password={passwordValue} confirmation={confirmationValue} />
           {feedback && <p className="auth-feedback" role="status">{feedback}</p>}
           <button className="primary-button full" disabled={!ready || isSubmitting || complete}>{isSubmitting ? "Mise à jour…" : "Mettre à jour"}</button>
         </form>

@@ -1,9 +1,10 @@
 "use client";
+import { PasswordField, PasswordRequirements } from "@/app/password-field";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { authErrorMessage } from "@/lib/auth/errors";
 import { meetsPasswordPolicy, passwordPolicyMessage } from "@/lib/auth/password-policy";
@@ -45,6 +46,7 @@ export function AuthModal({
   const configuration = getSupabaseConfiguration();
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -52,6 +54,9 @@ export function AuthModal({
     resolver: zodResolver(authSchema),
     defaultValues: { displayName: "", email: "", password: "", confirmation: "", acceptLegal: false },
   });
+
+  const passwordValue = useWatch({ control, name: "password" });
+  const confirmationValue = useWatch({ control, name: "confirmation" });
 
   async function submit(values: AuthValues) {
     if (submitting.current || openingGoogle.current) return;
@@ -216,8 +221,7 @@ export function AuthModal({
           {mode !== "reset" && (
             <label>
               Mot de passe
-              <input
-                type="password"
+              <PasswordField
                 autoComplete={mode === "register" ? "new-password" : "current-password"}
                 aria-invalid={Boolean(errors.password)}
                 {...register("password")}
@@ -226,7 +230,8 @@ export function AuthModal({
             </label>
           )}
           {mode === "register" && <>
-            <label>Confirmer le mot de passe<input type="password" autoComplete="new-password" {...register("confirmation")} /></label>
+            <label>Confirmer le mot de passe<PasswordField autoComplete="new-password" {...register("confirmation")} /></label>
+            <PasswordRequirements password={passwordValue} confirmation={confirmationValue} />
             <label className="legal-consent"><input type="checkbox" aria-label="Accepter les conditions générales et la politique de confidentialité" {...register("acceptLegal")} /> <span>J’accepte les <Link href="/legal/conditions-generales" target="_blank" rel="noopener noreferrer">conditions générales</Link> et la <Link href="/legal/confidentialite" target="_blank" rel="noopener noreferrer">politique de confidentialité</Link> de Mata Beauty.</span></label>
           </>}
           {feedback && <p className="auth-feedback" role="status">{feedback}</p>}

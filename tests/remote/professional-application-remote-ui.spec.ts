@@ -168,9 +168,10 @@ test("quatre documents, examen réel et approbation avant accès professionnel",
     await reviewer.goto("/onboarding/notifications");
     await reviewer.locator(".notification-card").filter({ hasText: "Complément reçu : dossier à vérifier" }).getByRole("button", { name: "Ouvrir", exact: true }).click();
     await expect(reviewer.getByRole("heading", { name: "Historique du dossier" })).toBeVisible();
-    await reviewer.getByRole("combobox", { name: /Décision/ }).selectOption("approved");
+    await expect(reviewer.getByRole("button", { name: "Approuver le dossier", exact: true })).toBeDisabled();
+    await reviewer.getByRole("checkbox", { name: "J’ai vérifié l’identité, les informations professionnelles et les quatre documents." }).check();
     await reviewer.getByLabel("Message au candidat").fill("Dossier de recette vérifié et approuvé.");
-    await reviewer.getByRole("button", { name: "Confirmer la décision" }).click();
+    await reviewer.getByRole("button", { name: "Approuver le dossier", exact: true }).click();
     await expect(reviewer.getByText("Décision enregistrée et candidat notifié.")).toBeVisible();
     await page.goto("/app/notifications");
     await page.locator(".notification-card").filter({ hasText: "Votre compte professionnel est approuvé" }).getByRole("button", { name: "Ouvrir", exact: true }).click();
