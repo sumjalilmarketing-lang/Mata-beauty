@@ -266,8 +266,17 @@ test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page
   await page.goto("/discover");
   const categoryCard = page.locator(`[data-category="${publishedService!.serviceMedia!.categorySlug}"]`);
   await expect(categoryCard).toHaveAttribute("data-media-origin", "professional");
-  await expect(categoryCard).toHaveAttribute("data-current-media", new RegExp(studioPostId));
-  await expect(categoryCard.locator("img").first()).toHaveJSProperty("naturalWidth", 1);
+  // A shared category can feature another professional's service. The exact
+  // new post/service association is verified above and its feed entry below.
+  const publicCatalog = await fetchPublishedProviders(clientApi);
+  const categoryPaths = new Set(publicCatalog.flatMap(service =>
+    service.serviceMedia?.categorySlug === publishedService!.serviceMedia!.categorySlug
+      ? [new URL(service.serviceMedia.src).pathname] : []));
+  await expect.poll(async () => {
+    const source = await categoryCard.getAttribute("data-current-media");
+    return Boolean(source && categoryPaths.has(new URL(source, remoteAppUrl).pathname));
+  }).toBe(true);
+  await expect.poll(() => categoryCard.locator("img").first().evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
 
   const allVideos = await admin.from("posts").select("id,title,social_post_media(storage_path)").eq("author_id", providerId).eq("post_type", "video").eq("status", "published");
   expect(allVideos.error).toBeNull();
