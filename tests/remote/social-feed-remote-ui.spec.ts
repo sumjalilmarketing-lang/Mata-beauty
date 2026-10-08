@@ -216,7 +216,7 @@ test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page
   await page.goto("/");
   await page.getByRole("button", { name: "Publier une vidéo" }).click();
   await page.getByLabel("Adresse e-mail").fill(providerEmail);
-  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/pro/);
   await expect(page.getByRole("navigation", { name: "Navigation Espace professionnel" }).getByRole("link")).toHaveText(["⌂Dashboard", "▶Studio", "≡Prestations", "□Agenda", "✉Messages", "¤Revenus", "○Profil"]);
@@ -294,7 +294,7 @@ test("le Studio publie une photo et un avant-après réels dans Storage", async 
   await page.goto("/");
   await page.getByRole("button", { name: "Publier une vidéo" }).click();
   await page.getByLabel("Adresse e-mail").fill(providerEmail);
-  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/pro/);
   await page.goto("/pro/videos");
@@ -312,7 +312,7 @@ test("le Studio publie une photo et un avant-après réels dans Storage", async 
   await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
   await page.locator('input[name="consent"]').check();
   await page.getByRole("button", { name: "Publier le contenu" }).click();
-  await expect(page.locator(`[data-post-id="${photoPostId}"]`)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(photoTitle, { exact: true })).toBeVisible({ timeout: 20_000 });
 
   await page.getByRole("button", { name: "Créer une publication" }).click();
   await page.locator('select[name="contentType"]').selectOption("before_after");
@@ -327,7 +327,7 @@ test("le Studio publie une photo et un avant-après réels dans Storage", async 
   await page.locator('select[name="serviceId"]').selectOption(providerServiceId);
   await page.locator('input[name="consent"]').check();
   await page.getByRole("button", { name: "Publier le contenu" }).click();
-  await expect(page.locator(`[data-post-id="${beforeAfterPostId}"]`)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(beforeAfterTitle, { exact: true })).toBeVisible({ timeout: 20_000 });
 
   const posts = await admin.from("posts").select("id,title,post_type,status").eq("author_id", providerId).in("title", [photoTitle, beforeAfterTitle]);
   expect(posts.error).toBeNull();
@@ -347,7 +347,7 @@ test("RLS masque les contenus non publiables et interdit les modifications étra
   await page.goto("/");
   await page.getByRole("button", { name: "Publier une vidéo" }).click();
   await page.getByLabel("Adresse e-mail").fill(providerEmail);
-  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/pro/);
   await page.goto("/pro/videos");
@@ -429,7 +429,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await page.goto("/");
   await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
   await page.getByLabel("Adresse e-mail").fill(clientEmail);
-  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Profil", exact: true }).first()).toBeVisible({ timeout: 20_000 });
   await page.goto("/");
@@ -446,7 +446,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await liveProviderPage.goto("/");
   await liveProviderPage.getByRole("button", { name: "Publier une vidéo" }).click();
   await liveProviderPage.getByLabel("Adresse e-mail").fill(providerEmail);
-  await liveProviderPage.getByLabel("Mot de passe").fill(password);
+  await liveProviderPage.getByLabel("Mot de passe", { exact: true }).fill(password);
   await liveProviderPage.getByRole("button", { name: "Se connecter", exact: true }).click();
   await liveProviderPage.waitForURL(/\/pro/);
   await liveProviderPage.goto("/pro/videos");
@@ -535,11 +535,22 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await page.getByLabel("Ajouter un commentaire").fill(`Super résultat ${run}`);
   await page.getByRole("button", { name: "Publier", exact: true }).click();
   await expect(page.getByText(`Super résultat ${run}`)).toBeVisible();
+  await page.getByLabel("Ajouter un commentaire").fill(`À supprimer ${run}`);
+  await page.getByRole("button", { name: "Publier", exact: true }).click();
+  const removableComment = page.locator('.comments-sheet article').filter({ hasText: `À supprimer ${run}` });
+  await expect(removableComment).toBeVisible();
+  await removableComment.getByRole('button', { name: 'Supprimer', exact: true }).click();
+  await expect(removableComment).toHaveCount(0);
   await page.getByRole("button", { name: "Fermer" }).click();
   await mainCard.getByRole("button", { name: "Profil de Mata Feed Pro" }).click();
   await expect(page.getByText("Mata Feed Pro").first()).toBeVisible();
   await page.getByRole("button", { name: "Retour" }).click();
   await expect(page.locator(`[data-post-id="${studioPostId}"]`)).toBeVisible();
+  await mainCard.getByRole("button", { name: "Voir les disponibilités", exact: true }).click();
+  await expect(page.locator('.premium-slot-grid button').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(`Tresses Preview ${run}`).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Fermer', exact: true }).click();
+  await expect(mainCard).toBeInViewport({ ratio: 0.5 });
   await mainCard.getByRole("button", { name: "Réserver" }).click();
   await expect(page.getByRole("heading", { name: "Réserver" })).toBeVisible();
   await expect(page.getByText(`Tresses Preview ${run}`).first()).toBeVisible();
@@ -596,7 +607,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await providerPage.goto("/");
   await providerPage.getByRole("button", { name: "Publier une vidéo" }).click();
   await providerPage.getByLabel("Adresse e-mail").fill(providerEmail);
-  await providerPage.getByLabel("Mot de passe").fill(password);
+  await providerPage.getByLabel("Mot de passe", { exact: true }).fill(password);
   await providerPage.getByRole("button", { name: "Se connecter", exact: true }).click();
   await providerPage.waitForURL(/\/pro/);
   await providerPage.goto("/pro/bookings");
@@ -660,7 +671,7 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   await page.goto("/");
   await page.getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
   await page.getByLabel("Adresse e-mail").fill(clientEmail);
-  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/app/);
   await page.goto("/");
@@ -681,7 +692,7 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   await preparePage(adminPage);
   await adminPage.goto("/admin");
   await adminPage.getByLabel("Adresse administrateur").fill(moderatorEmail);
-  await adminPage.getByLabel("Mot de passe").fill(password);
+  await adminPage.getByLabel("Mot de passe", { exact: true }).fill(password);
   await adminPage.getByRole("button", { name: "Accéder à l’administration" }).click();
   await completeQaMfa(adminPage, moderatorMfaSecret);
   await expect(adminPage.getByRole("heading", { name: "Vue d’ensemble", level: 1 })).toBeVisible({ timeout: 20_000 });
@@ -725,7 +736,7 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   await page.goto("/");
   await page.getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
   await page.getByLabel("Adresse e-mail").fill(clientEmail);
-  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/app/);
   await page.goto("/");
@@ -737,8 +748,8 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   await expect.poll(() => page.locator(".social-video-card").count()).toBeGreaterThan(8);
   const paginationRequests = feedRequests.filter((url) => new URL(url).searchParams.has("or"));
   expect(paginationRequests).toHaveLength(1);
-  const cardTexts = await page.locator(".social-video-card").allTextContents();
-  expect(new Set(cardTexts).size).toBe(cardTexts.length);
+  const cardIds = await page.locator(".social-video-card").evaluateAll(cards => cards.map(card => card.getAttribute("data-post-id")));
+  expect(new Set(cardIds).size).toBe(cardIds.length);
   await expect(page.getByRole("navigation", { name: "Filtres du feed" }).getByRole("button")).toHaveText(["Pour toi", "Près de moi", "Tendances"]);
   await page.getByRole("button", { name: "Près de moi", exact: true }).click();
   await page.getByLabel("Ville ou quartier").fill("Dakar");
@@ -757,7 +768,7 @@ test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async (
     await page.goto("/");
     await page.getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
     await page.getByLabel("Adresse e-mail").fill(clientEmail);
-    await page.getByLabel("Mot de passe").fill(password);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
     await page.waitForURL(/\/app/);
     await page.goto("/");
@@ -795,7 +806,7 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
     await page.waitForLoadState("networkidle");
     await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
     await page.getByLabel("Adresse e-mail").fill(clientEmail);
-    await page.getByLabel("Mot de passe").fill(password);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
     await page.waitForURL(/\/app/);
     await page.waitForLoadState("networkidle");
@@ -835,7 +846,7 @@ test("la navigation professionnelle reste simple sur mobile", async ({ browser }
     await page.goto("/");
     await page.getByRole("button", { name: "Publier une vidéo" }).click();
     await page.getByLabel("Adresse e-mail").fill(providerEmail);
-    await page.getByLabel("Mot de passe").fill(password);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
     await page.waitForURL(/\/pro/);
     await page.goto("/pro/videos");
@@ -915,7 +926,7 @@ test("le Studio refuse les fichiers invalides et récupère après interruption"
     }
     await page.goto(remoteAppUrl ?? 'http://localhost:3100');
     await page.getByRole('button',{name:'Publier une vidéo'}).click();
-    await page.getByLabel('Adresse e-mail').fill(providerEmail);await page.getByLabel('Mot de passe').fill(password);
+    await page.getByLabel('Adresse e-mail').fill(providerEmail);await page.getByLabel('Mot de passe', { exact: true }).fill(password);
     await page.getByRole('button',{name:'Se connecter',exact:true}).click();await page.waitForURL(/\/pro/);
     await page.goto('/pro/videos');await page.getByRole('button',{name:'Créer une publication'}).click();
     await page.locator('input[name="title"]').fill(title);await page.locator('textarea[name="caption"]').fill(title);
@@ -998,4 +1009,3 @@ test("feed interactions : anti-spam serveur et suppression de ses commentaires",
     expect((await api.from("post_comments").insert({ post_id: post.data!.id, author_id: id, body: "QA excessive" })).error).not.toBeNull();
   } finally { await api.auth.signOut(); expect((await admin.auth.admin.deleteUser(id)).error).toBeNull(); }
 });
-
