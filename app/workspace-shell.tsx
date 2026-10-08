@@ -52,7 +52,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
       <Link className="workspace-brand" href="/"><span>M</span><strong>Mata Beauty</strong></Link>
       <label className="workspace-space-picker">
         <span>Espace actif</span>
-        <select value={space} onChange={(event) => router.push(workspaceHref(event.target.value as WorkspaceSpaceKey))}>
+        <select aria-label="Espace actif" value={space} onChange={(event) => router.push(workspaceHref(event.target.value as WorkspaceSpaceKey))}>
           {visibleSpaces.map((key) => <option key={key} value={key}>{workspaceSpaces[key].label}</option>)}
         </select>
       </label>

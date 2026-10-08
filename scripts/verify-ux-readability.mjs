@@ -102,11 +102,18 @@ try{
   await page.goto(base+path);assert.equal(new URL(page.url()).pathname,path,`Unexpected redirect for ${path}: ${page.url()}`);await page.locator('.workspace-topbar h1,.admin-page h1,.premium-bottom-nav').first().waitFor();
   await page.getByText('Chargement…',{exact:true}).waitFor({state:'hidden'}).catch(()=>{});
   for(const theme of ['light','dark']){
-   await page.emulateMedia({colorScheme:theme});await page.setViewportSize({width:1440,height:900});await capture(path.replaceAll('/','-')+'-'+theme);
-   for(const [width,height] of sizes){await page.setViewportSize({width,height});const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);interactions.push({path,theme,width,height,action:'horizontal overflow',status:overflow?'FAIL':'PASS'});if(overflow){await page.screenshot({path:`${output}/overflow-${path.replaceAll('/','-')}-${theme}-${width}.png`,fullPage:true});const nodes=await page.locator('body *').evaluateAll(nodes=>nodes.filter(n=>{const r=n.getBoundingClientRect();return r.width>0&&r.right>innerWidth+1}).map(n=>({tag:n.tagName,className:n.className,width:n.getBoundingClientRect().width,text:n.textContent?.slice(0,80)})).slice(-20));await writeFile(`${output}/overflow-${path.replaceAll('/','-')}-${theme}-${width}.json`,JSON.stringify(nodes,null,2));}}
+   await page.emulateMedia({colorScheme:theme});await page.setViewportSize({width:1440,height:900});if(process.env.UX_ALL_SIZES!=='1')await capture(path.replaceAll('/','-')+'-'+theme);
+   for(const [width,height] of sizes){await page.setViewportSize({width,height});if(process.env.UX_ALL_SIZES==='1')await capture(path.replaceAll('/','-')+'-'+theme+'-'+width);const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);interactions.push({path,theme,width,height,action:'horizontal overflow',status:overflow?'FAIL':'PASS'});if(overflow){await page.screenshot({path:`${output}/overflow-${path.replaceAll('/','-')}-${theme}-${width}.png`,fullPage:true});const nodes=await page.locator('body *').evaluateAll(nodes=>nodes.filter(n=>{const r=n.getBoundingClientRect();return r.width>0&&r.right>innerWidth+1}).map(n=>({tag:n.tagName,className:n.className,width:n.getBoundingClientRect().width,text:n.textContent?.slice(0,80)})).slice(-20));await writeFile(`${output}/overflow-${path.replaceAll('/','-')}-${theme}-${width}.json`,JSON.stringify(nodes,null,2));}}
+  }
+  if(process.env.UX_TABLE==='1'&&path==='/operations/categories'){
+   await page.setViewportSize({width:375,height:812});const table=page.getByRole('region',{name:'Liste des catégories',exact:true});await table.focus();await page.keyboard.press('ArrowRight');await page.waitForTimeout(300);assert(await table.evaluate(n=>n.scrollLeft>0),'Category table must scroll horizontally by keyboard');
+   await table.getByRole('button',{name:'Modifier',exact:true}).first().click();await page.getByRole('heading',{name:'Modifier la catégorie',exact:true}).waitFor();assert((await page.locator('.admin-catalog-form').getByLabel('Nom',{exact:true}).inputValue()).length>0);
+   await capture('catalog-edit-mobile');await page.locator('.admin-catalog-form').getByRole('button',{name:'Annuler',exact:true}).click();assert.equal(await page.locator('.admin-catalog-form').getByLabel('Nom',{exact:true}).inputValue(),'');
+   interactions.push({path,action:'Keyboard table scroll, open category editor and cancel without saving',status:'PASS'});
   }
  }
  if(auditRole==='super_admin'){
+
  await page.goto(base+'/admin/administrators');await page.getByRole('heading',{name:'Équipe MATA Beauty'}).waitFor();
  const card=page.locator('article').filter({hasText:email});await card.getByRole('button',{name:'Modifier le rôle',exact:true}).click();
  await page.getByLabel('Nouveau rôle').selectOption('admin');await page.getByLabel('Justification').fill('Recette lisibilité : formulaire non envoyé');
