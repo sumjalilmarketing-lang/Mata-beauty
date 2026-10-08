@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { completeQaMfa } from "./qa-mfa";
 
 const supabaseUrl = process.env.REMOTE_SUPABASE_URL ?? "";
 const anonKey = process.env.REMOTE_SUPABASE_ANON_KEY ?? "";
@@ -143,6 +144,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   if (!admin) return;
+  if (clientId) expect.soft((await admin.from("support_tickets").delete().eq("requester_id", clientId)).error).toBeNull();
   for (const id of extraUserIds) expect.soft((await admin.auth.admin.deleteUser(id)).error).toBeNull();
   if (bookingId) expect.soft((await admin.from("conversations").delete().eq("booking_id", bookingId)).error).toBeNull();
   if (clientId && providerId) expect.soft((await admin.from("bookings").delete().eq("client_id", clientId).eq("provider_id", providerId)).error).toBeNull();
@@ -152,12 +154,74 @@ test.afterAll(async () => {
   if (clientId) expect.soft((await admin.auth.admin.deleteUser(clientId)).error).toBeNull();
 });
 
+test("support : échanges privés lisibles côté client et administration avec MFA", async ({ browser }, testInfo) => {
+  test.skip(process.env.MESSAGING_BASELINE === "1", "Capture avant correction uniquement");
+  test.setTimeout(240_000);
+  const managerEmail = `codex-messaging-support-${runId}@example.test`;
+  const managerId = await createUser(managerEmail); extraUserIds.push(managerId);
+  const role = await admin.from("admin_roles").select("id").eq("key", "super_admin").single(); expect(role.error).toBeNull();
+  expect((await admin.from("profiles").update({ role: "admin" }).eq("id", managerId)).error).toBeNull();
+  expect((await admin.from("admin_user_roles").insert({ user_id: managerId, role_id: role.data!.id, requires_mfa: true })).error).toBeNull();
+  const clientContext = await browser.newContext(), staffContext = await browser.newContext();
+  try {
+    const clientPage = await clientContext.newPage(), staffPage = await staffContext.newPage();
+    await signIn(clientPage, clientEmail, "Profil");
+    await clientPage.goto("/app/support");
+    const subject = `Recette messagerie support ${messageRun}`;
+    await clientPage.getByLabel("Objet (obligatoire)").fill(subject);
+    await clientPage.locator("#client-support .collection-form").getByRole("button", { name: "Envoyer", exact: true }).click();
+    await clientPage.getByRole("button", { name: subject, exact: true }).click();
+    await clientPage.getByLabel("Réponse au support").fill("Bonjour, voici ma demande.\nMerci pour votre aide.");
+    await clientPage.getByRole("button", { name: "Envoyer la réponse", exact: true }).click();
+    await expect(clientPage.locator(".support-thread .message-bubble.own")).toContainText("Bonjour, voici ma demande.");
+    await signIn(staffPage, managerEmail, "Profil");
+    await staffPage.goto("/admin"); await completeQaMfa(staffPage);
+    await staffPage.getByRole("navigation", { name: "Navigation Super Admin" }).getByRole("button", { name: /Support/ }).click();
+    await staffPage.getByRole("button", { name: subject, exact: true }).click();
+    await expect(staffPage.locator(".support-thread .message-bubble:not(.own)")).toContainText("Bonjour, voici ma demande.");
+    await staffPage.getByLabel("Réponse au support").fill("Bonjour, votre demande a bien été reçue.");
+    await staffPage.getByRole("button", { name: "Envoyer la réponse", exact: true }).click();
+    await expect(staffPage.locator(".support-thread .message-bubble.own")).toContainText("votre demande a bien été reçue");
+    await clientPage.getByRole("button", { name: "Actualiser les échanges", exact: true }).click();
+    await expect(clientPage.locator(".support-thread .message-bubble:not(.own)")).toContainText("votre demande a bien été reçue");
+    for (const colorScheme of ["light", "dark"] as const) {
+      await staffPage.emulateMedia({ colorScheme });
+      await staffPage.locator(".support-thread").screenshot({ path: testInfo.outputPath(`support-${colorScheme}.png`) });
+      const pairs = await staffPage.locator(".support-thread .message-bubble").evaluateAll(elements => elements.map(element => ({
+        background: getComputedStyle(element).backgroundColor, text: getComputedStyle(element.querySelector("p")!).color,
+      })));
+      for (const pair of pairs) expect(pair.background).not.toBe(pair.text);
+    }
+    const ticket = await admin.from("support_tickets").select("id").eq("requester_id", clientId).eq("subject", subject).single(); expect(ticket.error).toBeNull();
+    expect((await admin.from("support_messages").insert({ ticket_id: ticket.data!.id, sender_id: managerId, body: "Note interne confidentielle QA", is_internal: true })).error).toBeNull();
+    await clientPage.getByRole("button", { name: "Actualiser les échanges", exact: true }).click();
+    await expect(clientPage.getByText("Note interne confidentielle QA", { exact: true })).toHaveCount(0);
+    const other = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    expect((await other.auth.signInWithPassword({ email: providerEmail, password })).error).toBeNull();
+    expect((await other.from("support_messages").select("id").eq("ticket_id", ticket.data!.id)).data).toEqual([]);
+    expect((await other.rpc("manage_support_ticket", { target_ticket_id: ticket.data!.id, target_action: "reply", target_message: "Interdit" })).error).toBeTruthy();
+    await other.auth.signOut({ scope: "local" });
+  } finally { await clientContext.close(); await staffContext.close(); }
+});
+
 test("la cliente et le professionnel échangent réellement depuis l’interface", async ({ browser }, testInfo) => {
   test.setTimeout(360_000);
-  const clientContext = await browser.newContext();
-  const providerContext = await browser.newContext();
+  // Fault injection must intercept the request instead of a service worker.
+  const clientContext = await browser.newContext({ serviceWorkers: "block" });
+  const providerContext = await browser.newContext({ serviceWorkers: "block" });
   const clientPage = await clientContext.newPage();
   const providerPage = await providerContext.newPage();
+  const scriptErrors: string[] = [];
+  const navigationCancellations: string[] = [];
+  let reloadingClient = false;
+  for (const page of [clientPage, providerPage]) page.on("pageerror", error => {
+    // WebKit reports an in-flight fetch torn down by a hard reload as a native
+    // access-control error (HTTP status -1). Keep the evidence; never ignore an
+    // access-control error outside this explicitly forced navigation window.
+    if (page === clientPage && reloadingClient && error.message.includes("supabase.co/rest/v1/conversation_members?")
+      && error.message.endsWith("due to access control checks.")) navigationCancellations.push(error.message);
+    else scriptErrors.push(error.message);
+  });
 
   await signIn(clientPage, clientEmail, "Profil");
   await clientPage.getByRole("link", { name: "Messages", exact: true }).click();
@@ -215,6 +279,7 @@ test("la cliente et le professionnel échangent réellement depuis l’interface
       });
     });
     for (const result of contrast) { expect(result.body).toBeGreaterThanOrEqual(4.5); expect(result.time).toBeGreaterThanOrEqual(4.5); }
+    console.log("Message contrast ratios:", JSON.stringify(contrast));
     await testInfo.attach("contrast.json", { body: JSON.stringify(contrast), contentType: "application/json" });
 
     // Real server access checks: two unrelated accounts, including another Pro.
@@ -245,11 +310,16 @@ test("la cliente et le professionnel échangent réellement depuis l’interface
     expect(repeatedRows.error).toBeNull(); expect(repeatedRows.data).toHaveLength(1);
 
     const retryText = `Texte conservé après erreur ${messageRun}`;
-    await clientPage.route("**/rest/v1/messages**", route => route.request().method() === "POST"
-      ? route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Service indisponible" }) }) : route.continue());
+    let injectedFailures = 0;
+    await clientPage.route("**/rest/v1/messages**", route => {
+      if (route.request().method() !== "POST") return route.continue();
+      injectedFailures++;
+      return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Service indisponible" }) });
+    });
     await clientPage.getByLabel("Votre message").fill(retryText);
     await clientPage.getByRole("button", { name: "Envoyer", exact: true }).click();
-    await expect(clientPage.locator(".conversation-error")).toBeVisible();
+    await expect.poll(() => injectedFailures).toBeGreaterThan(0);
+    await expect(clientPage.locator(".conversation-error")).toBeVisible({ timeout: 15_000 });
     await expect(clientPage.getByLabel("Votre message")).toHaveValue(retryText);
     await clientPage.unroute("**/rest/v1/messages**");
     await clientPage.getByRole("button", { name: "Envoyer", exact: true }).click();
@@ -259,7 +329,8 @@ test("la cliente et le professionnel échangent réellement depuis l’interface
     await providerPage.getByLabel("Votre message").fill(longMessage);
     await providerPage.getByRole("button", { name: "Envoyer", exact: true }).click();
     await expect(clientPage.locator(".message-bubble p").filter({ hasText: `Message long ${messageRun}` })).toHaveText(longMessage, { timeout: 15_000 });
-    await clientPage.reload();
+    reloadingClient = true;
+    try { await clientPage.reload(); } finally { reloadingClient = false; }
     await clientPage.locator(".live-appointment").filter({ hasText: `Messagerie UI ${runId}` }).getByRole("button", { name: "Messages" }).click();
     await expect(clientPage.locator(".message-bubble p").filter({ hasText: `Message long ${messageRun}` })).toHaveText(longMessage);
 
@@ -288,6 +359,14 @@ test("la cliente et le professionnel échangent réellement depuis l’interface
     await expect(providerPage.locator("#conversation-title")).toHaveText("Mata Cliente UI");
     await expect(providerPage.getByText(clientMessage, { exact: true })).toBeAttached();
     await providerPage.locator("#booking-conversation").screenshot({ path: testInfo.outputPath("professional-agenda.png") });
+    await clientPage.setViewportSize({ width: 1366, height: 768 });
+    await clientPage.goto("/app/notifications");
+    const receivedNotification = clientPage.locator(".notification-card").filter({ hasText: "Nouveau message" }).first();
+    await expect(receivedNotification).toBeVisible();
+    await receivedNotification.getByRole("button", { name: "Ouvrir", exact: true }).click();
+    await expect(clientPage.locator("#conversation-title")).toHaveText(`Mata Pro UI ${runId}`);
+    expect(scriptErrors).toEqual([]);
+    await testInfo.attach("navigation-cancellations.json", { body: JSON.stringify(navigationCancellations), contentType: "application/json" });
   }
 
   await clientContext.close();
