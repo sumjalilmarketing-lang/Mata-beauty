@@ -22,6 +22,14 @@ await check('Client denied list, preview, lifecycle and state mutation',async()=
  assert((await client.api.from('admin_account_state').insert({user_id:client.id,archived_at:new Date().toISOString()})).error);
  assert.deepEqual((await client.api.from('admin_account_operations').select('*')).data,[]);
 });
+await check('Internal non-Super-Admin roles denied account lifecycle after MFA',async()=>{
+ for(const role of ['finance','support','verification_agent','moderator','content_manager','admin']) {
+  const member=await account(role);await mfa(member.api);
+  assert((await member.api.rpc('admin_managed_accounts')).error);
+  assert((await member.api.rpc('admin_account_preview',{target_user_id:target.id})).error);
+  for(const action of ['suspend','archive','reactivate','delete'])assert((await member.api.rpc('admin_manage_account',command(target.id,action))).error);
+ }
+});
 await check('Protected own Super Admin cannot be deleted, suspended or archived',async()=>{for(const action of ['delete','suspend','archive'])assert((await manager.api.rpc('admin_manage_account',command(manager.id,action))).error);});
 await check('Search and explicit server test marker',async()=>{const r=await manager.api.rpc('admin_managed_accounts',{search_term:target.email});assert.ifError(r.error);assert.equal(r.data.length,1);assert.equal(r.data[0].is_test,true);});
 await check('Archive revokes sessions and keeps profile; reactivation is explicit',async()=>{
