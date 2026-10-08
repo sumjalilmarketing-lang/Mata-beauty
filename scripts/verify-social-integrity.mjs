@@ -19,6 +19,7 @@ async function account(role){
  await service.from('welcome_email_deliveries').update({status:'needs_review'}).eq('user_id',actor.id);
  if(role){const r=await service.from('admin_roles').select('id').eq('key',role).single();assert.ifError(r.error);assert.ifError((await service.from('profiles').update({role:'admin'}).eq('id',actor.id)).error);assert.ifError((await service.from('admin_user_roles').insert({user_id:actor.id,role_id:r.data.id,requires_mfa:true})).error);}
  assert.ifError((await actor.api.auth.signInWithPassword({email,password})).error);
+ assert.ifError((await actor.api.rpc('synchronize_account_status')).error);
  if(role){const e=await actor.api.auth.mfa.enroll({factorType:'totp'});assert.ifError(e.error);assert.ifError((await actor.api.auth.mfa.challengeAndVerify({factorId:e.data.id,code:otp(e.data.totp.secret)})).error);}
  return actor;
 }

@@ -677,12 +677,28 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   await page.goto("/");
   const reportedCard = page.locator(`[data-post-id="${studioPostId}"]`);
   await page.waitForLoadState("networkidle");
+  const reportedCommentBody = `Commentaire à modérer ${run}`;
+  const reportedComment = await providerApi.from('post_comments').insert({post_id:studioPostId,author_id:providerId,body:reportedCommentBody}).select('id').single();
+  expect(reportedComment.error).toBeNull();
+  await reportedCard.getByRole('button',{name:'Commentaires',exact:true}).click();
+  await page.locator('.comments-sheet article').filter({hasText:reportedCommentBody}).getByRole('button',{name:'Signaler',exact:true}).click();
+  await expect.poll(async()=> (await admin.from('reports').select('id').eq('comment_id',reportedComment.data!.id).eq('reporter_id',clientId)).data?.length).toBe(1);
+  await page.getByRole('button',{name:'Fermer',exact:true}).click();
   page.once("dialog", (dialog) => dialog.accept());
   await reportedCard.getByLabel("Plus d’options", {exact:true}).click();
   await reportedCard.getByRole("button", { name: "Signaler" }).click();
   await expect(page.getByText("Signalement transmis à la modération.")).toBeVisible();
-  const report = await admin.from("reports").select("id,status,post_id").eq("post_id", studioPostId).eq("reporter_id", clientId).single();
+  const report = await admin.from("reports").select("id,status,post_id").eq("post_id", studioPostId).eq("reporter_id", clientId).is('comment_id',null).single();
   expect(report.error).toBeNull(); expect(report.data?.status).toBe("open");
+  const commentReport=await admin.from('reports').select('id').eq('comment_id',reportedComment.data!.id).eq('reporter_id',clientId).single();
+  expect(commentReport.error).toBeNull();
+  expect((await clientApi.rpc('report_post_comment',{target_comment_id:reportedComment.data!.id,target_reason:'spam'})).data).toBe(commentReport.data!.id);
+  expect((await clientApi.rpc('report_social_post',{target_post_id:studioPostId,target_reason:'spam'})).data).toBe(report.data!.id);
+  expect((await clientApi.rpc('manage_moderation_report',{target_report_id:commentReport.data!.id,target_action:'hide',target_reason:'QA refus attendu'})).error).not.toBeNull();
+  expect((await moderatorApi.rpc('manage_moderation_report',{target_report_id:commentReport.data!.id,target_action:'hide',target_reason:'QA masquer uniquement le commentaire'})).error).toBeNull();
+  expect((await admin.from('posts').select('status').eq('id',studioPostId).single()).data?.status).toBe('published');
+  expect((await admin.from('post_comments').select('is_hidden').eq('id',reportedComment.data!.id).single()).data?.is_hidden).toBe(true);
+  expect((await moderatorApi.rpc('manage_moderation_report',{target_report_id:commentReport.data!.id,target_action:'restore',target_reason:'QA restaurer uniquement le commentaire'})).error).toBeNull();
 
   const forbidden = await providerApi.rpc("admin_moderate_social_post", { target_post_id: studioPostId, decision: "hide", reason: "Tentative interdite" });
   expect(forbidden.error).not.toBeNull();
@@ -696,6 +712,16 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   await adminPage.getByRole("button", { name: "Accéder à l’administration" }).click();
   await completeQaMfa(adminPage, moderatorMfaSecret);
   await expect(adminPage.getByRole("heading", { name: "Vue d’ensemble", level: 1 })).toBeVisible({ timeout: 20_000 });
+  await adminPage.getByRole('navigation',{name:'Navigation Super Admin'}).getByRole('button',{name:'Commentaires',exact:true}).click();
+  const commentRow=adminPage.locator('.control-list-row').filter({hasText:reportedCommentBody});
+  adminPage.once('dialog',dialog=>dialog.accept());
+  await commentRow.getByRole('button',{name:'Masquer le commentaire',exact:true}).click();
+  await expect(adminPage.getByText('Commentaire masqué.',{exact:true})).toBeVisible();
+  expect((await clientApi.from('post_comments').select('id').eq('id',reportedComment.data!.id)).data).toEqual([]);
+  adminPage.once('dialog',dialog=>dialog.accept());
+  await commentRow.getByRole('button',{name:'Restaurer le commentaire',exact:true}).click();
+  await expect(adminPage.getByText('Commentaire restauré.',{exact:true})).toBeVisible();
+  expect((await clientApi.from('post_comments').select('id').eq('id',reportedComment.data!.id)).data).toHaveLength(1);
   await adminPage.getByRole("navigation", { name: "Navigation Super Admin" }).getByRole("button", { name: "Contenu social" }).click();
   const postRow = adminPage.getByRole("row").filter({ hasText: studioCaption });
   await expect(postRow).toBeVisible({ timeout: 20_000 });
@@ -759,8 +785,8 @@ test("les filtres et la pagination distante conservent le feed", async ({ page }
   await expect.poll(() => page.locator(".social-video-card").count()).toBeGreaterThanOrEqual(10);
 });
 
-test("le parcours réel reste utilisable sur les cinq largeurs mobiles", async ({ browser }) => {
-  test.setTimeout(180_000);
+test("le parcours réel reste utilisable sur huit largeurs mobiles et desktop", async ({ browser }) => {
+  test.setTimeout(360_000);
   for (const width of [320, 360, 375, 390, 430, 768, 1024, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: width <= 360 ? 740 : width <= 390 ? 844 : 932 } });
     const page = await context.newPage();

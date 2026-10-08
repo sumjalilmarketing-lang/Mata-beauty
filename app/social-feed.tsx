@@ -505,7 +505,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
         </div></details>
       </aside>
       <div className="social-caption">
-        <button className="creator-name" onClick={() => void openProvider(post)}>{t(post.businessName)}</button>
+        <button className="creator-name" onClick={() => void openProvider(post)}>{post.businessName === "Professionnel beauté" ? t(post.businessName) : post.businessName}</button>
         {post.city && <span className="feed-public-location">{post.city}</span>}
         {post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service">
           <button className="service-profile-link" onClick={() => void book(post)}><strong>{post.serviceTitle}</strong>{feedPrice(post.priceAmount, post.currency, locale) && <span>{feedPrice(post.priceAmount, post.currency, locale)}</span>}</button>

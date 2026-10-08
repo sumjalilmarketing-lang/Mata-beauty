@@ -25,6 +25,6 @@ const english: Record<string, string> = {
   "Commentaire non publié. Patientez avant de réessayer.": "Comment not posted. Please wait before trying again.",
   "Le commentaire n’a pas pu être supprimé.": "The comment could not be deleted.", "Cette action n’a pas pu être enregistrée.": "This action could not be saved.",
   "Ajoutée à Mes inspirations.": "Saved to your inspirations.", "Retirée de Mes inspirations.": "Removed from your inspirations.",
-  "J’aime enregistré.": "Liked.", "J’aime retiré.": "Like removed.",
+  "J’aime enregistré.": "Liked.", "Vidéo aimée.": "Liked.", "J’aime retiré.": "Like removed.",
 };
 export function feedText(text: string, locale: string) { return locale.toLowerCase().startsWith("en") ? english[text] ?? text : text; }
