@@ -8,7 +8,7 @@ const production=process.env.ALLOW_PRODUCTION_QA==='mata-beauty.com'&&url==='htt
 assert(production||url==='https://kazlvtxkbsdhbfvtqqdp.supabase.co','Explicit QA target required');
 const options={auth:{persistSession:false,autoRefreshToken:false}};
 const service=createClient(url,process.env.SUPABASE_SERVICE_ROLE_KEY,options);
-const accounts=[],postIds=[],results=[],storageObjects=[];
+const accounts=[],postIds=[],results=[],storageObjects=[],extraReportIds=[];
 let reportId;
 async function check(name,run){try{await run();results.push({name,status:'PASS'});}catch(error){results.push({name,status:'FAIL',detail:error.message});}console.log(results.at(-1).status+' '+name);}
 function otp(secret){const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits='';for(const c of secret.replace(/=/g,''))bits+=alphabet.indexOf(c).toString(2).padStart(5,'0');const bytes=[];for(let i=0;i+8<=bits.length;i+=8)bytes.push(parseInt(bits.slice(i,i+8),2));const counter=Buffer.alloc(8);counter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));const hash=createHmac('sha1',Buffer.from(bytes)).update(counter).digest();return ((hash.readUInt32BE(hash[19]&15)&0x7fffffff)%1000000).toString().padStart(6,'0');}
@@ -79,6 +79,16 @@ try{
  await check('Hidden comment is absent for an ordinary user',async()=>{const row=await other.api.from('post_comments').select('id').eq('id',commentId);assert.ifError(row.error);assert.equal(row.data.length,0);});
  await check('Moderator can read and restore a hidden comment',async()=>{const row=await moderator.api.from('post_comments').select('id').eq('id',commentId);assert.ifError(row.error);assert.equal(row.data.length,1);assert.ifError((await moderator.api.from('post_comments').update({is_hidden:false}).eq('id',commentId)).error);const restored=await service.from('post_comments').select('is_hidden').eq('id',commentId).single();assert.equal(restored.data.is_hidden,false);});
  await check('Hide and restore decisions have server audit events',async()=>{const audit=await service.from('audit_logs').select('action,actor_id').eq('entity_id',commentId);assert.ifError(audit.error);for(const action of ['comment.hidden','comment.restored'])assert(audit.data.some(row=>row.action===action&&row.actor_id===moderator.id));});
+ await check('Three comment reports do not suppress their parent video',async()=>{
+  const commentIds=[commentId];
+  for(let i=0;i<2;i++){const c=await owner.api.from('post_comments').insert({post_id:postId,author_id:owner.id,body:`QA report distinction ${i}`}).select('id').single();assert.ifError(c.error);commentIds.push(c.data.id);}
+  for(const id of commentIds){const r=await other.api.rpc('report_post_comment',{target_comment_id:id,target_reason:'spam'});assert.ifError(r.error);extraReportIds.push(r.data);}
+  const visible=await other.api.rpc('social_post_not_strongly_reported',{target_post_id:postId});assert.ifError(visible.error);assert.equal(visible.data,true);
+ });
+ await check('Three video reports still suppress the video and duplicates stay idempotent',async()=>{
+  for(const actor of [other,moderator,accounts.find(a=>a.role==='finance')]){const r=await actor.api.rpc('report_social_post',{target_post_id:postId,target_reason:'spam'});assert.ifError(r.error);extraReportIds.push(r.data);const duplicate=await actor.api.rpc('report_social_post',{target_post_id:postId,target_reason:'spam'});assert.ifError(duplicate.error);assert.equal(duplicate.data,r.data);}
+  const visible=await other.api.rpc('social_post_not_strongly_reported',{target_post_id:postId});assert.ifError(visible.error);assert.equal(visible.data,false);
+ });
  if(process.env.INCLUDE_HEALTH_AUDIT==='1'){
   async function drafts(count){const rows=Array.from({length:count},()=>{const id=randomUUID();postIds.push(id);return{id,author_id:owner.id,caption:'QA health draft',video_url:`${url}/storage/v1/object/public/provider-social-media/${owner.id}/${id}/video.mp4`,duration_seconds:5,status:'draft'};});assert.ifError((await owner.api.from('posts').insert(rows)).error);}
   await drafts(18);
@@ -93,6 +103,7 @@ try{
  }
 }catch(error){results.push({name:'Fixture setup',status:'FAIL',detail:error.message});}
 finally{
+ if(extraReportIds.length)assert.ifError((await service.from('reports').delete().in('id',extraReportIds)).error);
  if(reportId)assert.ifError((await service.from('reports').delete().eq('id',reportId)).error);
  if(process.env.INCLUDE_HEALTH_AUDIT==='1'&&accounts.length)assert.ifError((await service.from('fraud_alerts').delete().in('profile_id',accounts.map(actor=>actor.id))).error);
  for(const object of storageObjects)assert.ifError((await service.storage.from(object.bucket).remove([object.path])).error);

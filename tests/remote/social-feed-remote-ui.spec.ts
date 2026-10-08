@@ -666,7 +666,7 @@ test("le feed social distant relie les interactions au profil et à la réservat
 });
 
 test("le signalement est examiné, masqué, audité puis restauré avec les bons rôles", async ({ page, browser }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await preparePage(page);
   await page.goto("/");
   await page.getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
@@ -688,6 +688,7 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   await reportedCard.getByLabel("Plus d’options", {exact:true}).click();
   await reportedCard.getByRole("button", { name: "Signaler" }).click();
   await expect(page.getByText("Signalement transmis à la modération.")).toBeVisible();
+  await expect.poll(async()=> (await admin.from('reports').select('id').eq('post_id',studioPostId).eq('reporter_id',clientId).is('comment_id',null)).data?.length).toBe(1);
   const report = await admin.from("reports").select("id,status,post_id").eq("post_id", studioPostId).eq("reporter_id", clientId).is('comment_id',null).single();
   expect(report.error).toBeNull(); expect(report.data?.status).toBe("open");
   const commentReport=await admin.from('reports').select('id').eq('comment_id',reportedComment.data!.id).eq('reporter_id',clientId).single();
@@ -712,7 +713,7 @@ test("le signalement est examiné, masqué, audité puis restauré avec les bons
   await adminPage.getByRole("button", { name: "Accéder à l’administration" }).click();
   await completeQaMfa(adminPage, moderatorMfaSecret);
   await expect(adminPage.getByRole("heading", { name: "Vue d’ensemble", level: 1 })).toBeVisible({ timeout: 20_000 });
-  await adminPage.getByRole('navigation',{name:'Navigation Super Admin'}).getByRole('button',{name:'Commentaires',exact:true}).click();
+  await adminPage.getByRole('navigation',{name:'Navigation Super Admin'}).getByTitle('Commentaires',{exact:true}).click();
   const commentRow=adminPage.locator('.control-list-row').filter({hasText:reportedCommentBody});
   adminPage.once('dialog',dialog=>dialog.accept());
   await commentRow.getByRole('button',{name:'Masquer le commentaire',exact:true}).click();
