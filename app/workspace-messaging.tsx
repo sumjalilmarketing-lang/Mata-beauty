@@ -71,6 +71,6 @@ export function WorkspaceMessaging({ userId }: { userId: string }) {
         <div className="appointment-actions"><button type="button" onClick={() => setSelected(booking)}>Messages</button></div>
       </div>)}
     </article>
-    {selected && <BookingMessages bookingId={selected.id} serviceTitle={selected.provider_services?.title ?? "Prestation beauté"} userId={userId} onClose={() => setSelected(null)} />}
+    {selected && <BookingMessages key={selected.id} bookingId={selected.id} serviceTitle={selected.provider_services?.title ?? "Prestation beauté"} userId={userId} onClose={() => setSelected(null)} />}
   </section>;
 }

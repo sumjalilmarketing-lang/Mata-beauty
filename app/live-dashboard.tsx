@@ -466,6 +466,7 @@ export function LiveDashboard({
         )}
         {role !== "admin" && messageBooking && (
           <BookingMessages
+            key={messageBooking.id}
             bookingId={messageBooking.id}
             serviceTitle={messageBooking.provider_services?.title ?? "Prestation beauté"}
             userId={userId}

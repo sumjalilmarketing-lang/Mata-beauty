@@ -258,3 +258,98 @@
 .comments-sheet article small button { min-height: 44px; padding: 6px 10px; color: #fff; background: transparent; }
 .social-feed-shell :is(button,summary):focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 @media (max-height: 650px) { .social-video-card .social-actions { bottom: 155px; gap: 2px; } .social-video-card .social-caption { bottom: 10px; } }
+/* Private conversations: own the complete color pair, never inherit panel text
+   over a separately hard-coded bubble background. Shared by booking and support. */
+.conversation-panel, .support-thread {
+  --message-surface: var(--ui-surface, #fffafd);
+  --message-received: var(--ui-field, #eee7ec);
+  --message-text: var(--ui-text, #291822);
+  --message-muted: var(--ui-muted, #62515e);
+  --message-border: var(--ui-border, #a48b9c);
+  --message-field: var(--ui-field, #ffffff);
+  min-width: 0;
+  scroll-margin-bottom: 100px;
+}
+.workspace-layout :is(.conversation-panel, .support-thread) {
+  --message-surface: #21151f;
+  --message-received: #3c303b;
+  --message-text: #fff8fc;
+  --message-muted: #dfcedb;
+  --message-border: #94798c;
+  --message-field: #2e222c;
+}
+:is(.conversation-panel, .support-thread) .message-list {
+  min-width: 0;
+  min-height: 160px;
+  max-height: min(430px, 55dvh);
+  background: var(--message-surface);
+  color: var(--message-text);
+  border-color: var(--message-border);
+  gap: 12px;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+:is(.conversation-panel, .support-thread) .message-list .message-bubble {
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: min(85%, 560px);
+  padding: 12px 14px;
+  background: var(--message-received);
+  color: var(--message-text);
+  border: 1px solid var(--message-border);
+  border-radius: 5px 18px 18px;
+  align-self: flex-start;
+}
+:is(.conversation-panel, .support-thread) .message-list .message-bubble.own {
+  background: #85124f;
+  color: #ffffff;
+  border-color: #b8548a;
+  border-radius: 18px 5px 18px 18px;
+  align-self: flex-end;
+}
+:is(.conversation-panel, .support-thread) .message-list .message-bubble p {
+  margin: 0;
+  color: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+:is(.conversation-panel, .support-thread) .message-list .message-bubble time {
+  color: var(--message-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+:is(.conversation-panel, .support-thread) .message-list .message-bubble.own time { color: #ffe5f2; }
+:is(.conversation-panel, .support-thread) .message-author { display: block; color: inherit; font-size: 13px; margin-bottom: 5px; }
+:is(.conversation-panel, .support-thread) .message-list .read-receipt { color: var(--message-muted); font-size: 12px; }
+:is(.conversation-panel, .support-thread) .message-list .load-older { color: var(--message-text); min-height: 44px; font-size: 14px; text-decoration: underline; flex-shrink: 0; }
+:is(.conversation-panel, .support-thread) .message-composer { grid-template-columns: minmax(0, 1fr) auto; }
+:is(.conversation-panel, .support-thread) .message-composer label { min-width: 0; }
+:is(.conversation-panel, .support-thread) .message-composer textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 64px;
+  max-height: 180px;
+  background: var(--message-field);
+  color: var(--message-text);
+  border: 1px solid var(--message-border);
+  caret-color: var(--message-text);
+  font-size: 16px;
+  line-height: 1.5;
+  scroll-margin-block: 80px 120px;
+}
+:is(.conversation-panel, .support-thread) .message-composer textarea::placeholder { color: var(--message-muted); opacity: 1; }
+:is(.conversation-panel, .support-thread) .message-composer .primary-button { background: #85124f; color: #ffffff; min-height: 48px; padding: 12px 16px; }
+:is(.conversation-panel, .support-thread) :is(textarea, button, .message-list):focus-visible { outline: 3px solid #cc5a9a; outline-offset: 3px; }
+.conversation-panel .panel-heading { align-items: flex-start; gap: 12px; }
+.conversation-panel .panel-heading > div { min-width: 0; overflow-wrap: anywhere; }
+.conversation-panel .panel-heading small { display: block; font-size: 13px; line-height: 1.6; }
+.conversation-panel .panel-heading button { min-width: 64px; min-height: 44px; flex-shrink: 0; }
+.support-thread .message-list { margin-top: 12px; }
+@media (max-width: 767px) {
+  :is(.conversation-panel, .support-thread) .message-composer { grid-template-columns: minmax(0, 1fr); }
+  :is(.conversation-panel, .support-thread) .message-composer .primary-button { width: 100%; }
+  :is(.conversation-panel, .support-thread) .message-list { padding: 10px; }
+  .workspace-layout:has(.message-composer textarea:focus) .workspace-mobile-nav { display: none; }
+}

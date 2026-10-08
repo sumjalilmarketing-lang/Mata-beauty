@@ -4,6 +4,8 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { statusLabel } from "@/lib/ui/status-label";
+import { MessageBubble } from "./message-bubble";
 
 type MessageRow = {
   id: string;
@@ -45,7 +47,30 @@ export function BookingMessages({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(supabase ? "" : "Supabase n’est pas configuré.");
   const [refreshError, setRefreshError] = useState("");
-  const endRef = useRef<HTMLDivElement>(null);
+  const [context, setContext] = useState<{ name: string; startsAt: string; status: string } | null>(null);
+  const [contextError, setContextError] = useState("");
+  const sendingRef = useRef(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
+  const olderScroll = useRef<{ height: number; top: number } | null>(null);
+  const loadingOlder = useRef(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const controller = new AbortController();
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      const response = await fetch(`/api/bookings/conversation-context?booking=${encodeURIComponent(bookingId)}`, {
+        headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}` }, signal: controller.signal,
+      });
+      if (!response.ok) throw new Error("context_unavailable");
+      const value: { name: string; startsAt: string; status: string } = await response.json();
+      if (!controller.signal.aborted) setContext(value);
+    })().catch(() => {
+      if (!controller.signal.aborted) setContextError("Les informations du rendez-vous sont momentanément indisponibles.");
+    });
+    return () => controller.abort();
+  }, [bookingId, supabase]);
 
   const loadMembers = useCallback(async (selectedConversationId: string) => {
     const supabase = getSupabaseBrowserClient();
@@ -175,13 +200,19 @@ export function BookingMessages({
   }, [bookingId, loadMembers, markRead, supabase, userId]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "nearest" });
+    const list = listRef.current;
+    if (!list) return;
+    if (olderScroll.current) {
+      list.scrollTop = olderScroll.current.top + list.scrollHeight - olderScroll.current.height;
+      olderScroll.current = null;
+    } else if (followLatest.current) list.scrollTop = list.scrollHeight;
   }, [messages.length]);
 
   async function loadOlder() {
     const supabase = getSupabaseBrowserClient();
     const oldest = messages[0];
-    if (!supabase || !conversationId || !oldest) return;
+    if (!supabase || !conversationId || !oldest || loadingOlder.current) return;
+    loadingOlder.current = true;
     const { data, error: olderError } = await supabase
       .from("messages")
       .select("id,sender_id,body,created_at")
@@ -190,11 +221,13 @@ export function BookingMessages({
       .lt("created_at", oldest.created_at)
       .order("created_at", { ascending: false })
       .limit(pageSize);
+    loadingOlder.current = false;
     if (olderError) {
       setError(publicErrorMessage(olderError, "Impossible de charger les messages précédents."));
       return;
     }
     const older = ((data ?? []) as MessageRow[]).reverse();
+    if (older.length && listRef.current) olderScroll.current = { height: listRef.current.scrollHeight, top: listRef.current.scrollTop };
     setMessages((current) => mergeMessages(current, older));
     setHasOlder(older.length === pageSize);
   }
@@ -202,25 +235,30 @@ export function BookingMessages({
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
-    if (!supabase || !conversationId || sending) return;
+    if (!supabase || !conversationId || sendingRef.current) return;
     const form = event.currentTarget;
     const formData = new FormData(form);
     const body = String(formData.get("message") ?? "").trim();
     if (!body) return;
+    sendingRef.current = true;
     setSending(true);
     setError("");
-    const { data, error: sendError } = await supabase
-      .from("messages")
-      .insert({ conversation_id: conversationId, sender_id: userId, body })
-      .select("id,sender_id,body,created_at")
-      .single();
-    setSending(false);
-    if (sendError) {
-      setError(publicErrorMessage(sendError, "Le message n’a pas pu être envoyé."));
-      return;
+    try {
+      const { data, error: sendError } = await supabase
+        .from("messages")
+        .insert({ conversation_id: conversationId, sender_id: userId, body })
+        .select("id,sender_id,body,created_at")
+        .single();
+      if (sendError) throw sendError;
+      form.reset();
+      followLatest.current = true;
+      setMessages((current) => mergeMessages(current, [data as MessageRow]));
+    } catch (caught: unknown) {
+      setError(publicErrorMessage(caught, "Le message n’a pas pu être envoyé. Votre texte est conservé."));
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
     }
-    form.reset();
-    setMessages((current) => mergeMessages(current, [data as MessageRow]));
   }
 
   const otherMember = members.find((member) => member.profile_id !== userId);
@@ -232,23 +270,23 @@ export function BookingMessages({
   return (
     <article className="panel conversation-panel" id="booking-conversation" aria-labelledby="conversation-title">
       <div className="panel-heading">
-        <div><h2 id="conversation-title">Messages</h2><small>{serviceTitle} · conversation privée liée au rendez-vous</small></div>
+        <div><h2 id="conversation-title">{context?.name ?? "Messages"}</h2><small>{serviceTitle}</small>
+          {context && <small className="conversation-context">{new Intl.DateTimeFormat("fr-SN", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(context.startsAt))} · {statusLabel(context.status)}</small>}
+          {contextError && <small role="status">{contextError}</small>}
+        </div>
         <button type="button" onClick={onClose}>Fermer</button>
       </div>
       {error && <p className="conversation-error" role="alert">{error}</p>}
       {refreshError && <p className="conversation-error" role="alert">{refreshError}</p>}
-      <div className="message-list" aria-live="polite" aria-busy={loading}>
+      <div className="message-list" ref={listRef} aria-label="Historique de la conversation" tabIndex={0} aria-live="polite" aria-busy={loading}
+        onScroll={() => { const list = listRef.current; if (list) followLatest.current = list.scrollHeight - list.scrollTop - list.clientHeight < 80; }}>
         {hasOlder && <button className="load-older" type="button" onClick={() => void loadOlder()}>Afficher les messages précédents</button>}
         {loading && <p className="compact-empty">Chargement de la conversation…</p>}
         {!loading && messages.length === 0 && <p className="compact-empty">Commencez la conversation au sujet de ce rendez-vous.</p>}
         {messages.map((message) => (
-          <div className={message.sender_id === userId ? "message-bubble own" : "message-bubble"} key={message.id}>
-            <p>{message.body}</p>
-            <time dateTime={message.created_at}>{new Intl.DateTimeFormat("fr-SN", { dateStyle: "short", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(message.created_at))}</time>
-          </div>
+          <MessageBubble key={message.id} own={message.sender_id === userId} body={message.body} createdAt={message.created_at} />
         ))}
         {lastOwnMessage && <small className="read-receipt">{lastOwnMessageRead ? "Lu" : "Envoyé"}</small>}
-        <div ref={endRef} />
       </div>
       <form className="message-composer" onSubmit={(event) => void sendMessage(event)}>
         <label className="sr-only" htmlFor="booking-message">Votre message</label>
