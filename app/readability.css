@@ -194,6 +194,6 @@
 .workspace-layout .notification-center > label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-block: 8px; }
 .workspace-layout .notification-center input[type="checkbox"] { width: 24px; height: 24px; flex: 0 0 24px; }
 .workspace-layout .notification-center > button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--ui-border); border-radius: 9px; color: var(--ui-text); background: var(--ui-field); }
-:is(.workspace-layout, .super-admin-shell) .document-preview a { color: #541331; }
+:is(.workspace-layout, .super-admin-shell) .professional-dossier .document-preview a { color: #541331; }
 
 .super-admin-shell .admin-table-wrap:focus-visible { outline: 3px solid var(--ui-focus); outline-offset: 3px; }
