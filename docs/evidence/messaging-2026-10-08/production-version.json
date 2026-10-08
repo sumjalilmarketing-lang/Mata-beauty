@@ -1,0 +1,15 @@
+{
+  "checkedAt": "2026-10-08T16:21:56.793Z",
+  "domain": "https://mata-beauty.com/",
+  "status": 200,
+  "deployment": "dpl_5NpQkU7JeWgvRrrKbLauepgR9TeN",
+  "commit": "9a3afba9665c0af7a8e7d81cb216f846e825b0dd",
+  "immutableFinalUrl": "https://mata-beauty-9eyz8w1g7-africrm.vercel.app/",
+  "publicStyleCount": 2,
+  "identicalStyleLists": true,
+  "publicAssetCount": 15,
+  "immutableAssetCount": 15,
+  "identicalAssetLists": true,
+  "productionBackendPresent": true,
+  "qaBackendPresent": false
+}

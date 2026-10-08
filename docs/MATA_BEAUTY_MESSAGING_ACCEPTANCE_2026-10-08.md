@@ -1,8 +1,11 @@
 # Recette messagerie — 8 octobre 2026
 
-État : correction validée en Preview/QA ; publication et contrôle du domaine en cours.
+État : correction publiée et version vérifiée sur https://mata-beauty.com. Recette complète QA réussie ; échange authentifié sur appareils de l'utilisateur en attente de son résultat.
 
-Code applicatif : `b14221f`. Preview testée : https://mata-beauty-gtjcb51ph-africrm.vercel.app (backend QA isolé).
+Version production : `9a3afba9665c0af7a8e7d81cb216f846e825b0dd` (correctif applicatif `b14221f`, puis tests et preuves).
+Déploiement : `dpl_5NpQkU7JeWgvRrrKbLauepgR9TeN`, https://mata-beauty-9eyz8w1g7-africrm.vercel.app.
+Preview testée : https://mata-beauty-gtjcb51ph-africrm.vercel.app (backend QA isolé, même code applicatif).
+Vérification du domaine à 16:21:56 UTC : HTTP 200, mêmes 15 fichiers JavaScript et 2 CSS que le déploiement attendu, backend production présent, backend QA absent.
 
 ## Défaut reproduit et correction
 
@@ -37,13 +40,14 @@ Le défilement automatique reste dans l'historique et ne déplace plus toute la 
 | JavaScript | Parcours réservation complet | Aucune erreur `pageerror` | Preview/QA, Chromium | PASS |
 | Qualité locale | lint, typecheck, tests, build | 105 tests passent ; contrôles et build réussis | Local | PASS |
 | Safari/WebKit | Même scénario réservation, sécurité, réseau et responsive | Scénario complet réussi (1,5 minute) | Navigateur WebKit automatisé | PASS — pas un iPhone physique |
-| Domaine officiel | Version et smoke test public après publication | En attente du déploiement | Production | NOT TESTED |
+| Domaine officiel | Version et smoke test public après publication | Fichiers attendus servis, nouveaux styles présents, connexion accessible, API privée HTTP 401 sans session | Production, Chromium et WebKit | PASS |
 | Échange réel production | Deux participants sur un même rendez-vous | Utilisateur disponible pour le contrôle sur ses appareils | Production | NOT TESTED |
 | Matériel réel | iPhone Safari/Chrome, Android Chrome, tablette, clavier natif | L'émulation ne constitue pas un test matériel | Matériel physique | NOT TESTED |
 
 ## Sécurité et limites
 
 - Comptes et écritures de recette créés uniquement dans le projet QA `kazlvtxkbsdhbfvtqqdp`, puis supprimés. Le compte interne QA utilise MFA. Aucun compte réel n'a reçu de nouveau rôle.
+- Contrôle après nettoyage : aucun compte temporaire ni ticket support de cette recette restant en QA (comptage serveur confirmé).
 - Vérification en lecture seule du projet production `qjdwxdbvrxedyfolnpol` : RLS active sur `messages`, `conversation_members` et `support_messages` ; insertion d'un message liée à `auth.uid()` et à l'appartenance à la conversation.
 - La lecture de réservation utilise `has_conversation_access` : participant, ou agent support ayant une autorisation spécifique non révoquée et non expirée sur cette conversation, plus `support.manage`. Cette exception support préexistante est conservée, pas élargie.
 - Les notes internes du support sont exclues pour le demandeur. La nouvelle route de contexte est encore plus restrictive : deux participants uniquement, sans e-mail, téléphone ou adresse.
@@ -61,5 +65,10 @@ Le défilement automatique reste dans l'historique et ne déplace plus toute la 
 - [Mobile 393 px](evidence/messaging-2026-10-08/conversation-393.png)
 - [Tablette 768 px](evidence/messaging-2026-10-08/conversation-768.png)
 - [Support clair](evidence/messaging-2026-10-08/support-light.png), [support sombre](evidence/messaging-2026-10-08/support-dark.png)
+- [Version servie en production](evidence/messaging-2026-10-08/production-version.json), [smoke test production](evidence/messaging-2026-10-08/production-smoke.json)
+
+## Contrôle humain demandé après publication
+
+L'utilisateur a confirmé pouvoir réaliser l'échange sur ses appareils. Instruction transmise après vérification de version : actualiser les deux appareils ; Client → rendez-vous → envoyer « Test lisibilité client — 8 octobre » ; Pro → Agenda → Messages → répondre « Réponse pro — 8 octobre » ; contrôler lisibilité, notifications, historique après actualisation et bouton Envoyer avec clavier ouvert. Résultat et appareils/navigateurs pas encore communiqués. Ne pas transformer cette disponibilité en PASS.
 
 Tests reproductibles : `tests/remote/messaging-remote-ui.spec.ts` (comptes temporaires, double sens, notifications, MFA support, confidentialité, panne réseau, persistance, responsive) ; `tests/domain/conversation-context.test.ts` (5 cas de contrôle serveur inclus dans les 105 tests).
