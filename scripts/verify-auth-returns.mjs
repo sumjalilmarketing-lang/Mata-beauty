@@ -129,7 +129,7 @@ try{
   await page.getByLabel('Confirmer le mot de passe',{exact:true}).fill('DifferentPassword-123');
   await page.getByRole('checkbox').check();
   await page.getByRole('button',{name:'Créer le compte',exact:true}).click();
-  await page.getByRole('status').filter({hasText:'ne correspondent pas'}).waitFor();
+  await page.locator('.auth-feedback').filter({hasText:'ne correspondent pas'}).waitFor();
   const google=page.getByRole('button',{name:'Continuer avec Google',exact:true});await google.scrollIntoViewIfNeeded();
   const box=await google.boundingBox();assert(box&&box.x>=0&&box.x+box.width<=390);
   await page.screenshot({path:`${output}/signup-mobile.png`});await context.close();

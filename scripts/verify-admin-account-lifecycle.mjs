@@ -33,11 +33,14 @@ await check('Internal non-Super-Admin roles denied account lifecycle after MFA',
 await check('Protected own Super Admin cannot be deleted, suspended or archived',async()=>{for(const action of ['delete','suspend','archive'])assert((await manager.api.rpc('admin_manage_account',command(manager.id,action))).error);});
 await check('Search and explicit server test marker',async()=>{const r=await manager.api.rpc('admin_managed_accounts',{search_term:target.email});assert.ifError(r.error);assert.equal(r.data.length,1);assert.equal(r.data[0].is_test,true);});
 await check('Archive revokes sessions and keeps profile; reactivation is explicit',async()=>{
+ assert.ifError((await target.api.rpc('synchronize_account_status')).error);
  assert.ifError((await manager.api.rpc('admin_manage_account',command(target.id,'archive'))).error);
  assert.equal((await service.from('profiles').select('is_suspended').eq('id',target.id).single()).data.is_suspended,true);
+ assert((await target.api.rpc('synchronize_account_status')).error, 'Suspended session must not change account status');
  assert((await target.api.auth.refreshSession()).error);
  assert((await manager.api.rpc('admin_set_user_suspension',{target_user_id:target.id,suspended:false,reason:'QA must not bypass archive'})).error);
  assert.ifError((await manager.api.rpc('admin_manage_account',command(target.id,'reactivate'))).error);
+ assert.equal((await service.from('profiles').select('account_status').eq('id',target.id).single()).data.account_status,'active');
  assert.ifError((await target.api.auth.signInWithPassword({email:target.email,password:target.password})).error);
 });
 await check('Retained dossier blocks irreversible deletion and remains intact',async()=>{
