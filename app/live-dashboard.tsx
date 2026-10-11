@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
@@ -14,11 +15,13 @@ import { ProviderLaunchChecklist } from "./provider-launch-checklist";
 import { ProfessionalDocuments } from "./professional-documents";
 import { ReferralCard } from "./referral-card";
 import { NotificationCenter } from "./notification-center";
+import { BookingReview } from "./booking-review";
 
 type Role = "client" | "provider" | "admin";
 type ProviderStatus = "draft" | "pending_review" | "approved" | "rejected" | "suspended";
 type BookingRow = {
   id: string;
+  provider_id: string;
   starts_at: string;
   ends_at: string;
   status: BookingStatus;
@@ -26,6 +29,8 @@ type BookingRow = {
   currency: string;
   location_mode: "salon" | "client_address";
   appointment_address: string | null;
+  collaborator_name: string | null;
+  collaborator_avatar_url: string | null;
   provider_services: { title: string; duration_minutes: number } | null;
 };
 type BookingQueryRow = Omit<BookingRow, "provider_services"> & {
@@ -142,7 +147,7 @@ export function LiveDashboard({
         const ownerColumn = role === "client" ? "client_id" : "provider_id";
         const { data, error: bookingError } = await supabase
           .from("bookings")
-          .select("id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,provider_services(title,duration_minutes)")
+          .select("id,provider_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,provider_services(title,duration_minutes)")
           .eq(ownerColumn, userId)
           .order("starts_at", { ascending: true })
           .limit(30);
@@ -443,6 +448,8 @@ export function LiveDashboard({
                 <span className="date-block">{new Intl.DateTimeFormat("fr-SN", { day: "2-digit", month: "short", timeZone: "Africa/Dakar" }).format(new Date(booking.starts_at))}</span>
                 <div>
                   <strong>{booking.provider_services?.title ?? "Prestation beauté"}</strong>
+                  {booking.collaborator_name && <small>{booking.collaborator_avatar_url && <Image unoptimized src={booking.collaborator_avatar_url} alt="" width={36} height={36} />} Prestation assurée par {booking.collaborator_name}</small>}
+                  {role === "client" && booking.status === "completed" && <BookingReview bookingId={booking.id} clientId={userId} providerId={booking.provider_id} performer={booking.collaborator_name} />}
                   <small>{new Intl.DateTimeFormat("fr-SN", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(booking.starts_at))} · {booking.provider_services?.duration_minutes ?? Math.round((new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60000)} min</small>
                   <small>{booking.location_mode === "client_address" ? booking.appointment_address : "Chez le professionnel"} · {booking.total_amount.toLocaleString("fr-FR")} {booking.currency}</small>
                 </div>

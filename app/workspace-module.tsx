@@ -12,6 +12,7 @@ import { ClientProfile } from "./client-profile";
 import { ProfessionalApplication } from "./professional-application";
 import { OnboardingQueue } from "./onboarding-queue";
 import { SalonControlCenter } from "./salon-control-center";
+import { ProviderTeamAgenda } from "./team-management";
 import { WorkspaceMessaging } from "./workspace-messaging";
 import { LiveDashboard } from "./live-dashboard";
 import { SocialDashboard } from "./social-dashboard";
@@ -72,7 +73,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const refundReview = ["finance", "admin"].includes(space) && module.key === "refunds";
   const deletionQueue = space === "admin" && module.key === "deletion-requests";
   const [notice, setNotice] = useState("");
-  const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue"].includes(module.key));
+  const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
     : space === "admin" && module.key === "alerts" ? fraudAlerts
     : space === "admin" && module.key === "security" ? resources.sessions
@@ -120,7 +121,8 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (module.key === "notifications") return <NotificationCenter userId={userId} />;
   if (focused) return <LiveDashboard role={space === "client" ? "client" : "provider"} userId={userId} displayName="" moduleKey={module.key} onBack={() => window.location.assign("/")} onSignOut={async () => { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/"); }} />;
   if (onboardingInbox) return <OnboardingQueue moduleKey={module.key === "onboarding" ? "dashboard" : module.key} />;
-  if (space === "pro" && module.key === "agenda") return <ProviderAgenda userId={userId} />;
+  if (space === "pro" && module.key === "team") return <SalonControlCenter module={module} userId={userId} />;
+  if (space === "pro" && module.key === "agenda") return <><ProviderTeamAgenda userId={userId} /><ProviderAgenda userId={userId} /></>;
   if (space === "pro" && module.key === "revenue") return <ProviderRevenue userId={userId} />;
   if (space === "client" && module.key === "favorites") return <ClientFavorites userId={userId} />;
   if (space === "client" && module.key === "inspirations") return <SocialDashboard role="client" userId={userId} />;

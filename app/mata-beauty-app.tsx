@@ -60,12 +60,12 @@ type PaymentCapabilities = {
   methods: PaymentMethod[];
 };
 
-type BookingConfirmation = { id: string; date: string; time: string; location: string };
+type BookingConfirmation = { id: string; date: string; time: string; location: string; collaboratorName?: string | null; collaboratorPhoto?: string | null };
 type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; business_id?: string | null };
 type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[] };
 type BookingSelection = { provider: Provider; service: ProviderService; sourcePostId?: string };
 type AvailabilitySlot = { slot_start: string };
-type BookableCollaborator = { id: string; display_name: string; title: string | null };
+type BookableCollaborator = { collaborator_id: string; display_name: string; title: string | null; avatar_url: string | null; specialties: string[]; slot_start: string };
 
 const bookingDraftKey = "mata-booking-draft";
 const bookingDraftSchema = z.object({
@@ -150,6 +150,22 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [paymentReturn, setPaymentReturn] = useState<{ id: string; mode: "return" | "cancelled" } | null>(null);
   const [showLaunchWelcome, setShowLaunchWelcome] = useState(false);
 
+  useEffect(() => {
+    const target = new URLSearchParams(window.location.search).get("service");
+    if (!target || catalogState !== "live") return;
+    const parsed = z.string().uuid().safeParse(target);
+    if (!parsed.success) return;
+    const client = getSupabaseBrowserClient(); if (!client) return;
+    let active = true;
+    void client.from("provider_services").select("id,provider_id,title,duration_minutes,price_amount,business_id").eq("id", parsed.data).eq("is_active", true).is("archived_at", null).maybeSingle().then(({ data, error }) => {
+      if (!active) return;
+      const provider = catalog.find(item => item.profileId === data?.provider_id);
+      if (error || !data || !provider) { setNotice("Cette prestation n’est pas disponible à la réservation."); return; }
+      setRestoredBookingRequest(null); setBooking({ provider, service: data });
+    });
+    return () => { active = false; };
+  }, [catalog, catalogState]);
+
   function setScreen(next: "feed" | "home" | "results", nextCategory = category) {
     applyScreen(next);
     const url = new URL(window.location.href);
@@ -191,7 +207,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     const returnedPaymentId = z.string().uuid().safeParse(parameters.get("paymentId"));
     const paymentMode = parameters.get("payment");
     void Promise.resolve().then(() => {
-      if (draft) {
+      if (draft && !parameters.has("service")) {
         setBooking(draft.selection);
         setProfile(draft.selection.provider);
         setRestoredBookingRequest(draft.request);
@@ -533,7 +549,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       currency: quote.currency,
       client_note: request.note.trim() || null,
       source_post_id: booking.sourcePostId ?? null,
-    }).select("id").single();
+    }).select("id,collaborator_name,collaborator_avatar_url").single();
     if (error || !created) {
       setNotice(error?.code === "23P01" ? "Ce créneau vient d’être réservé." : "La réservation n’a pas pu être enregistrée.");
       return null;
@@ -552,18 +568,18 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       });
       if (!paymentResponse.ok) {
         setNotice("La réservation est enregistrée, mais le paiement n’a pas pu être préparé. Aucun débit n’a eu lieu.");
-        return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
+        return { id: created.id, collaboratorName: created.collaborator_name, collaboratorPhoto: created.collaborator_avatar_url, date: request.date, time: request.time, location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
       }
       const checkout = paymentCheckoutSchema.safeParse(await paymentResponse.json().catch(() => null));
       if (!checkout.success || !checkout.data.checkoutUrl || !isTrustedSandboxCheckoutUrl(checkout.data.checkoutUrl)) {
         setNotice("La réservation est enregistrée, mais aucun checkout sandbox fiable n’est disponible. Aucun débit n’a eu lieu.");
-        return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
+        return { id: created.id, collaboratorName: created.collaborator_name, collaboratorPhoto: created.collaborator_avatar_url, date: request.date, time: request.time, location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
       }
       setNotice("Redirection sécurisée vers PayDunya Sandbox…");
       window.location.assign(checkout.data.checkoutUrl);
       return null;
     }
-    return { id: created.id, date: request.date, time: request.time, location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
+    return { id: created.id, collaboratorName: created.collaborator_name, collaboratorPhoto: created.collaborator_avatar_url, date: request.date, time: request.time, location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
   }
 
   async function signOut() {
@@ -809,7 +825,8 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const [step, setStep] = useState(initialRequest?.time ? 2 : 1);
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
-  const [slots, setSlots] = useState<string[]>([]);
+  const [slotRows, setSlotRows] = useState<AvailabilitySlot[]>([]);
+  const [teamEnabled, setTeamEnabled] = useState(false);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [availabilityError, setAvailabilityError] = useState(false);
   const [availabilityAttempt, setAvailabilityAttempt] = useState(0);
@@ -822,20 +839,6 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   useEffect(() => {
     window.sessionStorage.setItem(bookingDraftKey, JSON.stringify({ selection, request: form }));
   }, [form, selection]);
-
-  useEffect(() => {
-    const businessId = service.business_id ?? provider.businessId;
-    const supabase = getSupabaseBrowserClient();
-    if (!businessId || !supabase) {
-      void Promise.resolve().then(() => setCollaborators([]));
-      return;
-    }
-    let active = true;
-    void supabase.from("collaborators").select("id,display_name,title").eq("business_id", businessId).eq("is_active", true).eq("is_bookable", true).is("archived_at", null).order("display_name").then(({ data }) => {
-      if (active) setCollaborators((data ?? []) as BookableCollaborator[]);
-    });
-    return () => { active = false; };
-  }, [provider.businessId, service.business_id]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -862,20 +865,24 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 15_000);
     void Promise.resolve().then(() => { if (active) { setAvailabilityLoading(true); setAvailabilityError(false); } });
-    void supabase.rpc("get_available_slots", {
-      target_provider_id: provider.profileId,
-      target_provider_service_id: service.id,
+    void supabase.rpc("get_booking_team_availability", {
+      target_service_id: service.id,
       from_date: form.date,
-      days: 1,
     }).abortSignal(controller.signal).then(({ data, error }) => {
       window.clearTimeout(timeout);
       if (!active) return;
-      setSlots(error ? [] : ((data ?? []) as AvailabilitySlot[]).map((slot) => new Date(slot.slot_start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" })));
+      const availability = data as { teamEnabled: boolean; slots: BookableCollaborator[] } | null;
+      setTeamEnabled(Boolean(availability?.teamEnabled));
+      setSlotRows(error ? [] : availability?.slots ?? []);
+      setCollaborators(error || !availability?.teamEnabled ? [] : availability.slots);
       setAvailabilityError(Boolean(error));
       setAvailabilityLoading(false);
     });
     return () => { active = false; window.clearTimeout(timeout); controller.abort(); };
   }, [form.date, provider.profileId, service.id, availabilityAttempt]);
+
+  const availablePeople = [...new Map(collaborators.map(person => [person.collaborator_id, person])).values()];
+  const slots = [...new Set((teamEnabled ? collaborators.filter(person => !form.collaboratorId || person.collaborator_id === form.collaboratorId) : slotRows).map(slot => new Date(slot.slot_start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" })))];
 
   const quickDates = useMemo(() => buildQuickDates(), []);
   async function confirm() {
@@ -902,11 +909,11 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
       {confirmation ? <BookingSuccess provider={provider} service={service} confirmation={confirmation} onClose={onClose} /> : <>
         <div className="fast-booking-progress" aria-label={`Étape ${step} sur 2`}><span className={step >= 1 ? "active" : ""}>1 <small>Créneau</small></span><i /><span className={step >= 2 ? "active" : ""}>2 <small>Confirmation</small></span></div>
         <div className="premium-booking-content">
-          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount)}</b></div><h3>Quand êtes-vous disponible ?</h3><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>Autre</small><strong>＋</strong><input aria-label="Choisir une autre date" type="date" min={today} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "" })} /></label></div><div className="slot-section-title"><strong>Créneaux disponibles</strong><small>Mis à jour en direct</small></div>{availabilityLoading ? <div className="slot-loading">Recherche des meilleurs créneaux…</div> : availabilityError ? <div role="alert" className="no-slots">Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.<button onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>Réessayer</button></div> : slots.length ? <div className="premium-slot-grid">{slots.map((time) => <button className={form.time === time ? "active" : ""} key={time} onClick={() => { setForm({ ...form, time }); setStep(2); }}>{time}</button>)}</div> : <div className="no-slots">Aucun créneau publié ce jour. Essayez une autre date.</div>}</>}
+          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount)}</b></div><h3>Quand êtes-vous disponible ?</h3><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "", collaboratorId: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>Autre</small><strong>＋</strong><input aria-label="Choisir une autre date" type="date" min={today} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "", collaboratorId: "" })} /></label></div>{teamEnabled && !availabilityLoading && <fieldset className="booking-team-choice"><legend>Choisir mon professionnel</legend><label><input type="radio" name="employee-choice" checked={!form.collaboratorId} onChange={() => setForm({ ...form, collaboratorId: "", time: "" })} />Peu importe, attribuez-moi un professionnel disponible</label>{availablePeople.map(person => <label key={person.collaborator_id}><input type="radio" name="employee-choice" checked={form.collaboratorId === person.collaborator_id} onChange={() => setForm({ ...form, collaboratorId: person.collaborator_id, time: "" })} />{person.avatar_url && <Image unoptimized src={person.avatar_url} alt={person.display_name} width={48} height={48} />}<span><strong>{person.display_name}</strong><small>{person.title}</small><small>{person.specialties.join(" · ")}</small></span></label>)}</fieldset>}<div className="slot-section-title"><strong>Créneaux disponibles</strong><small>Mis à jour en direct</small></div>{availabilityLoading ? <div className="slot-loading">Recherche des meilleurs créneaux…</div> : availabilityError ? <div role="alert" className="no-slots">Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.<button onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>Réessayer</button></div> : slots.length ? <div className="premium-slot-grid">{slots.map((time) => <button className={form.time === time ? "active" : ""} key={time} onClick={() => { setForm({ ...form, time }); setStep(2); }}>{time}</button>)}</div> : <div className="no-slots">Aucun créneau publié ce jour. Essayez une autre date.</div>}</>}
           {step === 2 && <>
             <h3>Vérifiez et confirmez</h3>
             <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date)} à {form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name}</small></div><b>{formatPrice(service.price_amount)}</b></div>
-            {collaborators.length > 0 && <label>Collaboratrice<select aria-label="Choisir une collaboratrice" value={form.collaboratorId} onChange={(event) => setForm({ ...form, collaboratorId: event.target.value })}><option value="">Sans préférence</option>{collaborators.map((person) => <option key={person.id} value={person.id}>{person.display_name}{person.title ? ` · ${person.title}` : ""}</option>)}</select></label>}
+            {teamEnabled && <p>Professionnel : {availablePeople.find(person => person.collaborator_id === form.collaboratorId)?.display_name ?? "Affectation automatique à une personne qualifiée et disponible"}</p>}
             <fieldset className="location-choice"><legend>Où ?</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>Chez le professionnel</strong><small>{provider.address ? `${provider.address} · ${provider.area}` : `${provider.area} · adresse à confirmer avec le professionnel`}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>À mon domicile</strong><small>Le professionnel se déplace</small></span></label>}</fieldset>
             {form.locationMode === "client_address" && <label>Adresse<textarea autoFocus value={form.address} placeholder="Votre adresse complète" onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}
             <fieldset className="location-choice"><legend>Paiement</legend>
@@ -932,7 +939,7 @@ function BookingSuccess({ provider, service, confirmation, onClose }: { provider
   const end = new Date(start.getTime() + service.duration_minutes * 60000);
   const calendarDate = (value: Date) => value.toISOString().replace(/[-:]/g, "").replace(".000", "");
   const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${service.title} · ${provider.name}`)}&dates=${calendarDate(start)}/${calendarDate(end)}`;
-  return <div className="premium-booking-success"><span>✓</span><p>Demande enregistrée</p><h2>Votre rendez-vous est créé</h2><dl><div><dt>Professionnel</dt><dd>{provider.name}</dd></div><div><dt>Prestation</dt><dd>{service.title}</dd></div><div><dt>Date</dt><dd>{confirmation.date} à {confirmation.time}</dd></div><div><dt>Adresse</dt><dd>{confirmation.location}</dd></div><div><dt>Prix</dt><dd>{formatPrice(service.price_amount)}</dd></div><div><dt>Paiement</dt><dd>À régler sur place · aucun débit en ligne</dd></div><div><dt>Statut</dt><dd>En attente de confirmation du professionnel</dd></div></dl><Link href="/app/messages">Message</Link><a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(confirmation.location)}`} target="_blank" rel="noreferrer">Itinéraire</a><BookingMicroFeedback bookingId={confirmation.id}/><a href={calendarUrl} target="_blank" rel="noreferrer">Ajouter au calendrier</a><button onClick={onClose}>Terminer</button></div>;
+  return <div className="premium-booking-success"><span>✓</span><p>Demande enregistrée</p><h2>Votre rendez-vous est créé</h2><dl><div><dt>Professionnel</dt><dd>{provider.name}</dd></div><div><dt>Votre intervenant</dt><dd>{confirmation.collaboratorPhoto && <Image unoptimized src={confirmation.collaboratorPhoto} alt="" width={48} height={48} />}{confirmation.collaboratorName ?? (service.business_id || provider.businessId ? "Votre professionnel sera confirmé par le salon." : provider.name)}</dd></div><div><dt>Prestation</dt><dd>{service.title}</dd></div><div><dt>Date</dt><dd>{confirmation.date} à {confirmation.time}</dd></div><div><dt>Adresse</dt><dd>{confirmation.location}</dd></div><div><dt>Prix</dt><dd>{formatPrice(service.price_amount)}</dd></div><div><dt>Paiement</dt><dd>À régler sur place · aucun débit en ligne</dd></div><div><dt>Statut</dt><dd>En attente de confirmation du professionnel</dd></div></dl><Link href="/app/messages">Message</Link><a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(confirmation.location)}`} target="_blank" rel="noreferrer">Itinéraire</a><BookingMicroFeedback bookingId={confirmation.id}/><a href={calendarUrl} target="_blank" rel="noreferrer">Ajouter au calendrier</a><button onClick={onClose}>Terminer</button></div>;
 }
 
 function BookingMicroFeedback({ bookingId }: { bookingId: string }) {

@@ -3,7 +3,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function notificationDestination(item: Pick<NotificationItem, "kind" | "data">): string | null {
   const href = item.data?.href;
   // Never follow arbitrary URLs from legacy notification data.
-  if (typeof href === "string" && /^\/(?:app|pro|onboarding|moderation|admin)(?:\/[a-z-]+)?(?:\?(?:dossier|booking|conversation)=[0-9a-f-]{36})?(?:#booking-[0-9a-f-]{36})?$/.test(href)) return href;
+  if (typeof href === "string" && /^\/(?:app|pro|salon|staff|onboarding|moderation|admin)(?:\/[a-z-]+)?(?:\?(?:dossier|booking|conversation)=[0-9a-f-]{36})?(?:#booking-[0-9a-f-]{36})?$/.test(href)) return href;
   const postId = item.data?.post_id;
   if (["social_moderation", "publication_completed"].includes(item.kind)) return "/pro/videos";
   if (typeof postId === "string" && uuid.test(postId)) return `/posts/${postId}`;
