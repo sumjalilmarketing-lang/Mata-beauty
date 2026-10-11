@@ -1,8 +1,8 @@
 # Recette — équipe et attribution des rendez-vous
 
-Date : 11 octobre 2026, Europe/Paris. Rapport provisoire à compléter après les parcours navigateur et le déploiement.
+Date : 11 octobre 2026, Europe/Paris. Code validé et migrations production appliquées ; promotion du frontend bloquée par une correction de credential nécessitant l’autorisation humaine.
 
-La gestion des employés et l’attribution des rendez-vous sont implémentées. Les contrôles locaux, les 27 vérifications API QA et le parcours navigateur étendu sur Chromium et WebKit sont PASS. La validation sur `https://mata-beauty.com` reste à compléter. Ce document ne prononce pas de validation de lancement public.
+La gestion des employés et l’attribution des rendez-vous sont implémentées dans le commit `20d5861836cb18fdb7141eda4d1298755a55c8aa`. Les contrôles locaux, les 27 vérifications API QA et le parcours navigateur étendu sur Chromium et WebKit sont PASS. Le build production est prêt mais n’a pas été promu, car une clé serveur déjà invalide sur l’ancienne production doit être corrigée. Ce document ne prononce pas de validation de lancement public.
 
 ## Périmètre livré
 
@@ -102,13 +102,13 @@ La vérification des notifications ci-dessus porte sur leurs enregistrements et 
 |---|---|---|
 | JWT encore valide après suspension : accès aux données privées d’équipe | Policies RLS restrictives et gardes dans les RPC de lecture | Scénarios API 18–19, 21–23, 25–26 PASS |
 | Écritures directes permettant de contourner le garde des RPC | Contrôle du compte actif sur `collaborators` et les changements de `team_booking_enabled` | Scénarios API 20 et 24 PASS |
-| Choix d’un employé conservé après changement de date, pouvant masquer les autres créneaux | Réinitialisation du choix lors du changement de date | Test navigateur ajouté ; résultat de cette révision en attente |
-| Historique masqué pour les rendez-vous terminés, annulés ou passés | Action « Voir l’historique » séparée de la réaffectation ; formulaire limité aux rendez-vous admissibles | Test navigateur après completion ajouté ; résultat en attente |
+| Choix d’un employé conservé après changement de date, pouvant masquer les autres créneaux | Réinitialisation du choix lors du changement de date | Chromium et WebKit : changement de date PASS |
+| Historique masqué pour les rendez-vous terminés, annulés ou passés | Action « Voir l’historique » séparée de la réaffectation ; formulaire limité aux rendez-vous admissibles | Chromium et WebKit : historique après prestation terminée PASS ; états annulé/passé non exécutés séparément |
 | Horodatage calculé pendant le rendu du composant | Horodatage conservé en état et actualisé ; contrôle frais à la soumission et garde serveur conservés | Lint et TypeScript PASS |
 
 La revue de code n’a pas identifié d’autre blocage concret dans les modifications examinées. Cette conclusion est limitée au périmètre de la revue et ne constitue pas un audit exhaustif de toute la plateforme.
 
-## Parcours navigateur et Preview — à compléter
+## Parcours navigateur et Preview
 
 | Parcours | État à la rédaction | Statut |
 |---|---|---|
@@ -130,9 +130,12 @@ Premier essai WebKit : parcours métier terminé, assertion globale erreurs FAIL
 
 | Contrôle restant | Résultat attendu | Statut |
 |---|---|---|
-| Migrations de cette livraison sur la base de production | Présence vérifiée des six migrations et contrôles de schéma | NOT TESTED |
-| Déploiement de cette livraison | Déploiement réussi et commit/identifiant consignés | NOT TESTED |
-| Version réellement servie par `https://mata-beauty.com` | Correspondance démontrée avec le déploiement attendu | NOT TESTED |
+| Migrations de cette livraison sur la base de production | Six migrations appliquées et relues ; RLS active sur les trois nouvelles tables ; aucun helper privé exécutable par anon/authenticated | PASS |
+| Build production préparé sans bascule du domaine | `dpl_5HrW2rjGLJBZ6HJGuPoG2991LFoU`, code `20d5861`, READY ; build 40 s ; base publique production confirmée | PASS |
+| Smoke navigateur du build production préparé | 3 PASS : accueil/découverte sans erreurs, champs mots de passe indépendants en 390 et 1366 px | PASS |
+| Sonde serveur du build et de la version publique précédente | `/api/health/server` renvoie 503, clé serveur Vercel refusée par Supabase en 401 | FAIL |
+| Correction ciblée de la clé serveur Production | Rejet automatique avant exécution, confirmation humaine demandée ; aucune valeur modifiée | BLOCKED |
+| Promotion et version réellement servie par `https://mata-beauty.com` | Ancien déploiement `dpl_FDacMsHbBwGajfn5BCivdtFT4b44` conservé ; aucune promotion de cette livraison | BLOCKED |
 | Parcours authentifié Client ↔ Professionnel en production | Réservation, affectation, absence/réaffectation et historique vérifiés sur le domaine public | NOT TESTED |
 | Réception effective des e-mails d’affectation/réaffectation | Boîte de test réelle consultée, contenu et liens vérifiés | NOT TESTED |
 | Employé possédant déjà un accès individuel | Notification et destination vérifiées avec ce profil | NOT TESTED |
@@ -140,4 +143,20 @@ Premier essai WebKit : parcours métier terminé, assertion globale erreurs FAIL
 | Android réel, Chrome | Même contrôle physique | NOT TESTED |
 | Trackpad physique | Défilement complet des formulaires, de l’agenda et de l’historique | NOT TESTED — PHYSICAL TRACKPAD REQUIRED |
 
-La réception réelle des e-mails, les essais matériels et les parcours authentifiés de production ne sont pas déduits des résultats API QA, unitaires ou du build. La conclusion de livraison doit être mise à jour après les contrôles encore en attente.
+La réception réelle des e-mails, les essais matériels et les parcours authentifiés de production ne sont pas déduits des résultats API QA, unitaires ou du build. Aucun utilisateur authentifié n’est disponible dans le navigateur contrôlé : le site affiche « Se connecter à MATA Beauty ».
+
+Staging production : `https://mata-beauty-befp0gz3g-africrm.vercel.app`. Métadonnées SHA vérifiées ; `gitDirty=1` provient des rapports sous `docs`, exclus du déploiement, sans modification de code après le commit. La validation des parcours sur le domaine devra suivre le remplacement autorisé du secret, une nouvelle construction, les tests de santé et la promotion de ce nouveau build.
+
+## Conservation des données et environnements
+
+- Avant/après les migrations production : les créneaux des sept prestations publiées sont identiques (comparaison nombre et empreinte des horaires sur sept jours) ; huit réservations présentes avant et après.
+- Aucune équipe activée implicitement. Les durées calculées incluent les options obligatoires : zéro différence avec le calcul de référence sur le catalogue production.
+- Versions enregistrées en production par MCP : `20261011094416`, `20261011094423`, `20261011094426`, `20261011094433`, `20261011094436`, `20261011094440` ; correspondance par nom aux six migrations versionnées dans Git.
+- Après les tests navigateur, zéro compte `codex-employee-ui-*` et zéro salon de ces fixtures restant en QA.
+- QA remise en pause (`INACTIVE`). `yobalelma_db`, temporairement suspendu avec autorisation, restauré et vérifié `ACTIVE_HEALTHY`.
+- Advisors production : aucune nouvelle table sans RLS. Les avertissements SECURITY DEFINER des RPC publiques de disponibilités et des RPC protégées par vérification de propriétaire/compte actif sont explicitement évalués, pas assimilés à une absence de contrôle. Voir [règle Supabase RPC authentifiées](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
+- Réserve historique distincte : HaveIBeenPwned leaked-password protection — BLOCKED BY PLAN — activation possible après upgrade Pro. Aucune activation ou imitation ajoutée dans cette livraison.
+
+## Anomalie préexistante découverte avant promotion
+
+**BUG-SERVER-KEY : sonde serveur 503.** Le premier staging production et l’ancien domaine public renvoient tous deux 503 sur `/api/health/server`, alors que les trois tests navigateur publics du staging passent. Les logs Supabase prouvent deux requêtes serveur Vercel `HEAD /rest/v1/categories` rejetées en 401 à 09:46:40Z et 09:46:59Z ; la même requête avec la clé serveur active du projet répond 200 à 09:47:48Z. Les permissions SQL de `service_role` sont correctes. Cause : clé serveur Production Vercel invalide/refusée. Correction ciblée préparée : remplacer uniquement la variable serveur `SUPABASE_SERVICE_ROLE_KEY` Production en conservant sa confidentialité, reconstruire et retester. Le contrôle automatique a refusé ce transfert de credential et cette mutation persistante avant exécution, faute d’autorisation humaine explicite. La confirmation a été demandée ; aucune clé modifiée, exposée au navigateur ou permission élargie.
