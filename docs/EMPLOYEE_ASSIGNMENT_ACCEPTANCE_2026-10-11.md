@@ -1,8 +1,8 @@
 # Recette — équipe et attribution des rendez-vous
 
-Date : 11 octobre 2026, Europe/Paris. Code validé et migrations production appliquées ; promotion du frontend bloquée par une correction de credential nécessitant l’autorisation humaine.
+Date : 11 octobre 2026, Europe/Paris. Module déployé, sonde serveur corrigée et contrôles publics effectués sur le domaine.
 
-La gestion des employés et l’attribution des rendez-vous sont implémentées dans le commit `20d5861836cb18fdb7141eda4d1298755a55c8aa`. Les contrôles locaux, les 27 vérifications API QA et le parcours navigateur étendu sur Chromium et WebKit sont PASS. Le build production est prêt mais n’a pas été promu, car une clé serveur déjà invalide sur l’ancienne production doit être corrigée. Ce document ne prononce pas de validation de lancement public.
+La gestion des employés et l’attribution des rendez-vous sont implémentées dans le commit `20d5861836cb18fdb7141eda4d1298755a55c8aa`. Le frontend déployé correspond au commit documentaire suivant `3a38ad1a60a6c13b18b99757bbce4ba451f803fa`, sans différence de code applicatif. Les contrôles locaux, les 27 vérifications API QA et le parcours navigateur étendu sur Chromium et WebKit sont PASS. Cinq scénarios publics ont été exécutés sur `https://mata-beauty.com`. La recette a ensuite révélé et corrigé le format des créneaux indépendants par une septième migration serveur. Les limites authentifiées et matérielles ci-dessous restent distinctes : ce document ne prononce pas une validation globale de lancement public.
 
 ## Périmètre livré
 
@@ -40,6 +40,7 @@ Créer une fiche employé ne crée pas de compte d’authentification et n’acc
 | `20261008174332_employee_resource_namespace.sql` | Contrainte de chevauchement distinguant les ressources par professionnel |
 | `20261008174522_require_enabled_team_assignment.sql` | Refus d’une affectation explicite lorsque la réservation par équipe est désactivée |
 | `20261011092427_harden_employee_account_access.sql` | Restrictions de lecture après suspension/désactivation et garde des modifications directes de l’équipe |
+| `20261011095523_fix_independent_team_availability_shape.sql` | Format objet `{slot_start}` des créneaux des professionnels indépendants |
 
 Les nouvelles tables publiques `collaborator_hours`, `collaborator_exceptions` et `booking_assignments` activent RLS. Les fonctions internes sont placées dans `booking_private` sans accès direct accordé aux rôles publics. Les opérations autorisées côté serveur vérifient la propriété et les conditions d’affectation.
 
@@ -126,16 +127,19 @@ Preview testée : `https://mata-beauty-3qgv7dved-africrm.vercel.app`, déploieme
 
 Premier essai WebKit : parcours métier terminé, assertion globale erreurs FAIL. La trace identifie huit requêtes annulées (`Load request cancelled`, statut -1) lors des navigations forcées du test, avec les mêmes endpoints HTTP 200 et en-tête CORS correct avant/après. Le helper de navigation a été corrigé pour utiliser les liens visibles. Retest complet PASS. Aucun filtre d’erreurs ajouté, aucun affaiblissement CORS applicatif.
 
-## Production et limites restantes — à compléter
+## Production et limites restantes
 
 | Contrôle restant | Résultat attendu | Statut |
 |---|---|---|
-| Migrations de cette livraison sur la base de production | Six migrations appliquées et relues ; RLS active sur les trois nouvelles tables ; aucun helper privé exécutable par anon/authenticated | PASS |
-| Build production préparé sans bascule du domaine | `dpl_5HrW2rjGLJBZ6HJGuPoG2991LFoU`, code `20d5861`, READY ; build 40 s ; base publique production confirmée | PASS |
-| Smoke navigateur du build production préparé | 3 PASS : accueil/découverte sans erreurs, champs mots de passe indépendants en 390 et 1366 px | PASS |
-| Sonde serveur du build et de la version publique précédente | `/api/health/server` renvoie 503, clé serveur Vercel refusée par Supabase en 401 | FAIL |
-| Correction ciblée de la clé serveur Production | Rejet automatique avant exécution, confirmation humaine demandée ; aucune valeur modifiée | BLOCKED |
-| Promotion et version réellement servie par `https://mata-beauty.com` | Ancien déploiement `dpl_FDacMsHbBwGajfn5BCivdtFT4b44` conservé ; aucune promotion de cette livraison | BLOCKED |
+| Migrations de cette livraison sur la base de production | Sept migrations appliquées et relues ; RLS active sur les trois nouvelles tables ; aucun helper privé exécutable par anon/authenticated | PASS |
+| Build production promu sans reconstruction | `dpl_EfsvKDxDgNwbzCebG9jdtLKtM9rJ`, commit `3a38ad1`, READY ; build 33 s ; base publique production confirmée | PASS |
+| Smoke navigateur du build production préparé | 3 PASS sur le build final : accueil/découverte sans erreurs, champs mots de passe indépendants en 390 et 1366 px | PASS |
+| Sonde serveur après correction | `/api/health/server` du nouveau build et de mata-beauty.com : HTTP 200, configuration/base/serviceRole vrais | PASS |
+| Correction ciblée de la clé serveur Production | Autorisation humaine explicite reçue ; seule variable Production remplacée via mémoire/stdin, type Secret conservé | PASS |
+| Promotion et version réellement servie par `https://mata-beauty.com` | Alias exact vers le nouveau déploiement et 15/15 références JS identiques au build testé | PASS |
+| Tests navigateur sur le domaine public | 5 PASS : deux tailles pour les mots de passe, absence d’erreurs accueil/découverte, navigation publique, authentification sur sept tailles de 375×812 à 1920×1080 | PASS |
+| Créneaux indépendants après correction serveur | 7 prestations contrôlées, format objet valide, nombres de créneaux identiques ; CUA : créneau 10:00, récapitulatif, connexion requise | PASS |
+| Régression automatisée indépendante en production | Chromium : 1 PASS (15,7 s) ; WebKit : 1 PASS (8,8 s), format RPC/horaires/récapitulatif/connexion requis contrôlés sans écriture de réservation | PASS |
 | Parcours authentifié Client ↔ Professionnel en production | Réservation, affectation, absence/réaffectation et historique vérifiés sur le domaine public | NOT TESTED |
 | Réception effective des e-mails d’affectation/réaffectation | Boîte de test réelle consultée, contenu et liens vérifiés | NOT TESTED |
 | Employé possédant déjà un accès individuel | Notification et destination vérifiées avec ce profil | NOT TESTED |
@@ -145,13 +149,14 @@ Premier essai WebKit : parcours métier terminé, assertion globale erreurs FAIL
 
 La réception réelle des e-mails, les essais matériels et les parcours authentifiés de production ne sont pas déduits des résultats API QA, unitaires ou du build. Aucun utilisateur authentifié n’est disponible dans le navigateur contrôlé : le site affiche « Se connecter à MATA Beauty ».
 
-Staging production : `https://mata-beauty-befp0gz3g-africrm.vercel.app`. Métadonnées SHA vérifiées ; `gitDirty=1` provient des rapports sous `docs`, exclus du déploiement, sans modification de code après le commit. La validation des parcours sur le domaine devra suivre le remplacement autorisé du secret, une nouvelle construction, les tests de santé et la promotion de ce nouveau build.
+Build production promu : `https://mata-beauty-kbznw31cq-africrm.vercel.app`. Métadonnées SHA vérifiées ; `gitDirty=1` provient des rapports sous `docs`, exclus du déploiement, sans modification de code applicatif après le commit. Empreinte SHA256 commune des références JS : `5b438abd80268a4836117fdb325664c00e64a765ff10bd7c876462d3cc4ec250`. Preuve : `work/employee-assignment/production-version-proof.json`. Scan initial du nouveau déploiement après promotion : 50 entrées, aucune erreur/5xx ni avertissement ; ce scan limité n’équivaut pas à une surveillance continue.
 
 ## Conservation des données et environnements
 
 - Avant/après les migrations production : les créneaux des sept prestations publiées sont identiques (comparaison nombre et empreinte des horaires sur sept jours) ; huit réservations présentes avant et après.
 - Aucune équipe activée implicitement. Les durées calculées incluent les options obligatoires : zéro différence avec le calcul de référence sur le catalogue production.
 - Versions enregistrées en production par MCP : `20261011094416`, `20261011094423`, `20261011094426`, `20261011094433`, `20261011094436`, `20261011094440` ; correspondance par nom aux six migrations versionnées dans Git.
+- Correctif de format indépendant enregistré ensuite : `20261011095542`. Cette septième migration est appliquée et testée en production ; elle devra être appliquée à la QA lors de sa prochaine reprise (QA actuellement en pause).
 - Après les tests navigateur, zéro compte `codex-employee-ui-*` et zéro salon de ces fixtures restant en QA.
 - QA remise en pause (`INACTIVE`). `yobalelma_db`, temporairement suspendu avec autorisation, restauré et vérifié `ACTIVE_HEALTHY`.
 - Advisors production : aucune nouvelle table sans RLS. Les avertissements SECURITY DEFINER des RPC publiques de disponibilités et des RPC protégées par vérification de propriétaire/compte actif sont explicitement évalués, pas assimilés à une absence de contrôle. Voir [règle Supabase RPC authentifiées](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
@@ -159,4 +164,8 @@ Staging production : `https://mata-beauty-befp0gz3g-africrm.vercel.app`. Métado
 
 ## Anomalie préexistante découverte avant promotion
 
-**BUG-SERVER-KEY : sonde serveur 503.** Le premier staging production et l’ancien domaine public renvoient tous deux 503 sur `/api/health/server`, alors que les trois tests navigateur publics du staging passent. Les logs Supabase prouvent deux requêtes serveur Vercel `HEAD /rest/v1/categories` rejetées en 401 à 09:46:40Z et 09:46:59Z ; la même requête avec la clé serveur active du projet répond 200 à 09:47:48Z. Les permissions SQL de `service_role` sont correctes. Cause : clé serveur Production Vercel invalide/refusée. Correction ciblée préparée : remplacer uniquement la variable serveur `SUPABASE_SERVICE_ROLE_KEY` Production en conservant sa confidentialité, reconstruire et retester. Le contrôle automatique a refusé ce transfert de credential et cette mutation persistante avant exécution, faute d’autorisation humaine explicite. La confirmation a été demandée ; aucune clé modifiée, exposée au navigateur ou permission élargie.
+**BUG-SERVER-KEY : sonde serveur 503 — corrigé.** Le premier staging production et l’ancien domaine public renvoyaient tous deux 503 sur `/api/health/server`, alors que les trois tests navigateur publics du staging passaient. Les logs Supabase prouvent deux requêtes serveur Vercel `HEAD /rest/v1/categories` rejetées en 401 à 09:46:40Z et 09:46:59Z ; la même requête avec la clé serveur active du projet répond 200 à 09:47:48Z. Les permissions SQL de `service_role` sont correctes. Cause : clé serveur Production Vercel invalide/refusée. Après un rejet automatique avant exécution, l’utilisateur a explicitement autorisé le transfert sécurisé et le redéploiement. Seule la variable serveur Production a été remplacée, en conservant son type Secret, par mémoire/stdin. Nouveau build et domaine : sonde HTTP 200. Aucune clé exposée au navigateur ni permission élargie.
+
+**BUG-INDEPENDENT-SLOTS : « Invalid Date » — corrigé.** Reproduit sur le domaine après promotion en ouvrant une prestation indépendante. Les tests d’équipe QA et le contrôle du nombre de créneaux ne couvraient pas la forme JSON de cette branche. Cause : `to_jsonb(t)` sérialise en valeur scalaire un résultat PostgreSQL à une seule colonne ; l’interface attend un objet avec `slot_start`. La migration corrective construit explicitement cet objet sans modifier les horaires. Test SQL avant application : 26 horaires conservés par la nouvelle expression. Après application : sept prestations, zéro créneau mal formé, quantités identiques et toujours huit réservations. Contrôle CUA : 26 boutons horaires lisibles, choix 10:00, bon récapitulatif, puis connexion requise ; aucune réservation réelle créée. Aucune modification du module vidéo.
+
+Test de régression reproductible : `tests/remote/independent-booking-availability.spec.ts` avec `REMOTE_APP_URL`, `REMOTE_INDEPENDENT_SERVICE_ID` et `REMOTE_INDEPENDENT_DATE`. Capture production : `work/employee-assignment/independent-booking-production.png`. Les contrôles publics généraux ne constituent pas une recette exhaustive de la lecture de toutes les vidéos.
