@@ -1,0 +1,67 @@
+.messaging-columns { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 18px; }
+.messaging-columns > * { min-width: 0; }
+.conversation-inbox .conversation-search { display: grid; gap: 8px; font-size: 14px; margin-bottom: 16px; }
+.conversation-inbox .conversation-search input { width: 100%; min-height: 44px; font-size: 16px; }
+.conversation-inbox .conversation-inbox-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 16px 0; }
+.conversation-inbox-row > img, .conversation-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+.conversation-avatar { display: grid; place-items: center; background: #85124f; color: white; font-weight: 700; }
+.conversation-inbox-content { min-width: 0; }
+.conversation-inbox-content strong { display: block; overflow-wrap: anywhere; }
+.conversation-inbox-content p { margin: 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conversation-inbox-content time { font-size: 12px; }
+.conversation-inbox-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.conversation-inbox-actions button, .conversation-pending-booking button { min-height: 44px; }
+.conversation-load-more { min-height: 44px; width: 100%; margin-top: 12px; }
+.conversation-unread { min-width: 24px; min-height: 24px; padding: 3px 7px; border-radius: 99px; text-align: center; background: #85124f; color: white; font-size: 12px; }
+.conversation-inbox-row.selected { border-left: 3px solid #d377aa; padding-left: 10px; }
+.conversation-pending-booking { display: flex; gap: 12px; justify-content: space-between; align-items: center; }
+.conversation-archive-filter { display: flex; gap: 8px; align-items: center; font-size: 14px; margin-block: 12px; }
+.conversation-panel .conversation-tools, .conversation-panel .conversation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 12px; }
+.conversation-panel .conversation-tools button, .conversation-panel .conversation-actions :is(button, a), .conversation-panel .conversation-attachment button, .conversation-panel .conversation-confirm button { min-height: 44px; padding: 9px 12px; border: 1px solid var(--message-border); border-radius: 10px; background: var(--message-field); color: var(--message-text); font-size: 14px; line-height: 1.5; text-decoration: none; }
+.conversation-panel :is(.conversation-tools button[aria-expanded="true"], .conversation-actions .primary-button, .conversation-confirm .primary-button) { background: #85124f; color: #fff; border-color: #b8548a; }
+.conversation-panel .message-list .message-bubble-rich { width: min(85%, 420px); }
+.conversation-panel .message-list .message-highlighted { outline: 3px solid #d377aa; outline-offset: 3px; }
+.conversation-panel :is(.conversation-service-card, .conversation-quote-card, .conversation-reference-picker, .conversation-quote-form, .conversation-upload, .conversation-drafts) { background: var(--message-field); color: var(--message-text); padding: 14px; border-radius: 12px; border: 1px solid var(--message-border); min-width: 0; }
+.conversation-panel .message-bubble .conversation-service-card, .conversation-panel .message-bubble .conversation-quote-card { margin-bottom: 10px; }
+.conversation-panel :is(.conversation-quote-card, .conversation-service-card) :is(h3, p, small, span, strong, dt, dd) { color: inherit; }
+.conversation-panel .conversation-card-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.conversation-quote-status { padding: 4px 8px; border: 1px solid var(--message-border); border-radius: 20px; font-size: 12px; }
+.conversation-quote-card h3 { margin-block: 10px; font-size: 18px; }
+.conversation-quote-card dl { display: grid; gap: 8px; margin-block: 12px; }
+.conversation-quote-card dl > div { display: flex; justify-content: space-between; gap: 12px; }
+.conversation-quote-card dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.conversation-quote-card small { display: block; line-height: 1.5; font-size: 12px; }
+.conversation-panel .conversation-quote-conditions { border-top: 1px solid var(--message-border); padding-top: 10px; margin-bottom: 10px; }
+.conversation-confirm { margin-block: 12px; padding: 12px; border: 2px solid #c977a3; border-radius: 12px; }
+.conversation-confirm button { margin: 8px 8px 0 0; }
+.conversation-panel :is(.conversation-quote-form, .conversation-reference-picker) label { display: grid; gap: 7px; margin-bottom: 14px; color: var(--message-text); font-size: 14px; }
+.conversation-panel :is(.conversation-quote-form, .conversation-reference-picker) :is(input, select, textarea) { width: 100%; min-width: 0; min-height: 44px; background: var(--message-field); color: var(--message-text); border: 1px solid var(--message-border); border-radius: 8px; padding: 10px; font: inherit; font-size: 16px; }
+.conversation-panel .conversation-quote-form small, .conversation-panel .conversation-upload small { display: block; color: var(--message-muted); line-height: 1.5; margin-bottom: 12px; }
+.conversation-form-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.conversation-file-label { display: grid; gap: 12px; margin-block: 8px 12px; }
+.conversation-file-label input { width: 100%; min-width: 0; font-size: 14px; }
+.conversation-file-label input::file-selector-button { min-height: 44px; padding-inline: 10px; background: #85124f; color: white; border: 1px solid #b8548a; border-radius: 8px; margin-right: 10px; }
+.conversation-panel :is(.conversation-attachment, .conversation-upload-preview, .conversation-service-card) :is(img, video) { display: block; width: 100%; height: auto; max-height: 360px; object-fit: contain; border-radius: 8px; background: #140c12; margin-bottom: 10px; }
+.conversation-upload-preview > span { display: block; overflow-wrap: anywhere; font-size: 14px; }
+.conversation-panel .conversation-service-card > :is(strong, span) { display: block; }
+.conversation-panel .conversation-service-card > span { font-size: 13px; margin-block: 5px; }
+.conversation-catalog { display: grid; gap: 10px; padding-top: 12px; }
+.conversation-panel summary { padding-block: 12px; cursor: pointer; font-size: 14px; min-height: 44px; }
+.conversation-drafts > .conversation-quote-card { margin-top: 12px; }
+.conversation-panel :is(button, input, select, textarea, a, summary):focus-visible, .conversation-inbox :is(button, input):focus-visible { outline: 3px solid #d377aa; outline-offset: 3px; }
+.conversation-panel button:disabled { opacity: .65; cursor: not-allowed; }
+@media (min-width: 1100px) {
+  .messaging-workspace.has-conversation .messaging-columns { grid-template-columns: minmax(280px, .8fr) minmax(0, 1.4fr); }
+  .messaging-workspace.has-conversation .conversation-inbox { max-height: 75dvh; overflow-y: auto; }
+}
+@media (max-width: 1099px) {
+  .messaging-workspace.has-conversation .conversation-inbox { display: none; }
+}
+@media (max-width: 767px) {
+  .conversation-panel .message-list .message-bubble-rich { max-width: 95%; width: 95%; }
+  .conversation-form-columns { grid-template-columns: 1fr; gap: 0; }
+  .conversation-panel .conversation-tools { gap: 6px; }
+  .conversation-panel .conversation-tools button { flex: 1 1 120px; }
+  .conversation-panel .message-composer { padding-bottom: env(safe-area-inset-bottom); }
+  .conversation-quote-card dl > div { flex-wrap: wrap; }
+}

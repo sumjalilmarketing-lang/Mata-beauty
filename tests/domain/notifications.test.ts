@@ -12,4 +12,11 @@ describe("private notification destinations", () => {
     expect(notificationDestination({ kind: "professional_application", data: { status: "approved" } })).toBe("/pro");
     expect(notificationDestination({ kind: "professional_application", data: { status: "additional_information_required" } })).toBe("/app/application");
   });
+  it("opens the exact private message and rejects extra parameters", () => {
+    const id = "11111111-2222-4333-8444-555555555555";
+    const href = `/pro/messages?conversation=${id}&message=${id}`;
+    expect(notificationDestination({ kind: "message_created", data: { href } })).toBe(href);
+    expect(notificationDestination({ kind: "message_created", data: { href: `${href}&redirect=https://evil.example` } })).toBeNull();
+    expect(notificationDestination({ kind: "message_created", data: { conversation_id: id, message_id: id } })).toBe(`/app/messages?conversation=${id}&message=${id}`);
+  });
 });

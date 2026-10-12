@@ -311,7 +311,7 @@ test("la cliente et le professionnel échangent réellement depuis l’interface
 
     const retryText = `Texte conservé après erreur ${messageRun}`;
     let injectedFailures = 0;
-    await clientPage.route("**/rest/v1/messages**", route => {
+    await clientPage.route("**/rest/v1/rpc/send_conversation_message", route => {
       if (route.request().method() !== "POST") return route.continue();
       injectedFailures++;
       return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Service indisponible" }) });
@@ -321,7 +321,7 @@ test("la cliente et le professionnel échangent réellement depuis l’interface
     await expect.poll(() => injectedFailures).toBeGreaterThan(0);
     await expect(clientPage.locator(".conversation-error")).toBeVisible({ timeout: 15_000 });
     await expect(clientPage.getByLabel("Votre message")).toHaveValue(retryText);
-    await clientPage.unroute("**/rest/v1/messages**");
+    await clientPage.unroute("**/rest/v1/rpc/send_conversation_message");
     await clientPage.getByRole("button", { name: "Envoyer", exact: true }).click();
     await expect(providerPage.getByText(retryText, { exact: true })).toBeVisible({ timeout: 15_000 });
 

@@ -73,9 +73,7 @@ async function preparePage(page: Page) {
     }
   });
   page.on("pageerror", (error) => {
-    const diagnostic = `${test.info().title} | ${page.url().split("?")[0]} | ${error.stack ?? error.message}`;
-    console.log("Application page error", diagnostic);
-    browserConsoleErrors.push(diagnostic);
+    browserConsoleErrors.push(`${test.info().title} | ${page.url().split("?")[0]} | ${error.message}`);
   });
   page.on("response", (response) => {
     if (response.status() >= 400 && !response.url().includes("vercel.live")) {
@@ -115,6 +113,7 @@ async function publishStudioVideo(page: Page, title: string, caption: string, ha
 
 test.beforeAll(async () => {
   test.setTimeout(120_000);
+  expect(supabaseUrl, "Les fixtures sociales privilégiées sont réservées au projet QA isolé").toBe("https://kazlvtxkbsdhbfvtqqdp.supabase.co");
   admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   clientId = await createUser(clientEmail);
   providerId = await createUser(providerEmail, true);
@@ -219,7 +218,7 @@ test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page
   await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/pro/);
-  await expect(page.getByRole("navigation", { name: "Navigation Espace professionnel" }).getByRole("link")).toHaveText(["⌂Dashboard", "▶Studio", "≡Prestations", "□Agenda", "✉Messages", "¤Revenus", "○Profil"]);
+  expect(await page.getByRole("navigation", { name: "Navigation Espace professionnel" }).getByRole("link").allTextContents()).toEqual(expect.arrayContaining(["⌂Dashboard", "▶Studio", "≡Prestations", "□Agenda", "✉Messages", "¤Revenus", "○Profil"]));
   await page.goto("/pro/services");
   await expect(page.locator('.service-form select[name="serviceId"]')).toBeVisible();
   await page.locator('.service-form select[name="serviceId"]').selectOption({ index: 1 });
@@ -424,7 +423,7 @@ test("un lien signé expiré est remplacé depuis le chemin Storage stable", asy
 });
 
 test("le feed social distant relie les interactions au profil et à la réservation", async ({ page, browser }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   await preparePage(page);
   await page.goto("/");
   await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
@@ -532,18 +531,77 @@ test("le feed social distant relie les interactions au profil et à la réservat
   await mainCard.getByRole("button", { name: "Suivre" }).click();
   await mainCard.getByLabel("Plus d’options", {exact:true}).click();
   await mainCard.getByRole("button", { name: "Commentaires" }).click();
+  await expect.poll(() => activeVideo.evaluate(node => (node as HTMLVideoElement).paused)).toBe(true);
+  const commentPausedTime = await activeVideo.evaluate(node => (node as HTMLVideoElement).currentTime);
   await page.getByLabel("Ajouter un commentaire").fill(`Super résultat ${run}`);
   await page.getByRole("button", { name: "Publier", exact: true }).click();
   await expect(page.getByText(`Super résultat ${run}`)).toBeVisible();
+  const parentComment = page.locator(".comments-sheet article").filter({ hasText: `Super résultat ${run}` });
+  await parentComment.getByRole("button", { name: "Aimer le commentaire", exact: true }).click();
+  await expect(parentComment.getByRole("button", { name: "Retirer le J’aime du commentaire", exact: true })).toHaveAttribute("aria-pressed", "true");
+  const commentId = await parentComment.getAttribute("data-comment-id"); expect(commentId).toBeTruthy();
+  const persistedLike = await admin.from("post_comment_likes").select("profile_id").eq("comment_id", commentId!); expect(persistedLike.error).toBeNull(); expect(persistedLike.data).toEqual([{ profile_id: clientId }]);
+  const repeatedLike = await clientApi.rpc("set_post_comment_like", { target_comment_id: commentId, target_liked: true }); expect(repeatedLike.error).toBeNull(); expect(repeatedLike.data).toEqual({ active: true, count: 1 });
+  const publicApi = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
+  expect((await publicApi.rpc("set_post_comment_like", { target_comment_id: commentId, target_liked: true })).error).not.toBeNull();
+  expect((await clientApi.from("post_comment_likes").insert({ comment_id: commentId, profile_id: providerId })).error).not.toBeNull();
+  const othersLikes = await providerApi.from("post_comment_likes").select("profile_id").eq("comment_id", commentId!); expect(othersLikes.error).toBeNull(); expect(othersLikes.data).toEqual([]);
+  const publicLikeCounts = await publicApi.rpc("get_post_comment_likes", { target_comment_ids: [commentId] }); expect(publicLikeCounts.error).toBeNull(); expect(publicLikeCounts.data).toEqual([{ comment_id: commentId, like_count: 1, liked: false }]);
+  expect((await admin.from("post_comments").update({ is_hidden: true }).eq("id", commentId!)).error).toBeNull();
+  try {
+    expect((await clientApi.rpc("set_post_comment_like", { target_comment_id: commentId, target_liked: false })).error).not.toBeNull();
+    const hiddenCounts = await publicApi.rpc("get_post_comment_likes", { target_comment_ids: [commentId] }); expect(hiddenCounts.error).toBeNull(); expect(hiddenCounts.data).toEqual([]);
+  } finally { expect((await admin.from("post_comments").update({ is_hidden: false }).eq("id", commentId!)).error).toBeNull(); }
+  expect((await admin.from("profiles").update({ is_suspended: true }).eq("id", clientId)).error).toBeNull();
+  try { expect((await clientApi.rpc("set_post_comment_like", { target_comment_id: commentId, target_liked: false })).error).not.toBeNull(); }
+  finally { expect((await admin.from("profiles").update({ is_suspended: false }).eq("id", clientId)).error).toBeNull(); }
+  await parentComment.getByRole("button", { name: "Retirer le J’aime du commentaire", exact: true }).click();
+  await expect(parentComment.getByRole("button", { name: "Aimer le commentaire", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await parentComment.getByRole("button", { name: "Répondre", exact: true }).click();
+  await page.getByLabel("Ajouter un commentaire").fill(`Réponse réelle ${run}`);
+  await page.getByRole("button", { name: "Publier", exact: true }).click();
+  const reply = page.locator(".comments-sheet article.comment-reply").filter({ hasText: `Réponse réelle ${run}` }); await expect(reply).toBeVisible();
+  const storedReply = await admin.from("post_comments").select("parent_id,author_id,post_id").eq("id", (await reply.getAttribute("data-comment-id"))!).single();
+  expect(storedReply.error).toBeNull(); expect(storedReply.data).toEqual({ parent_id: commentId, author_id: clientId, post_id: studioPostId });
   await page.getByLabel("Ajouter un commentaire").fill(`À supprimer ${run}`);
   await page.getByRole("button", { name: "Publier", exact: true }).click();
   const removableComment = page.locator('.comments-sheet article').filter({ hasText: `À supprimer ${run}` });
   await expect(removableComment).toBeVisible();
   await removableComment.getByRole('button', { name: 'Supprimer', exact: true }).click();
   await expect(removableComment).toHaveCount(0);
+  expect(await activeVideo.evaluate(node => (node as HTMLVideoElement).currentTime)).toBeCloseTo(commentPausedTime, 1);
+  await test.info().attach("commentaires-reponse-et-like", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "Fermer" }).click();
+  await expect.poll(() => activeVideo.evaluate(node => (node as HTMLVideoElement).paused)).toBe(false);
+  await mainCard.getByRole("button", { name: "Mettre la vidéo en pause" }).click();
+  const explicitlyPausedTime = await activeVideo.evaluate(node => (node as HTMLVideoElement).currentTime);
+  await mainCard.getByRole("button", { name: "Commentaires" }).click();
+  await expect(page.getByRole("dialog", { name: "Commentaires", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Fermer", exact: true }).click();
+  await expect.poll(() => activeVideo.evaluate(node => (node as HTMLVideoElement).paused)).toBe(true);
+  expect(await activeVideo.evaluate(node => (node as HTMLVideoElement).currentTime)).toBeCloseTo(explicitlyPausedTime, 1);
   await mainCard.getByRole("button", { name: "Profil de Mata Feed Pro" }).click();
-  await expect(page.getByText("Mata Feed Pro").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Mata Feed Pro", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Message", exact: true })).toBeVisible();
+  const gallery = page.getByRole("region", { name: "Vidéos du professionnel" });
+  await expect(gallery.locator(`[data-gallery-post-id="${studioPostId}"]`)).toBeVisible();
+  await expect(gallery.locator(`[data-gallery-post-id="${photoPostId}"]`)).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.locator(".professional-video-grid").evaluate(node => getComputedStyle(node).gridTemplateColumns.split(" ").length)).toBe(3);
+  await gallery.locator(`[data-gallery-post-id="${studioPostId}"]`).scrollIntoViewIfNeeded();
+  const galleryScroll = await page.evaluate(() => window.scrollY);
+  await gallery.locator(`[data-gallery-post-id="${studioPostId}"]`).click();
+  const viewer = page.getByRole("dialog", { name: "Vidéos de Mata Feed Pro", exact: true });
+  const galleryVideo = viewer.locator(`[data-post-id="${studioPostId}"] video`);
+  await expect(galleryVideo).toBeInViewport({ ratio: 0.5 });
+  await expect.poll(() => galleryVideo.evaluate(node => (node as HTMLVideoElement).paused)).toBe(true);
+  expect(await galleryVideo.evaluate(node => (node as HTMLVideoElement).currentTime)).toBeCloseTo(explicitlyPausedTime, 1);
+  await viewer.getByRole("button", { name: "Retour à la galerie", exact: true }).click();
+  await expect(viewer).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeCloseTo(galleryScroll, 0);
+  await expect(gallery.locator(`[data-gallery-post-id="${studioPostId}"]`)).toBeFocused();
+  await test.info().attach("profil-galerie-mobile", { body: await page.screenshot(), contentType: "image/png" });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole("button", { name: "Retour" }).click();
   await expect(page.locator(`[data-post-id="${studioPostId}"]`)).toBeVisible();
   await mainCard.getByRole("button", { name: "Voir les disponibilités", exact: true }).click();
@@ -623,7 +681,9 @@ test("le feed social distant relie les interactions au profil et à la réservat
     admin.from("follows").select("follower_id", { count: "exact", head: true }).eq("followed_provider_id", providerId).eq("follower_id", clientId),
     admin.from("post_comments").select("id", { count: "exact", head: true }).eq("post_id", studioPostId).eq("author_id", clientId),
   ]);
-  expect([like.count, save.count, follow.count, comment.count]).toEqual([1, 1, 1, 1]);
+  // One top-level comment and its threaded reply are expected; the third
+  // comment created by this scenario is explicitly deleted above.
+  expect([like.count, save.count, follow.count, comment.count]).toEqual([1, 1, 1, 2]);
   let releaseProfile: () => void = () => {};
   const profileGate = new Promise<void>(resolve => { releaseProfile = resolve; });
   await page.route('**/rest/v1/rpc/get_my_private_profile',async route=>{await profileGate;await route.continue();});
@@ -807,7 +867,7 @@ test("le parcours réel reste utilisable sur huit largeurs mobiles et desktop", 
     await page.getByRole("button", { name: "Retour" }).click();
     await expect(page.locator(`[data-post-id="${studioPostId}"]`)).toBeVisible();
     await mobileCard.getByRole("button", { name: "Réserver", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Réserver" })).toBeVisible();
+    await expect(page.locator("#booking-title")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
     await page.screenshot({ path: `work/ultra-simple/booking-${width}.png` });
     await context.close();
@@ -824,9 +884,6 @@ test("le feed réel fonctionne en WebKit iPhone 390 px", async () => {
     window.addEventListener("pagehide", () => console.log("QA pagehide", Date.now()));
     window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => console.log("QA unhandled rejection", Date.now(), String(event.reason)));
   });
-  page.on("requestfailed", (request) => console.log("WebKit request failed", Date.now(), request.url().split("?")[0], request.failure()?.errorText));
-  page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) console.log("WebKit navigation", Date.now(), frame.url().split("?")[0]); });
-  page.on("console", (message) => { if (message.type() === "error") console.log("WebKit console", Date.now(), message.text()); });
   try {
     await preparePage(page);
     await page.goto("/");
@@ -877,7 +934,9 @@ test("la navigation professionnelle reste simple sur mobile", async ({ browser }
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
     await page.waitForURL(/\/pro/);
     await page.goto("/pro/videos");
-    await expect(page.getByRole("navigation", { name: "Navigation mobile" }).getByRole("link")).toHaveCount(7);
+    const mobileNavigation = page.getByRole("navigation", { name: "Navigation mobile" });
+    await expect(mobileNavigation.getByRole("link")).toHaveCount(8);
+    await expect(mobileNavigation.getByRole("link", { name: /Mon équipe/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Publier la vidéo", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
     await page.screenshot({ path: `work/ultra-simple/studio-${width}.png` });

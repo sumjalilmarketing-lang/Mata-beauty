@@ -6,6 +6,7 @@ import { z } from "zod";
 import { AuthModal, type AuthenticatedProfile } from "./auth-modal";
 import { LiveDashboard } from "./live-dashboard";
 import { SocialFeed } from "./social-feed";
+import { PublicProfessionalProfile } from "./public-professional-profile";
 import { LocationPicker } from "./location-picker";
 import { distanceKm, matchesSearch, type Coordinates } from "@/lib/domain/location";
 import { calculateBookingEnd, calculateBookingQuote } from "@/lib/domain/booking";
@@ -62,7 +63,6 @@ type PaymentCapabilities = {
 
 type BookingConfirmation = { id: string; date: string; time: string; location: string; collaboratorName?: string | null; collaboratorPhoto?: string | null };
 type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; business_id?: string | null };
-type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[] };
 type BookingSelection = { provider: Provider; service: ProviderService; sourcePostId?: string };
 type AvailabilitySlot = { slot_start: string };
 type BookableCollaborator = { collaborator_id: string; display_name: string; title: string | null; avatar_url: string | null; specialties: string[]; slot_start: string };
@@ -149,9 +149,11 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [authRequest, setAuthRequest] = useState<{ role: "client" | "provider" | "admin"; mode: "login" | "register" | "reset"; returnTo?: string } | null>(null);
   const [paymentReturn, setPaymentReturn] = useState<{ id: string; mode: "return" | "cancelled" } | null>(null);
   const [showLaunchWelcome, setShowLaunchWelcome] = useState(false);
+  const bookingReturn = useRef<string | null>(null);
 
   useEffect(() => {
-    const target = new URLSearchParams(window.location.search).get("service");
+    const parameters = new URLSearchParams(window.location.search);
+    const target = parameters.get("service");
     if (!target || catalogState !== "live") return;
     const parsed = z.string().uuid().safeParse(target);
     if (!parsed.success) return;
@@ -161,7 +163,10 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       if (!active) return;
       const provider = catalog.find(item => item.profileId === data?.provider_id);
       if (error || !data || !provider) { setNotice("Cette prestation n’est pas disponible à la réservation."); return; }
-      setRestoredBookingRequest(null); setBooking({ provider, service: data });
+      const sourcePost = z.string().uuid().safeParse(parameters.get("sourcePost"));
+      const returnTo = safeOAuthDestination(parameters.get("returnTo"));
+      bookingReturn.current = /^\/professional\/[a-zA-Z0-9_-]+(?:\?video=[0-9a-f-]{36})?$/.test(returnTo) ? returnTo : null;
+      setRestoredBookingRequest(null); setBooking({ provider, service: data, ...(sourcePost.success ? { sourcePostId: sourcePost.data } : {}) });
     });
     return () => { active = false; };
   }, [catalog, catalogState]);
@@ -455,6 +460,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     window.sessionStorage.removeItem(bookingDraftKey);
     setRestoredBookingRequest(null);
     setBooking(null);
+    if (bookingReturn.current) window.location.assign(bookingReturn.current);
   }
 
   function runSearch(event?: FormEvent) {
@@ -609,7 +615,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }
 
   if (profile) {
-    return <><ProviderProfileScreen provider={profile} favorite={favorites.includes(profile.profileId)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service) => startBooking({ provider: profile, service })} />{booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}{authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} returnTo={authRequest.returnTo} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}</>;
+    return <><PublicProfessionalProfile key={profile.profileId} providerId={profile.profileId} authenticated={authenticated} favorite={favorites.includes(profile.profileId)} onBack={() => setProfile(null)} onFavorite={() => void toggleFavorite(profile)} onBook={(service, sourcePostId) => startBooking({ provider: profile, service, sourcePostId })} />{booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}{authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} returnTo={authRequest.returnTo} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}</>;
   }
 
   return (
@@ -781,43 +787,6 @@ function ProviderCard({ provider, nextSlot, favorite, onFavorite, onView, onBook
     <div className="premium-provider-photo">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={provider.specialty} sizes="120px" caption /> : <span>{provider.initials}</span>}</div>
     <div><div className="provider-name-row"><h3><button className="provider-profile-link" onClick={(event) => { event.stopPropagation(); onView(); }}>{provider.name}</button></h3><button aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"} onClick={(event) => { event.stopPropagation(); onFavorite(); }}>{favorite ? "♥" : "♡"}</button></div>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}<p>★ {provider.rating.toFixed(1)} ({provider.reviews} avis) · {provider.area}</p>{nextSlot && <p className="next-slot-badge">● {formatSlotLabel(nextSlot)}</p>}<div className="provider-booking-line"><span><strong>{formatPrice(provider.price)}</strong><small>{formatDuration(provider.durationMinutes)}</small></span><button onClick={(event) => { event.stopPropagation(); onBook(); }}>Voir les créneaux</button></div></div>
   </article>;
-}
-
-function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook }: { provider: Provider; favorite: boolean; onBack: () => void; onFavorite: () => void; onBook: (service: ProviderService) => void }) {
-  const [tab, setTab] = useState<"services" | "reviews" | "about">("services");
-  const [detail, setDetail] = useState<ProviderDetail>({ bio: null, services: [], portfolio: [] });
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    let active = true;
-    void Promise.all([
-      supabase.from("provider_profiles").select("bio").eq("profile_id", provider.profileId).maybeSingle(),
-      supabase.from("provider_services").select("id,title,duration_minutes,price_amount,business_id").eq("provider_id", provider.profileId).eq("is_active", true).order("price_amount"),
-      supabase.from("portfolio_items").select("storage_path").eq("provider_id", provider.profileId).order("sort_order").limit(12),
-    ]).then(([profileResult, servicesResult, portfolioResult]) => {
-      if (!active) return;
-      setDetail({
-        bio: profileResult.data?.bio ?? null,
-        services: (servicesResult.data ?? []) as ProviderService[],
-        portfolio: (portfolioResult.data ?? []).map((item) => supabase.storage.from("portfolios").getPublicUrl(item.storage_path).data.publicUrl),
-      });
-    });
-    return () => { active = false; };
-  }, [provider.profileId]);
-  const services = detail.services.length ? detail.services : [{ id: provider.serviceId, title: provider.specialty, duration_minutes: provider.durationMinutes, price_amount: provider.price }];
-  return <main className="premium-mobile-app"><div className="premium-app-frame profile-app-frame"><div className="mobile-screen premium-profile-screen">
-    <div className="premium-profile-hero">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={provider.specialty} priority sizes="430px" /> : <div>{provider.initials}</div>}<div className="profile-hero-actions"><button aria-label="Retour" onClick={onBack}>‹</button><span /><button aria-label="Partager" onClick={() => void navigator.share?.({ title: provider.name, url: window.location.href })}>⇧</button><button aria-label="Favori" onClick={onFavorite}>{favorite ? "♥" : "♡"}</button></div></div>
-    <section className="premium-profile-info"><div className="profile-heading-row"><h1>{provider.name}</h1>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}</div><p className="profile-rating">★ {provider.rating.toFixed(1)} ({provider.reviews} avis) <i>•</i> {provider.area}</p><p>{detail.bio || `${provider.specialty}, avec une approche professionnelle et personnalisée.`}</p><div className="profile-facts"><span>◷<strong>Sur rendez-vous</strong><small>Horaires réels</small></span><span>⌂<strong>{provider.homeService ? "À domicile" : "En salon"}</strong><small>{provider.homeService ? "Disponible" : "Sur place"}</small></span><span>◫<strong>Clientèle</strong><small>Mixte</small></span></div>
-      {detail.portfolio.length > 0 && <div className="portfolio-strip">{detail.portfolio.map((url, index) => <Image key={url} src={url} alt={`Réalisation ${index + 1} de ${provider.name}`} width={92} height={92} />)}</div>}
-    </section>
-    <div className="profile-tabs"><button className={tab === "services" ? "active" : ""} onClick={() => setTab("services")}>Prestations</button><button className={tab === "reviews" ? "active" : ""} onClick={() => setTab("reviews")}>Avis</button><button className={tab === "about" ? "active" : ""} onClick={() => setTab("about")}>À propos</button></div>
-    <section className="profile-tab-content">
-      {tab === "services" && services.map((service) => <button className="profile-service-row" key={service.id} onClick={() => onBook(service)}><span><strong>{service.title}</strong><small><em>{formatPrice(service.price_amount)}</em> · {formatDuration(service.duration_minutes)}</small></span><span>Choisir <b>›</b></span></button>)}
-      {tab === "reviews" && <div className="profile-empty-tab"><strong>{provider.rating.toFixed(1)} / 5</strong><p>{provider.reviews ? `${provider.reviews} avis vérifiés sont associés à ce profil.` : "Aucun avis publié pour le moment."}</p></div>}
-      {tab === "about" && <div className="profile-empty-tab"><strong>Informations pratiques</strong><p>{detail.bio || `Prestations disponibles à ${provider.area}. Les coordonnées complètes sont communiquées pendant la réservation.`}</p></div>}
-    </section>
-    <div className="profile-book-bar"><button onClick={() => onBook(services[0])}>Voir les disponibilités</button></div>
-  </div></div></main>;
 }
 
 function BookingModal({ selection, initialDate, initialRequest, authenticated, onClose, onSubmit }: { selection: BookingSelection; initialDate: string; initialRequest: BookingRequest | null; authenticated: boolean; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<BookingConfirmation | null> }) {
