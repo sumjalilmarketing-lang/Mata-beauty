@@ -6,7 +6,7 @@ import { publicErrorMessage } from "@/lib/ui/public-error";
 type Document = { id: string; kind: string; storage_path: string; status: string; rejection_reason: string | null; created_at: string };
 const kinds: Record<string, string> = { identity: "Pièce d’identité", business_registration: "Immatriculation", qualification: "Qualification", address_proof: "Justificatif d’adresse" };
 
-export function ProfessionalDocuments({ providerId, review = false, readOnly = false, onReady, onChange, onBusyChange }: { providerId: string; review?: boolean; readOnly?: boolean; onReady?: (ready: boolean) => void; onChange?: () => void; onBusyChange?: (busy: boolean) => void }) {
+export function ProfessionalDocuments({ providerId, review = false, readOnly = false, onReady, onChange, onBusyChange, onCompleteChange }: { providerId: string; review?: boolean; readOnly?: boolean; onReady?: (ready: boolean) => void; onChange?: () => void; onBusyChange?: (busy: boolean) => void; onCompleteChange?: (complete: boolean) => void }) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,10 +35,14 @@ export function ProfessionalDocuments({ providerId, review = false, readOnly = f
     const client = getSupabaseBrowserClient(); if (!client) { setLoading(false); setNotice("Les documents n’ont pas pu être chargés."); return; }
     const result = await client.from("provider_documents").select("id,kind,storage_path,status,rejection_reason,created_at").eq("provider_id", providerId).order("created_at", { ascending: false }).order("id", { ascending: false });
     if (result.error) setNotice("Les documents n’ont pas pu être chargés.");
-    else setDocuments((result.data ?? []).filter((document, index, all) => all.findIndex(item => item.kind === document.kind) === index));
+    else {
+      const next = (result.data ?? []).filter((document, index, all) => all.findIndex(item => item.kind === document.kind) === index);
+      setDocuments(next);
+      onCompleteChange?.(Object.keys(kinds).every(kind => next.some(document => document.kind === kind && document.status !== "rejected")));
+    }
     setLoading(false);
     onReady?.(!result.error);
-  }, [providerId, onReady]);
+  }, [providerId, onReady, onCompleteChange]);
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = event.currentTarget;

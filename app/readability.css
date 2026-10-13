@@ -353,3 +353,41 @@
   :is(.conversation-panel, .support-thread) .message-list { padding: 10px; }
   .workspace-layout:has(.message-composer textarea:focus) .workspace-mobile-nav { display: none; }
 }
+.professional-application-hero{border-color:#e8d8e2!important;background:linear-gradient(135deg,#fff,#fbf4f8)!important}
+.professional-application-hero .application-kicker,.application-step-panel .application-kicker{display:block;color:#8b174e;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.professional-application-hero :is(h2,p),.application-step-panel :is(h2,p){color:#24131f}
+.professional-application-hero>p,.application-step-panel>p{line-height:1.6}
+.application-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:22px 0 0;padding:0;list-style:none}
+.application-steps li{min-width:0;display:grid;grid-template-columns:30px 1fr;align-items:center;gap:8px;padding:10px;border:1px solid #eadde5;border-radius:12px;background:#fff}
+.application-steps li>span{width:28px;height:28px;display:grid;place-items:center;border-radius:50%;color:#66545f;background:#f3edf1;font-weight:800}
+.application-steps li small{color:#66545f;font-size:12px;line-height:1.3}
+.application-steps li.current{border-color:#a51b5c;background:#fff6fa}
+.application-steps li.current>span,.application-steps li.complete>span{color:#fff;background:#8f174f}
+.application-steps li.current small,.application-steps li.complete small{color:#4b2035;font-weight:700}
+.application-start-form>p{grid-column:1/-1;margin:0;color:#66545f;line-height:1.5}
+.application-step-nav,.application-step-actions{display:flex;flex-wrap:wrap;gap:9px}
+.application-step-nav button,.application-step-actions button{min-height:44px;padding:10px 15px;border:1px solid #cbb8c3;border-radius:9px;color:#4b3340;background:#fff}
+.application-step-nav button.active{border-color:#8f174f;color:#74114f;background:#fff6fa}
+.application-step-actions .primary-button{border-color:#8f174f;color:#fff;background:#8f174f}
+.application-step-panel{border-color:#e8d8e2!important;background:#fff!important}
+@media(max-width:640px){.application-steps{grid-template-columns:repeat(2,minmax(0,1fr))}.application-steps li{padding:9px}.application-step-nav button{flex:1 1 100%;text-align:left}.application-step-actions{display:grid;grid-template-columns:1fr}.application-step-actions button{width:100%}}
+.application-account-choice{grid-column:1/-1;min-width:0;padding:0;border:0}
+.application-account-choice>legend{margin-bottom:5px;color:#24131f;font-size:22px;font-weight:700}
+.application-account-choice>p{margin:0 0 14px;color:#66545f}
+.application-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.application-choice-grid>label{position:relative;min-width:0;min-height:130px;padding:17px;display:grid;grid-template-columns:34px minmax(0,1fr);align-content:start;gap:6px 10px;border:1px solid #d9c5d0;border-radius:14px;color:#24131f;background:#fff;cursor:pointer}
+.application-choice-grid>label.selected{border:2px solid #e91e70;background:#fff5f9;box-shadow:0 8px 24px rgba(165,27,92,.09)}
+.application-choice-grid input{grid-row:1/4;align-self:start;width:22px;height:22px;margin:2px 0;accent-color:#e91e70}
+.application-choice-grid>label>span{position:absolute;right:15px;top:12px;color:#a51b5c;font-size:23px}
+.application-choice-grid strong{padding-right:28px;font-size:15px}
+.application-choice-grid small{grid-column:2;color:#66545f;font-size:13px;line-height:1.45}
+.workspace-layout-salon .team-management button{min-height:44px;padding:10px 14px;border:1px solid #d9c5d0;border-radius:10px;color:#74114f;background:#fff}
+.workspace-layout-salon .team-management .salon-primary{border-color:#8f174f;color:#fff;background:#e91e70}
+.workspace-layout-salon .team-management :is(.team-cards>article,.team-appointment){border-color:#eadde5;color:#24131f;background:#fff}
+.workspace-layout-salon .team-management p{color:#66545f}
+.workspace-layout-salon .team-management .team-toolbar button:hover{background:#fff5f9}
+.workspace-layout-salon .salon-list>div{color:#24131f}
+@media(max-width:640px){.application-choice-grid{grid-template-columns:1fr}.application-choice-grid>label{min-height:112px}}
+.application-step-panel .dashboard-form label{color:#3e2b37}
+.application-step-panel .dashboard-form :is(input,select,textarea){color:#24131f;background:#fff;border-color:#cbb8c3}
+.application-step-panel .dashboard-form :is(input,select,textarea)::placeholder{color:#66545f}
