@@ -9,6 +9,7 @@ export type WorkspaceModule = {
   group: string;
   description: string;
   permission?: AdminPermissionKey;
+  staffPermission?: "bookings.read" | "bookings.manage" | "messages.read" | "messages.reply" | "services.read" | "clients.read" | readonly ("bookings.read" | "bookings.manage" | "messages.read" | "messages.reply" | "services.read" | "clients.read")[];
   primary?: boolean;
   resource?: "bookings" | "payments" | "notifications" | "messages" | "profiles" | "providers" | "businesses" | "collaborators" | "services" | "videos" | "reviews" | "reports" | "audit" | "wallets" | "payouts" | "reconciliation" | "financial-events" | "commissions" | "disputes" | "comments" | "sessions" | "promotions" | "campaigns" | "settings" | "deletion-requests";
 };
@@ -24,7 +25,7 @@ export type WorkspaceSpace = {
 
 // The short builder keeps the large navigation matrix readable.
 // eslint-disable-next-line @next/next/no-assign-module-variable
-const module = (key: string, label: string, icon: string, group: string, description: string, options: Partial<Pick<WorkspaceModule, "permission" | "primary" | "resource">> = {}): WorkspaceModule => ({ key, label, icon, group, description, ...options });
+const module = (key: string, label: string, icon: string, group: string, description: string, options: Partial<Pick<WorkspaceModule, "permission" | "staffPermission" | "primary" | "resource">> = {}): WorkspaceModule => ({ key, label, icon, group, description, ...options });
 
 const clientModules = [
   module("dashboard", "Dashboard", "⌂", "Essentiel", "Vos rendez-vous, messages, rappels et actions prioritaires.", { primary: true }),
@@ -83,15 +84,15 @@ const salonModules = [
 ] as const;
 
 const staffModules = [
-  module("dashboard", "Mon dashboard", "⌂", "Mon activité", "Vos rendez-vous, messages et priorités.", { primary: true }),
-  module("agenda", "Mon agenda", "□", "Mon activité", "Vos horaires et disponibilités.", { primary: true, resource: "bookings" }),
-  module("bookings", "Mes rendez-vous", "▣", "Mon activité", "Rendez-vous qui vous sont affectés.", { primary: true, resource: "bookings" }),
-  module("clients", "Mes clientes", "◎", "Relations", "Clientes rencontrées dans le cadre du salon.", { primary: true, resource: "profiles" }),
-  module("messages", "Mes messages", "✉", "Relations", "Conversations autorisées.", { primary: true, resource: "messages" }),
-  module("services", "Mes prestations", "≡", "Mon activité", "Prestations que le salon vous autorise à réaliser.", { resource: "services" }),
-  module("statistics", "Mes statistiques", "↗", "Mon activité", "Votre activité personnelle sans données financières confidentielles."),
-  module("profile", "Mon profil", "○", "Compte", "Identité professionnelle affichée par le salon.", { resource: "profiles" }),
-  module("settings", "Paramètres", "⚙", "Compte", "Notifications et sécurité de votre compte."),
+  module("dashboard", "Mon dashboard", "⌂", "Mon activité", "Vos rendez-vous, messages et priorités.", { primary: true, staffPermission: "bookings.read" }),
+  module("agenda", "Mon agenda", "□", "Mon activité", "Vos horaires et disponibilités.", { primary: true, staffPermission: "bookings.read", resource: "bookings" }),
+  module("bookings", "Mes rendez-vous", "▣", "Mon activité", "Rendez-vous qui vous sont affectés.", { primary: true, staffPermission: "bookings.read", resource: "bookings" }),
+  module("clients", "Mes clientes", "◎", "Relations", "Clientes rencontrées dans le cadre du salon.", { primary: true, staffPermission: "clients.read", resource: "profiles" }),
+  module("messages", "Mes messages", "✉", "Relations", "Conversations autorisées.", { primary: true, staffPermission: "messages.read", resource: "messages" }),
+  module("services", "Mes prestations", "≡", "Mon activité", "Prestations que le salon vous autorise à réaliser.", { staffPermission: "services.read", resource: "services" }),
+  module("statistics", "Mes statistiques", "↗", "Mon activité", "Votre activité personnelle sans données financières confidentielles.", { staffPermission: "bookings.read" }),
+  module("profile", "Mon profil", "○", "Compte", "Identité professionnelle affichée par le salon.", { staffPermission: "bookings.read", resource: "profiles" }),
+  module("settings", "Paramètres", "⚙", "Compte", "Notifications, sécurité et accès au salon.", { staffPermission: ["bookings.read", "bookings.manage", "messages.read", "messages.reply", "services.read", "clients.read"] }),
 ] as const;
 
 const onboardingModules = [

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { availableWorkspaces, canAccessWorkspace, canAccessWorkspaceModule, type WorkspaceIdentity } from "../../lib/auth/workspace-access";
 import { workspaceSpaces } from "../../lib/navigation/spaces";
 
-const base: WorkspaceIdentity = { applicationRoles: [], adminRoles: [], permissions: [], ownsBusiness: false, isCollaborator: false };
+const base: WorkspaceIdentity = { applicationRoles: [], adminRoles: [], permissions: [], ownsBusiness: false, isCollaborator: false, staffPermissions: [] };
 
 describe("workspace access matrix", () => {
   it("separates client, professional, salon owner and staff capabilities", () => {
@@ -27,6 +27,13 @@ describe("workspace access matrix", () => {
     const superAdmin = { ...base, applicationRoles: ["admin"] as const, adminRoles: ["super_admin"] as const };
     expect(canAccessWorkspace("admin", superAdmin)).toBe(true);
     expect(canAccessWorkspaceModule(superAdmin, "roles.manage")).toBe(true);
+  });
+
+  it("uses salon permissions for staff and blocks admin-role bypasses there", () => {
+    const staffAdmin = { ...base, isCollaborator: true, adminRoles: ["super_admin"] as const, staffPermissions: ["bookings.read"] };
+    expect(canAccessWorkspaceModule(staffAdmin, "roles.manage", "staff", "bookings.read")).toBe(true);
+    expect(canAccessWorkspaceModule(staffAdmin, "roles.manage", "staff", "messages.reply")).toBe(false);
+    expect(canAccessWorkspaceModule(staffAdmin, "roles.manage", "staff")).toBe(false);
   });
 });
 

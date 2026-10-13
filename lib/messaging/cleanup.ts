@@ -18,3 +18,24 @@ export async function cleanupAbandonedMessageUploads() {
   }
   return data.length;
 }
+
+/** Expired Stories and abandoned Story uploads are reclaimed by the existing authenticated worker. */
+export async function cleanupExpiredProfessionalStories() {
+  const service = serviceSupabase();
+  const now = new Date().toISOString();
+  const abandonedBefore = new Date(Date.now() - 2 * 3600_000).toISOString();
+  const [expired, abandoned] = await Promise.all([
+    service.from("professional_stories").select("id,storage_path,upload_path").eq("status", "published").lte("expires_at", now).limit(25),
+    service.from("professional_stories").select("id,storage_path,upload_path").eq("status", "pending").lt("created_at", abandonedBefore).limit(25),
+  ]);
+  if (expired.error || abandoned.error) throw new Error("story_cleanup_unavailable");
+  const rows = [...(expired.data ?? []), ...(abandoned.data ?? [])];
+  for (const story of rows) {
+    const paths = [...new Set([story.storage_path, story.upload_path].filter((path): path is string => Boolean(path)))];
+    const removed = await service.storage.from("professional-stories").remove(paths);
+    if (removed.error) throw new Error("story_cleanup_pending");
+    const deleted = await service.from("professional_stories").delete().eq("id", story.id);
+    if (deleted.error) throw new Error("story_cleanup_pending");
+  }
+  return rows.length;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { WorkspaceModule, WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import { workspaceHref, workspaceSpaces } from "@/lib/navigation/spaces";
@@ -62,7 +62,7 @@ const moderationHistory: ResourceDefinition = { table: "moderation_actions", sel
 const financialHistory: ResourceDefinition = { table: "financial_audit_log", select: "id,action,transaction_reference,created_at", title: (row) => label(row.action), meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` };
 const refunds: ResourceDefinition = { table: "refunds", select: "id,payment_id,amount,status,reason,created_at", title: (row) => `${money(row.amount)} · ${label(row.status)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
 
-export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean }) {
+export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved, canReplyToMessages = true, canManageBookings = false, staffBusinessId }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean; canReplyToMessages?: boolean; canManageBookings?: boolean; staffBusinessId?: string | null }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const focused = (space === "pro" && ["dashboard", "services", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
   const supportInbox = (space === "support" && ["dashboard", "tickets", "unassigned", "mine", "priority", "escalations"].includes(module.key)) || (space === "operations" && module.key === "support") || (space === "admin" && module.key === "escalations");
@@ -127,10 +127,15 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (space === "client" && module.key === "favorites") return <ClientFavorites userId={userId} />;
   if (space === "client" && module.key === "inspirations") return <SocialDashboard role="client" userId={userId} />;
 
-  if (space === "salon" && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
+  if (space === "salon" && module.key === "messages") return <WorkspaceMessaging userId={userId} canPublishStories canManageAssignments />;
+  if (space === "staff" && module.key === "messages") return <WorkspaceMessaging userId={userId} canReply={canReplyToMessages} />;
+  if (space === "staff" && module.key === "settings") return <StaffAccessSettings businessId={staffBusinessId ?? ""} />;
+  if (space === "staff" && ["agenda", "bookings"].includes(module.key)) return <StaffBookings canManage={canManageBookings} />;
+  if (space === "staff" && module.key === "services") return <StaffServices businessId={staffBusinessId ?? ""} />;
   if (space === "salon" && module.key !== "videos") return <SalonControlCenter module={module} userId={userId} />;
   if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;
-  if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
+  if (space === "pro" && module.key === "messages") return <WorkspaceMessaging userId={userId} canPublishStories={providerApproved} canManageAssignments />;
+  if (space === "client" && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
   if (space === "client" && module.key === "profile") return <ClientProfile userId={userId} />;
   if (space === "client" && module.key === "application") return <ProfessionalApplication userId={userId} />;
   if (space === "client" && ["settings", "payments", "reviews", "support"].includes(module.key)) return <ClientControlCenter userId={userId} section={module.key} />;
@@ -156,6 +161,55 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
 }
 
 function text(value: unknown, fallback: string) { return typeof value === "string" && value.trim() ? value : fallback; }
+function StaffAccessSettings({ businessId }: { businessId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  async function leave() {
+    if (busy || !window.confirm("Quitter cette équipe ? Votre accès au salon sera révoqué immédiatement. Les rendez-vous et messages déjà créés resteront conservés.")) return;
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch("/api/salon/invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "leave", businessId }) });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Impossible de quitter le salon.");
+      window.location.assign("/app");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Impossible de quitter le salon."); setBusy(false); }
+  }
+  return <section className="workspace-content"><div className="workspace-intro"><div><h2>Accès au salon</h2><p>Vos autorisations sont limitées au rôle et aux permissions attribuées par le responsable.</p></div></div><article className="workspace-panel"><h3>Quitter l’équipe</h3><p>Cette action révoque votre accès au salon. Votre compte MATA Beauty reste actif et l’historique du salon est conservé.</p>{message && <p role="alert">{message}</p>}<button className="danger" disabled={busy} onClick={() => void leave()}>{busy ? "Révocation…" : "Quitter ce salon"}</button></article></section>;
+}
+function StaffBookings({ canManage }: { canManage: boolean }) {
+  const [rows, setRows] = useState<Array<{ id: string; status: string; starts_at: string; ends_at: string; provider_services: { title: string | null } | null }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState("");
+  const [message, setMessage] = useState("");
+  const client = getSupabaseBrowserClient();
+  const load = useCallback(async () => {
+    if (!client) { setLoading(false); setMessage("Connexion indisponible."); return; }
+    const { data, error } = await client.from("bookings").select("id,status,starts_at,ends_at,provider_services(title)").order("starts_at", { ascending: false }).limit(100);
+    if (error) setMessage("Les rendez-vous autorisés n’ont pas pu être chargés.");
+    setRows((data ?? []) as unknown as typeof rows); setLoading(false);
+  }, [client]);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  async function update(id: string, status: string) {
+    if (!client || busyId) return;
+    setBusyId(id); setMessage("");
+    const { error } = await client.rpc("staff_update_booking_status", { target_booking_id: id, target_status: status });
+    setBusyId("");
+    if (error) { setMessage("Le rendez-vous n’a pas été modifié. Actualisez et vérifiez vos droits."); return; }
+    setMessage("Rendez-vous mis à jour."); await load();
+  }
+  const actions: Record<string, Array<[string, string]>> = { pending: [["confirmed", "Confirmer"], ["declined", "Refuser"]], confirmed: [["in_progress", "Démarrer"], ["no_show", "Signaler une absence"]], in_progress: [["completed", "Terminer"]] };
+  return <section className="workspace-content"><div className="workspace-intro"><div><h2>Mes rendez-vous</h2><p>Réservations qui vous sont attribuées, selon les accès du salon.</p></div></div><article className="workspace-panel">{message && <p role="status">{message}</p>}{loading ? <p>Chargement…</p> : rows.length ? <div className="workspace-list">{rows.map(row => <div key={row.id}><span>{row.provider_services?.title ?? "Prestation"} · {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(row.starts_at))}</span><small>{row.status.replaceAll("_", " ")} · jusqu’à {new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" }).format(new Date(row.ends_at))}</small>{canManage && (actions[row.status] ?? []).map(([status, label]) => <button key={status} disabled={busyId === row.id} onClick={() => void update(row.id, status)}>{busyId === row.id ? "Mise à jour…" : label}</button>)}</div>)}</div> : <p>Aucun rendez-vous affecté.</p>}</article></section>;
+}
+function StaffServices({ businessId }: { businessId: string }) {
+  const [rows, setRows] = useState<Array<{ id: string; title: string; duration_minutes: number; price_amount: number; currency: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    void getSupabaseBrowserClient()?.from("provider_services").select("id,title,duration_minutes,price_amount,currency").eq("business_id", businessId).eq("is_active", true).is("archived_at", null).order("title").then(({ data }) => { if (active) { setRows((data ?? []) as typeof rows); setLoading(false); } });
+    return () => { active = false; };
+  }, [businessId]);
+  return <section className="workspace-content"><div className="workspace-intro"><div><h2>Prestations du salon</h2><p>Catalogue du salon auquel vous êtes rattaché.</p></div></div><article className="workspace-panel">{loading ? <p>Chargement…</p> : rows.length ? <div className="workspace-list">{rows.map(row => <div key={row.id}><span>{row.title}</span><small>{row.duration_minutes} min · {new Intl.NumberFormat("fr-FR", { style: "currency", currency: row.currency, maximumFractionDigits: 0 }).format(row.price_amount)}</small></div>)}</div> : <p>Aucune prestation à afficher.</p>}</article></section>;
+}
 function label(value: unknown) { return text(value, "Non renseigné").replaceAll("_", " "); }
 function shortId(value: unknown) { return text(value, "").slice(0, 8).toUpperCase(); }
 function date(value: unknown) { if (typeof value !== "string") return "Date non renseignée"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "Date non renseignée" : new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(parsed); }

@@ -42,3 +42,45 @@
 }
 
 .team-management{display:grid;gap:20px;min-width:0}.team-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px;margin:18px 0}.team-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:12px 0}.team-management button,.team-appointment button,.team-management+.salon-panel button{min-height:44px;padding:10px 14px;border:1px solid var(--ws-line);border-radius:10px;background:#321728;color:#fff}.team-management button:disabled{opacity:.55}.team-management .salon-form fieldset{grid-column:1/-1;min-width:0;border:1px solid var(--ws-line);border-radius:10px;padding:14px}.team-management p{color:#ded5df;line-height:1.6;overflow-wrap:anywhere}.team-management img{border-radius:50%;object-fit:cover}.team-appointment{padding:14px;margin:10px 0;border:1px solid var(--ws-line);border-radius:12px;background:var(--ws-card)}.team-appointment [role=alert]{color:#ffd2a0}.team-management .salon-primary{background:#a51e5d;color:#fff}@media(max-width:600px){.team-management .salon-form{grid-template-columns:1fr}.team-toolbar>*{max-width:100%}}
+/* Pro and salon use the approved light, black and MATA pink visual system. */
+.workspace-layout-pro,.workspace-layout-salon{--ws-pink:#a51b5c;--ws-card:#fff;--ws-line:#eadde5;--ui-text:#24131f;--ui-muted:#66545f;--ui-field:#fff;--ui-border:#9d8492;--ui-focus:#74114f;color-scheme:light;color:#24131f;background:#fbf8fa}
+.workspace-layout-pro .workspace-sidebar,.workspace-layout-salon .workspace-sidebar{background:#fff;border-color:#eadde5;box-shadow:8px 0 32px rgba(54,18,39,.04)}
+.workspace-layout-pro .workspace-brand,.workspace-layout-salon .workspace-brand{color:#24131f}
+.workspace-layout-pro .workspace-space-picker>span,.workspace-layout-salon .workspace-space-picker>span,.workspace-layout-pro .workspace-nav-group>p,.workspace-layout-salon .workspace-nav-group>p{color:#735d6b}
+.workspace-layout-pro .workspace-space-picker select,.workspace-layout-salon .workspace-space-picker select{color:#24131f;background:#fff;border-color:#d8c8d1}
+.workspace-layout-pro .workspace-nav-group a,.workspace-layout-salon .workspace-nav-group a{color:#4c3b46}
+.workspace-layout-pro .workspace-nav-group a>span,.workspace-layout-salon .workspace-nav-group a>span{color:#795d6c}
+.workspace-layout-pro .workspace-nav-group a:hover,.workspace-layout-pro .workspace-nav-group a.active,.workspace-layout-salon .workspace-nav-group a:hover,.workspace-layout-salon .workspace-nav-group a.active{color:#74114f;background:#f9edf3}
+.workspace-layout-pro .workspace-signout,.workspace-layout-salon .workspace-signout{color:#4c3b46;border-color:#d8c8d1}
+.workspace-layout-pro .workspace-topbar,.workspace-layout-salon .workspace-topbar{border-color:#eadde5}
+.workspace-layout-pro .workspace-topbar h1,.workspace-layout-salon .workspace-topbar h1{color:#24131f}
+.workspace-layout-pro .workspace-topbar p,.workspace-layout-salon .workspace-topbar p{color:#74114f}
+.workspace-layout-pro .workspace-tools input,.workspace-layout-salon .workspace-tools input,.workspace-layout-pro .workspace-notifications,.workspace-layout-salon .workspace-notifications{color:#24131f;background:#fff;border-color:#d8c8d1}
+.workspace-layout-pro .workspace-breadcrumb,.workspace-layout-salon .workspace-breadcrumb{color:#735d6b}
+.workspace-layout-pro .workspace-breadcrumb a,.workspace-layout-salon .workspace-breadcrumb a{color:#5f4855}
+.workspace-layout-pro .workspace-intro,.workspace-layout-salon .workspace-intro{color:#24131f;background:radial-gradient(circle at 90% 10%,rgba(165,27,92,.08),transparent 34%),linear-gradient(135deg,#fff,#f9f0f5);border-color:#eadde5;box-shadow:0 18px 50px rgba(54,18,39,.06)}
+.workspace-layout-pro .workspace-intro p,.workspace-layout-salon .workspace-intro p{color:#5f4e59}
+.workspace-layout-pro .workspace-intro span,.workspace-layout-salon .workspace-intro span,.workspace-layout-pro .workspace-panel header span,.workspace-layout-salon .workspace-panel header span{color:#74114f}
+.workspace-layout-pro .workspace-status,.workspace-layout-salon .workspace-status{color:#4c3b46;background:#fff;border-color:#e4d5de}
+.workspace-layout-pro .workspace-metrics article,.workspace-layout-salon .workspace-metrics article,.workspace-layout-pro .workspace-panel,.workspace-layout-salon .workspace-panel,.workspace-layout-pro .panel,.workspace-layout-salon .panel{color:#24131f;background:#fff;border-color:#eadde5;box-shadow:0 10px 32px rgba(54,18,39,.04)}
+.workspace-layout-pro .workspace-metrics span,.workspace-layout-salon .workspace-metrics span,.workspace-layout-pro .workspace-metrics small,.workspace-layout-salon .workspace-metrics small,.workspace-layout-pro .workspace-panel p,.workspace-layout-salon .workspace-panel p{color:#66545f}
+.workspace-layout-pro .workspace-metrics strong,.workspace-layout-salon .workspace-metrics strong,.workspace-layout-pro .workspace-panel h3,.workspace-layout-salon .workspace-panel h3,.workspace-layout-pro .panel :is(h2,h3),.workspace-layout-salon .panel :is(h2,h3){color:#24131f}
+.workspace-layout-pro .workspace-mobile-nav,.workspace-layout-salon .workspace-mobile-nav{background:rgba(255,255,255,.97);border-color:#eadde5;box-shadow:0 -8px 28px rgba(54,18,39,.06)}
+.workspace-layout-pro .workspace-mobile-nav a,.workspace-layout-salon .workspace-mobile-nav a{color:#66545f}
+.workspace-layout-pro .workspace-mobile-nav a.active,.workspace-layout-salon .workspace-mobile-nav a.active{color:#8b174e}
+.workspace-layout-pro .salon-form :is(input,select,textarea),.workspace-layout-salon .salon-form :is(input,select,textarea),.workspace-layout-pro .dashboard-form :is(input,select,textarea),.workspace-layout-salon .dashboard-form :is(input,select,textarea){color:#24131f;background:#fff;border-color:#cbb8c3}
+.workspace-layout-pro .salon-form label,.workspace-layout-salon .salon-form label,.workspace-layout-pro .dashboard-form label,.workspace-layout-salon .dashboard-form label{color:#3e2b37}
+.workspace-layout-pro .salon-list>div,.workspace-layout-salon .salon-list>div{border-color:#eadde5;color:#24131f}
+.workspace-layout-pro .salon-list small,.workspace-layout-salon .salon-list small{color:#66545f}
+.workspace-layout-pro .salon-primary,.workspace-layout-salon .salon-primary,.workspace-layout-pro .salon-panel button:not(.danger),.workspace-layout-salon .salon-panel button:not(.danger){color:#fff;background:#8f174f;border-color:#8f174f}
+.workspace-layout-pro .salon-panel button.danger,.workspace-layout-salon .salon-panel button.danger{color:#8f174f;background:#fff;border-color:#c77797}
+.workspace-layout-pro .workspace-empty,.workspace-layout-salon .workspace-empty{color:#66545f}
+.workspace-layout-pro .workspace-empty strong,.workspace-layout-salon .workspace-empty strong{color:#24131f}
+.workspace-layout-pro :is(button,a,input,select,textarea,summary):focus-visible,.workspace-layout-salon :is(button,a,input,select,textarea,summary):focus-visible{outline-color:#74114f}
+.salon-dashboard-metrics{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}.salon-dashboard-metrics article{min-width:0}.salon-dashboard-metrics strong{overflow-wrap:anywhere;font-size:clamp(21px,2vw,28px)}
+.salon-quick-links{display:flex;flex-wrap:wrap;gap:10px}.salon-quick-links a{min-height:44px;padding:12px 16px;border:1px solid #d9c5d0;border-radius:10px;color:#74114f;background:#fff;text-decoration:none;font-size:14px;font-weight:700}.salon-quick-links a:hover{background:#f9edf3}
+.salon-currency-note{grid-column:1/-1;margin:0;color:#66545f;font-size:13px}
+@media(max-width:720px){.workspace-layout-pro .workspace-mobile-nav,.workspace-layout-salon .workspace-mobile-nav{padding-bottom:max(8px,env(safe-area-inset-bottom))}.workspace-layout-pro .workspace-main,.workspace-layout-salon .workspace-main{padding-inline:15px}.salon-dashboard-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.salon-quick-links{display:grid;grid-template-columns:1fr}.salon-dashboard-metrics article{padding:14px}}
+.workspace-layout-pro .salon-quick-links a,.workspace-layout-salon .salon-quick-links a{display:inline-flex;align-items:center;gap:8px}
+.workspace-layout-salon .team-management .team-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr))}
+.workspace-layout-salon .team-management .team-cards>article{box-shadow:0 10px 30px rgba(54,18,39,.05)}

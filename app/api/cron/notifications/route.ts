@@ -1,6 +1,6 @@
 import { validDispatchRequest } from "@/lib/email/dispatch-auth";
 import { deliverTransactionalEmails } from "@/lib/email/transactional";
-import { cleanupAbandonedMessageUploads } from "@/lib/messaging/cleanup";
+import { cleanupAbandonedMessageUploads, cleanupExpiredProfessionalStories } from "@/lib/messaging/cleanup";
 
 export const maxDuration = 60;
 export async function GET(request: Request) {
@@ -9,6 +9,7 @@ export async function GET(request: Request) {
     const delivery = await deliverTransactionalEmails();
     // Keep email dispatch independent from temporary storage failures.
     await cleanupAbandonedMessageUploads().catch(() => console.error("abandoned_message_upload_cleanup_pending"));
+    await cleanupExpiredProfessionalStories().catch(() => console.error("professional_story_cleanup_pending"));
     return Response.json(delivery, { headers: { "Cache-Control": "no-store" } });
   } catch {
     console.error("transactional_email_worker_failed");
