@@ -3,9 +3,17 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const path = request.nextUrl.pathname;
+  const demoOnly = process.env.MESSAGING_V2_DEMO_ONLY === "true";
+  const isMessagingDemo = path === "/messaging-v2-demo" || path.startsWith("/messaging-v2-demo/");
+  if (demoOnly) {
+    if (isMessagingDemo) return response;
+    if (path.startsWith("/api/")) return NextResponse.json({ error: "DEMO_ONLY" }, { status: 404, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.redirect(new URL("/messaging-v2-demo", request.url));
+  }
   // The visual messaging demo is deliberately static and must never contact a
   // configured Supabase project (Preview deployments may inherit production env).
-  if (request.nextUrl.pathname === "/messaging-v2-demo" || request.nextUrl.pathname.startsWith("/messaging-v2-demo/")) return response;
+  if (isMessagingDemo) return response;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) return response;
@@ -23,7 +31,6 @@ export async function proxy(request: NextRequest) {
     },
   });
   await supabase.auth.getUser();
-  const path = request.nextUrl.pathname;
   const privilegedOrTechnical = /^\/(admin|onboarding|support-agent|moderation|finance|operations|auth)(\/|$)/.test(path)
     || /^\/api\/(admin|auth|cron|health)(\/|$)/.test(path)
     || path === "/api/payments/webhook"
