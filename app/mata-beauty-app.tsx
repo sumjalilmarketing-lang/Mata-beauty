@@ -834,10 +834,10 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 15_000);
     void Promise.resolve().then(() => { if (active) { setAvailabilityLoading(true); setAvailabilityError(false); } });
-    void supabase.rpc("get_booking_team_availability", {
+    void Promise.resolve(supabase.rpc("get_booking_team_availability", {
       target_service_id: service.id,
       from_date: form.date,
-    }).abortSignal(controller.signal).then(({ data, error }) => {
+    }).abortSignal(controller.signal)).then(({ data, error }) => {
       window.clearTimeout(timeout);
       if (!active) return;
       const availability = data as { teamEnabled: boolean; slots: BookableCollaborator[] } | null;
@@ -845,6 +845,14 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
       setSlotRows(error ? [] : availability?.slots ?? []);
       setCollaborators(error || !availability?.teamEnabled ? [] : availability.slots);
       setAvailabilityError(Boolean(error));
+      setAvailabilityLoading(false);
+    }).catch(() => {
+      window.clearTimeout(timeout);
+      if (!active) return;
+      setTeamEnabled(false);
+      setSlotRows([]);
+      setCollaborators([]);
+      setAvailabilityError(true);
       setAvailabilityLoading(false);
     });
     return () => { active = false; window.clearTimeout(timeout); controller.abort(); };

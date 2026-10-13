@@ -25,10 +25,23 @@ async function mockSupabase(page: Page, state: AuditState) {
   const date = tomorrow.toISOString().slice(0, 10);
   state.selectedSlot = `${date}T10:00:00Z`;
 
+  await page.route("**/api/auth/welcome", (route) => json(route, { ok: true, alreadySent: true }));
+
   await page.route(`${api}/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+
+    if (request.method() === "OPTIONS") {
+      return route.fulfill({
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "http://localhost:3000",
+          "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+          "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
+        },
+      });
+    }
 
     if (path === "/auth/v1/settings") return json(route, { external: { google: true } });
     if (path === "/rest/v1/categories") return json(route, [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 }]);
@@ -45,6 +58,10 @@ async function mockSupabase(page: Page, state: AuditState) {
         refresh_token: `${state.currentRole}-refresh`,
         user: { id: userId, email: payload.email, aud: "authenticated", role: "authenticated", user_metadata: {} },
       });
+    }
+    if (path === "/auth/v1/user") {
+      const userId = state.currentRole === "provider" ? providerId : state.currentRole === "other" ? otherClientId : clientId;
+      return json(route, { id: userId, email: `${state.currentRole}-audit@example.test`, aud: "authenticated", role: "authenticated", user_metadata: {} });
     }
     if (path === "/auth/v1/logout") return json(route, {});
     if (path === "/rest/v1/social_feed") {
@@ -104,6 +121,22 @@ async function mockSupabase(page: Page, state: AuditState) {
     if (path === "/rest/v1/rpc/get_available_slots") {
       return json(route, state.bookingCreated ? [{ slot_start: `${date}T11:00:00Z` }] : [{ slot_start: state.selectedSlot }, { slot_start: `${date}T11:00:00Z` }]);
     }
+    if (path === "/rest/v1/rpc/get_booking_team_availability") {
+      return json(route, {
+        teamEnabled: false,
+        slots: state.bookingCreated ? [{ slot_start: `${date}T11:00:00Z` }] : [{ slot_start: state.selectedSlot }, { slot_start: `${date}T11:00:00Z` }],
+      });
+    }
+    if (path === "/rest/v1/rpc/get_my_private_profile") {
+      return json(route, {
+        role: "client",
+        is_suspended: false,
+        account_status: "active",
+        first_name: "Mata",
+        last_name: "Audit",
+        phone: null,
+      });
+    }
     if (path === "/rest/v1/profiles") {
       return json(route, {
         role: state.currentRole === "provider" ? "provider" : "client",
@@ -150,9 +183,12 @@ async function mockSupabase(page: Page, state: AuditState) {
 async function signIn(page: Page, email: string) {
   await page.getByLabel("Adresse e-mail").click();
   await page.getByLabel("Adresse e-mail").fill(email);
-  await page.getByLabel("Mot de passe").click();
-  await page.getByLabel("Mot de passe").fill("Audit-Only-123!");
+  await page.locator('input[name="password"]').fill("Audit-Only-123!");
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+}
+
+async function expectAuthenticatedSession(page: Page) {
+  await expect.poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === "sb-audit-auth-token")).toBe(true);
 }
 
 test.describe("audit chronométré de réservation", () => {
@@ -174,15 +210,14 @@ test.describe("audit chronométré de réservation", () => {
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await page.locator(".premium-provider-card").click(); actions += 1;
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
-    await page.getByRole("button", { name: /Tresses express/ }).click(); actions += 1;
+    await page.locator(".public-profile-services .public-profile-service").filter({ hasText: "Tresses express" }).click(); actions += 1;
     await page.getByRole("button", { name: "10:00" }).click(); actions += 1;
     await expect(page.getByText("Tresses express", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
     await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click(); actions += 1;
     await page.getByLabel("Adresse e-mail").click(); actions += 1;
     await page.getByLabel("Adresse e-mail").fill("client-audit@example.test");
-    await page.getByLabel("Mot de passe").click(); actions += 1;
-    await page.getByLabel("Mot de passe").fill("Audit-Only-123!");
+    await page.locator('input[name="password"]').fill("Audit-Only-123!"); actions += 1;
     await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
     await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
@@ -204,7 +239,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.getByRole("button", { name: "10:00" }).click(); actions += 1;
     await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click(); actions += 1;
     await page.getByLabel("Adresse e-mail").fill("client-social@example.test"); actions += 1;
-    await page.getByLabel("Mot de passe").fill("Audit-Only-123!"); actions += 1;
+    await page.locator('input[name="password"]').fill("Audit-Only-123!"); actions += 1;
     await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
     await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
@@ -255,13 +290,13 @@ test.describe("audit chronométré de réservation", () => {
     await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
     await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click();
     await page.locator(".premium-provider-card").click();
-    await page.getByRole("button", { name: /Tresses express/ }).click();
+    await page.locator(".public-profile-services .public-profile-service").filter({ hasText: "Tresses express" }).click();
     await expect(page.getByRole("button", { name: "10:00" })).toHaveCount(0);
     await page.getByRole("button", { name: "Fermer" }).click();
     await page.getByRole("button", { name: "Retour" }).click();
-    await page.getByRole("button", { name: "Profil" }).click();
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /Se connecter à MATA Beauty|Profil/ }).click();
     await signIn(page, "client-audit@example.test");
-    await expect(page).toHaveURL(/connexion=requise/, { timeout: 15_000 });
+    await expectAuthenticatedSession(page);
     expect(state.bookingCreated).toBe(true);
   });
 
@@ -269,12 +304,16 @@ test.describe("audit chronométré de réservation", () => {
     const state: AuditState = { bookingCreated: true, currentRole: "other", selectedSlot: "" };
     await mockSupabase(page, state);
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+    await page.getByRole("button", { name: "Réserver", exact: true }).click();
+    await page.getByRole("button", { name: "11:00", exact: true }).click();
+    await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click();
+    await expect(page.getByRole("dialog", { name: "Se connecter" })).toBeVisible();
     await signIn(page, "other-audit@example.test");
-    await expect(page).toHaveURL(/connexion=requise/, { timeout: 15_000 });
+    await expectAuthenticatedSession(page);
+    await expect(page.getByText("Ce créneau vient d’être réservé.")).toBeVisible();
     const response = await page.evaluate(async ({ id, endpoint }) => fetch(`${endpoint}/rest/v1/bookings?id=eq.${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: "Bearer other-token" },
       body: JSON.stringify({ status: "cancelled_by_client" }),
     }).then((result) => result.status), { id: bookingId, endpoint: api });
     expect(response).toBe(403);
@@ -287,7 +326,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
     await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click();
     await page.locator(".premium-provider-card").click();
-    await page.getByRole("button", { name: /Tresses express/ }).click();
+    await page.locator(".public-profile-services .public-profile-service").filter({ hasText: "Tresses express" }).click();
     await page.getByRole("button", { name: "10:00" }).click();
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
     await page.reload();
@@ -319,8 +358,8 @@ test.describe("audit chronométré de réservation", () => {
     const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
     let unavailable = true;
-    await page.route(`${api}/rest/v1/rpc/get_available_slots`, async (route) => {
-      if (unavailable) return json(route, { message: "Service unavailable" }, 503);
+    await page.route(`${api}/rest/v1/rpc/get_booking_team_availability`, async (route) => {
+      if (unavailable) return route.abort("failed");
       return route.fallback();
     });
     await page.goto("/");
