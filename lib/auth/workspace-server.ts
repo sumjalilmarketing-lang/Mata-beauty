@@ -18,23 +18,27 @@ export async function requireWorkspace(space: WorkspaceSpaceKey, moduleKey: stri
   const [adminResult, ownedResult, collaboratorResult, providerResult] = await Promise.all([
     supabase.rpc("get_admin_context"),
     supabase.from("businesses").select("id", { count: "exact", head: true }).eq("owner_id", user.id),
-    supabase.from("collaborators").select("id", { count: "exact", head: true }).eq("profile_id", user.id).eq("is_active", true),
+    supabase.rpc("current_collaborator_access"),
     supabase.from("provider_profiles").select("status").eq("profile_id", user.id).maybeSingle(),
   ]);
+  const collaboratorAccess = (Array.isArray(collaboratorResult.data) ? collaboratorResult.data[0] : null) as
+    | { business_id: string; staff_permissions: string[]; internal_role: string; collaborator_id: string }
+    | null;
   const admin = (adminResult.data ?? {}) as AdminContext;
   const identity: WorkspaceIdentity = {
     applicationRoles: profile.roles,
     adminRoles: (admin.roles ?? []) as AdminRoleKey[],
     permissions: admin.permissions ?? [],
     ownsBusiness: (ownedResult.count ?? 0) > 0,
-    isCollaborator: (collaboratorResult.count ?? 0) > 0,
+    isCollaborator: Boolean(collaboratorAccess),
+    staffPermissions: Array.isArray(collaboratorAccess?.staff_permissions) ? collaboratorAccess.staff_permissions.filter((permission): permission is string => typeof permission === "string") : [],
   };
   if (["pro", "salon"].includes(space) && providerResult.data?.status !== "approved") redirect("/app/application");
   if (!canAccessWorkspace(space, identity)) redirect(`/?acces=refuse&returnTo=${encodeURIComponent(requestedPath)}`);
   if (!workspaceSpaces[space].modules.some((item) => item.key === moduleKey)) notFound();
   const currentModule = workspaceModule(space, moduleKey);
-  if (!canAccessWorkspaceModule(identity, currentModule.permission)) redirect(workspaceModule(space, "dashboard").key === currentModule.key ? "/" : workspacePath(space));
-  return { identity, module: currentModule, availableSpaces: availableWorkspaces(identity), userEmail: user.email ?? "Compte Mata Beauty", userId: user.id, providerApproved: providerResult.data?.status === "approved" };
+  if (!canAccessWorkspaceModule(identity, currentModule.permission, space, currentModule.staffPermission)) redirect(workspaceModule(space, "dashboard").key === currentModule.key ? "/" : workspacePath(space));
+  return { identity, module: currentModule, availableSpaces: availableWorkspaces(identity), userEmail: user.email ?? "Compte Mata Beauty", userId: user.id, staffBusinessId: collaboratorAccess?.business_id ?? null, providerApproved: providerResult.data?.status === "approved" };
 }
 
 function workspacePath(space: WorkspaceSpaceKey) {

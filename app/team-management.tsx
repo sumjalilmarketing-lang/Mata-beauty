@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 
-type Member = { id: string; display_name: string; first_name: string | null; public_last_name: string | null; title: string | null; avatar_url: string | null; specialties: string[]; buffer_minutes: number; is_active: boolean; is_bookable: boolean; archived_at: string | null };
+type Member = { id: string; display_name: string; has_account: boolean; internal_role: string; staff_permissions: string[]; first_name: string | null; public_last_name: string | null; title: string | null; avatar_url: string | null; specialties: string[]; buffer_minutes: number; is_active: boolean; is_bookable: boolean; archived_at: string | null };
+type CollaboratorAccess = { collaborator_id: string; internal_role: string; staff_permissions: string[]; has_profile: boolean };
 type Service = { id: string; title: string; business_id: string | null };
 type Qualification = { collaborator_id: string; provider_service_id: string };
 type Hours = { id: string; collaborator_id: string; weekday: number; starts_at: string; ends_at: string };
@@ -42,13 +43,18 @@ export function TeamManagement({ businessId, ownerId }: { businessId: string; ow
   const [revision, setRevision] = useState(0);
   const load = useCallback(async () => {
     const client = api();
-    const [people, offers, business] = await Promise.all([
+    const [people, offers, business, access] = await Promise.all([
       client.from("collaborators").select("id,display_name,first_name,public_last_name,title,avatar_url,specialties,buffer_minutes,is_active,is_bookable,archived_at").eq("business_id", businessId).order("display_name"),
       client.from("provider_services").select("id,title,business_id").eq("provider_id", ownerId).is("archived_at", null),
       client.from("businesses").select("team_booking_enabled").eq("id", businessId).single(),
+      client.rpc("owner_list_collaborator_access", { target_business_id: businessId }),
     ]);
-    for (const result of [people, offers, business]) if (result.error) throw result.error;
-    const next = (people.data ?? []) as Member[];
+    for (const result of [people, offers, business, access]) if (result.error) throw result.error;
+    const accessById = new Map<string, CollaboratorAccess>(((access.data ?? []) as CollaboratorAccess[]).map((row) => [row.collaborator_id, row]));
+    const next = ((people.data ?? []) as Omit<Member, "has_account" | "internal_role" | "staff_permissions">[]).map((person) => {
+      const grant = accessById.get(person.id);
+      return { ...person, has_account: Boolean(grant?.has_profile), internal_role: grant?.internal_role ?? "member", staff_permissions: grant?.staff_permissions ?? [] };
+    });
     setMembers(next); setServices(((offers.data ?? []) as Service[]).filter(s => !s.business_id || s.business_id === businessId)); setEnabled(Boolean(business.data?.team_booking_enabled));
     if (next.length) {
       const ids = next.map(m => m.id);
@@ -115,6 +121,7 @@ export function TeamManagement({ businessId, ownerId }: { businessId: string; ow
       <h3>{person.display_name}</h3><p>{person.title}</p><p>{person.specialties.join(" · ")}</p><p>{person.archived_at ? "Archivé" : !person.is_active ? "Inactif" : person.is_bookable ? "Réservable selon ses horaires" : "Non réservable"}</p>
       {!person.archived_at && <div className="team-toolbar"><button disabled={busy} onClick={() => { setSelected(person); setEditing(true); }}>Modifier la fiche</button><button disabled={busy} onClick={() => { setSelected(person); setEditing(false); }}>Horaires et absences</button>
         <button disabled={busy} onClick={() => void mutate(async () => { const r = await api().from("collaborators").update({ is_active: !person.is_active }).eq("id", person.id); if (r.error) throw r.error; }, "Disponibilité mise à jour.")}>{person.is_active ? "Désactiver" : "Réactiver"}</button>
+        {person.has_account && <button className="danger" disabled={busy} onClick={() => { if (!window.confirm(`Révoquer l’accès de ${person.display_name} à ce salon ? Ses réservations et messages restent conservés.`)) return; void mutate(async () => { const response = await fetch("/api/salon/invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "revoke_collaborator", businessId, collaboratorId: person.id }) }); const result = await response.json() as { error?: string }; if (!response.ok) throw new Error(result.error ?? "Révocation impossible."); }, "Accès au salon révoqué. L’historique est conservé."); }}>Révoquer l’accès</button>}
         <button disabled={busy} onClick={() => { if (window.confirm(`Archiver ${person.display_name} ? Son historique est conservé. Vérifiez ensuite les rendez-vous à réaffecter.`)) void mutate(async () => { const r = await api().from("collaborators").update({ is_active: false, is_bookable: false, archived_at: new Date().toISOString() }).eq("id", person.id); if (r.error) throw r.error; }, "Collaborateur archivé, historique conservé."); }}>Archiver</button></div>}
     </article>)}</div>
     {editing && <article className="workspace-panel salon-panel"><h3>{selected ? `Modifier ${selected.display_name}` : "Nouvel employé"}</h3><form key={selected?.id ?? "new"} className="salon-form" onSubmit={save}>

@@ -6,13 +6,18 @@ test.beforeEach(async ({ page }) => {
 
 test.beforeEach(async ({ page }) => {
   await page.route("https://audit.supabase.co/auth/v1/authorize**", (route) => route.fulfill({ status: 204 }));
-  await page.route("http://localhost:3000/api/auth/providers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ google: true }) }));
+  await page.route("**/api/auth/providers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ google: true }) }));
   await page.route("https://audit.supabase.co/rest/v1/categories**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 }]) }));
   await page.route("https://audit.supabase.co/rest/v1/provider_profiles**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
     profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier Tresses", city: "Dakar", service_mode: "salon", average_rating: 4.8, review_count: 12, verified_at: "2026-01-01T00:00:00Z", cover_url: null,
     provider_services: [{ id: "22222222-2222-4222-8222-222222222222", title: "Tresses collées", duration_minutes: 90, price_amount: 10000, services: { name: "Tresses collées", categories: { name: "Tresses" } } }],
   }]) }));
+  // Mock the catalogue enrichment as well; audit.supabase.co is deliberately
+  // non-routable, so leaving these reads unmocked leaves the UI in loading.
+  await page.route("https://audit.supabase.co/rest/v1/provider_services**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.route("https://audit.supabase.co/rest/v1/social_feed**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.route("https://audit.supabase.co/rest/v1/promotions**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.route("https://audit.supabase.co/rest/v1/rpc/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: route.request().url().includes("get_available_slots") ? "[]" : "null" }));
   page.on("pageerror", (error) => { throw error; });
   page.on("console", (message) => {
     if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());
@@ -29,12 +34,14 @@ test("premium home opens a real category results screen", async ({ page }) => {
   await expect(page.getByText("Awa Signature", { exact: true })).toHaveCount(0);
   await tressesCategory.click();
   await expect(page.getByRole("heading", { name: "Tresses", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Tresses collées" })).toBeVisible();
+  await expect(page.locator(".subcategory-strip").getByRole("button", { name: "Tresses collées", exact: true })).toBeVisible();
 });
+
+const profileNavButton = (page: import("@playwright/test").Page) => page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ });
 
 test("authentication has no fake preview mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await profileNavButton(page).click();
   await expect(page.getByRole("heading", { name: "Se connecter" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Se connecter", exact: true })).toBeEnabled();
   await expect(page.getByRole("dialog")).not.toContainText("aperçu");
@@ -42,7 +49,7 @@ test("authentication has no fake preview mode", async ({ page }) => {
 
 test("registration requires explicit legal consent", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await profileNavButton(page).click();
   await page.getByRole("button", { name: "Créer un compte", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Créer votre compte" })).toBeVisible();
   const consent = page.getByRole("checkbox", { name: "Accepter les conditions générales et la politique de confidentialité" });
@@ -82,7 +89,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
     HTMLMediaElement.prototype.play = function () { this.dataset.playing = "true"; return Promise.resolve(); };
     HTMLMediaElement.prototype.pause = function () { this.dataset.playing = "false"; };
   });
-  let requestedBatch = "";
+  const requestedBatches: string[] = [];
   await page.route("https://audit.supabase.co/*.mp4", (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
   await page.route("https://audit.supabase.co/rest/v1/rpc/get_available_slots**", (route) => route.fulfill({
     status: 200, contentType: "application/json", body: JSON.stringify([{ slot_start: "2026-08-17T10:00:00+00:00" }]),
@@ -91,7 +98,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await page.route("https://audit.supabase.co/rest/v1/rpc/record_product_event**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
   await page.route("https://audit.supabase.co/rest/v1/rpc/record_video_view**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
   await page.route("https://audit.supabase.co/rest/v1/social_feed**", (route) => {
-    requestedBatch = new URL(route.request().url()).searchParams.get("limit") ?? "";
+    requestedBatches.push(new URL(route.request().url()).searchParams.get("limit") ?? "");
     const base = {
       author_id: "11111111-1111-4111-8111-111111111111", thumbnail_url: null, duration_seconds: 18,
       view_count: 120, like_count: 32, comment_count: 4, save_count: 7, share_count: 2,
@@ -108,10 +115,11 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await page.goto("/");
   const feed = page.locator(".social-feed");
   await expect(page.locator(".social-video-card")).toHaveCount(2, { timeout: 15_000 });
-  expect(requestedBatch).toBe("8");
+  expect(requestedBatches).toContain("8");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
-  await expect(page.getByText(/Prochain créneau/).first()).toBeVisible();
-  await page.getByRole("button", { name: "Réserver", exact: true }).first().click();
+  await expect(page.locator(".social-video-card").first().getByRole("button", { name: "Voir les disponibilités", exact: true })).toBeVisible();
+  const activeCard = page.locator(".social-video-card").filter({ has: page.locator('video[data-playing="true"]') }).first();
+  await activeCard.getByRole("button", { name: "Réserver", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Réserver", exact: true })).toBeVisible();
   await expect(page.getByText("Tresses collées", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Fermer" }).click();
@@ -142,7 +150,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
 
 test("Google login starts a real OAuth request with a fixed callback", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await profileNavButton(page).click();
   const google = page.getByRole("button", { name: "Continuer avec Google", exact: true });
   await expect(google).toBeEnabled();
   const authorizeRequest = page.waitForRequest((request) => new URL(request.url()).pathname === "/auth/v1/authorize");
@@ -178,7 +186,7 @@ test("password recovery does not require the old password", async ({ page }) => 
 test("invalid OAuth callbacks fail closed without an open redirect", async ({ page }) => {
   await page.goto("/auth/callback?next=https%3A%2F%2Fevil.example%2Fsteal");
   await expect(page.getByText("Retour Google invalide.", { exact: true })).toBeVisible();
-  expect(new URL(page.url()).origin).toBe("http://localhost:3000");
+  expect(new URL(page.url()).hostname).toBe("localhost");
 });
 
 test("professional Google registration keeps a non-administrative intent", async ({ page }) => {

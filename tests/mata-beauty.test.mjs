@@ -203,7 +203,7 @@ test("the social video layer is server-counted, attributable, storage-isolated, 
   assert.match(feed, /index===activeIndex \|\| index===activeIndex\+1/);
   assert.match(feed, /index===activeIndex\+1 \? "metadata" : "none"/);
   assert.match(feed, /socialFeedFilters/);
-  assert.match(feed, /<button onClick=\{\(\) => void book\(post\)\}>Réserver<\/button>/);
+  assert.match(feed, /className="feed-book"[^>]*onClick=\{\(\) => void book\(post\)\}[^>]*>\{t\("Réserver"\)\}<\/button>/);
   assert.match(feed, /onBook\(post\.authorId,.*post\.id\)/s);
   for (const model of ["social_post_views", "social_post_likes", "social_post_comments", "social_post_saves", "social_post_shares", "social_post_reports", "provider_follows"]) {
     assert.match(immersive, new RegExp(`view public\\.${model}`));
@@ -246,7 +246,7 @@ test("booking conversations are participant-only, realtime, paginated, and read-
   const [migration, notificationRepair, messages, dashboard] = await Promise.all([
     readFile(new URL("supabase/migrations/20260804190000_booking_conversations_realtime.sql", root), "utf8"),
     readFile(new URL("supabase/migrations/20260804191000_repair_message_notifications.sql", root), "utf8"),
-    readFile(new URL("app/booking-messages.tsx", root), "utf8"),
+    readFile(new URL("app/conversation-messages.tsx", root), "utf8"),
     readFile(new URL("app/live-dashboard.tsx", root), "utf8"),
   ]);
   assert.match(migration, /create unique index if not exists conversations_booking_unique_idx/);
@@ -260,8 +260,10 @@ test("booking conversations are participant-only, realtime, paginated, and read-
   assert.match(notificationRepair, /member\.profile_id <> new\.sender_id/);
   assert.match(messages, /postgres_changes/);
   assert.match(messages, /\.limit\(pageSize\)/);
-  assert.match(messages, /lastOwnMessageRead/);
-  assert.match(messages, /sender_id: userId/);
+  assert.match(messages, /const isRead = lastOwn && others\.length > 0/);
+  assert.match(messages, /read-receipt/);
+  assert.match(messages, /message\.sender_id === userId/);
+  assert.match(messages, /sentMessage\(result\.data\)/);
   assert.match(dashboard, /<BookingMessages/);
   assert.doesNotMatch(messages + dashboard, /SUPABASE_SERVICE_ROLE_KEY/);
 });
@@ -322,7 +324,8 @@ test("Google OAuth uses PKCE, a server callback, and idempotent non-privileged p
   assert.match(callback, /safeOAuthDestination/);
   assert.match(providersRoute, /AbortSignal\.timeout\(5000\)/);
   assert.match(providersRoute, /Cache-Control/);
-  assert.doesNotMatch(callback, /console\.(log|error)/);
+  assert.match(callback, /console\.error\("welcome_email_delivery_failed"\)/);
+  assert.doesNotMatch(callback, /console\.(?:log|error)\(\s*(?:code|token|password|secret|authenticated\.user)\b/i);
   assert.match(migration, /on conflict\(id\) do nothing/);
   assert.match(migration, /request_professional_profile/);
   assert.match(migration, /values\(identity\.id, 'customer'\)/);

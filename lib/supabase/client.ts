@@ -1,7 +1,8 @@
 import { createBrowserClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let browserClient: SupabaseClient | null = null;
+let publicMediaClient: SupabaseClient | null = null;
 let runtimeConfiguration: { url: string; anonKey: string } | null = null;
 
 export function configureSupabaseBrowserClient(configuration: { url: string; anonKey: string }) {
@@ -9,6 +10,7 @@ export function configureSupabaseBrowserClient(configuration: { url: string; ano
   if (runtimeConfiguration?.url !== normalized.url || runtimeConfiguration?.anonKey !== normalized.anonKey) {
     runtimeConfiguration = normalized;
     browserClient = null;
+    publicMediaClient = null;
   }
 }
 
@@ -30,4 +32,22 @@ export function getSupabaseBrowserClient() {
     },
   });
   return browserClient;
+}
+
+/**
+ * Creates signed URLs for public-feed media without forwarding a possibly
+ * expired user access token. Storage RLS still decides which objects are
+ * readable; this client uses only the publishable/anon key.
+ */
+export function getSupabasePublicMediaClient() {
+  const configuration = getSupabaseConfiguration();
+  if (!configuration.configured) return null;
+  publicMediaClient ??= createClient(configuration.url, configuration.anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false,
+    },
+  });
+  return publicMediaClient;
 }

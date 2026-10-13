@@ -15,8 +15,8 @@ import "./conversation-messages.css";
 type MemberRow = { profile_id: string; last_read_at: string | null };
 const pageSize = 50;
 
-export function ConversationMessages({ conversationId: requestedConversation, bookingId, requestedMessageId, serviceTitle, userId, onClose, onChanged }: {
-  conversationId?: string; bookingId?: string; requestedMessageId?: string | null; serviceTitle?: string; userId: string; onClose: () => void; onChanged?: () => void;
+export function ConversationMessages({ conversationId: requestedConversation, bookingId, requestedMessageId, serviceTitle, initialMessage, userId, onClose, onChanged, canReply = true }: {
+  conversationId?: string; bookingId?: string; requestedMessageId?: string | null; serviceTitle?: string; initialMessage?: string; userId: string; onClose: () => void; onChanged?: () => void; canReply?: boolean;
 }) {
   const client = getSupabaseBrowserClient();
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -48,6 +48,9 @@ export function ConversationMessages({ conversationId: requestedConversation, bo
   const markingRead = useRef(false);
   const reconcileRef = useRef<() => void>(() => {});
   const changed = useRef(onChanged);
+  const pendingRequest = summary?.request_status === "pending";
+  const maySendRequestIntro = pendingRequest && summary?.requested_by === userId && !messages.some(message => message.sender_id === userId);
+  const canSendMessage = canReply && (summary?.request_status !== "declined") && (!pendingRequest || maySendRequestIntro);
   useEffect(() => { changed.current = onChanged; }, [onChanged]);
 
   const loadMembers = useCallback(async (id: string) => {
@@ -289,7 +292,7 @@ export function ConversationMessages({ conversationId: requestedConversation, bo
       })}
       {lastOwn && <small className="read-receipt">{isRead ? "Lu" : "Envoyé"}</small>}
     </div>
-    {conversationId && <>
+    {conversationId && canSendMessage && <>
       <div className="conversation-tools" aria-label="Pièces jointes et prestations">
         <button type="button" aria-expanded={tool === "media"} onClick={() => setTool(tool === "media" ? null : "media")}>Photo / vidéo</button>
         <button type="button" aria-expanded={tool === "service"} onClick={() => setTool(tool === "service" ? null : "service")}>Partager une prestation</button>
@@ -304,9 +307,12 @@ export function ConversationMessages({ conversationId: requestedConversation, bo
       {tool === "quote" && summary?.provider_id === userId && <ConversationQuoteForm key={editingQuote?.id ?? "new"} conversationId={conversationId} services={activeServices} existing={editingQuote} onSaved={() => { setTool(null); setEditingQuote(null); reconcileRef.current(); }} onClose={() => setTool(null)} />}
       {drafts.length > 0 && <details className="conversation-drafts"><summary>Mes brouillons de devis ({drafts.length})</summary>{drafts.map(quote => <ConversationQuoteCard key={quote.id} quote={quote} userId={userId} onChanged={() => reconcileRef.current()} onEdit={value => { setEditingQuote(value); setTool("quote"); }} />)}</details>}
     </>}
-    <form className="message-composer" onSubmit={event => void sendText(event)}><label className="sr-only" htmlFor="booking-message">Votre message</label>
-      <textarea id="booking-message" name="message" required minLength={1} maxLength={4000} rows={2} placeholder="Écrire un message…" disabled={!conversationId || sending} />
+    {!canReply && <p className="conversation-readonly-notice">Consultation seule : le responsable du salon ne vous a pas accordé le droit de répondre.</p>}
+    {pendingRequest && !maySendRequestIntro && <p className="conversation-readonly-notice">{summary?.requested_by === userId ? "Votre demande a été envoyée. Vous pourrez poursuivre après acceptation." : "Cette demande doit être acceptée avant toute réponse."}</p>}
+    {summary?.request_status === "declined" && <p className="conversation-readonly-notice">Cette demande de conversation a été refusée.</p>}
+    {canSendMessage && <form className="message-composer" onSubmit={event => void sendText(event)}><label className="sr-only" htmlFor="booking-message">Votre message</label>
+      <textarea id="booking-message" name="message" defaultValue={initialMessage} required minLength={1} maxLength={4000} rows={2} placeholder="Écrire un message…" disabled={!conversationId || sending} />
       <button className="primary-button" type="submit" disabled={!conversationId || sending}>{sending ? "Envoi…" : "Envoyer"}</button>
-    </form>
+    </form>}
   </article>;
 }

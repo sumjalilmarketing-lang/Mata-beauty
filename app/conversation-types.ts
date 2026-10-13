@@ -14,6 +14,8 @@ export type ConversationSummary = {
   last_message_body: string | null;
   last_message_type: string | null;
   archived_at: string | null;
+  request_status?: "pending" | "accepted" | "declined";
+  requested_by?: string | null;
 };
 
 export type ConversationMessage = {

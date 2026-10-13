@@ -8,6 +8,7 @@ export type WorkspaceIdentity = {
   permissions: readonly string[];
   ownsBusiness: boolean;
   isCollaborator: boolean;
+  staffPermissions: readonly string[];
 };
 
 export function canAccessWorkspace(space: WorkspaceSpaceKey, identity: WorkspaceIdentity) {
@@ -22,7 +23,8 @@ export function canAccessWorkspace(space: WorkspaceSpaceKey, identity: Workspace
   return identity.adminRoles.some((role) => allowed.includes(role));
 }
 
-export function canAccessWorkspaceModule(identity: WorkspaceIdentity, permission?: AdminPermissionKey) {
+export function canAccessWorkspaceModule(identity: WorkspaceIdentity, permission?: AdminPermissionKey, space?: WorkspaceSpaceKey, staffPermission?: string | readonly string[]) {
+  if (space === "staff") return typeof staffPermission === "string" ? identity.staffPermissions.includes(staffPermission) : Boolean(staffPermission?.some(value => identity.staffPermissions.includes(value)));
   if (!permission || identity.adminRoles.includes("super_admin")) return true;
   return identity.permissions.includes(permission);
 }

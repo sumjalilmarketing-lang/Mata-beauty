@@ -62,7 +62,10 @@ test("nearby uses commercial coordinates and excludes unknown locations (simulat
   await expect(page.getByText("Résultats dans un rayon de 25 km", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Voir les résultats", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(1);
-  await expect(page.locator(".social-video-card")).toContainText("Inspiration 1");
+  // The compact Inspiration card intentionally omits captions; location and
+  // business identity are the visible public fields for this fixture.
+  await expect(page.locator(".social-video-card")).toContainText("Atelier test");
+  await expect(page.locator(".social-video-card")).toContainText("Dakar");
 });
 
 test("nearby permission refusal offers a manual zone and keeps it in Explorer (simulated position)", async ({ page }) => {
@@ -110,13 +113,13 @@ test("desktop wheel reaches the feed from both the content and side margins", as
 
 test("authentication content and Google button fit inside the centered dialog", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   const box = (await dialog.boundingBox())!;
   const viewport = page.viewportSize()!;
   expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThan(2);
-  for (const control of [page.getByRole("button", { name: "Continuer avec Google" }), page.getByLabel("Adresse e-mail"), page.getByLabel("Mot de passe"), page.getByRole("button", { name: "Se connecter", exact: true })]) {
+  for (const control of [page.getByRole("button", { name: "Continuer avec Google" }), page.getByLabel("Adresse e-mail"), dialog.locator('input[name="password"]'), page.getByRole("button", { name: "Se connecter", exact: true })]) {
     const bounds = (await control.boundingBox())!;
     expect(bounds.x).toBeGreaterThanOrEqual(box.x);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(box.x + box.width);

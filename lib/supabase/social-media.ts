@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getSupabasePublicMediaClient } from "@/lib/supabase/client";
 import { publicProfessionalName } from "@/lib/domain/feed-presentation";
 
 export type FeedPost = {
@@ -43,7 +43,7 @@ export function mapFeedPost(row: SocialFeedRow): FeedPost {
 }
 
 async function usableSignedUrl(bucketId: string, storagePath: string) {
-  const supabase = getSupabaseBrowserClient();
+  const supabase = getSupabasePublicMediaClient();
   if (!supabase) return null;
   const { data, error } = await supabase.storage.from(bucketId).createSignedUrl(storagePath, 3600);
   if (error || !data?.signedUrl) return null;

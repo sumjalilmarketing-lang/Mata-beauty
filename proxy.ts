@@ -3,6 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
+  // The visual messaging demo is deliberately static and must never contact a
+  // configured Supabase project (Preview deployments may inherit production env).
+  if (request.nextUrl.pathname === "/messaging-v2-demo" || request.nextUrl.pathname.startsWith("/messaging-v2-demo/")) return response;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) return response;
