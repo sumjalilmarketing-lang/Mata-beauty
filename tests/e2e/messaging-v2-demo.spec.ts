@@ -10,7 +10,9 @@ test("messaging V2 demo exercises role, request, story and local message interac
   await expect(page.getByText("Démonstration visuelle — données fictives")).toBeVisible();
   await expect(page.getByText("Aucune action n’est enregistrée. Cette page ne se connecte pas à Supabase.")).toBeVisible();
   await expect(page.getByRole("button", { name: /Ajouter une Story/ })).toHaveCount(0);
+  await expect(page.getByLabel("Profil de démonstration")).toBeEnabled();
   await page.getByLabel("Profil de démonstration").selectOption("owner");
+  await expect(page.getByRole("region", { name: "Messagerie — Responsable de salon" })).toBeVisible();
   if (await page.evaluate(() => window.innerWidth <= 700)) await page.locator(".mv2-thread-row").first().click();
   await expect(page.getByLabel("Attribuer la conversation")).toBeVisible();
   await page.getByLabel("Attribuer la conversation").selectOption("fatou");
@@ -53,6 +55,7 @@ test("messaging V2 demo exercises role, request, story and local message interac
 test("mobile messaging V2 demo fits the viewport and returns from the thread to the inbox", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/messaging-v2-demo");
+  await expect(page.getByLabel("Profil de démonstration")).toBeEnabled();
   await expect(page.locator(".mv2-thread-row").first()).toBeVisible();
   const dimensions = await page.evaluate(() => ({ bodyWidth: document.body.scrollWidth, viewportWidth: window.innerWidth }));
   expect(dimensions.bodyWidth).toBeLessThanOrEqual(dimensions.viewportWidth);

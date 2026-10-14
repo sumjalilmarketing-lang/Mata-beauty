@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 type Role = "client" | "independent" | "owner" | "collaborator";
 type DemoMessage = { from: "self" | "other"; text: string; time: string };
@@ -12,6 +12,9 @@ const roleNames: Record<Role, string> = {
   owner: "Responsable de salon",
   collaborator: "Collaborateur",
 };
+const subscribeHydration = () => () => {};
+const getHydrationSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
 const stories = [
   { name: "Studio Naya", color: "#f4a6c2", caption: "Notre nouvelle pose protectrice est disponible cette semaine." },
   { name: "Mariam Beauty", color: "#d8b4fe", caption: "Un aperçu des créations du jour ✨" },
@@ -25,6 +28,7 @@ const seedThreads: DemoThread[] = [
 
 export function MessagingV2Demo() {
   const [role, setRole] = useState<Role>("client");
+  const hydrated = useSyncExternalStore(subscribeHydration, getHydrationSnapshot, getServerHydrationSnapshot);
   const [threads, setThreads] = useState(seedThreads);
   const [selectedId, setSelectedId] = useState(seedThreads[0].id);
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
@@ -60,7 +64,7 @@ export function MessagingV2Demo() {
   }
 
   return <main className="mv2-page">
-    <header className="mv2-topbar"><a className="mv2-brand" href="#demo" aria-label="MATA Beauty">MATA<span>BEAUTY</span></a><div className="mv2-topbar-title"><span>Messagerie</span><small>Sociale & professionnelle</small></div><label className="mv2-role">Profil de démonstration<select aria-label="Profil de démonstration" value={role} onChange={event => setRole(event.target.value as Role)}>{Object.entries(roleNames).map(([value, name]) => <option key={value} value={value}>{name}</option>)}</select></label></header>
+    <header className="mv2-topbar"><a className="mv2-brand" href="#demo" aria-label="MATA Beauty">MATA<span>BEAUTY</span></a><div className="mv2-topbar-title"><span>Messagerie</span><small>Sociale & professionnelle</small></div><label className="mv2-role">Profil de démonstration<select aria-label="Profil de démonstration" value={role} disabled={!hydrated} onChange={event => setRole(event.target.value as Role)}>{Object.entries(roleNames).map(([value, name]) => <option key={value} value={value}>{name}</option>)}</select></label></header>
     <div className="mv2-demo-banner"><span aria-hidden="true">i</span><p><strong>Démonstration visuelle — données fictives</strong><br />Aucune action n’est enregistrée. Cette page ne se connecte pas à Supabase.</p></div>
     <section className="mv2-stories" aria-label="Stories de démonstration"><div className="mv2-section-heading"><div><h1>Vos conversations</h1><p>Retrouvez vos échanges et les nouveautés.</p></div>{canPublish && <button className="mv2-outline" type="button" onClick={() => setNotice("Ajout de Story simulé : aucun fichier n’est téléversé.")}>＋ Ajouter une Story</button>}</div><div className="mv2-story-list">{stories.map(item => <button type="button" key={item.name} className="mv2-story" aria-label={`Voir la Story de ${item.name}`} onClick={() => setStory(item)}><span className="mv2-story-avatar" style={{ background: item.color }}>{item.name.slice(0, 1)}</span><span>{item.name}</span></button>)}</div></section>
     <section className={`mv2-workspace${mobileThreadOpen ? " mobile-show-thread" : ""}`} aria-label={`Messagerie — ${roleNames[role]}`}>
