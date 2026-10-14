@@ -2,6 +2,18 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  outputFileTracingIncludes: {
+    '/api/messages/media': [
+      'node_modules/sharp/**/*',
+      'node_modules/@img/sharp-linux-x64/**/*',
+      'node_modules/@img/sharp-libvips-linux-x64/**/*',
+    ],
+    '/api/stories': [
+      'node_modules/sharp/**/*',
+      'node_modules/@img/sharp-linux-x64/**/*',
+      'node_modules/@img/sharp-libvips-linux-x64/**/*',
+    ],
+  },
   env: {
     NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? "local",
   },
