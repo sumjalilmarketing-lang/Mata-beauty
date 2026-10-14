@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasPublishedBusinessHours, validateWeeklyBusinessHours, type WeeklyBusinessHour } from "@/lib/domain/business-hours";
+import { hasPublishedBusinessHours, hasReservableServiceSchedule, validateWeeklyBusinessHours, type WeeklyBusinessHour } from "@/lib/domain/business-hours";
 
 const closedDay = (weekday: number): WeeklyBusinessHour => ({ weekday, is_closed: true, opens_at: null, closes_at: null });
 
@@ -19,5 +19,12 @@ describe("weekly business hours", () => {
   it("rejects missing and reversed time ranges", () => {
     expect(validateWeeklyBusinessHours([{ weekday: 1, is_closed: false, opens_at: null, closes_at: "17:00" }])).toContain("heure de fermeture");
     expect(validateWeeklyBusinessHours([{ weekday: 1, is_closed: false, opens_at: "18:00", closes_at: "09:00" }])).toContain("heure de fermeture");
+  });
+
+  it("requires the schedule source used by the booking mode", () => {
+    expect(hasReservableServiceSchedule({ serviceId: "s1", teamBookingEnabled: false, providerAvailabilityPublished: true, teamServiceIds: [] })).toBe(true);
+    expect(hasReservableServiceSchedule({ serviceId: "s1", teamBookingEnabled: false, providerAvailabilityPublished: false, teamServiceIds: ["s1"] })).toBe(false);
+    expect(hasReservableServiceSchedule({ serviceId: "s1", teamBookingEnabled: true, providerAvailabilityPublished: true, teamServiceIds: ["s2"] })).toBe(false);
+    expect(hasReservableServiceSchedule({ serviceId: "s1", teamBookingEnabled: true, providerAvailabilityPublished: false, teamServiceIds: ["s1"] })).toBe(true);
   });
 });

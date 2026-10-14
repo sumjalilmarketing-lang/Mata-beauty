@@ -17,3 +17,14 @@ export function validateWeeklyBusinessHours(hours: readonly WeeklyBusinessHour[]
   }
   return null;
 }
+
+export function hasReservableServiceSchedule(input: {
+  serviceId: string;
+  teamBookingEnabled: boolean;
+  providerAvailabilityPublished: boolean;
+  teamServiceIds: readonly string[];
+}): boolean {
+  return input.teamBookingEnabled
+    ? input.teamServiceIds.includes(input.serviceId)
+    : input.providerAvailabilityPublished;
+}
