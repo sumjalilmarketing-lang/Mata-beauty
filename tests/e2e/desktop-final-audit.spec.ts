@@ -44,7 +44,9 @@ test("cached feed can paginate during a slow initial refresh without repeating p
   await page.reload();
   await expect(page.locator(".social-video-card")).toHaveCount(8);
   await page.locator(".social-feed").evaluate((node) => node.scrollTo({ top: node.scrollHeight, behavior: "auto" }));
-  await expect(page.locator(".social-video-card")).toHaveCount(9, { timeout: 10_000 });
+  // The test deliberately holds the first refresh for 1.5s while the feed is
+  // reloaded; allow slower WebKit startup and concurrent viewport runs too.
+  await expect(page.locator(".social-video-card")).toHaveCount(9, { timeout: 20_000 });
   expect(cursors).toEqual([false, true]);
 });
 

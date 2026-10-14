@@ -44,7 +44,7 @@ export function TeamManagement({ businessId, ownerId }: { businessId: string; ow
   const load = useCallback(async () => {
     const client = api();
     const [people, offers, business, access] = await Promise.all([
-      client.from("collaborators").select("id,display_name,first_name,public_last_name,title,avatar_url,specialties,buffer_minutes,is_active,is_bookable,archived_at").eq("business_id", businessId).order("display_name"),
+      client.from("collaborators_public").select("id,display_name,first_name,public_last_name,title,avatar_url,specialties,buffer_minutes,is_active,is_bookable,archived_at").eq("business_id", businessId).order("display_name"),
       client.from("provider_services").select("id,title,business_id").eq("provider_id", ownerId).is("archived_at", null),
       client.from("businesses").select("team_booking_enabled").eq("id", businessId).single(),
       client.rpc("owner_list_collaborator_access", { target_business_id: businessId }),
@@ -94,7 +94,7 @@ export function TeamManagement({ businessId, ownerId }: { businessId: string; ow
         const path = `${businessId}/employee-${result.data}-${crypto.randomUUID()}.${extension}`;
         const upload = await api().storage.from("business-media").upload(path, file, { contentType: file.type, upsert: false });
         if (upload.error) throw upload.error;
-        const update = await api().from("collaborators").update({ avatar_url: api().storage.from("business-media").getPublicUrl(path).data.publicUrl }).eq("id", result.data as string);
+        const update = await api().from("collaborators_public").update({ avatar_url: api().storage.from("business-media").getPublicUrl(path).data.publicUrl }).eq("id", result.data as string);
         if (update.error) { await api().storage.from("business-media").remove([path]); throw update.error; }
       }
       savedMemberId.current = null; setEditing(false);
@@ -120,9 +120,9 @@ export function TeamManagement({ businessId, ownerId }: { businessId: string; ow
       {person.avatar_url && <Image unoptimized src={person.avatar_url} alt={`Photo de ${person.display_name}`} width={64} height={64} />}
       <h3>{person.display_name}</h3><p>{person.title}</p><p>{person.specialties.join(" · ")}</p><p>{person.archived_at ? "Archivé" : !person.is_active ? "Inactif" : person.is_bookable ? "Réservable selon ses horaires" : "Non réservable"}</p>
       {!person.archived_at && <div className="team-toolbar"><button disabled={busy} onClick={() => { setSelected(person); setEditing(true); }}>Modifier la fiche</button><button disabled={busy} onClick={() => { setSelected(person); setEditing(false); }}>Horaires et absences</button>
-        <button disabled={busy} onClick={() => void mutate(async () => { const r = await api().from("collaborators").update({ is_active: !person.is_active }).eq("id", person.id); if (r.error) throw r.error; }, "Disponibilité mise à jour.")}>{person.is_active ? "Désactiver" : "Réactiver"}</button>
+        <button disabled={busy} onClick={() => void mutate(async () => { const r = await api().from("collaborators_public").update({ is_active: !person.is_active }).eq("id", person.id); if (r.error) throw r.error; }, "Disponibilité mise à jour.")}>{person.is_active ? "Désactiver" : "Réactiver"}</button>
         {person.has_account && <button className="danger" disabled={busy} onClick={() => { if (!window.confirm(`Révoquer l’accès de ${person.display_name} à ce salon ? Ses réservations et messages restent conservés.`)) return; void mutate(async () => { const response = await fetch("/api/salon/invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "revoke_collaborator", businessId, collaboratorId: person.id }) }); const result = await response.json() as { error?: string }; if (!response.ok) throw new Error(result.error ?? "Révocation impossible."); }, "Accès au salon révoqué. L’historique est conservé."); }}>Révoquer l’accès</button>}
-        <button disabled={busy} onClick={() => { if (window.confirm(`Archiver ${person.display_name} ? Son historique est conservé. Vérifiez ensuite les rendez-vous à réaffecter.`)) void mutate(async () => { const r = await api().from("collaborators").update({ is_active: false, is_bookable: false, archived_at: new Date().toISOString() }).eq("id", person.id); if (r.error) throw r.error; }, "Collaborateur archivé, historique conservé."); }}>Archiver</button></div>}
+        <button disabled={busy} onClick={() => { if (window.confirm(`Archiver ${person.display_name} ? Son historique est conservé. Vérifiez ensuite les rendez-vous à réaffecter.`)) void mutate(async () => { const r = await api().from("collaborators_public").update({ is_active: false, is_bookable: false, archived_at: new Date().toISOString() }).eq("id", person.id); if (r.error) throw r.error; }, "Collaborateur archivé, historique conservé."); }}>Archiver</button></div>}
     </article>)}</div>
     {editing && <article className="workspace-panel salon-panel"><h3>{selected ? `Modifier ${selected.display_name}` : "Nouvel employé"}</h3><form key={selected?.id ?? "new"} className="salon-form" onSubmit={save}>
       <label>Prénom<input name="first_name" required maxLength={50} defaultValue={selected?.first_name ?? selected?.display_name ?? ""} /></label><label>Nom public<input name="last_name" maxLength={49} defaultValue={selected?.public_last_name ?? ""} /></label>

@@ -16,6 +16,7 @@ declare
   collaborator_b uuid;
 begin
   perform set_config('request.jwt.claim.role', 'service_role', true);
+  perform set_config('request.jwt.claims', jsonb_build_object('role', 'service_role')::text, true);
   insert into auth.users (id, aud, role, email, encrypted_password, email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
   values
@@ -49,7 +50,8 @@ begin
     (collaborator_b, business_b, invitee_a, 'manager', array['bookings.read','bookings.manage']::text[]);
 
   perform set_config('app.accept_business_invitation', '', true);
-  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.role', 'anon', true);
+  perform set_config('request.jwt.claims', jsonb_build_object('role', 'anon')::text, true);
 end
 $$;
 
@@ -69,12 +71,12 @@ begin
   exception when insufficient_privilege then
     null;
   end;
-  execute 'select count(display_name) from public.collaborators' into visible_names;
+  execute 'select count(display_name) from public.collaborators_public where business_id in (''a1000001-0000-4000-8000-000000000001'', ''b1000002-0000-4000-8000-000000000002'')' into visible_names;
   if visible_names <> 2 then
     raise exception 'FAIL: anon should see the two public active team labels, saw %', visible_names;
   end if;
   begin
-    execute 'update public.collaborators set display_name = ''Anon changed''';
+    execute 'update public.collaborators_public set display_name = ''Anon changed''';
     raise exception 'FAIL: anon collaborator update unexpectedly succeeded';
   exception when insufficient_privilege then
     null;
@@ -102,8 +104,9 @@ $$;
 
 reset role;
 set local role authenticated;
-select set_config('request.jwt.claim.sub', 'a0000001-0000-4000-8000-000000000001', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', 'a0000001-0000-4000-8000-000000000001', true);
+select set_config('request.jwt.claims', jsonb_build_object('sub', 'a0000001-0000-4000-8000-000000000001', 'role', 'authenticated')::text, true);
 do $$
 declare visible_names integer; access_count integer; changed_count integer;
 begin
@@ -111,7 +114,7 @@ begin
     or has_column_privilege('authenticated', 'public.collaborators', 'profile_id', 'update') then
     raise exception 'FAIL: authenticated can read or update collaborator profile_id';
   end if;
-  execute 'select count(display_name) from public.collaborators' into visible_names;
+  execute 'select count(display_name) from public.collaborators_public where business_id in (''a1000001-0000-4000-8000-000000000001'', ''b1000002-0000-4000-8000-000000000002'')' into visible_names;
   if visible_names <> 2 then
     raise exception 'FAIL: authenticated public presentation visibility expected two rows, saw %', visible_names;
   end if;
@@ -129,13 +132,13 @@ begin
   exception when insufficient_privilege then
     null;
   end;
-  update public.collaborators set display_name = 'QA Staff Alpha Updated'
+  update public.collaborators_public set display_name = 'QA Staff Alpha Updated'
   where business_id = 'a1000001-0000-4000-8000-000000000001';
   get diagnostics changed_count = row_count;
   if changed_count <> 1 then
     raise exception 'FAIL: salon A owner could not update their public collaborator presentation';
   end if;
-  update public.collaborators set display_name = 'Cross Salon Mutation'
+  update public.collaborators_public set display_name = 'Cross Salon Mutation'
   where business_id = 'b1000002-0000-4000-8000-000000000002';
   get diagnostics changed_count = row_count;
   if changed_count <> 0 then
@@ -145,7 +148,9 @@ end
 $$;
 
 reset role;
+select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', 'c0000003-0000-4000-8000-000000000003', true);
+select set_config('request.jwt.claims', jsonb_build_object('sub', 'c0000003-0000-4000-8000-000000000003', 'role', 'authenticated')::text, true);
 set local role authenticated;
 do $$
 declare access_count integer; other_salon_count integer;
@@ -171,7 +176,9 @@ end
 $$;
 
 reset role;
+select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', 'a0000001-0000-4000-8000-000000000001', true);
+select set_config('request.jwt.claims', jsonb_build_object('sub', 'a0000001-0000-4000-8000-000000000001', 'role', 'authenticated')::text, true);
 set local role authenticated;
 do $$
 declare v_invitation_id uuid; v_expired_id uuid; v_revoked_id uuid; v_expires_at timestamptz; rows_found integer;
@@ -211,6 +218,7 @@ end
 $$;
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', 'a0000001-0000-4000-8000-000000000001', true);
+select set_config('request.jwt.claims', jsonb_build_object('sub', 'a0000001-0000-4000-8000-000000000001', 'role', 'authenticated')::text, true);
 set local role authenticated;
 do $$
 declare v_revoked_id uuid;
@@ -224,6 +232,7 @@ end
 $$;
 reset role;
 select set_config('request.jwt.claim.role', 'service_role', true);
+select set_config('request.jwt.claims', jsonb_build_object('role', 'service_role')::text, true);
 set local role service_role;
 do $$
 declare v_invitation_id uuid; v_expired_id uuid; v_revoked_id uuid; result jsonb; rows_found integer;

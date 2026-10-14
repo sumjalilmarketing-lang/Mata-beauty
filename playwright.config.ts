@@ -3,6 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
+  // Keep browser-driven pages deterministic on constrained local runners.
+  workers: 2,
   reporter: "list",
   use: {
     baseURL: "http://localhost:3000",

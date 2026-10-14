@@ -386,13 +386,17 @@ test("private workspaces expose only functional controls and safe errors", async
 });
 
 test("salon workspace is connected, archived safely and protected by RLS", async () => {
-  const [center, route, migration, paymentUi] = await Promise.all([
+  const [center, team, workspace, route, migration, paymentUi] = await Promise.all([
     readFile(new URL("app/salon-control-center.tsx", root), "utf8"),
+    readFile(new URL("app/team-management.tsx", root), "utf8"),
+    readFile(new URL("app/workspace-module.tsx", root), "utf8"),
     readFile(new URL("app/workspace-route.tsx", root), "utf8"),
     readFile(new URL("supabase/migrations/20260815210000_salon_production_workflows.sql", root), "utf8"),
     readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
   ]);
-  for (const table of ["businesses", "business_hours", "business_closures", "business_invitations", "business_media", "collaborators", "provider_services", "bookings"]) assert.match(center, new RegExp(`from\\(\\"${table}\\"\\)`));
+  for (const table of ["businesses", "business_hours", "business_closures", "business_invitations", "business_media", "provider_services", "bookings"]) assert.match(center, new RegExp(`from\\(\\"${table}\\"\\)`));
+  assert.match(center + team + workspace, /collaborators_public/);
+  assert.doesNotMatch(center + team + workspace, /from\(\"collaborators\"\)/);
   assert.match(center, /archive_owned_business/);
   assert.match(center, /12 \* 1024 \* 1024/);
   assert.match(center, /image\/jpeg/);
