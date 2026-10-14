@@ -61,3 +61,19 @@ test("mobile messaging V2 demo fits the viewport and returns from the thread to 
   await page.getByRole("button", { name: "Retour à la liste" }).click();
   await expect(page.getByRole("tab", { name: "Conversations" })).toBeVisible();
 });
+
+test("demo-only preview redirects app routes and blocks API routes before Supabase", async ({ page }) => {
+  test.skip(process.env.MESSAGING_V2_DEMO_ONLY !== "true", "Enabled only for the branch-scoped fictitious-data Preview.");
+  const supabaseRequests: string[] = [];
+  page.on("request", request => {
+    if (/supabase\.co/i.test(request.url())) supabaseRequests.push(request.url());
+  });
+
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/messaging-v2-demo$/);
+  await expect(page.getByText("Démonstration visuelle — données fictives")).toBeVisible();
+  const apiResponse = await page.request.get("/api/stories");
+  expect(apiResponse.status()).toBe(404);
+  expect(await apiResponse.json()).toEqual({ error: "DEMO_ONLY" });
+  expect(supabaseRequests).toEqual([]);
+});

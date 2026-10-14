@@ -66,6 +66,8 @@ Les migrations sont seulement préparées. Aucun PostgreSQL/Docker/Supabase CLI 
 
 La route `/messaging-v2-demo` présente une démonstration clairement marquée avec profils Client, Professionnel indépendant, Responsable de salon et Collaborateur. Stories, demandes, réponses, envoi et attribution sont des scénarios locaux fictifs. La route importe uniquement son composant et son style de démonstration; `proxy.ts` la laisse passer avant toute initialisation Supabase. Le test E2E observe le trafic et exige zéro requête vers `*.supabase.co`.
 
+La Preview de la branche `codex/social-messaging-v2` active `MESSAGING_V2_DEMO_ONLY=true` par variable Vercel ciblée sur cette seule branche. Le proxy redirige toutes les pages hors démo vers `/messaging-v2-demo` et renvoie 404 aux API avant l'initialisation du client Supabase. Les pages et API fonctionnelles V2 restent donc inaccessibles dans cette Preview fictive; les tests réels nécessitent un environnement local/QA isolé après application contrôlée des migrations.
+
 La Preview Vercel `africrm/mata-beauty` existe et son environnement Preview a été vérifié en lecture seule : `NEXT_PUBLIC_SUPABASE_URL` cible le projet QA `kazlvtxkbsdhbfvtqqdp`; la Production Vercel cible `qjdwxdbvrxedyfolnpol`. La page de démonstration ne contacte aucun des deux. Les variables d'environnement du projet n'ont pas été modifiées. Une démo visuelle réussie ne valide ni API, ni compte réel, ni RLS, ni Realtime.
 
 ### Dépendances statiques des migrations

@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const demoOnlyMode = process.env.MESSAGING_V2_DEMO_ONLY === "true";
+const localBaseUrl = demoOnlyMode ? "http://localhost:3010" : "http://localhost:3000";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
@@ -7,7 +10,7 @@ export default defineConfig({
   workers: 2,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: localBaseUrl,
     trace: "retain-on-failure",
   },
   projects: [
@@ -25,13 +28,14 @@ export default defineConfig({
     { name: "widescreen", use: { viewport: { width: 1920, height: 1080 } } },
   ],
   webServer: {
-    command: "node node_modules/next/dist/bin/next dev",
-    url: "http://localhost:3000",
+    command: demoOnlyMode ? "node node_modules/next/dist/bin/next dev -p 3010" : "node node_modules/next/dist/bin/next dev",
+    url: localBaseUrl,
     reuseExistingServer: true,
     timeout: 120_000,
     env: {
       NEXT_PUBLIC_SUPABASE_URL: "https://audit.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "audit-public-anon-key",
+      MESSAGING_V2_DEMO_ONLY: process.env.MESSAGING_V2_DEMO_ONLY ?? "false",
     },
   },
 });
