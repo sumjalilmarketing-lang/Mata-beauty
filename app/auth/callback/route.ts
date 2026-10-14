@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     const { data: authenticated } = await supabase.auth.getUser();
     if (authenticated.user) {
       try { await sendWelcomeEmail(authenticated.user.id); }
-      catch { console.error("welcome_email_delivery_failed"); }
+      catch { /* Email delivery must not block a valid OAuth session. */ }
     }
     return callbackRedirect(request, {
       auth: "google",

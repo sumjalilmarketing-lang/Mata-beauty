@@ -203,7 +203,7 @@ test("the social video layer is server-counted, attributable, storage-isolated, 
   assert.match(feed, /index===activeIndex \|\| index===activeIndex\+1/);
   assert.match(feed, /index===activeIndex\+1 \? "metadata" : "none"/);
   assert.match(feed, /socialFeedFilters/);
-  assert.match(feed, /<button onClick=\{\(\) => void book\(post\)\}>Réserver<\/button>/);
+  assert.match(feed, /<button className="feed-book" disabled=\{authPending\} onClick=\{\(\) => void book\(post\)\}>\{t\("Réserver"\)\}<\/button>/);
   assert.match(feed, /onBook\(post\.authorId,.*post\.id\)/s);
   for (const model of ["social_post_views", "social_post_likes", "social_post_comments", "social_post_saves", "social_post_shares", "social_post_reports", "provider_follows"]) {
     assert.match(immersive, new RegExp(`view public\\.${model}`));
