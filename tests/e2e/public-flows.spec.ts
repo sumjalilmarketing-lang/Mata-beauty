@@ -76,22 +76,31 @@ test("primary mobile navigation keeps comfortable touch targets", async ({ page 
   }
 });
 
-test("Inspiration swipes vertically with one active player, filters and an eight-item batch", async ({ page }) => {
+test("Inspiration swipes vertically with one active player, filters and an eight-item batch", async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     window.addEventListener("error", (event) => { if (event.target instanceof HTMLVideoElement) event.stopImmediatePropagation(); }, true);
-    HTMLMediaElement.prototype.play = function () { this.dataset.playing = "true"; return Promise.resolve(); };
-    HTMLMediaElement.prototype.pause = function () { this.dataset.playing = "false"; };
+    HTMLMediaElement.prototype.play = function () { this.dataset.playing = "true"; this.dispatchEvent(new Event("playing")); return Promise.resolve(); };
+    HTMLMediaElement.prototype.pause = function () { this.dataset.playing = "false"; this.dispatchEvent(new Event("pause")); };
   });
   let requestedBatch = "";
   await page.route("https://audit.supabase.co/*.mp4", (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
   await page.route("https://audit.supabase.co/rest/v1/rpc/get_available_slots**", (route) => route.fulfill({
-    status: 200, contentType: "application/json", body: JSON.stringify([{ slot_start: "2026-08-17T10:00:00+00:00" }]),
+    status: 200, contentType: "application/json", body: JSON.stringify([{ slot_start: "2026-10-17T10:00:00+00:00" }]),
   }));
   await page.route("https://audit.supabase.co/rest/v1/rpc/record_post_booking_click**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
   await page.route("https://audit.supabase.co/rest/v1/rpc/record_product_event**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
   await page.route("https://audit.supabase.co/rest/v1/rpc/record_video_view**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
+  await page.route("https://audit.supabase.co/rest/v1/provider_profiles**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
+    profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier Tresses", city: "Dakar", service_mode: "salon",
+    average_rating: 4.8, review_count: 12, verified_at: "2026-01-01T00:00:00Z", cover_url: null, status: "approved",
+    provider_services: [{ id: "22222222-2222-4222-8222-222222222222", title: "Tresses collées", duration_minutes: 90, price_amount: 10000,
+      business_id: "33333333-3333-4333-8333-333333333333", businesses: { address: "", city: "Dakar", area: "", latitude: null, longitude: null },
+      services: { name: "Tresses", categories: { name: "Tresses" } } }],
+  }]) }));
+  await page.route("https://audit.supabase.co/rest/v1/provider_services**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.route("https://audit.supabase.co/rest/v1/social_feed**", (route) => {
-    requestedBatch = new URL(route.request().url()).searchParams.get("limit") ?? "";
+    const query = new URL(route.request().url()).searchParams;
+    if (query.get("select") === "*") requestedBatch = query.get("limit") ?? "";
     const base = {
       author_id: "11111111-1111-4111-8111-111111111111", thumbnail_url: null, duration_seconds: 18,
       view_count: 120, like_count: 32, comment_count: 4, save_count: 7, share_count: 2,
@@ -110,11 +119,45 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await expect(page.locator(".social-video-card")).toHaveCount(2, { timeout: 15_000 });
   expect(requestedBatch).toBe("8");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
-  await expect(page.getByText(/Prochain créneau/).first()).toBeVisible();
   await page.getByRole("button", { name: "Réserver", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Réserver", exact: true })).toBeVisible();
   await expect(page.getByText("Tresses collées", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Fermer" }).click();
+  const feedShell = page.locator(".social-feed-shell");
+  await expect(feedShell).toHaveAttribute("data-feed-mode", "immersive");
+  await page.getByRole("button", { name: "Afficher le mode Premium" }).click();
+  await expect(feedShell).toHaveAttribute("data-feed-mode", "premium");
+  const premiumPanel = page.locator(".feed-premium-panel").first();
+  await expect(premiumPanel.getByRole("button", { name: "Atelier Tresses" })).toBeVisible();
+  await expect(premiumPanel.getByRole("heading", { name: "Tresses collées" })).toBeVisible();
+  await expect(premiumPanel.getByText(/10\s?000/)).toBeVisible();
+  await expect(premiumPanel.getByText(/Prochain créneau/)).toBeVisible();
+  const panelLayout = await premiumPanel.evaluate((panel) => {
+    const header = document.querySelector(".social-feed-header")?.getBoundingClientRect();
+    const feed = document.querySelector(".social-feed");
+    const panelBox = panel.getBoundingClientRect();
+    const bottomNav = document.querySelector(".premium-bottom-nav")?.getBoundingClientRect();
+    const card = panel.closest(".social-video-card");
+    return { panelTop: panelBox.top, headerBottom: header?.bottom ?? 0, panelBottom: panelBox.bottom, navTop: bottomNav?.top ?? window.innerHeight,
+      feedPadding: feed ? getComputedStyle(feed).paddingTop : "missing", cardHeight: card?.getBoundingClientRect().height, viewportWidth: window.innerWidth,
+      panelPosition: getComputedStyle(panel).position, display: getComputedStyle(panel).display };
+  });
+  expect(panelLayout.panelTop, JSON.stringify(panelLayout)).toBeGreaterThanOrEqual(panelLayout.headerBottom);
+  expect(panelLayout.panelBottom, JSON.stringify(panelLayout)).toBeLessThanOrEqual(panelLayout.navTop);
+  const actionLayout = await premiumPanel.getByRole("button", { name: "Réserver", exact: true }).evaluate((button) => ({
+    buttonBottom: button.getBoundingClientRect().bottom, panelBottom: button.closest(".feed-premium-panel")!.getBoundingClientRect().bottom,
+    panelHeight: button.closest(".feed-premium-panel")!.getBoundingClientRect().height, viewportHeight: window.innerHeight,
+  }));
+  expect(actionLayout.buttonBottom, JSON.stringify(actionLayout)).toBeLessThanOrEqual(actionLayout.panelBottom);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("feed-premium.png") });
+  await premiumPanel.getByRole("button", { name: "Réserver", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Réserver", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Fermer" }).click();
+  await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
+  await page.getByRole("button", { name: "Afficher le mode immersif" }).click();
+  await expect(feedShell).toHaveAttribute("data-feed-mode", "immersive");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("mata-social-feed-mode"))).toBe("immersive");
   await page.getByRole("button", { name: "Mettre la vidéo en pause" }).first().click();
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(0);
   await page.getByRole("button", { name: "Lire la vidéo" }).first().click();
