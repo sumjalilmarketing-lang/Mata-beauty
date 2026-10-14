@@ -4,9 +4,11 @@ import { createServer } from "node:http";
 import { createClient } from "@supabase/supabase-js";
 import { browserAccount, browserLoginLink, finishFinalAcceptance, startFinalAcceptance } from "./final-acceptance-harness.mjs";
 
-const previewUrl = process.env.MATA_PREVIEW_URL ?? "https://mata-beauty-3bn126hnu-africrm.vercel.app/";
+const previewUrl = process.env.MATA_PREVIEW_URL ?? "http://127.0.0.1:3000/";
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 assert.ok(serviceKey, "SUPABASE_SERVICE_ROLE_KEY est requis");
+assert.equal(process.env.MATA_LOCAL_ACCEPTANCE_ONLY, "true", "Définir explicitement MATA_LOCAL_ACCEPTANCE_ONLY=true pour une recette isolée");
+assert.ok(["localhost", "127.0.0.1", "[::1]", "::1"].includes(new URL(previewUrl).hostname), "La recette locale doit cibler une application loopback");
 
 function localValue(name) {
   const source = readFileSync(".env.local", "utf8");
@@ -14,7 +16,10 @@ function localValue(name) {
   return match?.[1]?.trim().replace(/^['"]|['"]$/g, "");
 }
 
-const url = localValue("NEXT_PUBLIC_SUPABASE_URL") ?? "https://qjdwxdbvrxedyfolnpol.supabase.co";
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? localValue("NEXT_PUBLIC_SUPABASE_URL");
+assert.ok(url, "NEXT_PUBLIC_SUPABASE_URL est requis pour la recette locale");
+const hostname = new URL(url).hostname;
+assert.ok(["localhost", "127.0.0.1", "[::1]", "::1"].includes(hostname), "La recette locale doit cibler une adresse loopback");
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? localValue("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 assert.ok(anonKey, "NEXT_PUBLIC_SUPABASE_ANON_KEY est requis");
 
