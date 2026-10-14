@@ -1,4 +1,4 @@
-import { getSupabasePublicMediaClient } from "@/lib/supabase/client";
+import { getSupabaseBrowserClient, getSupabasePublicMediaClient } from "@/lib/supabase/client";
 import { publicProfessionalName } from "@/lib/domain/feed-presentation";
 
 export type FeedPost = {
@@ -58,5 +58,13 @@ export async function resolvePrivateMedia(row: SocialFeedRow): Promise<SocialFee
   const primary = privateItems[0];
   const signedThumbnail = primary?.thumbnail_path ? await usableSignedUrl(primary.bucket_id, primary.thumbnail_path) : null;
   return { ...row, video_url: signedMedia[0]!, thumbnail_url: signedThumbnail, media_urls: signedMedia.filter((url): url is string => Boolean(url)) };
+}
+
+export async function refreshFeedPostMedia(postId: string): Promise<SocialFeedRow | null> {
+  const client = getSupabaseBrowserClient();
+  if (!client) return null;
+  const { data, error } = await client.from("social_feed").select("*").eq("id", postId).abortSignal(AbortSignal.timeout(15000)).maybeSingle();
+  if (error || !data) return null;
+  return resolvePrivateMedia(data as SocialFeedRow);
 }
 
