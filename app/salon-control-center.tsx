@@ -10,8 +10,7 @@ import { TeamManagement, TeamAgenda } from "./team-management";
 
 type Business = { id: string; name: string; slug: string; description: string | null; phone: string | null; address: string; city: string; area: string | null; latitude: number | null; longitude: number | null; logo_url: string | null; cover_url: string | null; status: string; is_active: boolean; archived_at: string | null };
 type Service = { id: string; service_id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; currency: string; is_active: boolean; archived_at: string | null };
-type Collaborator = { id: string; display_name: string; title: string | null; internal_role: string; is_bookable: boolean; is_active: boolean; archived_at: string | null };
-type Invitation = { id: string; email: string; internal_role: string; status: string; expires_at: string };
+type Collaborator = { id: string; display_name: string; title: string | null; is_bookable: boolean; is_active: boolean; archived_at: string | null };
 type Booking = { id: string; starts_at: string; ends_at: string; status: string; total_amount: number; currency: string; collaborator_id: string | null; provider_service_id: string };
 type Hours = { id: string; weekday: number; opens_at: string | null; closes_at: string | null; is_closed: boolean };
 type Closure = { id: string; starts_at: string; ends_at: string; reason: string | null };
@@ -22,11 +21,10 @@ type Review = { id: string; rating: number; comment: string | null; provider_rep
 const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const supportedModules = new Set(["dashboard", "profile", "team", "services", "agenda", "bookings", "revenue", "statistics", "reviews", "portfolio", "settings"]);
 
-export function SalonControlCenter({ module, userId }: { module: WorkspaceModule; userId: string }) {
+export function SalonControlCenter({ module, userId, collaboratorAccessEnabled = false }: { module: WorkspaceModule; userId: string; collaboratorAccessEnabled?: boolean }) {
   const [business, setBusiness] = useState<Business | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [hours, setHours] = useState<Hours[]>([]);
   const [closures, setClosures] = useState<Closure[]>([]);
@@ -46,21 +44,20 @@ export function SalonControlCenter({ module, userId }: { module: WorkspaceModule
     if (error) { setState("error"); setFeedback(publicErrorMessage(error, "Le salon n’a pas pu être chargé.")); return; }
     const nextBusiness = businessData as Business | null; setBusiness(nextBusiness);
     const { data: catalogData } = await supabase.from("services").select("id,name").eq("is_active", true).order("name"); setCatalog((catalogData ?? []) as CatalogService[]);
-    if (!nextBusiness) { setServices([]); setCollaborators([]); setInvitations([]); setBookings([]); setHours([]); setClosures([]); setMedia([]); setState("ready"); return; }
-    const [serviceResult, collaboratorResult, invitationResult, bookingResult, hoursResult, closureResult, mediaResult, reviewResult] = await Promise.all([
+    if (!nextBusiness) { setServices([]); setCollaborators([]); setBookings([]); setHours([]); setClosures([]); setMedia([]); setState("ready"); return; }
+    const [serviceResult, collaboratorResult, bookingResult, hoursResult, closureResult, mediaResult, reviewResult] = await Promise.all([
       supabase.from("provider_services").select("id,service_id,title,description,duration_minutes,price_amount,currency,is_active,archived_at").eq("business_id", nextBusiness.id).is("archived_at", null).order("title"),
-      supabase.from("collaborators").select("id,display_name,title,internal_role,is_bookable,is_active,archived_at").eq("business_id", nextBusiness.id).is("archived_at", null).order("display_name"),
-      supabase.from("business_invitations").select("id,email,internal_role,status,expires_at").eq("business_id", nextBusiness.id).eq("status", "pending").order("created_at", { ascending: false }),
+      supabase.from(collaboratorAccessEnabled ? "collaborators_public" : "collaborators").select("id,display_name,title,is_bookable,is_active,archived_at").eq("business_id", nextBusiness.id).is("archived_at", null).order("display_name"),
       supabase.from("bookings").select("id,starts_at,ends_at,status,total_amount,currency,collaborator_id,provider_service_id").eq("business_id", nextBusiness.id).order("starts_at", { ascending: false }).limit(200),
       supabase.from("business_hours").select("id,weekday,opens_at,closes_at,is_closed").eq("business_id", nextBusiness.id).order("weekday"),
       supabase.from("business_closures").select("id,starts_at,ends_at,reason").eq("business_id", nextBusiness.id).order("starts_at"),
       supabase.from("business_media").select("id,storage_path,media_type,sort_order").eq("business_id", nextBusiness.id).order("sort_order"),
       supabase.from("reviews").select("id,rating,comment,provider_reply,created_at").eq("provider_id", userId).eq("is_visible", true).order("created_at", { ascending: false }),
     ]);
-    const firstError = [serviceResult, collaboratorResult, invitationResult, bookingResult, hoursResult, closureResult, mediaResult, reviewResult].find((result) => result.error)?.error;
+    const firstError = [serviceResult, collaboratorResult, bookingResult, hoursResult, closureResult, mediaResult, reviewResult].find((result) => result.error)?.error;
     if (firstError) { setState("error"); setFeedback(publicErrorMessage(firstError, "Certaines données du salon sont indisponibles.")); return; }
-    setServices((serviceResult.data ?? []) as Service[]); setCollaborators((collaboratorResult.data ?? []) as Collaborator[]); setInvitations((invitationResult.data ?? []) as Invitation[]); setBookings((bookingResult.data ?? []) as Booking[]); setHours((hoursResult.data ?? []) as Hours[]); setClosures((closureResult.data ?? []) as Closure[]); setMedia((mediaResult.data ?? []) as Media[]); setReviews((reviewResult.data ?? []) as Review[]); setState("ready");
-  }, [userId]);
+    setServices((serviceResult.data ?? []) as Service[]); setCollaborators((collaboratorResult.data ?? []) as Collaborator[]); setBookings((bookingResult.data ?? []) as Booking[]); setHours((hoursResult.data ?? []) as Hours[]); setClosures((closureResult.data ?? []) as Closure[]); setMedia((mediaResult.data ?? []) as Media[]); setReviews((reviewResult.data ?? []) as Review[]); setState("ready");
+  }, [userId, collaboratorAccessEnabled]);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
   const today = useMemo(() => bookings.filter((booking) => new Date(booking.starts_at).toDateString() === new Date().toDateString()), [bookings]);
@@ -116,7 +113,7 @@ export function SalonControlCenter({ module, userId }: { module: WorkspaceModule
 
   if (module.key === "services") return <section className="workspace-content"><SalonHero title="Prestations" description="Prix et durées sont enregistrés côté serveur et recopiés dans chaque réservation." />{feedback && <p className="salon-feedback" role="status">{feedback}</p>}<article className="workspace-panel salon-panel"><form className="salon-form" onSubmit={(event) => void addService(event)}><label>Prestation de référence<select name="serviceId" required defaultValue=""><option value="" disabled>Choisir</option>{catalog.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Nom public<input name="title" required minLength={2} maxLength={120} /></label><label>Durée (minutes)<input name="duration" type="number" min="15" max="720" step="15" required /></label><label>Prix (FCFA)<input name="price" type="number" min="0" max="10000000" required /></label><label className="wide">Description<textarea name="description" maxLength={2000} /></label><button className="salon-primary">Ajouter la prestation</button></form><div className="salon-list">{services.map((service) => <div key={service.id}><div><strong>{service.title}</strong><small>{service.duration_minutes} min · {money(service.price_amount)} · {service.is_active ? "Active" : "Inactive"}</small></div><button onClick={() => void toggleService(service)}>{service.is_active ? "Désactiver" : "Activer"}</button><button className="danger" onClick={() => void archiveService(service)}>Archiver</button></div>)}{services.length === 0 && <p>Aucune prestation. Ajoutez la première offre réservable.</p>}</div></article></section>;
 
-  if (module.key === "team") return <section className="workspace-content"><TeamManagement businessId={business.id} ownerId={userId} />{feedback && <p role="status">{feedback}</p>}<article className="workspace-panel salon-panel salon-invitation-notice"><span className="salon-eyebrow">Accès au compte</span><h3>Invitations des collaborateurs</h3><p>La gestion des fiches d’équipe et des horaires est disponible. L’envoi d’invitations donnant accès à un compte n’est pas activé : la Production ne fournit pas encore un parcours serveur complet d’acceptation, d’expiration et de révocation. Aucune invitation ne sera présentée comme envoyée tant que ce contrôle n’est pas déployé.</p>{invitations.length > 0 && <div className="salon-list">{invitations.map((item) => <div key={item.id}><div><strong>{item.email}</strong><small>Demande enregistrée · {item.internal_role} · échéance {new Date(item.expires_at).toLocaleDateString("fr-FR")}</small></div><span className="salon-status-pending">À vérifier</span></div>)}</div>}</article></section>;
+  if (module.key === "team") return <section className="workspace-content"><TeamManagement businessId={business.id} ownerId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />{feedback && <p role="status">{feedback}</p>}</section>;
 
   if (module.key === "agenda") return <section className="workspace-content"><TeamAgenda businessId={business.id} /><SalonHero title="Agenda du salon" description="Horaires réguliers, fermetures exceptionnelles et rendez-vous réels." />{feedback && <p className="salon-feedback" role="status">{feedback}</p>}<div className="salon-two-columns"><article className="workspace-panel salon-panel"><h3>Horaires d’ouverture</h3><form onSubmit={(event) => void saveHours(event)}>{days.map((day, weekday) => { const current = hours.find((item) => item.weekday === weekday); return <div className="hours-row" key={day}><strong>{day}</strong><input aria-label={`Ouverture ${day}`} name={`open-${weekday}`} type="time" defaultValue={current?.opens_at?.slice(0, 5) ?? "09:00"} /><input aria-label={`Fermeture ${day}`} name={`close-${weekday}`} type="time" defaultValue={current?.closes_at?.slice(0, 5) ?? "18:00"} /><label><input name={`closed-${weekday}`} type="checkbox" defaultChecked={current?.is_closed ?? weekday === 0} /> Fermé</label></div>; })}<button className="salon-primary">Enregistrer les horaires</button></form></article><article className="workspace-panel salon-panel"><h3>Fermetures exceptionnelles</h3><form className="salon-form" onSubmit={(event) => void addClosure(event)}><label>Début<input name="startsAt" type="datetime-local" required /></label><label>Fin<input name="endsAt" type="datetime-local" required /></label><label className="wide">Motif<input name="reason" maxLength={240} /></label><button className="salon-primary">Ajouter</button></form><div className="salon-list">{closures.map((item) => <div key={item.id}><div><strong>{item.reason || "Fermeture"}</strong><small>{date(item.starts_at)} → {date(item.ends_at)}</small></div><button onClick={() => void removeClosure(item.id)}>Retirer</button></div>)}</div></article></div></section>;
 

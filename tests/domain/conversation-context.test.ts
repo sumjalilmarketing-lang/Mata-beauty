@@ -6,9 +6,9 @@ vi.mock("../../lib/payments/server", () => ({ authenticatedSupabase: mocks.authe
 const bookingId = "a8c338c6-434d-42bb-916e-99a29f7e85ca";
 const request = () => new Request(`https://mata-beauty.com/api/bookings/conversation-context?booking=${bookingId}`);
 const booking = { client_id: "client", provider_id: "provider", starts_at: "2026-10-30T11:00:00Z", status: "confirmed" };
-function authenticate(id: string, data: typeof booking | null, error: object | null = null) {
+function authenticate(id: string, data: typeof booking | null, error: object | null = null, staffContext: object[] = []) {
   const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data, error }) };
-  mocks.authenticate.mockResolvedValue({ user: { id }, client: { from: () => query } });
+  mocks.authenticate.mockResolvedValue({ user: { id }, client: { from: () => query, rpc: vi.fn().mockResolvedValue({ data: staffContext, error: null }) } });
 }
 beforeEach(() => vi.resetAllMocks());
 describe("private conversation identity", () => {
@@ -43,5 +43,14 @@ describe("private conversation identity", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(await response.json()).toEqual({ name: "Salon Awa", startsAt: booking.starts_at, status: "confirmed" });
+  });
+  it("returns assigned staff context only through the permission-scoped RPC", async () => {
+    authenticate("staff", null, null, [{ ...booking, service_title: "Tresses" }]);
+    mocks.service.mockReturnValue({ from: () => ({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { display_name: "Client Test", first_name: null, last_name: null }, error: null }) }) }),
+    }) });
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ name: "Client Test", startsAt: booking.starts_at, status: "confirmed" });
   });
 });

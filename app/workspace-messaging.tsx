@@ -14,7 +14,7 @@ type BookingRow = {
   provider_services: { title: string | null } | null;
 };
 
-export function WorkspaceMessaging({ userId }: { userId: string }) {
+export function WorkspaceMessaging({ userId, staffMode = false, canReply = true }: { userId: string; staffMode?: boolean; canReply?: boolean }) {
   const requestedBooking = useSearchParams().get("booking");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [selected, setSelected] = useState<BookingRow | null>(null);
@@ -33,23 +33,24 @@ export function WorkspaceMessaging({ userId }: { userId: string }) {
       });
       return () => { active = false; };
     }
-    client
-      .from("bookings")
-      .select("id,starts_at,status,provider_services(title)")
-      .order("starts_at", { ascending: false })
-      .limit(100)
-      .then(({ data, error: bookingError }) => {
+    void (async () => {
+      const result = staffMode
+        ? await client.rpc("list_staff_message_bookings")
+        : await client.from("bookings").select("id,starts_at,status,provider_services(title)").order("starts_at", { ascending: false }).limit(100);
+      const { data, error: bookingError } = result;
         if (!active) return;
         if (bookingError) setError(publicErrorMessage(bookingError, "Impossible de charger vos conversations."));
         else {
-          const loaded = (data ?? []) as unknown as BookingRow[];
+          const loaded = staffMode
+            ? ((data ?? []) as { id: string; starts_at: string; status: string; service_title: string | null }[]).map(row => ({ id: row.id, starts_at: row.starts_at, status: row.status, provider_services: { title: row.service_title } }))
+            : (data ?? []) as unknown as BookingRow[];
           setBookings(loaded);
           if (requestedBooking) setSelected(loaded.find(booking => booking.id === requestedBooking) ?? null);
         }
         setLoading(false);
-      });
+    })();
     return () => { active = false; };
-  }, [requestedBooking]);
+  }, [requestedBooking, staffMode]);
 
   return <section className="workspace-content">
     <div className="workspace-intro">
@@ -71,6 +72,6 @@ export function WorkspaceMessaging({ userId }: { userId: string }) {
         <div className="appointment-actions"><button type="button" onClick={() => setSelected(booking)}>Messages</button></div>
       </div>)}
     </article>
-    {selected && <BookingMessages key={selected.id} bookingId={selected.id} serviceTitle={selected.provider_services?.title ?? "Prestation beauté"} userId={userId} onClose={() => setSelected(null)} />}
+    {selected && <BookingMessages key={selected.id} bookingId={selected.id} serviceTitle={selected.provider_services?.title ?? "Prestation beauté"} userId={userId} canReply={canReply} onClose={() => setSelected(null)} />}
   </section>;
 }

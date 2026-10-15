@@ -31,11 +31,13 @@ export function BookingMessages({
   bookingId,
   serviceTitle,
   userId,
+  canReply = true,
   onClose,
 }: {
   bookingId: string;
   serviceTitle: string;
   userId: string;
+  canReply?: boolean;
   onClose: () => void;
 }) {
   const supabase = getSupabaseBrowserClient();
@@ -288,11 +290,11 @@ export function BookingMessages({
         ))}
         {lastOwnMessage && <small className="read-receipt">{lastOwnMessageRead ? "Lu" : "Envoyé"}</small>}
       </div>
-      <form className="message-composer" onSubmit={(event) => void sendMessage(event)}>
+      {canReply ? <form className="message-composer" onSubmit={(event) => void sendMessage(event)}>
         <label className="sr-only" htmlFor="booking-message">Votre message</label>
         <textarea id="booking-message" name="message" required minLength={1} maxLength={4000} rows={2} placeholder="Écrire un message…" disabled={!conversationId || sending} />
         <button className="primary-button" type="submit" disabled={!conversationId || sending}>{sending ? "Envoi…" : "Envoyer"}</button>
-      </form>
+      </form> : <p className="salon-feedback">Accès en lecture seule : votre rôle ne permet pas de répondre.</p>}
     </article>
   );
 }

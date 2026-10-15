@@ -62,7 +62,8 @@ test("nearby uses commercial coordinates and excludes unknown locations (simulat
   await expect(page.getByText("Résultats dans un rayon de 25 km", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Voir les résultats", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(1);
-  await expect(page.locator(".social-video-card")).toContainText("Inspiration 1");
+  await expect(page.locator(".social-video-card")).toHaveAttribute("data-post-id", "00000000-0000-4000-8000-000000000000");
+  await expect(page.locator('.social-video-card img[alt="Inspiration 1"]')).toBeVisible();
 });
 
 test("nearby permission refusal offers a manual zone and keeps it in Explorer (simulated position)", async ({ page }) => {
@@ -110,13 +111,13 @@ test("desktop wheel reaches the feed from both the content and side margins", as
 
 test("authentication content and Google button fit inside the centered dialog", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Se connecter à MATA Beauty" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   const box = (await dialog.boundingBox())!;
   const viewport = page.viewportSize()!;
   expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThan(2);
-  for (const control of [page.getByRole("button", { name: "Continuer avec Google" }), page.getByLabel("Adresse e-mail"), page.getByLabel("Mot de passe"), page.getByRole("button", { name: "Se connecter", exact: true })]) {
+  for (const control of [page.getByRole("button", { name: "Continuer avec Google" }), page.getByLabel("Adresse e-mail"), page.locator('input[name="password"]'), page.getByRole("button", { name: "Se connecter", exact: true })]) {
     const bounds = (await control.boundingBox())!;
     expect(bounds.x).toBeGreaterThanOrEqual(box.x);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(box.x + box.width);
@@ -127,6 +128,13 @@ test("authentication content and Google button fit inside the centered dialog", 
   await page.getByRole("button", { name: "Créer le compte", exact: true }).scrollIntoViewIfNeeded();
   await expect(page.getByRole("button", { name: "Créer le compte", exact: true })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("collaborator invitations stay disabled and discard stale link tokens until the migration is enabled", async ({ page }) => {
+  await page.goto("/salon/invitation/accept#token=local-test-token-1234567890123456789012345678901234567890");
+  await expect(page.getByRole("heading", { name: "Rejoindre un salon" })).toBeVisible();
+  await expect(page.locator(".salon-invitation-accept").getByText("Les invitations collaborateur ne sont pas encore activées.")).toBeVisible();
+  await expect(page).toHaveURL(/\/salon\/invitation\/accept$/);
 });
 
 test("Explorer survives refresh and browser back", async ({ page }) => {

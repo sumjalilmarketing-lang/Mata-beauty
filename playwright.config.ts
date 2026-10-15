@@ -4,8 +4,9 @@ export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
   reporter: "list",
+  outputDir: ".next/playwright-results-pro-salon",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:3100",
     trace: "retain-on-failure",
   },
   projects: [
@@ -23,13 +24,14 @@ export default defineConfig({
     { name: "widescreen", use: { viewport: { width: 1920, height: 1080 } } },
   ],
   webServer: {
-    command: "node node_modules/next/dist/bin/next dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: true,
+    command: "node node_modules/next/dist/bin/next dev --port 3100",
+    url: "http://localhost:3100",
+    reuseExistingServer: false,
     timeout: 120_000,
     env: {
       NEXT_PUBLIC_SUPABASE_URL: "https://audit.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "audit-public-anon-key",
+      NEXT_PUBLIC_SALON_COLLABORATOR_ACCESS_ENABLED: "false",
     },
   },
 });

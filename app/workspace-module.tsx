@@ -12,7 +12,7 @@ import { ClientProfile } from "./client-profile";
 import { ProfessionalApplication } from "./professional-application";
 import { OnboardingQueue } from "./onboarding-queue";
 import { SalonControlCenter } from "./salon-control-center";
-import { ProviderTeamAgenda } from "./team-management";
+import { ProviderTeamAgenda, StaffAgenda, StaffServices } from "./team-management";
 import { WorkspaceMessaging } from "./workspace-messaging";
 import { LiveDashboard } from "./live-dashboard";
 import { SocialDashboard } from "./social-dashboard";
@@ -62,7 +62,7 @@ const moderationHistory: ResourceDefinition = { table: "moderation_actions", sel
 const financialHistory: ResourceDefinition = { table: "financial_audit_log", select: "id,action,transaction_reference,created_at", title: (row) => label(row.action), meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` };
 const refunds: ResourceDefinition = { table: "refunds", select: "id,payment_id,amount,status,reason,created_at", title: (row) => `${money(row.amount)} · ${label(row.status)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
 
-export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean }) {
+export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved, staffCanReply, staffCanManageBookings, collaboratorAccessEnabled = false }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean; staffCanReply: boolean; staffCanManageBookings: boolean; collaboratorAccessEnabled?: boolean }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const focused = (space === "pro" && ["dashboard", "services", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
   const supportInbox = (space === "support" && ["dashboard", "tickets", "unassigned", "mine", "priority", "escalations"].includes(module.key)) || (space === "operations" && module.key === "support") || (space === "admin" && module.key === "escalations");
@@ -73,7 +73,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const refundReview = ["finance", "admin"].includes(space) && module.key === "refunds";
   const deletionQueue = space === "admin" && module.key === "deletion-requests";
   const [notice, setNotice] = useState("");
-  const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
+  const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
     : space === "admin" && module.key === "alerts" ? fraudAlerts
     : space === "admin" && module.key === "security" ? resources.sessions
@@ -121,14 +121,18 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (module.key === "notifications") return <NotificationCenter userId={userId} />;
   if (focused) return <LiveDashboard role={space === "client" ? "client" : "provider"} userId={userId} displayName="" moduleKey={module.key} onBack={() => window.location.assign("/")} onSignOut={async () => { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/"); }} />;
   if (onboardingInbox) return <OnboardingQueue moduleKey={module.key === "onboarding" ? "dashboard" : module.key} />;
-  if (space === "pro" && module.key === "team") return <SalonControlCenter module={module} userId={userId} />;
+  if (space === "pro" && module.key === "team") return <SalonControlCenter module={module} userId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />;
   if (space === "pro" && module.key === "agenda") return <><ProviderTeamAgenda userId={userId} /><ProviderAgenda userId={userId} /></>;
   if (space === "pro" && module.key === "revenue") return <ProviderRevenue userId={userId} />;
   if (space === "client" && module.key === "favorites") return <ClientFavorites userId={userId} />;
   if (space === "client" && module.key === "inspirations") return <SocialDashboard role="client" userId={userId} />;
 
   if (space === "salon" && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
-  if (space === "salon" && module.key !== "videos") return <SalonControlCenter module={module} userId={userId} />;
+  if (space === "staff" && module.key === "messages") return <WorkspaceMessaging userId={userId} staffMode canReply={staffCanReply} />;
+  if (space === "staff" && ["agenda", "bookings"].includes(module.key)) return <StaffAgenda canManage={staffCanManageBookings} />;
+  if (space === "staff" && module.key === "dashboard") return <StaffAgenda canManage={staffCanManageBookings} />;
+  if (space === "staff" && module.key === "services") return <StaffServices />;
+  if (space === "salon" && module.key !== "videos") return <SalonControlCenter module={module} userId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />;
   if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;
   if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
   if (space === "client" && module.key === "profile") return <ClientProfile userId={userId} />;

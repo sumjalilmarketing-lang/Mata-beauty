@@ -383,13 +383,21 @@ test("private workspaces expose only functional controls and safe errors", async
 });
 
 test("salon workspace is connected, archived safely and protected by RLS", async () => {
-  const [center, route, migration, paymentUi] = await Promise.all([
+  const [center, route, migration, collaboratorMigration, team, teamApi, paymentUi] = await Promise.all([
     readFile(new URL("app/salon-control-center.tsx", root), "utf8"),
     readFile(new URL("app/workspace-route.tsx", root), "utf8"),
     readFile(new URL("supabase/migrations/20260815210000_salon_production_workflows.sql", root), "utf8"),
+    readFile(new URL("supabase/migrations/20261015001940_salon_collaborator_access.sql", root), "utf8"),
+    readFile(new URL("app/team-management.tsx", root), "utf8"),
+    readFile(new URL("app/api/salon/team/route.ts", root), "utf8"),
     readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
   ]);
-  for (const table of ["businesses", "business_hours", "business_closures", "business_invitations", "business_media", "collaborators", "provider_services", "bookings"]) assert.match(center, new RegExp(`from\\(\\"${table}\\"\\)`));
+  for (const table of ["businesses", "business_hours", "business_closures", "business_media", "provider_services", "bookings"]) assert.match(center, new RegExp(`from\\(\\"${table}\\"\\)`));
+  assert.match(center, /collaboratorAccessEnabled \? "collaborators_public" : "collaborators"/);
+  assert.match(teamApi, /owner_list_business_invitations/);
+  assert.match(team, /api\/salon\/team/);
+  assert.match(collaboratorMigration, /create policy "messages participant or authorized salon staff insert"/);
+  assert.match(collaboratorMigration, /interval '48 hours'/);
   assert.match(center, /archive_owned_business/);
   assert.match(center, /12 \* 1024 \* 1024/);
   assert.match(center, /image\/jpeg/);
@@ -403,14 +411,14 @@ test("salon workspace is connected, archived safely and protected by RLS", async
   assert.match(paymentUi, /Paiement de démonstration/);
 });
 
-test("professional and salon workspace keeps production limitations explicit", async () => {
+test("professional and salon workspace keeps production integrations explicit and safe", async () => {
   const [center, application, shell] = await Promise.all([
     readFile(new URL("app/salon-control-center.tsx", root), "utf8"),
     readFile(new URL("app/professional-application.tsx", root), "utf8"),
     readFile(new URL("app/workspace-shell.tsx", root), "utf8"),
   ]);
-  assert.match(center, /la Production ne fournit pas encore un parcours serveur complet/);
-  assert.doesNotMatch(center, /from\("business_invitations"\)\.insert/);
+  assert.match(center, /collaboratorAccessEnabled \? "collaborators_public" : "collaborators"/);
+  assert.doesNotMatch(center, /from\("business_invitations"\)/);
   assert.match(center, /200 rendez-vous les plus récents/);
   assert.match(center, /navigator\.geolocation\.getCurrentPosition/);
   assert.match(center, /Les deux doivent être renseignées ensemble/);
