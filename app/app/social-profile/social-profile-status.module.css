@@ -44,7 +44,7 @@
 .secondaryAction { border: 1px solid #8a536e; color: #5d1b3b; background: #fff; }
 .retryAction { color: #5d1b3b; background: #fbe8f0; }
 .actions a:focus-visible, .brand:focus-visible { outline: 3px solid #a20e50; outline-offset: 3px; }
-.footer { width: min(100%, 1120px); padding: 14px 0 2px; color: #58434f; text-align: center; font-size: 13px; line-height: 1.5; }
+.footer { width: min(100%, 1120px); padding: 14px 12px 8px; border-top: 1px solid #eadfe4; color: #58434f; background: #fff9fb; text-align: center; font-size: 13px; line-height: 1.5; }
 @media (max-width: 520px) {
   .header { min-height: 54px; }
   .privateLabel { max-width: 115px; text-align: right; font-size: 12px; }
