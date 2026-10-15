@@ -332,8 +332,34 @@ async function loadClient(lookup: string, viewerId: string | null): Promise<Publ
   };
 }
 
-export async function loadOwnClientSocialProfile(profileId: string) {
-  return loadClient(profileId, profileId);
+export type OwnClientSocialProfileStatus =
+  | "ready"
+  | "profile_missing"
+  | "not_client"
+  | "suspended"
+  | "load_failed"
+  | "profile_unavailable";
+
+export type OwnClientSocialProfileResult =
+  | { status: "ready"; profile: PublicSocialProfileData }
+  | { status: Exclude<OwnClientSocialProfileStatus, "ready">; profile: null };
+
+export async function loadOwnClientSocialProfile(profileId: string): Promise<OwnClientSocialProfileResult> {
+  try {
+    const { data, error } = await serviceSupabase().from("profiles")
+      .select("id,role,is_suspended").eq("id", profileId).maybeSingle();
+    if (error) return { status: "load_failed", profile: null };
+    if (!data) return { status: "profile_missing", profile: null };
+    const owner = data as { id: string; role: string; is_suspended: boolean };
+    if (owner.role !== "client") return { status: "not_client", profile: null };
+    if (owner.is_suspended) return { status: "suspended", profile: null };
+    const profile = await loadClient(profileId, profileId);
+    return profile
+      ? { status: "ready", profile }
+      : { status: "profile_unavailable", profile: null };
+  } catch {
+    return { status: "load_failed", profile: null };
+  }
 }
 
 export async function loadPublicSocialProfile(kind: SocialProfileKind, lookup: string, viewerId: string | null) {
