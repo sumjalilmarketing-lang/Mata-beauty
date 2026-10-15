@@ -274,11 +274,12 @@ async function loadSalon(lookup: string, viewerId: string | null): Promise<Publi
   };
 }
 
-async function loadClient(lookup: string, viewerId: string | null): Promise<PublicSocialProfileData | null> {
+async function loadClient(lookup: string, viewerId: string | null, ownerHasClientRole = false): Promise<PublicSocialProfileData | null> {
   const isOwnerId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookup) && viewerId === lookup;
   if (!isOwnerId && !/^[a-zA-Z0-9_]{3,30}$/.test(lookup)) return null;
   const client = serviceSupabase();
-  let query = client.from("profiles").select("id,username,display_name,avatar_url,bio,role,is_suspended").eq("role", "client");
+  let query = client.from("profiles").select("id,username,display_name,avatar_url,bio,role,is_suspended");
+  if (!(isOwnerId && ownerHasClientRole)) query = query.eq("role", "client");
   query = isOwnerId ? query.eq("id", lookup) : query.ilike("username", lookup);
   const { data, error } = await query.maybeSingle();
   if (error || !data || data.is_suspended) return null;
@@ -346,14 +347,18 @@ export type OwnClientSocialProfileResult =
 
 export async function loadOwnClientSocialProfile(profileId: string): Promise<OwnClientSocialProfileResult> {
   try {
-    const { data, error } = await serviceSupabase().from("profiles")
-      .select("id,role,is_suspended").eq("id", profileId).maybeSingle();
-    if (error) return { status: "load_failed", profile: null };
+    const client = serviceSupabase();
+    const [{ data, error }, { data: roles, error: rolesError }] = await Promise.all([
+      client.from("profiles").select("id,role,is_suspended").eq("id", profileId).maybeSingle(),
+      client.from("account_roles").select("role").eq("profile_id", profileId),
+    ]);
+    if (error || rolesError) return { status: "load_failed", profile: null };
     if (!data) return { status: "profile_missing", profile: null };
     const owner = data as { id: string; role: string; is_suspended: boolean };
-    if (owner.role !== "client") return { status: "not_client", profile: null };
     if (owner.is_suspended) return { status: "suspended", profile: null };
-    const profile = await loadClient(profileId, profileId);
+    const ownerHasClientRole = owner.role === "client" || (roles ?? []).some(row => row.role === "customer");
+    if (!ownerHasClientRole) return { status: "not_client", profile: null };
+    const profile = await loadClient(profileId, profileId, ownerHasClientRole);
     return profile
       ? { status: "ready", profile }
       : { status: "profile_unavailable", profile: null };
