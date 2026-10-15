@@ -130,6 +130,19 @@ test("authentication content and Google button fit inside the centered dialog", 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
+test("protected salon notice does not cover authentication branding on mobile or desktop", async ({ page }) => {
+  await page.goto("/?connexion=requise&returnTo=%2Fsalon");
+  const notice = page.getByRole("status").filter({ hasText: "Connectez-vous pour continuer vers votre espace." });
+  const brand = page.getByRole("dialog").locator(".auth-brand");
+  await expect(notice).toBeVisible();
+  await expect(brand).toBeVisible();
+  const noticeBox = await notice.boundingBox();
+  const brandBox = await brand.boundingBox();
+  expect(noticeBox).not.toBeNull();
+  expect(brandBox).not.toBeNull();
+  expect(noticeBox!.y + noticeBox!.height).toBeLessThanOrEqual(brandBox!.y);
+});
+
 test("collaborator invitations stay disabled and discard stale link tokens until the migration is enabled", async ({ page }) => {
   await page.goto("/salon/invitation/accept#token=local-test-token-1234567890123456789012345678901234567890");
   await expect(page.getByRole("heading", { name: "Rejoindre un salon" })).toBeVisible();
@@ -146,3 +159,4 @@ test("Explorer survives refresh and browser back", async ({ page }) => {
   await page.goBack();
   await expect(page.getByRole("navigation", { name: "Filtres du feed" })).toBeVisible();
 });
+
