@@ -147,6 +147,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
         {profile.kind === "client" ? profile.isOwner ? <>
           <Link className={styles.primaryButton} href="/app/settings">Modifier le profil</Link>
           <Link className={styles.secondaryButton} href="/app/bookings">Mes réservations</Link>
+          <Link className={styles.secondaryButton} href="/app/messages">Mes messages</Link>
         </> : <button className={styles.secondaryButton} type="button" onClick={() => void shareProfile()}>Partager</button> : <>
           {profile.services.length > 0 && <button className={styles.primaryButton} type="button" onClick={() => book(firstService!.id)}>Réserver</button>}
           <button className={styles.secondaryButton} type="button" onClick={() => setContactOpen(true)}>Contacter</button>
