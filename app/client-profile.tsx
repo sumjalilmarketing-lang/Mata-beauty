@@ -42,7 +42,7 @@ export function ClientProfile({ userId }: { userId: string }) {
       <div className="client-avatar">{profile.avatar_url ? <Image src={profile.avatar_url} alt="Photo de profil" width={88} height={88} unoptimized /> : <span aria-label="Initiales du profil">{initials}</span>}</div>
       <div><small>MON ESPACE PERSONNEL</small><h2>{name}</h2>{profile.bio && <p>{profile.bio}</p>}</div>
       <Link href="/app/settings#edit-client-profile">Modifier mon profil</Link>
-      {profile.username && <Link href={"/u/" + encodeURIComponent(profile.username)}>Voir mon profil social</Link>}
+      <Link href="/app/social-profile">Profil social</Link>
       <div className="client-profile-counts"><b>{counts.bookings}<small>Rendez-vous</small></b><b>{counts.saves}<small>Enregistrés</small></b></div>
     </article>
     <nav className="profile-shortcuts" aria-label="Mon activité">
