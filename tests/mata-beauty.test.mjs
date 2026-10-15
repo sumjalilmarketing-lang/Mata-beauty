@@ -427,6 +427,40 @@ test("professional and salon workspace keeps production integrations explicit an
   assert.match(shell, /workspace-\$\{space\}/);
 });
 
+test("public social profiles reuse approved production data and keep client identity private", async () => {
+  const [loader, professionalRoute, salonRoute, clientRoute, profileView, feed, conversationContext, mediaRoute] = await Promise.all([
+    readFile(new URL("lib/profiles/public-social-profile.ts", root), "utf8"),
+    readFile(new URL("app/professional/[username]/page.tsx", root), "utf8"),
+    readFile(new URL("app/salons/[slug]/page.tsx", root), "utf8"),
+    readFile(new URL("app/u/[username]/page.tsx", root), "utf8"),
+    readFile(new URL("app/public-social-profile.tsx", root), "utf8"),
+    readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
+    readFile(new URL("app/api/bookings/conversation-context/route.ts", root), "utf8"),
+    readFile(new URL("app/api/public/social-posts/[id]/media/route.ts", root), "utf8"),
+  ]);
+  assert.match(loader, /from\("provider_profiles"\)/);
+  assert.match(loader, /\.eq\("status", "approved"\)/);
+  assert.match(loader, /from\("businesses"\)/);
+  assert.match(loader, /from\("social_feed"\)/);
+  assert.match(loader, /createSignedUrl\(path, 3600\)/);
+  assert.match(loader, /profile_visibility !== "public"/);
+  assert.match(loader, /canShowCollections = isOwner \|\| privacy\?\.show_collections === true/);
+  assert.doesNotMatch(loader, /console\.(log|error)/);
+  assert.match(professionalRoute, /createSupabasePageClient/);
+  assert.match(salonRoute, /loadPublicSocialProfile\("salon"/);
+  assert.match(clientRoute, /loadPublicSocialProfile\("client"/);
+  assert.match(profileView, /toggle_follow_provider_from_post/);
+  assert.match(profileView, /\?service=/);
+  assert.match(profileView, /aria-modal="true"/);
+  assert.match(feed, /window\.location\.assign\("\/professional\/"/);
+  assert.match(conversationContext, /profilePath/);
+  assert.match(conversationContext, /profile_visibility === "public"/);
+  assert.match(mediaRoute, /from\("social_feed"\)/);
+  assert.match(mediaRoute, /createSignedUrl\(media\.storage_path, 3600\)/);
+  assert.match(mediaRoute, /\.eq\("post_type", "video"\)/);
+  assert.doesNotMatch(profileView, /SUPABASE_SERVICE_ROLE_KEY/);
+});
+
 test("release candidate automates scheduled posts and centralizes commissions", async () => {
   const [migration, schedule, vercel, admin] = await Promise.all([
     readFile(new URL("supabase/migrations/20260815200000_release_candidate_integrations.sql", root), "utf8"),
@@ -509,3 +543,4 @@ test("content security policy permits local blob previews in Studio", async () =
   assert.match(config, /img-src 'self' data: blob: https:/);
   assert.match(config, /media-src 'self' blob: https:\/\/\*\.supabase\.co/);
 });
+

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-type Profile = { first_name: string | null; last_name: string | null; display_name: string | null; avatar_url: string | null; bio: string | null };
+type Profile = { first_name: string | null; last_name: string | null; display_name: string | null; avatar_url: string | null; bio: string | null; username: string | null };
 export const applicationStatusLabels: Record<string, string> = {
   draft: "Votre dossier est en brouillon", profile_incomplete: "Complétez votre dossier",
   submitted: "Votre dossier a été envoyé", under_review: "Votre dossier est en cours d’examen",
@@ -23,7 +23,7 @@ export function ClientProfile({ userId }: { userId: string }) {
     if (!client) { setError(true); return; }
     setError(false);
     const [identity, application, bookings, saves] = await Promise.all([
-      client.from("profiles").select("first_name,last_name,display_name,avatar_url,bio").eq("id", userId).single(),
+      client.from("profiles").select("first_name,last_name,display_name,avatar_url,bio,username").eq("id", userId).single(),
       client.from("professional_onboarding").select("status").eq("provider_id", userId).maybeSingle(),
       client.from("bookings").select("id", { count: "exact", head: true }).eq("client_id", userId),
       client.from("post_saves").select("post_id", { count: "exact", head: true }).eq("profile_id", userId),
@@ -42,6 +42,7 @@ export function ClientProfile({ userId }: { userId: string }) {
       <div className="client-avatar">{profile.avatar_url ? <Image src={profile.avatar_url} alt="Photo de profil" width={88} height={88} unoptimized /> : <span aria-label="Initiales du profil">{initials}</span>}</div>
       <div><small>MON ESPACE PERSONNEL</small><h2>{name}</h2>{profile.bio && <p>{profile.bio}</p>}</div>
       <Link href="/app/settings#edit-client-profile">Modifier mon profil</Link>
+      {profile.username && <Link href={"/u/" + encodeURIComponent(profile.username)}>Voir mon profil social</Link>}
       <div className="client-profile-counts"><b>{counts.bookings}<small>Rendez-vous</small></b><b>{counts.saves}<small>Enregistrés</small></b></div>
     </article>
     <nav className="profile-shortcuts" aria-label="Mon activité">
@@ -57,3 +58,4 @@ export function ClientProfile({ userId }: { userId: string }) {
     <Link className="panel profile-settings-link" href="/app/settings">Paramètres et confidentialité →</Link>
   </section>;
 }
+

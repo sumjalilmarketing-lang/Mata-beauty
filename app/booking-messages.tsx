@@ -6,6 +6,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { statusLabel } from "@/lib/ui/status-label";
 import { MessageBubble } from "./message-bubble";
+import Link from "next/link";
 
 type MessageRow = {
   id: string;
@@ -49,7 +50,7 @@ export function BookingMessages({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(supabase ? "" : "Supabase n’est pas configuré.");
   const [refreshError, setRefreshError] = useState("");
-  const [context, setContext] = useState<{ name: string; startsAt: string; status: string } | null>(null);
+  const [context, setContext] = useState<{ name: string; startsAt: string; status: string; profilePath?: string | null } | null>(null);
   const [contextError, setContextError] = useState("");
   const sendingRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -66,7 +67,7 @@ export function BookingMessages({
         headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}` }, signal: controller.signal,
       });
       if (!response.ok) throw new Error("context_unavailable");
-      const value: { name: string; startsAt: string; status: string } = await response.json();
+      const value: { name: string; startsAt: string; status: string; profilePath?: string | null } = await response.json();
       if (!controller.signal.aborted) setContext(value);
     })().catch(() => {
       if (!controller.signal.aborted) setContextError("Les informations du rendez-vous sont momentanément indisponibles.");
@@ -272,7 +273,7 @@ export function BookingMessages({
   return (
     <article className="panel conversation-panel" id="booking-conversation" aria-labelledby="conversation-title">
       <div className="panel-heading">
-        <div><h2 id="conversation-title">{context?.name ?? "Messages"}</h2><small>{serviceTitle}</small>
+        <div><h2 id="conversation-title">{context?.name ?? "Messages"}</h2><small>{serviceTitle}</small>{context?.profilePath && <Link href={context.profilePath}>Voir le profil public</Link>}
           {context && <small className="conversation-context">{new Intl.DateTimeFormat("fr-SN", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(context.startsAt))} · {statusLabel(context.status)}</small>}
           {contextError && <small role="status">{contextError}</small>}
         </div>
@@ -298,3 +299,4 @@ export function BookingMessages({
     </article>
   );
 }
+

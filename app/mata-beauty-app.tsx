@@ -474,9 +474,9 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }
 
   function viewProvider(provider: Provider) {
-    setProfile(provider);
     const client = getSupabaseBrowserClient();
     if (client) void recordProductEvent(client, "provider_viewed", { provider_id: provider.profileId, category: provider.category });
+    window.location.assign("/professional/" + encodeURIComponent(provider.profileId));
   }
 
   async function openSocialProvider(authorId: string) {
@@ -1001,4 +1001,5 @@ function formatSlotLabel(slot: string) {
   const prefix = isToday(slot) ? "Aujourd’hui" : date.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", timeZone: "Africa/Dakar" });
   return `${prefix} à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" })}`;
 }
+
 

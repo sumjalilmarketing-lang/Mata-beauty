@@ -34,14 +34,22 @@ export async function GET(request: Request) {
   // is returned here, never email, phone, address or the rest of their profile.
   const service = serviceSupabase();
   const [profile, provider] = await Promise.all([
-    service.from("profiles").select("display_name,first_name,last_name").eq("id", otherId).maybeSingle(),
+    service.from("profiles").select("display_name,first_name,last_name,username,role").eq("id", otherId).maybeSingle(),
     !staffBooking && otherId === context.provider_id
-      ? service.from("provider_profiles").select("business_name").eq("profile_id", otherId).maybeSingle()
+      ? service.from("provider_profiles").select("business_name,slug,status").eq("profile_id", otherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ]);
   if (profile.error || provider.error) return Response.json({ error: "unavailable" }, { status: 503, headers });
   const name = provider.data?.business_name?.trim() || profile.data?.display_name?.trim()
     || [profile.data?.first_name, profile.data?.last_name].filter(Boolean).join(" ")
     || (otherId === context.provider_id ? "Professionnel" : "Client");
-  return Response.json({ name, startsAt: context.starts_at, status: context.status }, { headers });
+  let profilePath: string | null = null;
+  if (provider.data?.status === "approved" && provider.data.slug) {
+    profilePath = `/professional/${encodeURIComponent(provider.data.slug)}`;
+  } else if (profile.data?.role === "client" && profile.data.username) {
+    const privacy = await service.from("profile_privacy_settings").select("profile_visibility").eq("profile_id", otherId).maybeSingle();
+    if (!privacy.error && privacy.data?.profile_visibility === "public") profilePath = `/u/${encodeURIComponent(profile.data.username)}`;
+  }
+  return Response.json({ name, startsAt: context.starts_at, status: context.status, ...(profilePath ? { profilePath } : {}) }, { headers });
 }
+
