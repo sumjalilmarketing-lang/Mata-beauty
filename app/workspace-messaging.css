@@ -23,7 +23,7 @@
   padding: 18px; overflow: hidden; border: 1px solid var(--msg-line); border-radius: 16px;
   color: var(--msg-ink); background: var(--msg-surface); box-shadow: 0 12px 36px rgb(75 22 49 / 6%);
 }
-.messaging-workspace .conversation-inbox { display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+.messaging-workspace .conversation-inbox { display: flex; flex-direction: column; height: min(720px, calc(100dvh - 190px)); overflow-y: auto; overscroll-behavior: contain; }
 .messaging-workspace .conversation-inbox .panel-heading { position: sticky; top: -18px; z-index: 2; gap: 10px; margin: -18px -18px 14px; padding: 18px 18px 12px; background: var(--msg-surface); }
 .messaging-workspace .conversation-inbox .panel-heading h2 { margin: 0; color: var(--msg-ink); font-size: 19px; }
 .messaging-workspace .conversation-search { display: grid; gap: 7px; margin: 0 0 12px; color: var(--msg-muted); font-size: 13px; font-weight: 650; }
@@ -54,7 +54,7 @@
 .messaging-workspace .messaging-list-empty { padding: 20px 4px; color: var(--msg-muted); font-size: 13px; line-height: 1.55; }
 .messaging-workspace .conversation-thread { display: flex; min-width: 0; min-height: 0; flex-direction: column; }
 .messaging-workspace .conversation-thread > .conversation-panel {
-  display: flex; flex: 1; min-height: min(680px, calc(100dvh - 205px)); flex-direction: column; padding: 0;
+  display: flex; flex: 1; height: min(720px, calc(100dvh - 205px)); min-height: min(680px, calc(100dvh - 205px)); flex-direction: column; padding: 0;
 }
 .messaging-workspace .conversation-panel > .panel-heading {
   box-sizing: border-box; flex: none; min-height: 72px; margin: 0; padding: 14px 18px;
@@ -91,7 +91,7 @@
   min-width: 96px; min-height: 46px; border: 0; border-radius: 12px; color: #fff; background: var(--msg-pink); font-size: 14px;
 }
 .messaging-workspace .messaging-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px;
+  display: flex; height: min(720px, calc(100dvh - 190px)); flex-direction: column; align-items: center; justify-content: center; padding: 32px;
   text-align: center; background: radial-gradient(circle at 50% 44%, #fff0f6, #fff 58%);
 }
 .messaging-workspace .messaging-empty-icon {
@@ -107,9 +107,9 @@
   .messaging-workspace .messaging-columns { display: block; min-height: 0; }
   .messaging-workspace.has-conversation .conversation-inbox,
   .messaging-workspace .messaging-empty { display: none; }
-  .messaging-workspace .conversation-inbox { min-height: 65dvh; max-height: none; border-radius: 0; }
+  .messaging-workspace .conversation-inbox { height: auto; min-height: 65dvh; max-height: none; border-radius: 0; }
   .messaging-workspace .conversation-thread > .conversation-panel {
-    min-height: calc(100dvh - 155px); border-radius: 0;
+    height: calc(100dvh - 155px); min-height: calc(100dvh - 155px); border-radius: 0;
   }
   .messaging-workspace .conversation-panel .message-list { min-height: 36dvh; }
   .messaging-workspace.has-conversation .workspace-intro { display: none; }
