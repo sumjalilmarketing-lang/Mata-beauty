@@ -324,7 +324,7 @@ async function loadClient(lookup: string, viewerId: string | null): Promise<Publ
     followingCount = links.count ?? ids.length;
   }
   return {
-    kind: "client", id: profile.id, slug: profile.username, name: profile.display_name?.trim() || profile.username?.trim() || "Mon profil",
+    kind: "client", id: profile.id, slug: profile.username?.trim() || "client-" + profile.id.slice(0, 8), name: profile.display_name?.trim() || profile.username?.trim() || "Mon profil",
     handle: "@" + (profile.username?.trim() || "client-" + profile.id.slice(0, 8)), bio: profile.bio, city: null, area: null, address: null,
     avatarUrl: safeHttpUrl(profile.avatar_url), coverUrl: null, verified: false, specialties: [], rating: null, reviewCount: 0,
     followersCount: null, followingCount, videoCount: 0, favoritesCount, posts: [], favorites, following, services: [], reviews: [],
