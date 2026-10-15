@@ -26,4 +26,3 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
   return Response.json({ error: "unavailable" }, { status: 503, headers });
 }
-

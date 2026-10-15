@@ -58,4 +58,3 @@ export function ClientProfile({ userId }: { userId: string }) {
     <Link className="panel profile-settings-link" href="/app/settings">Paramètres et confidentialité →</Link>
   </section>;
 }
-

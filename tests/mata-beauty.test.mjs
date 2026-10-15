@@ -543,4 +543,3 @@ test("content security policy permits local blob previews in Studio", async () =
   assert.match(config, /img-src 'self' data: blob: https:/);
   assert.match(config, /media-src 'self' blob: https:\/\/\*\.supabase\.co/);
 });
-

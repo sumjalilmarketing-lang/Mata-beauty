@@ -222,4 +222,3 @@ function formatMoney(amount: number, currency: string | null) {
   try { return new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount); }
   catch { return amount.toLocaleString("fr-FR") + " " + currency; }
 }
-

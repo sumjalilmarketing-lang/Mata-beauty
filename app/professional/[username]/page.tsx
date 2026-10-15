@@ -30,4 +30,3 @@ export default async function ProfessionalPage({ params, searchParams }: { param
   if (!profile) notFound();
   return <PublicSocialProfile profile={profile} initialVideoId={(await searchParams)?.video ?? null} />;
 }
-

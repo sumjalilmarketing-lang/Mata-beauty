@@ -1002,4 +1002,3 @@ function formatSlotLabel(slot: string) {
   return `${prefix} à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" })}`;
 }
 
-

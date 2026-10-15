@@ -52,4 +52,3 @@ export async function GET(request: Request) {
   }
   return Response.json({ name, startsAt: context.starts_at, status: context.status, ...(profilePath ? { profilePath } : {}) }, { headers });
 }
-
