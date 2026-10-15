@@ -275,12 +275,14 @@ async function loadSalon(lookup: string, viewerId: string | null): Promise<Publi
 }
 
 async function loadClient(lookup: string, viewerId: string | null): Promise<PublicSocialProfileData | null> {
-  if (!/^[a-zA-Z0-9_]{3,30}$/.test(lookup)) return null;
+  const isOwnerId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookup) && viewerId === lookup;
+  if (!isOwnerId && !/^[a-zA-Z0-9_]{3,30}$/.test(lookup)) return null;
   const client = serviceSupabase();
-  const { data, error } = await client.from("profiles").select("id,username,display_name,avatar_url,bio,role,is_suspended")
-    .ilike("username", lookup).eq("role", "client").maybeSingle();
+  let query = client.from("profiles").select("id,username,display_name,avatar_url,bio,role,is_suspended").eq("role", "client");
+  query = isOwnerId ? query.eq("id", lookup) : query.ilike("username", lookup);
+  const { data, error } = await query.maybeSingle();
   if (error || !data || data.is_suspended) return null;
-  const profile = data as { id: string; username: string; display_name: string | null; avatar_url: string | null; bio: string | null; role: string; is_suspended: boolean };
+  const profile = data as { id: string; username: string | null; display_name: string | null; avatar_url: string | null; bio: string | null; role: string; is_suspended: boolean };
   const isOwner = viewerId === profile.id;
   const privacyResult = await client.from("profile_privacy_settings").select("profile_visibility,show_collections,show_follows")
     .eq("profile_id", profile.id).maybeSingle();
@@ -322,12 +324,16 @@ async function loadClient(lookup: string, viewerId: string | null): Promise<Publ
     followingCount = links.count ?? ids.length;
   }
   return {
-    kind: "client", id: profile.id, slug: profile.username, name: profile.display_name?.trim() || profile.username,
-    handle: "@" + profile.username, bio: profile.bio, city: null, area: null, address: null,
+    kind: "client", id: profile.id, slug: profile.username, name: profile.display_name?.trim() || profile.username?.trim() || "Mon profil",
+    handle: "@" + (profile.username?.trim() || "client-" + profile.id.slice(0, 8)), bio: profile.bio, city: null, area: null, address: null,
     avatarUrl: safeHttpUrl(profile.avatar_url), coverUrl: null, verified: false, specialties: [], rating: null, reviewCount: 0,
     followersCount: null, followingCount, videoCount: 0, favoritesCount, posts: [], favorites, following, services: [], reviews: [],
     salon: null, isOwner, canShowFollows, canShowCollections,
   };
+}
+
+export async function loadOwnClientSocialProfile(profileId: string) {
+  return loadClient(profileId, profileId);
 }
 
 export async function loadPublicSocialProfile(kind: SocialProfileKind, lookup: string, viewerId: string | null) {
