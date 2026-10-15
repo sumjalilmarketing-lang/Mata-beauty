@@ -442,6 +442,9 @@ test("public social profiles reuse approved production data and keep client iden
   assert.match(loader, /\.eq\("status", "approved"\)/);
   assert.match(loader, /from\("businesses"\)/);
   assert.match(loader, /from\("social_feed"\)/);
+  assert.match(loader, /function publicHandle\(/);
+  assert.match(loader, /handle: publicHandle\(identity\.data\?\.username, provider\.business_name\)/);
+  assert.match(loader, /handle: publicHandle\(business\.slug, business\.name\)/);
   assert.match(loader, /createSignedUrl\(path, 3600\)/);
   assert.match(loader, /profile_visibility !== "public"/);
   assert.match(loader, /canShowCollections = isOwner \|\| privacy\?\.show_collections === true/);

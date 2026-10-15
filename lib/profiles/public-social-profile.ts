@@ -104,6 +104,13 @@ function safeHttpUrl(value: string | null | undefined) {
   }
 }
 
+function publicHandle(candidate: string | null | undefined, displayName: string) {
+  const normalized = candidate?.trim();
+  if (normalized && !/^(?:provider|salon|business)-[0-9a-f-]{12,}$/i.test(normalized)) return "@" + normalized;
+  const fallback = displayName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return "@" + (fallback || "mata-beauty");
+}
+
 function mediaPathFromUrl(value: string | null | undefined) {
   if (!value) return null;
   try {
@@ -223,7 +230,7 @@ async function loadProfessional(lookup: string, viewerId: string | null): Promis
   const salon = businessResult.data as SocialProfileLink | null;
   return {
     kind: "professional", id: provider.profile_id, slug: provider.slug, name: provider.business_name,
-    handle: identity.data?.username ? "@" + identity.data.username : "@" + provider.slug,
+    handle: publicHandle(identity.data?.username, provider.business_name),
     bio: provider.bio, city: provider.city, area: null, address: null,
     avatarUrl: safeHttpUrl(identity.data?.avatar_url), coverUrl: safeHttpUrl(provider.cover_url),
     verified: Boolean(provider.verified_at), specialties,
@@ -255,7 +262,7 @@ async function loadSalon(lookup: string, viewerId: string | null): Promise<Publi
     specialtiesFor(provider.profile_id),
   ]);
   return {
-    kind: "salon", id: provider.profile_id, slug: business.slug, name: business.name, handle: "@" + business.slug,
+    kind: "salon", id: provider.profile_id, slug: business.slug, name: business.name, handle: publicHandle(business.slug, business.name),
     bio: business.description, city: business.city, area: business.area, address: business.address,
     avatarUrl: safeHttpUrl(business.logo_url), coverUrl: safeHttpUrl(business.cover_url), verified: Boolean(provider.verified_at), specialties,
     rating: Number(provider.average_rating) || 0, reviewCount: Number(provider.review_count) || 0,
