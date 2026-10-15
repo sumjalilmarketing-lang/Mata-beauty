@@ -615,7 +615,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   return (
     <main className="premium-mobile-app" data-theme={theme}>
       {showSplash && <div className="mata-splash" role="status" aria-label="Ouverture de Mata Beauty"><Image src="/brand/mata-app-icon.webp" alt="" width={172} height={172} priority unoptimized /><strong>MATA</strong><span>BEAUTY</span><i /></div>}
-      {notice && <div className="toast" role="status">{notice}</div>}
+      {notice && <div className={authRequest ? "toast toast-auth" : "toast"} role="status">{notice}</div>}
       <div className="premium-app-frame">
         {screen === "feed" ? <SocialFeed
           location={feedLocation}
@@ -1001,3 +1001,4 @@ function formatSlotLabel(slot: string) {
   const prefix = isToday(slot) ? "Aujourd’hui" : date.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", timeZone: "Africa/Dakar" });
   return `${prefix} à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" })}`;
 }
+
