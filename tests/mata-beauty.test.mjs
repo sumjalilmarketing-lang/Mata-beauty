@@ -428,11 +428,12 @@ test("professional and salon workspace keeps production integrations explicit an
 });
 
 test("public social profiles reuse approved production data and keep client identity private", async () => {
-  const [loader, professionalRoute, salonRoute, clientRoute, profileView, feed, conversationContext, mediaRoute] = await Promise.all([
+  const [loader, professionalRoute, salonRoute, clientRoute, ownerRoute, profileView, feed, conversationContext, mediaRoute] = await Promise.all([
     readFile(new URL("lib/profiles/public-social-profile.ts", root), "utf8"),
     readFile(new URL("app/professional/[username]/page.tsx", root), "utf8"),
     readFile(new URL("app/salons/[slug]/page.tsx", root), "utf8"),
     readFile(new URL("app/u/[username]/page.tsx", root), "utf8"),
+    readFile(new URL("app/app/social-profile/page.tsx", root), "utf8"),
     readFile(new URL("app/public-social-profile.tsx", root), "utf8"),
     readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
     readFile(new URL("app/api/bookings/conversation-context/route.ts", root), "utf8"),
@@ -452,6 +453,9 @@ test("public social profiles reuse approved production data and keep client iden
   assert.match(professionalRoute, /createSupabasePageClient/);
   assert.match(salonRoute, /loadPublicSocialProfile\("salon"/);
   assert.match(clientRoute, /loadPublicSocialProfile\("client"/);
+  assert.match(ownerRoute, /auth\.auth\.getUser\(\)/);
+  assert.match(ownerRoute, /loadOwnClientSocialProfile/);
+  assert.match(loader, /viewerId === lookup/);
   assert.match(profileView, /toggle_follow_provider_from_post/);
   assert.match(profileView, /\?service=/);
   assert.match(profileView, /aria-modal="true"/);
