@@ -105,7 +105,7 @@ export function TeamManagement({ businessId, ownerId }: { businessId: string; ow
   }
   if (loading) return <p role="status">Chargement de l’équipe…</p>;
   return <div className="team-management">
-    <header><h2>Mon équipe</h2><p>Les fiches collaborateurs ne créent aucun compte de connexion. Les horaires sont affichés à l’heure du Sénégal.</p></header>
+    <header><h2>Mon équipe</h2><p>Ces fiches servent aux prestations, aux horaires et aux réservations. Elles ne créent pas de compte de connexion et ne donnent aucun accès au salon. Les invitations Auth et les permissions collaborateurs ne sont pas activées tant que leur contrôle serveur n’est pas disponible en Production. Les horaires sont affichés à l’heure du Sénégal.</p></header>
     {message && <p className="salon-feedback" role="status">{message}</p>}
     <div className="team-toolbar"><button disabled={busy} className="salon-primary" onClick={() => { savedMemberId.current = null; setSelected(null); setEditing(true); }}>Ajouter un employé</button>
       <button disabled={busy} onClick={() => void mutate(async () => { const result = await api().rpc("set_team_booking_enabled", { target_business_id: businessId, enabled: !enabled }); if (result.error) throw result.error; }, enabled ? "Réservation par équipe désactivée." : "Réservation par équipe activée.")}>{enabled ? "Désactiver la réservation par équipe" : "Activer la réservation par équipe"}</button></div>

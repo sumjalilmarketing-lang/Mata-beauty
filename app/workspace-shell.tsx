@@ -47,7 +47,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
     router.refresh();
   }
 
-  return <div className="workspace-layout">
+  return <div className={`workspace-layout workspace-${space}`}>
     <aside className="workspace-sidebar">
       <Link className="workspace-brand" href="/"><span>M</span><strong>Mata Beauty</strong></Link>
       <label className="workspace-space-picker">

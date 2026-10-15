@@ -403,6 +403,22 @@ test("salon workspace is connected, archived safely and protected by RLS", async
   assert.match(paymentUi, /Paiement de démonstration/);
 });
 
+test("professional and salon workspace keeps production limitations explicit", async () => {
+  const [center, application, shell] = await Promise.all([
+    readFile(new URL("app/salon-control-center.tsx", root), "utf8"),
+    readFile(new URL("app/professional-application.tsx", root), "utf8"),
+    readFile(new URL("app/workspace-shell.tsx", root), "utf8"),
+  ]);
+  assert.match(center, /la Production ne fournit pas encore un parcours serveur complet/);
+  assert.doesNotMatch(center, /from\("business_invitations"\)\.insert/);
+  assert.match(center, /200 rendez-vous les plus récents/);
+  assert.match(center, /navigator\.geolocation\.getCurrentPosition/);
+  assert.match(center, /Les deux doivent être renseignées ensemble/);
+  assert.match(application, /avatars"\)\.upload/);
+  assert.match(application, /L’accès professionnel sera activé après approbation/);
+  assert.match(shell, /workspace-\$\{space\}/);
+});
+
 test("release candidate automates scheduled posts and centralizes commissions", async () => {
   const [migration, schedule, vercel, admin] = await Promise.all([
     readFile(new URL("supabase/migrations/20260815200000_release_candidate_integrations.sql", root), "utf8"),
