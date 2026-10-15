@@ -464,6 +464,8 @@ test("public social profiles reuse approved production data and keep client iden
   assert.match(statusStyles, /color: #20151b/);
   assert.match(statusStyles, /background: #fff9fb/);
   assert.match(loader, /status: "profile_missing"/);
+  assert.match(loader, /from\("account_roles"\)/);
+  assert.match(loader, /owner\.role === "client" \|\| \(roles \?\? \[\]\)\.some\(row => row\.role === "customer"\)/);
   assert.match(loader, /status: "not_client"/);
   assert.match(loader, /status: "load_failed"/);
   assert.match(loader, /viewerId === lookup/);
