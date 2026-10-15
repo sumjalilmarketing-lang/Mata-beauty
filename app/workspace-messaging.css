@@ -34,12 +34,13 @@
 .messaging-workspace .conversation-search input::placeholder { color: #65545e; opacity: 1; }
 .messaging-workspace .conversation-list { min-width: 0; }
 .messaging-workspace .messaging-conversation-row {
-  box-sizing: border-box; display: grid; width: 100%; min-height: 82px; grid-template-columns: 46px minmax(0,1fr) auto;
+  box-sizing: border-box; display: grid; width: 100%; min-height: 82px; grid-template-columns: 46px minmax(0,1fr) auto auto;
   align-items: center; gap: 11px; padding: 12px 8px; border: 0; border-top: 1px solid var(--msg-line);
   color: var(--msg-ink); background: #fff; text-align: left; font: inherit; cursor: pointer; transition: background-color .16s ease;
 }
 .messaging-workspace .messaging-conversation-row:hover { background: var(--msg-canvas); }
 .messaging-workspace .messaging-conversation-row[aria-current="true"] { border-left: 3px solid var(--msg-pink); padding-left: 5px; background: var(--msg-pink-soft); }
+.messaging-workspace .messaging-open-button { min-height: 40px; padding: 7px 10px; border: 1px solid var(--msg-line); border-radius: 10px; color: #fff; background: var(--msg-pink); font-size: 12px; font-weight: 700; }
 .messaging-workspace .messaging-conversation-row:focus-visible { position: relative; z-index: 1; outline: 3px solid var(--msg-pink); outline-offset: -3px; }
 .messaging-workspace .conversation-date-avatar { width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid #f1d3e0; border-radius: 50%; color: var(--msg-pink); background: var(--msg-pink-soft); font-size: 18px; }
 .messaging-workspace .conversation-row-copy { min-width: 0; }
@@ -118,7 +119,7 @@
   .messaging-workspace .messaging-columns { gap: 0; }
   .messaging-workspace .conversation-inbox { padding: 12px; }
   .messaging-workspace .conversation-inbox .panel-heading { top: -12px; margin: -12px -12px 12px; padding: 12px; }
-  .messaging-workspace .messaging-conversation-row { grid-template-columns: 42px minmax(0,1fr) auto; gap: 9px; padding: 11px 7px; }
+  .messaging-workspace .messaging-conversation-row { grid-template-columns: 42px minmax(0,1fr) auto auto; gap: 9px; padding: 11px 7px; }
   .messaging-workspace .conversation-date-avatar { width: 42px; height: 42px; }
   .messaging-workspace .conversation-panel > .panel-heading { min-height: 62px; padding: 10px 12px; }
   .messaging-workspace .conversation-panel .message-list { padding: 16px 12px; }
