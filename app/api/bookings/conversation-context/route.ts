@@ -17,6 +17,9 @@ export async function GET(request: Request) {
   if (error) return Response.json({ error: "unavailable" }, { status: 503, headers });
   let staffBooking: BookingContext | null = null;
   if (!booking || ![booking.client_id, booking.provider_id].includes(auth.user.id)) {
+    if (process.env.NEXT_PUBLIC_SALON_COLLABORATOR_ACCESS_ENABLED !== "true") {
+      return Response.json({ error: "not_found" }, { status: 404, headers });
+    }
     const staff = await auth.client.rpc("get_staff_booking_context", { target_booking_id: bookingId });
     const result = Array.isArray(staff.data) ? staff.data[0] as BookingContext | undefined : null;
     if (staff.error || !result) return Response.json({ error: "not_found" }, { status: 404, headers });
