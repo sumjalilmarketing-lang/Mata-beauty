@@ -347,6 +347,63 @@
 .conversation-panel .panel-heading small { display: block; font-size: 13px; line-height: 1.6; }
 .conversation-panel .panel-heading button { min-width: 64px; min-height: 44px; flex-shrink: 0; }
 .support-thread .message-list { margin-top: 12px; }
+.messaging-shell {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: min(720px, 78dvh);
+  padding: 0;
+  overflow: hidden;
+  border-color: #d9c8d2;
+  background: #fff;
+}
+.messaging-sidebar { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-right: 1px solid #d9c8d2; background: #fff; }
+.messaging-sidebar-heading { min-height: 62px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e7dce2; }
+.messaging-sidebar-heading h3 { margin: 0; color: #311c29; font-size: 17px; }
+.messaging-sidebar-heading > span { min-width: 28px; min-height: 28px; display: grid; place-items: center; border-radius: 50%; background: #fce6f0; color: #771344; font-size: 12px; font-weight: 800; }
+.messaging-search { margin: 12px 14px; min-height: 44px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border: 1px solid #c8b6c0; border-radius: 12px; background: #fffafd; color: #5c3c4e; }
+.messaging-search > span { font-size: 22px; line-height: 1; }
+.messaging-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #291822; font: inherit; font-size: 14px; }
+.messaging-contact-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.messaging-contact { width: 100%; min-height: 76px; padding: 11px 14px; display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 11px; border: 0; border-bottom: 1px solid #eee5ea; background: #fff; color: #291822; text-align: left; cursor: pointer; }
+.messaging-contact:hover { background: #fff8fb; }
+.messaging-contact.selected { border-left: 4px solid #c51560; padding-left: 10px; background: #fceaf2; }
+.messaging-contact:focus-visible { outline: 3px solid #a51b59; outline-offset: -3px; }
+.messaging-avatar { width: 48px; height: 48px; overflow: hidden; display: grid; place-items: center; border-radius: 50%; background: #f5dce8; color: #65103d; font-size: 18px; font-weight: 800; }
+.messaging-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.messaging-contact-copy { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.messaging-contact-copy strong { overflow: hidden; color: #291822; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.messaging-contact-copy small { overflow: hidden; color: #574651; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.messaging-contact-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; color: #574651; font-size: 11px; white-space: nowrap; }
+.messaging-contact-meta small { color: #714d60; font-size: 10px; }
+.messaging-thread-area { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #fffafd; }
+.messaging-thread-area > .conversation-panel { width: 100%; min-height: 0; flex: 1; display: flex; flex-direction: column; margin: 0; padding: 18px; border: 0; border-radius: 0; box-shadow: none; background: #fffafd; }
+.messaging-thread-area .conversation-panel .message-list { min-height: 0; max-height: none; flex: 1; margin-top: 12px; background: #fffafd; }
+.messaging-thread-area .conversation-panel .panel-heading h2 { color: #291822; font-size: 20px; }
+.messaging-thread-area .conversation-panel .panel-heading small { color: #574651; }
+.messaging-mobile-heading { display: none; }
+.conversation-appointments { margin-top: 8px; color: #492b3d; font-size: 13px; }
+.conversation-appointments summary { min-height: 42px; display: flex; align-items: center; cursor: pointer; font-weight: 700; }
+.conversation-appointments ul { margin: 0; padding: 0 0 8px 20px; color: #574651; line-height: 1.6; }
+.message-day-separator { align-self: center; margin: 5px 0; padding: 5px 12px; border: 1px solid #d9c8d2; border-radius: 999px; background: #fff; color: #574651; font-size: 11px; }
+.messaging-empty-state { max-width: 380px; margin: auto; padding: 34px; text-align: center; color: #574651; }
+.messaging-empty-state > span { width: 62px; height: 62px; margin: 0 auto 15px; display: grid; place-items: center; border-radius: 50%; background: #fce6f0; color: #85124f; font-size: 28px; }
+.messaging-empty-state h3 { color: #291822; font-size: 21px; }
+.messaging-empty-state p { line-height: 1.6; }
+@media (max-width: 767px) {
+  .messaging-shell { display: block; min-height: 70dvh; overflow: hidden; }
+  .messaging-sidebar { min-height: 70dvh; border-right: 0; }
+  .messaging-workspace.has-selection .messaging-sidebar { display: none; }
+  .messaging-thread-area { min-height: 70dvh; }
+  .messaging-workspace:not(.has-selection) .messaging-thread-area { display: none; }
+  .messaging-mobile-heading { min-height: 54px; padding: 5px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #d9c8d2; background: #fff; color: #291822; }
+  .messaging-mobile-heading button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: #711343; font-size: 25px; }
+  .messaging-thread-area > .conversation-panel { min-height: 0; padding: 10px; }
+  .messaging-thread-area .conversation-panel > .panel-heading { display: none; }
+  .messaging-thread-area .conversation-panel .message-list { max-height: none; min-height: 240px; }
+  .messaging-contact { min-height: 74px; }
+}
 @media (max-width: 767px) {
   :is(.conversation-panel, .support-thread) .message-composer { grid-template-columns: minmax(0, 1fr); }
   :is(.conversation-panel, .support-thread) .message-composer .primary-button { width: 100%; }

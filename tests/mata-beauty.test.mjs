@@ -266,6 +266,28 @@ test("booking conversations are participant-only, realtime, paginated, and read-
   assert.doesNotMatch(messages + dashboard, /SUPABASE_SERVICE_ROLE_KEY/);
 });
 
+test("stable booking inbox groups private threads by participant identity without merging groups", async () => {
+  const [grouping, inbox, messages, context] = await Promise.all([
+    readFile(new URL("lib/messaging/group-booking-conversations.ts", root), "utf8"),
+    readFile(new URL("app/workspace-messaging.tsx", root), "utf8"),
+    readFile(new URL("app/booking-messages.tsx", root), "utf8"),
+    readFile(new URL("app/api/bookings/conversation-context/route.ts", root), "utf8"),
+  ]);
+  assert.match(grouping, /participant:\$\{participantId\}/);
+  assert.match(grouping, /members\.length === 2/);
+  assert.match(grouping, /conversation:\$\{conversation\?\.id/);
+  assert.match(inbox, /select\("id,client_id,provider_id,starts_at,status,provider_services\(title\)"\)/);
+  assert.match(inbox, /conversation_members/);
+  assert.match(inbox, /bookings=\$\{allBookingIds\.join\(","\)\}/);
+  assert.match(inbox, /Aucun message/);
+  assert.match(messages, /\.in\("conversation_id", ids\)/);
+  assert.match(messages, /markRead\(ids\)/);
+  assert.match(messages, /message-day-separator/);
+  assert.match(context, /\.filter\(row => \[row\.client_id, row\.provider_id\]\.includes\(auth\.user\.id\)\)/);
+  assert.match(context, /bookingIds\.length > 100/);
+  assert.doesNotMatch(inbox + messages, /list_my_conversations_page|get_my_conversation/);
+});
+
 test("the audit hardening keeps identity verification, booking prices, and sandbox activation server-owned", async () => {
   const [migration, releaseRoute, createRoute, refundRoute, webhookRoute, paymentServer, capabilitiesRoute, gateway, app] = await Promise.all([
     readFile(new URL("supabase/migrations/20260804160000_full_audit_security_fixes.sql", root), "utf8"),
@@ -474,7 +496,7 @@ test("public social profiles reuse approved production data and keep client iden
   assert.match(profileView, /aria-modal="true"/);
   assert.match(feed, /window\.location\.assign\("\/professional\/"/);
   assert.match(conversationContext, /profilePath/);
-  assert.match(conversationContext, /profile_visibility === "public"/);
+  assert.match(conversationContext, /privacy\.get\(participantId\) === "public"/);
   assert.match(mediaRoute, /from\("social_feed"\)/);
   assert.match(mediaRoute, /createSignedUrl\(media\.storage_path, 3600\)/);
   assert.match(mediaRoute, /\.eq\("post_type", "video"\)/);
