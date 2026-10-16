@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { PublicSocialProfileData, SocialProfilePost } from "@/lib/profiles/public-social-profile";
+import { SocialProfileVideoFrame } from "./social-profile-video-frame";
 import styles from "./public-social-profile.module.css";
 
 type TabKey = "videos" | "favorites" | "services" | "reviews" | "following";
@@ -22,6 +23,9 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
       : "/professional/" + encodeURIComponent(profile.slug);
   const posts = tab === "favorites" ? profile.favorites : profile.posts;
   const firstService = profile.services[0];
+  const selectedVideoService = selectedVideo?.serviceId
+    ? profile.services.find(service => service.id === selectedVideo.serviceId)
+    : undefined;
   const initials = useMemo(() => profile.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "M", [profile.name]);
 
   useEffect(() => {
@@ -64,9 +68,13 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
     try {
       const response = await fetch(`/api/public/social-posts/${encodeURIComponent(selectedVideo.id)}/media`, { cache: "no-store" });
       if (!response.ok) throw new Error("refresh_failed");
-      const refreshed: { videoUrl?: string } = await response.json();
+      const refreshed: { videoUrl?: string; thumbnailUrl?: string | null } = await response.json();
       if (!refreshed.videoUrl) throw new Error("refresh_failed");
-      setSelectedVideo(current => current?.id === selectedVideo.id ? { ...current, videoUrl: refreshed.videoUrl! } : current);
+      setSelectedVideo(current => current?.id === selectedVideo.id ? {
+        ...current,
+        videoUrl: refreshed.videoUrl!,
+        thumbnailUrl: refreshed.thumbnailUrl ?? current.thumbnailUrl,
+      } : current);
     } catch {
       setNotice("Cette vidéo est momentanément indisponible. Réessayez dans un instant.");
     } finally { setVideoRenewing(false); }
@@ -185,7 +193,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
     </section>}
     {(tab === "videos" || tab === "favorites") && <section className={styles.videoGrid} aria-label={tab === "favorites" ? "Vidéos favorites" : "Publications vidéo"}>
       {posts.map(post => <button className={styles.videoTile} type="button" key={post.id} onClick={() => showVideo(post)} aria-label={"Ouvrir la publication " + (post.caption || post.postType)}>
-        {post.thumbnailUrl ? <Image src={post.thumbnailUrl} alt="" fill sizes="(max-width: 760px) 33vw, 260px" unoptimized /> : <span className={styles.videoFallback}>MATA<br/>BEAUTY</span>}
+        <SocialProfileVideoFrame videoUrl={post.videoUrl} thumbnailUrl={post.thumbnailUrl} />
         <span className={styles.playMark}>▶</span>
         <span className={styles.views}>{formatCount(post.viewCount)} vues</span>
       </button>)}
@@ -208,7 +216,10 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
         {selectedVideo.videoUrl ? <video key={selectedVideo.videoUrl} src={selectedVideo.videoUrl} poster={selectedVideo.thumbnailUrl ?? undefined} controls autoPlay muted playsInline preload="metadata" onError={() => void renewVideo()} /> : <div className={styles.videoUnavailable}>{videoRenewing ? "Chargement de la vidéo…" : "Vidéo indisponible"}</div>}
         <div className={styles.playerInfo}><small>{selectedVideo.authorName ?? profile.name}</small><p>{selectedVideo.caption || "Réalisation beauté"}</p>
           {selectedVideo.authorSlug && <Link href={"/professional/" + encodeURIComponent(selectedVideo.authorSlug)}>Voir le profil professionnel</Link>}
-          {profile.services.length > 0 && <button type="button" onClick={() => book(firstService!.id)}>Réserver</button>}
+          {selectedVideoService && <>
+            <span className={styles.playerService}>{selectedVideoService.title} · {formatMoney(selectedVideoService.priceAmount, selectedVideoService.currency)}</span>
+            <button type="button" onClick={() => book(selectedVideoService.id)}>Réserver cette prestation</button>
+          </>}
         </div>
       </div>
     </div>}
@@ -223,3 +234,4 @@ function formatMoney(amount: number, currency: string | null) {
   try { return new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount); }
   catch { return amount.toLocaleString("fr-FR") + " " + currency; }
 }
+

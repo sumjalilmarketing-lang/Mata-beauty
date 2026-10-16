@@ -450,7 +450,7 @@ test("professional and salon workspace keeps production integrations explicit an
 });
 
 test("public social profiles reuse approved production data and keep client identity private", async () => {
-  const [loader, professionalRoute, salonRoute, clientRoute, ownerRoute, statusStyles, profileView, feed, conversationContext, mediaRoute] = await Promise.all([
+  const [loader, professionalRoute, salonRoute, clientRoute, ownerRoute, statusStyles, profileView, feed, conversationContext, mediaRoute, videoAssociation, videoFrame] = await Promise.all([
     readFile(new URL("lib/profiles/public-social-profile.ts", root), "utf8"),
     readFile(new URL("app/professional/[username]/page.tsx", root), "utf8"),
     readFile(new URL("app/salons/[slug]/page.tsx", root), "utf8"),
@@ -461,6 +461,8 @@ test("public social profiles reuse approved production data and keep client iden
     readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
     readFile(new URL("app/api/bookings/conversation-context/route.ts", root), "utf8"),
     readFile(new URL("app/api/public/social-posts/[id]/media/route.ts", root), "utf8"),
+    readFile(new URL("lib/profiles/social-profile-video-media.ts", root), "utf8"),
+    readFile(new URL("app/social-profile-video-frame.tsx", root), "utf8"),
   ]);
   assert.match(loader, /from\("provider_profiles"\)/);
   assert.match(loader, /\.eq\("status", "approved"\)/);
@@ -470,6 +472,9 @@ test("public social profiles reuse approved production data and keep client iden
   assert.match(loader, /handle: publicHandle\(identity\.data\?\.username, provider\.business_name\)/);
   assert.match(loader, /handle: publicHandle\(business\.slug, business\.name\)/);
   assert.match(loader, /createSignedUrl\(path, 3600\)/);
+  assert.match(loader, /provider_service_id/);
+  assert.match(loader, /resolveSocialProfileVideoMedia/);
+  assert.match(loader, /filter\(item => item\.videoUrl !== null\)/);
   assert.match(loader, /profile_visibility !== "public"/);
   assert.match(loader, /canShowCollections = isOwner \|\| privacy\?\.show_collections === true/);
   assert.doesNotMatch(loader, /console\.(log|error)/);
@@ -494,11 +499,21 @@ test("public social profiles reuse approved production data and keep client iden
   assert.match(profileView, /toggle_follow_provider_from_post/);
   assert.match(profileView, /\?service=/);
   assert.match(profileView, /aria-modal="true"/);
+  assert.match(profileView, /selectedVideoService\.id/);
+  assert.match(profileView, /SocialProfileVideoFrame/);
   assert.match(feed, /window\.location\.assign\("\/professional\/"/);
   assert.match(conversationContext, /profilePath/);
   assert.match(conversationContext, /privacy\.get\(participantId\) === "public"/);
   assert.match(mediaRoute, /from\("social_feed"\)/);
-  assert.match(mediaRoute, /createSignedUrl\(media\.storage_path, 3600\)/);
+  assert.match(mediaRoute, /resolveSocialProfileVideoMedia/);
+  assert.match(mediaRoute, /createSignedUrl\(media\.videoPath, 3600\)/);
+  assert.match(mediaRoute, /createSignedUrl\(media\.thumbnailPath, 3600\)/);
+  assert.match(videoAssociation, /item\.media_type === "video"/);
+  assert.match(videoAssociation, /videos\.length === 1/);
+  assert.doesNotMatch(videoAssociation, /media_type !== "image"/);
+  assert.match(videoFrame, /onSeeked/);
+  assert.match(videoFrame, /IntersectionObserver/);
+  assert.doesNotMatch(profileView, /MATA<br\s*\/?>\s*BEAUTY/);
   assert.match(mediaRoute, /\.eq\("post_type", "video"\)/);
   assert.doesNotMatch(profileView, /SUPABASE_SERVICE_ROLE_KEY/);
 });
@@ -585,3 +600,4 @@ test("content security policy permits local blob previews in Studio", async () =
   assert.match(config, /img-src 'self' data: blob: https:/);
   assert.match(config, /media-src 'self' blob: https:\/\/\*\.supabase\.co/);
 });
+

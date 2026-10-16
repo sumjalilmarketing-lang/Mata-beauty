@@ -1,6 +1,7 @@
 import "server-only";
 
 import { serviceSupabase } from "@/lib/payments/server";
+import { resolveSocialProfileVideoMedia } from "@/lib/profiles/social-profile-video-media";
 
 export type SocialProfileKind = "client" | "professional" | "salon";
 export type SocialProfilePost = {
@@ -13,6 +14,7 @@ export type SocialProfilePost = {
   publishedAt: string;
   authorSlug: string | null;
   authorName: string | null;
+  serviceId: string | null;
 };
 export type SocialProfileService = {
   id: string;
@@ -89,6 +91,7 @@ type FeedRow = {
   business_name: string;
   slug: string;
   post_type: string;
+  provider_service_id: string | null;
   media_items: Array<{ media_type: string; bucket_id: string; storage_path: string; thumbnail_path: string | null }> | null;
 };
 type ServiceRow = { id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; currency: string | null };
@@ -111,18 +114,6 @@ function publicHandle(candidate: string | null | undefined, displayName: string)
   return "@" + (fallback || "mata-beauty");
 }
 
-function mediaPathFromUrl(value: string | null | undefined) {
-  if (!value) return null;
-  try {
-    const pathname = new URL(value).pathname;
-    const marker = "/provider-social-media/";
-    const at = pathname.indexOf(marker);
-    return at < 0 ? null : decodeURIComponent(pathname.slice(at + marker.length));
-  } catch {
-    return null;
-  }
-}
-
 async function signMedia(bucket: string, path: string | null | undefined) {
   if (!path) return null;
   const { data, error } = await serviceSupabase().storage.from(bucket).createSignedUrl(path, 3600);
@@ -131,18 +122,17 @@ async function signMedia(bucket: string, path: string | null | undefined) {
 
 async function publicPosts(providerId: string, author: SocialProfileLink): Promise<SocialProfilePost[]> {
   const { data, error } = await serviceSupabase().from("social_feed")
-    .select("id,author_id,caption,video_url,thumbnail_url,view_count,published_at,business_name,slug,post_type,media_items")
+    .select("id,author_id,caption,video_url,thumbnail_url,view_count,published_at,business_name,slug,post_type,provider_service_id,media_items")
     .eq("author_id", providerId).eq("post_type", "video").order("published_at", { ascending: false }).limit(60);
   if (error) throw error;
   const rows = (data ?? []) as unknown as FeedRow[];
   return Promise.all(rows.map(async row => {
-    const primary = (row.media_items ?? []).find(item => item.media_type !== "image");
-    const videoPath = primary?.storage_path ?? mediaPathFromUrl(row.video_url);
-    const thumbnailPath = primary?.thumbnail_path ?? mediaPathFromUrl(row.thumbnail_url);
-    const privateMedia = primary?.bucket_id === "provider-social-media" || videoPath !== null;
+    const media = resolveSocialProfileVideoMedia({ videoUrl: row.video_url, thumbnailUrl: row.thumbnail_url, mediaItems: row.media_items });
+    const signedVideoPath = media.videoBucket === "provider-social-media" ? media.videoPath : null;
+    const signedThumbnailPath = media.thumbnailBucket === "provider-social-media" ? media.thumbnailPath : null;
     const [videoUrl, thumbnailUrl] = await Promise.all([
-      videoPath && privateMedia ? signMedia("provider-social-media", videoPath) : Promise.resolve(safeHttpUrl(row.video_url)),
-      thumbnailPath && privateMedia ? signMedia("provider-social-media", thumbnailPath) : Promise.resolve(safeHttpUrl(row.thumbnail_url)),
+      signedVideoPath ? signMedia("provider-social-media", signedVideoPath) : Promise.resolve(safeHttpUrl(row.video_url)),
+      signedThumbnailPath ? signMedia("provider-social-media", signedThumbnailPath) : Promise.resolve(safeHttpUrl(row.thumbnail_url)),
     ]);
     return {
       id: row.id,
@@ -154,8 +144,9 @@ async function publicPosts(providerId: string, author: SocialProfileLink): Promi
       publishedAt: row.published_at,
       authorSlug: author.slug,
       authorName: author.name,
+      serviceId: row.provider_service_id,
     };
-  })).then(items => items.filter(item => item.videoUrl !== null || item.thumbnailUrl !== null));
+  })).then(items => items.filter(item => item.videoUrl !== null));
 }
 
 async function publicPostCount(providerId: string) {
@@ -299,18 +290,17 @@ async function loadClient(lookup: string, viewerId: string | null, ownerHasClien
     const ids = ((saves.data ?? []) as { post_id: string }[]).map(row => row.post_id);
     if (ids.length) {
       const posts = await Promise.all(ids.map(async id => {
-        const { data: row } = await client.from("social_feed").select("id,author_id,caption,video_url,thumbnail_url,view_count,published_at,business_name,slug,post_type,media_items").eq("id", id).maybeSingle();
+        const { data: row } = await client.from("social_feed").select("id,author_id,caption,video_url,thumbnail_url,view_count,published_at,business_name,slug,post_type,provider_service_id,media_items").eq("id", id).maybeSingle();
         if (!row) return null;
         const author = row as unknown as FeedRow;
-        const primary = author.media_items?.find(item => item.media_type !== "image");
-        const videoPath = primary?.storage_path ?? mediaPathFromUrl(author.video_url);
-        const thumbnailPath = primary?.thumbnail_path ?? mediaPathFromUrl(author.thumbnail_url);
-        const isPrivate = primary?.bucket_id === "provider-social-media" || videoPath !== null;
+        const media = resolveSocialProfileVideoMedia({ videoUrl: author.video_url, thumbnailUrl: author.thumbnail_url, mediaItems: author.media_items });
+        const signedVideoPath = media.videoBucket === "provider-social-media" ? media.videoPath : null;
+        const signedThumbnailPath = media.thumbnailBucket === "provider-social-media" ? media.thumbnailPath : null;
         const [videoUrl, thumbnailUrl] = await Promise.all([
-          isPrivate && videoPath ? signMedia("provider-social-media", videoPath) : Promise.resolve(safeHttpUrl(author.video_url)),
-          isPrivate && thumbnailPath ? signMedia("provider-social-media", thumbnailPath) : Promise.resolve(safeHttpUrl(author.thumbnail_url)),
+          signedVideoPath ? signMedia("provider-social-media", signedVideoPath) : Promise.resolve(safeHttpUrl(author.video_url)),
+          signedThumbnailPath ? signMedia("provider-social-media", signedThumbnailPath) : Promise.resolve(safeHttpUrl(author.thumbnail_url)),
         ]);
-        return { id: author.id, caption: author.caption ?? "", videoUrl, thumbnailUrl, postType: author.post_type, viewCount: Number(author.view_count) || 0, publishedAt: author.published_at, authorSlug: author.slug, authorName: author.business_name } satisfies SocialProfilePost;
+        return { id: author.id, caption: author.caption ?? "", videoUrl, thumbnailUrl, postType: author.post_type, viewCount: Number(author.view_count) || 0, publishedAt: author.published_at, authorSlug: author.slug, authorName: author.business_name, serviceId: author.provider_service_id } satisfies SocialProfilePost;
       }));
       favorites = posts.filter((post): post is NonNullable<typeof post> => post !== null && post.videoUrl !== null);
     }
@@ -376,3 +366,4 @@ export async function loadPublicSocialProfile(kind: SocialProfileKind, lookup: s
     return null;
   }
 }
+
