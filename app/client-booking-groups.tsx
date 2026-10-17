@@ -15,7 +15,7 @@ const labels: Record<ClientBookingItem["status"], string> = {
 const money = (amount: number, currency: string) => `${amount.toLocaleString("fr-FR")} ${currency}`;
 const dateTime = (value: string) => new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(value));
 
-export function ClientBookingGroups({ items, clientId, stats, onMessage, onCancel }: { items: readonly ClientBookingItem[]; clientId: string; stats: { upcoming: number; pending: number; past: number }; onMessage: (booking: ClientBookingItem) => void; onCancel: (booking: ClientBookingItem) => void }) {
+export function ClientBookingGroups({ items, clientId, stats, hasMore, loadingMore, onLoadMore, onMessage, onCancel }: { items: readonly ClientBookingItem[]; clientId: string; stats: { upcoming: number; pending: number; past: number }; hasMore: boolean; loadingMore: boolean; onLoadMore: () => void; onMessage: (booking: ClientBookingItem) => void; onCancel: (booking: ClientBookingItem) => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const groups = groupClientBookings(items);
 
@@ -68,6 +68,7 @@ export function ClientBookingGroups({ items, clientId, stats, onMessage, onCance
       </article>;
     })}
     </div>}
+    {hasMore && <button type="button" className="client-booking-load-more" onClick={onLoadMore} disabled={loadingMore}>{loadingMore ? "Chargement…" : "Charger l’historique précédent"}</button>}
   </>;
 }
 
