@@ -62,7 +62,9 @@ export function groupClientBookings(items: readonly ClientBookingItem[], now = n
     group.bookings.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.id.localeCompare(b.id));
     const active = group.bookings.filter((booking) => isActiveClientBooking(booking, now));
     group.activeCount = active.length;
-    group.nextBooking = active.find((booking) => Date.parse(booking.startsAt) >= now.getTime()) ?? null;
+    group.nextBooking = active.find((booking) => Date.parse(booking.startsAt) >= now.getTime())
+      ?? active.find((booking) => booking.status === "in_progress")
+      ?? null;
     group.latestClosedBooking = [...group.bookings].reverse().find((booking) => closedStatuses.has(booking.status)) ?? null;
   }
   return result.sort((a, b) => {

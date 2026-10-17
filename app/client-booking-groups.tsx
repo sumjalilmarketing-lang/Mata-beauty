@@ -40,7 +40,7 @@ export function ClientBookingGroups({ items, clientId, onMessage, onCancel }: { 
         </div>
         <div className="client-booking-card__summary">
           <div><strong>{group.activeCount}</strong><span>{group.activeCount === 1 ? "rendez-vous actif" : "rendez-vous actifs"}</span></div>
-          {upcoming ? <p><b>Prochain rendez-vous</b><br />{dateTime(upcoming.startsAt)} · {upcoming.serviceName}</p> : <p>Aucun rendez-vous à venir.</p>}
+          {upcoming ? <p><b>{upcoming.status === "in_progress" ? "Rendez-vous en cours" : "Prochain rendez-vous"}</b><br />{dateTime(upcoming.startsAt)} · {upcoming.serviceName}</p> : <p>Aucun rendez-vous à venir.</p>}
         </div>
         <div className="client-booking-card__actions">
           <button type="button" className="client-booking-history-toggle" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : group.id)}>{expanded ? "Masquer l’historique" : `Voir l’historique (${group.bookings.length})`}</button>

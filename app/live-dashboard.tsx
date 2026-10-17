@@ -144,7 +144,8 @@ export function LiveDashboard({
     const businesses = new Map(((businessResult.data ?? []) as BusinessBookingIdentity[]).map((item) => [item.id, item]));
     return rows.map((row) => {
       const service = Array.isArray(row.provider_services) ? row.provider_services[0] ?? null : row.provider_services;
-      const business = service?.business_id ? businesses.get(service.business_id) : undefined;
+      const businessId = service?.business_id ?? null;
+      const business = businessId ? businesses.get(businessId) : undefined;
       const provider = providers.get(row.provider_id);
       const providerName = business?.name || provider?.business_name || "Professionnel";
       const address = business
@@ -152,7 +153,7 @@ export function LiveDashboard({
         : [provider?.base_address, provider?.area, provider?.city].filter(Boolean).join(", ");
       return {
         id: row.id,
-        groupId: business ? `business:${business.id}` : `provider:${row.provider_id}`,
+        groupId: businessId ? `business:${businessId}` : `provider:${row.provider_id}`,
         providerId: row.provider_id,
         providerName,
         providerSlug: provider?.slug ?? null,

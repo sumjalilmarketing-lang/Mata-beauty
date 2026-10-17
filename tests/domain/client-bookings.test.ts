@@ -41,7 +41,9 @@ describe("client booking groups", () => {
   });
 
   it("keeps an active appointment in progress active even if its start time is in the past", () => {
-    expect(isActiveClientBooking(booking({ status: "in_progress", startsAt: "2026-10-17T11:30:00.000Z", endsAt: "2026-10-17T12:30:00.000Z" }), now)).toBe(true);
+    const inProgress = booking({ status: "in_progress", startsAt: "2026-10-17T11:30:00.000Z", endsAt: "2026-10-17T12:30:00.000Z" });
+    expect(isActiveClientBooking(inProgress, now)).toBe(true);
+    expect(groupClientBookings([inProgress], now)[0]?.nextBooking?.id).toBe(inProgress.id);
   });
 
   it("preserves all records and orders each salon history chronologically", () => {
