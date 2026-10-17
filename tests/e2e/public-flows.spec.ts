@@ -1,18 +1,21 @@
 import { expect, test } from "@playwright/test";
 
+const supabaseOrigin = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://audit.supabase.co";
+const appOrigin = `http://127.0.0.1:${process.env.MATA_PLAYWRIGHT_PORT ?? 3160}`;
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem("mata-launch-welcome", "done"));
 });
 
 test.beforeEach(async ({ page }) => {
-  await page.route("https://audit.supabase.co/auth/v1/authorize**", (route) => route.fulfill({ status: 204 }));
-  await page.route("http://localhost:3000/api/auth/providers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ google: true }) }));
-  await page.route("https://audit.supabase.co/rest/v1/categories**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 }]) }));
-  await page.route("https://audit.supabase.co/rest/v1/provider_profiles**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
+  await page.route(`${supabaseOrigin}/auth/v1/authorize**`, (route) => route.fulfill({ status: 204 }));
+  await page.route("**/api/auth/providers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ google: true }) }));
+  await page.route(`${supabaseOrigin}/rest/v1/categories**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 }]) }));
+  await page.route(`${supabaseOrigin}/rest/v1/provider_profiles**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
     profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier Tresses", city: "Dakar", service_mode: "salon", average_rating: 4.8, review_count: 12, verified_at: "2026-01-01T00:00:00Z", cover_url: null,
     provider_services: [{ id: "22222222-2222-4222-8222-222222222222", title: "Tresses collées", duration_minutes: 90, price_amount: 10000, services: { name: "Tresses collées", categories: { name: "Tresses" } } }],
   }]) }));
-  await page.route("https://audit.supabase.co/rest/v1/promotions**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.route(`${supabaseOrigin}/rest/v1/promotions**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   page.on("pageerror", (error) => { throw error; });
   page.on("console", (message) => {
     if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());
@@ -34,7 +37,7 @@ test("premium home opens a real category results screen", async ({ page }) => {
 
 test("authentication has no fake preview mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(?:Profil|Ouvrir mon compte|Se connecter à MATA Beauty)$/ }).click();
   await expect(page.getByRole("heading", { name: "Se connecter" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Se connecter", exact: true })).toBeEnabled();
   await expect(page.getByRole("dialog")).not.toContainText("aperçu");
@@ -42,7 +45,7 @@ test("authentication has no fake preview mode", async ({ page }) => {
 
 test("registration requires explicit legal consent", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(?:Profil|Ouvrir mon compte|Se connecter à MATA Beauty)$/ }).click();
   await page.getByRole("button", { name: "Créer un compte", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Créer votre compte" })).toBeVisible();
   const consent = page.getByRole("checkbox", { name: "Accepter les conditions générales et la politique de confidentialité" });
@@ -83,22 +86,22 @@ test("Inspiration swipes vertically with one active player, filters and an eight
     HTMLMediaElement.prototype.pause = function () { this.dataset.playing = "false"; this.dispatchEvent(new Event("pause")); };
   });
   let requestedBatch = "";
-  await page.route("https://audit.supabase.co/*.mp4", (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
-  await page.route("https://audit.supabase.co/rest/v1/rpc/get_available_slots**", (route) => route.fulfill({
+  await page.route(`${supabaseOrigin}/*.mp4`, (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
+  await page.route(`${supabaseOrigin}/rest/v1/rpc/get_available_slots**`, (route) => route.fulfill({
     status: 200, contentType: "application/json", body: JSON.stringify([{ slot_start: "2026-10-17T10:00:00+00:00" }]),
   }));
-  await page.route("https://audit.supabase.co/rest/v1/rpc/record_post_booking_click**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
-  await page.route("https://audit.supabase.co/rest/v1/rpc/record_product_event**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
-  await page.route("https://audit.supabase.co/rest/v1/rpc/record_video_view**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
-  await page.route("https://audit.supabase.co/rest/v1/provider_profiles**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
+  await page.route(`${supabaseOrigin}/rest/v1/rpc/record_post_booking_click**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
+  await page.route(`${supabaseOrigin}/rest/v1/rpc/record_product_event**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
+  await page.route(`${supabaseOrigin}/rest/v1/rpc/record_video_view**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "null" }));
+  await page.route(`${supabaseOrigin}/rest/v1/provider_profiles**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
     profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier Tresses", city: "Dakar", service_mode: "salon",
     average_rating: 4.8, review_count: 12, verified_at: "2026-01-01T00:00:00Z", cover_url: null, status: "approved",
     provider_services: [{ id: "22222222-2222-4222-8222-222222222222", title: "Tresses collées", duration_minutes: 90, price_amount: 10000,
       business_id: "33333333-3333-4333-8333-333333333333", businesses: { address: "", city: "Dakar", area: "", latitude: null, longitude: null },
       services: { name: "Tresses", categories: { name: "Tresses" } } }],
   }]) }));
-  await page.route("https://audit.supabase.co/rest/v1/provider_services**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
-  await page.route("https://audit.supabase.co/rest/v1/social_feed**", (route) => {
+  await page.route(`${supabaseOrigin}/rest/v1/provider_services**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.route(`${supabaseOrigin}/rest/v1/social_feed**`, (route) => {
     const query = new URL(route.request().url()).searchParams;
     if (query.get("select") === "*") requestedBatch = query.get("limit") ?? "";
     const base = {
@@ -113,6 +116,11 @@ test("Inspiration swipes vertically with one active player, filters and an eight
       { ...base, id: "66666666-6666-4666-8666-666666666666", caption: "Première transformation", video_url: "https://audit.supabase.co/one.mp4" },
       { ...base, id: "77777777-7777-4777-8777-777777777777", caption: "Deuxième transformation", video_url: "https://audit.supabase.co/two.mp4", published_at: new Date(Date.now()-1000).toISOString() },
     ]) });
+  });
+  await page.route("**/api/public/social-posts/*/media", (route) => {
+    const postId = new URL(route.request().url()).pathname.split("/").at(-2);
+    const mediaName = postId === "66666666-6666-4666-8666-666666666666" ? "one.mp4" : "two.mp4";
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ videoUrl: `${supabaseOrigin}/${mediaName}`, thumbnailUrl: null }) });
   });
   await page.goto("/");
   const feed = page.locator(".social-feed");
@@ -185,7 +193,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
 
 test("Google login starts a real OAuth request with a fixed callback", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(?:Profil|Ouvrir mon compte|Se connecter à MATA Beauty)$/ }).click();
   const google = page.getByRole("button", { name: "Continuer avec Google", exact: true });
   await expect(google).toBeEnabled();
   const authorizeRequest = page.waitForRequest((request) => new URL(request.url()).pathname === "/auth/v1/authorize");
@@ -221,7 +229,7 @@ test("password recovery does not require the old password", async ({ page }) => 
 test("invalid OAuth callbacks fail closed without an open redirect", async ({ page }) => {
   await page.goto("/auth/callback?next=https%3A%2F%2Fevil.example%2Fsteal");
   await expect(page.getByText("Retour Google invalide.", { exact: true })).toBeVisible();
-  expect(new URL(page.url()).origin).toBe("http://localhost:3000");
+  expect(new URL(page.url()).origin).toBe(appOrigin);
 });
 
 test("professional Google registration keeps a non-administrative intent", async ({ page }) => {

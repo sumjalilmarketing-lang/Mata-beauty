@@ -14,9 +14,28 @@ function respond(response, status, body, headers = {}) {
 export function createSupabaseFixtureServer(port) {
   return createServer((request, response) => {
   const url = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
-  if (url.pathname === "/health") return respond(response, 200, { ok: true });
+  const testPort = Number(process.env.MATA_PLAYWRIGHT_PORT ?? 3160);
+  const origin = request.headers.origin;
+  const allowedOrigins = new Set([`http://127.0.0.1:${testPort}`, `http://localhost:${testPort}`]);
+  const corsHeaders = typeof origin === "string" && allowedOrigins.has(origin)
+    ? {
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Methods": "GET, HEAD, POST, PATCH, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "accept, accept-profile, apikey, authorization, content-type, content-profile, prefer, range, x-client-info, x-supabase-api-version, x-upsert",
+      "Access-Control-Expose-Headers": "content-range, range, x-total-count",
+      "Access-Control-Max-Age": "600",
+      Vary: "Origin",
+    }
+    : {};
+  const send = (status, body, headers = {}) => respond(response, status, body, { ...corsHeaders, ...headers });
+  if (request.method === "OPTIONS") {
+    response.writeHead(204, corsHeaders);
+    response.end();
+    return;
+  }
+  if (url.pathname === "/health") return send(200, { ok: true });
   if (url.pathname === "/rest/v1/provider_profiles") {
-    return respond(response, 200, {
+    return send(200, {
       profile_id: providerId,
       slug: "mata-audit-tresses",
       business_name: "Mata Audit Tresses",
@@ -30,19 +49,19 @@ export function createSupabaseFixtureServer(port) {
     });
   }
   if (url.pathname === "/rest/v1/profiles") {
-    return respond(response, 200, { avatar_url: null, username: "mata-audit-tresses" });
+    return send(200, { avatar_url: null, username: "mata-audit-tresses" });
   }
   if (url.pathname === "/rest/v1/provider_services") {
-    return respond(response, 200, [{ id: serviceId, title: "Tresses express", description: "", duration_minutes: 60, price_amount: 10000, currency: "XOF" }]);
+    return send(200, [{ id: serviceId, title: "Tresses express", description: "", duration_minutes: 60, price_amount: 10000, currency: "XOF" }]);
   }
   if (url.pathname === "/rest/v1/businesses") {
-    return respond(response, 406, { code: "PGRST116", details: "The result contains 0 rows", message: "JSON object requested, multiple (or no) rows returned" });
+    return send(406, { code: "PGRST116", details: "The result contains 0 rows", message: "JSON object requested, multiple (or no) rows returned" });
   }
   if (url.pathname === "/rest/v1/social_feed" || url.pathname === "/rest/v1/reviews" || url.pathname === "/rest/v1/follows" || url.pathname === "/rest/v1/provider_categories") {
     const isHead = request.method === "HEAD" || url.searchParams.get("select") !== null && request.headers.prefer?.includes("count=");
-    return respond(response, 200, isHead ? null : [], isHead ? { "Content-Range": "*/0" } : {});
+    return send(200, isHead ? null : [], isHead ? { "Content-Range": "*/0" } : {});
   }
-  return respond(response, 200, []);
+  return send(200, []);
   });
 }
 

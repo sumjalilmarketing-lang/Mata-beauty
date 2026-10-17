@@ -11,6 +11,7 @@ export type BookingConversationInput = {
     id: string;
     updatedAt: string;
     memberIds: string[];
+    unreadCount?: number;
     latestMessage?: { body: string; createdAt: string; senderId: string };
   };
 };
@@ -24,6 +25,7 @@ export type GroupedBookingConversation = {
   bookings: BookingConversationInput["booking"][];
   latestActivityAt: string;
   preview: string | null;
+  unreadCount: number;
 };
 
 /**
@@ -61,6 +63,7 @@ export function groupBookingConversations(
         bookings: [booking],
         latestActivityAt: conversation?.latestMessage?.createdAt ?? conversation?.updatedAt ?? booking.startsAt,
         preview: conversation?.latestMessage?.body ?? null,
+        unreadCount: conversation?.unreadCount ?? 0,
       });
       continue;
     }
@@ -76,10 +79,12 @@ export function groupBookingConversations(
         bookings: [],
         latestActivityAt: booking.startsAt,
         preview: null,
+        unreadCount: 0,
       };
       privateByParticipant.set(participantId, group);
     }
     group.bookings.push(booking);
+    group.unreadCount += conversation?.unreadCount ?? 0;
     if (conversation && !group.conversationIds.includes(conversation.id)) group.conversationIds.push(conversation.id);
     const activityAt = conversation?.latestMessage?.createdAt ?? conversation?.updatedAt ?? booking.startsAt;
     const hasConversation = Boolean(conversation);

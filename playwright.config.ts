@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const testPort = Number(process.env.MATA_PLAYWRIGHT_PORT ?? 3160);
 const fixturePort = Number(process.env.MATA_SUPABASE_FIXTURE_PORT ?? 3161);
-const testOrigin = `http://localhost:${testPort}`;
+const testOrigin = `http://127.0.0.1:${testPort}`;
 const fixtureOrigin = `http://127.0.0.1:${fixturePort}`;
 process.env.MATA_SUPABASE_FIXTURE_ORIGIN = fixtureOrigin;
 
@@ -13,6 +13,10 @@ export default defineConfig({
   outputDir: ".next/playwright-results-pro-salon",
   use: {
     baseURL: testOrigin,
+    // The app's PWA worker can take ownership of requests and bypass
+    // Playwright's page.route fixtures. Block it in these deterministic
+    // browser/API tests; PWA behavior is exercised separately.
+    serviceWorkers: "block",
     trace: "retain-on-failure",
   },
   projects: [

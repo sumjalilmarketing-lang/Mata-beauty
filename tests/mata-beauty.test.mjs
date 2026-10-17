@@ -278,7 +278,11 @@ test("stable booking inbox groups private threads by participant identity withou
   assert.match(grouping, /conversation:\$\{conversation\?\.id/);
   assert.match(inbox, /select\("id,client_id,provider_id,starts_at,status,provider_services\(title\)"\)/);
   assert.match(inbox, /conversation_members/);
-  assert.match(inbox, /bookings=\$\{allBookingIds\.join\(","\)\}/);
+  assert.match(inbox, /contextBatches/);
+  assert.match(inbox, /index \+= 100/);
+  assert.match(inbox, /bookings=\$\{batch\.join\(","\)\}/);
+  assert.match(inbox, /select\("id", \{ count: "exact", head: true \}\)/);
+  assert.match(inbox, /mata-conversations-read/);
   assert.match(inbox, /Aucun message/);
   assert.match(messages, /\.in\("conversation_id", ids\)/);
   assert.match(messages, /markRead\(ids\)/);

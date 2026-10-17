@@ -23,6 +23,7 @@ Object.assign(process.env, {
   MATA_E2E_TSCONFIG: ".next/playwright-tsconfig.json",
   NEXT_PUBLIC_SUPABASE_URL: fixtureOrigin,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: randomUUID(),
+  NEXT_PUBLIC_APP_URL: testOrigin,
   SUPABASE_SERVICE_ROLE_KEY: randomUUID(),
   NEXT_PUBLIC_SALON_COLLABORATOR_ACCESS_ENABLED: "false",
 });
@@ -62,6 +63,23 @@ async function waitForApp(server) {
   throw new Error("Next.js local E2E server did not become ready within 120 seconds.");
 }
 
+async function warmRoutes() {
+  const routes = [
+    "/discover",
+    "/professional/11111111-1111-4111-8111-111111111111",
+    "/posts/66666666-6666-4666-8666-666666666666",
+    "/salon/invitation/accept",
+    "/?connexion=requise&returnTo=%2Fsalon",
+    "/?auth=reset",
+    "/auth/callback?next=%2Fapp%2Fmessages",
+    "/api/auth/providers",
+  ];
+  for (const route of routes) {
+    try { await fetch(new URL(route, testOrigin), { signal: AbortSignal.timeout(20_000) }); }
+    catch { /* A route can be intentionally unavailable until its local fixture is ready. */ }
+  }
+}
+
 async function closeServer(server) {
   if (!server?.listening) return;
   server.closeAllConnections();
@@ -87,6 +105,19 @@ function runPlaywright(args) {
   });
 }
 
+function buildTestApp() {
+  return new Promise((resolveBuild, reject) => {
+    const build = spawn(process.execPath, [resolve(root, "node_modules/next/dist/bin/next"), "build", "--webpack"], {
+      cwd: root,
+      env: process.env,
+      stdio: "inherit",
+      windowsHide: true,
+    });
+    build.once("error", reject);
+    build.once("exit", (code, signal) => resolveBuild(code ?? (signal ? 1 : 0)));
+  });
+}
+
 process.once("SIGINT", () => {
   interrupted = true;
   if (testProcess && process.platform === "win32") testProcess.kill("SIGINT");
@@ -99,14 +130,17 @@ process.once("SIGTERM", () => {
 let exitCode = 1;
 try {
   fixture = await startSupabaseFixture(fixturePort);
-  // Webpack avoids Turbopack's detached Rust worker on Windows, which can
-  // outlive the server and race with the next build's .next cleanup.
-  nextApp = next({ dev: true, webpack: true, dir: root, port: testPort, hostname: "127.0.0.1" });
+  // A production server removes dev HMR races from mobile WebKit while keeping
+  // the same isolated fixture URLs compiled into this disposable build.
+  const buildCode = await buildTestApp();
+  if (buildCode !== 0) throw new Error(`Next.js isolated E2E build exited with code ${buildCode}.`);
+  nextApp = next({ dev: false, dir: root, port: testPort, hostname: "127.0.0.1" });
   await nextApp.prepare();
   const handler = nextApp.getRequestHandler();
   appServer = createServer((request, response) => handler(request, response));
   await listen(appServer, testPort);
   await waitForApp(appServer);
+  await warmRoutes();
   exitCode = await runPlaywright(process.argv.slice(2));
 } catch (error) {
   console.error(error instanceof Error ? error.stack ?? error.message : error);

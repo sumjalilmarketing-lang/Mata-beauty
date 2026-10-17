@@ -47,6 +47,22 @@ describe("groupBookingConversations", () => {
     expect(result.find(item => item.key === "conversation:conversation-ambiguous")?.existingConversationOnly).toBe(true);
   });
 
+  it("sums real unread message counts only across the verified participant's private threads", () => {
+    const first = {
+      ...booking("booking-one"),
+      conversation: { id: "conversation-one", updatedAt: "2026-10-02T12:00:00.000Z", memberIds: [clientId, providerId], unreadCount: 2 },
+    } satisfies BookingConversationInput;
+    const second = {
+      ...booking("booking-two", providerId, "2026-10-03T10:00:00.000Z"),
+      conversation: { id: "conversation-two", updatedAt: "2026-10-03T12:00:00.000Z", memberIds: [clientId, providerId], unreadCount: 1 },
+    } satisfies BookingConversationInput;
+
+    const [group] = groupBookingConversations([first, second], clientId);
+
+    expect(group.conversationIds).toEqual(["conversation-one", "conversation-two"]);
+    expect(group.unreadCount).toBe(3);
+  });
+
   it("keeps an existing conversation's real activity ahead of a later appointment date", () => {
     const oldMessage = {
       ...booking("booking-old", providerId, "2026-10-01T10:00:00.000Z"),

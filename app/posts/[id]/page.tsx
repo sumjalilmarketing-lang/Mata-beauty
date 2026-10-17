@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import { SharedPostPlayer } from "../shared-post-player";
 
 type SharedPost = {
   id: string; author_id: string; caption: string; video_url: string; thumbnail_url: string | null;
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title,
     description: post.caption,
-    openGraph: { title, description: post.caption, type: "video.other", images: post.thumbnail_url ? [{ url: post.thumbnail_url }] : [], videos: [{ url: post.video_url }] },
+    openGraph: { title, description: post.caption, type: "video.other", images: post.thumbnail_url ? [{ url: post.thumbnail_url }] : [] },
     twitter: { card: "summary_large_image", title, description: post.caption, images: post.thumbnail_url ? [post.thumbnail_url] : [] },
   };
 }
@@ -32,6 +33,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function SharedPostPage({ params }: { params: Promise<{ id: string }> }) {
   const post = await getPost((await params).id);
   if (!post) return <main className="shared-post-page"><h1>Cette vidéo n’est plus disponible.</h1><Link href="/">Retour au feed</Link></main>;
-  return <main className="shared-post-page"><article><video src={post.video_url} poster={post.thumbnail_url ?? undefined} controls playsInline preload="metadata" /><div><small>{post.city}</small><h1>{post.service_title}</h1><h2>{post.business_name}</h2><p>{post.caption}</p><strong>{post.duration_minutes} min · à partir de {post.price_amount.toLocaleString("fr-FR")} FCFA</strong><Link href={`/?post=${post.id}`}>Voir la vidéo, le profil et réserver</Link></div></article></main>;
+  return <main className="shared-post-page"><article><SharedPostPlayer postId={post.id} /><div><small>{post.city}</small><h1>{post.service_title}</h1><h2>{post.business_name}</h2><p>{post.caption}</p><strong>{post.duration_minutes} min · à partir de {post.price_amount.toLocaleString("fr-FR")} FCFA</strong><Link href={`/?post=${post.id}`}>Voir la vidéo, le profil et réserver</Link></div></article></main>;
 }
 

@@ -109,7 +109,7 @@ const formatPrice = (value: number) => `${new Intl.NumberFormat("fr-FR").format(
 const today = new Date().toISOString().slice(0, 10);
 const defaultBookingDate = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
-export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "feed" }: { supabaseUrl: string; supabaseAnonKey: string; initialScreen?: "feed" | "home" | "results" }) {
+export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "feed", initialServiceId }: { supabaseUrl: string; supabaseAnonKey: string; initialScreen?: "feed" | "home" | "results"; initialServiceId?: string }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const oauthReturn = useRef({ intent: null as string | null, authenticated: false });
   const [showSplash, setShowSplash] = useState(false);
@@ -151,22 +151,37 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [showLaunchWelcome, setShowLaunchWelcome] = useState(false);
 
   useEffect(() => {
-    const target = new URLSearchParams(window.location.search).get("service");
-    if (!target || catalogState !== "live") return;
+    const target = initialServiceId ?? new URLSearchParams(window.location.search).get("service");
+    if (!target) return;
     const parsed = z.string().uuid().safeParse(target);
     if (!parsed.success) return;
-    const client = getSupabaseBrowserClient(); if (!client) return;
+    // Restore the user's in-progress booking immediately after OAuth/reload.
+    // The catalog may take longer to hydrate (especially on mobile networks);
+    // the server still validates that the service is active when booking.
+    const draft = readBookingDraft();
+    const restoredSelection = draft?.selection.service.id === parsed.data ? draft.selection : null;
     let active = true;
+    if (draft && restoredSelection) {
+      queueMicrotask(() => {
+        if (!active) return;
+        setRestoredBookingRequest(draft.request);
+        setBooking(restoredSelection);
+      });
+    }
+    if (catalogState !== "live") return () => { active = false; };
+    const client = getSupabaseBrowserClient(); if (!client) return () => { active = false; };
     void client.from("provider_services").select("id,provider_id,title,duration_minutes,price_amount,business_id").eq("id", parsed.data).eq("is_active", true).is("archived_at", null).maybeSingle().then(({ data, error }) => {
       if (!active) return;
       const provider = catalog.find(item => item.profileId === data?.provider_id);
-      if (error || !data || !provider) { setNotice("Cette prestation n’est pas disponible à la réservation."); return; }
-      const draft = readBookingDraft();
-      const restoredRequest = draft && draft.selection.service.id === data.id ? draft.request : null;
-      setRestoredBookingRequest(restoredRequest); setBooking({ provider, service: data });
+      if (error || !data || !provider) {
+        if (!restoredSelection) setNotice("Cette prestation n’est pas disponible à la réservation.");
+        return;
+      }
+      setRestoredBookingRequest(draft && draft.selection.service.id === data.id ? draft.request : null);
+      setBooking({ provider, service: data });
     });
     return () => { active = false; };
-  }, [catalog, catalogState]);
+  }, [catalog, catalogState, initialServiceId]);
 
   function setScreen(next: "feed" | "home" | "results", nextCategory = category) {
     applyScreen(next);
@@ -191,7 +206,9 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       try { setArea((params.get("zone") ?? window.sessionStorage.getItem("mata-location-zone") ?? "").slice(0, 120)); } catch { setArea(params.get("zone") ?? ""); }
       setProfile(null);
     };
-    void Promise.resolve().then(restore);
+    // Apply the URL state before the user can interact. Deferring this update
+    // to a microtask can overwrite an immediate navigation click after hydrate.
+    restore();
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
   }, []);

@@ -1,4 +1,7 @@
 export type NotificationItem = { id: string; title: string; body: string; kind: string; data: Record<string, unknown>; read_at: string | null; created_at: string };
+export function notificationBadgeAfterRead(current: number, changedCount: number | null): number {
+  return changedCount === null ? 0 : Math.max(0, current - Math.max(0, changedCount));
+}
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function notificationDestination(item: Pick<NotificationItem, "kind" | "data">): string | null {
   const href = item.data?.href;

@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+const supabaseOrigin = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://audit.supabase.co";
+
 // Layout/interaction tests with simulated catalogue data; not proof of real media playback.
 test.beforeEach(async ({ page }) => {
-  await page.route("https://audit.supabase.co/**", (route) => {
+  await page.route(`${supabaseOrigin}/**`, (route) => {
     const path = new URL(route.request().url()).pathname;
     const rows = path.endsWith("/social_feed") ? [0, 1, 2].map((index) => ({
       id: `00000000-0000-4000-8000-00000000000${index}`,
@@ -30,7 +32,7 @@ test("cached feed can paginate during a slow initial refresh without repeating p
     duration_seconds: 0, average_rating: 0, review_count: 0,
     published_at: new Date(Date.now() - index * 1000).toISOString(),
   }));
-  await page.route("https://audit.supabase.co/rest/v1/social_feed**", async (route) => {
+  await page.route(`${supabaseOrigin}/rest/v1/social_feed**`, async (route) => {
     const hasCursor = new URL(route.request().url()).searchParams.has("or");
     cursors.push(hasCursor);
     // Keep the first page in flight while the user scrolls the already-rendered cache.
@@ -51,7 +53,7 @@ test("cached feed can paginate during a slow initial refresh without repeating p
 test("nearby uses commercial coordinates and excludes unknown locations (simulated GPS)", async ({ page, context }) => {
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 14.7, longitude: -17.4, accuracy: 30 });
-  await page.route("https://audit.supabase.co/rest/v1/provider_profiles**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
+  await page.route(`${supabaseOrigin}/rest/v1/provider_profiles**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
     profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier test", city: "Dakar", service_mode: "salon", average_rating: 0, review_count: 0,
     provider_services: [0, 1, 2].map((index) => ({ id: `22222222-2222-4222-8222-22222222222${index}`, title: "Tresses", duration_minutes: 60, price_amount: 15000,
       businesses: index === 2 ? null : { address: "Adresse commerciale", city: index === 0 ? "Dakar" : "Thiès", area: null, latitude: index === 0 ? 14.71 : 14.79, longitude: index === 0 ? -17.4 : -16.92 },
@@ -132,7 +134,7 @@ test("authentication content and Google button fit inside the centered dialog", 
 
 test("protected salon notice does not cover authentication branding on mobile or desktop", async ({ page }) => {
   await page.goto("/?connexion=requise&returnTo=%2Fsalon");
-  const notice = page.getByRole("status").filter({ hasText: "Connectez-vous pour continuer vers votre espace." });
+  const notice = page.getByRole("status").filter({ hasText: /Connectez-vous pour (?:continuer vers votre espace|accéder à cet espace)\./ });
   const brand = page.getByRole("dialog").locator(".auth-brand");
   await expect(notice).toBeVisible();
   await expect(brand).toBeVisible();
