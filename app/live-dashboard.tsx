@@ -16,12 +16,15 @@ import { ProfessionalDocuments } from "./professional-documents";
 import { ReferralCard } from "./referral-card";
 import { NotificationCenter } from "./notification-center";
 import { BookingReview } from "./booking-review";
+import { ClientBookingGroups } from "./client-booking-groups";
+import type { ClientBookingItem } from "@/lib/domain/client-bookings";
 
 type Role = "client" | "provider" | "admin";
 type ProviderStatus = "draft" | "pending_review" | "approved" | "rejected" | "suspended";
 type BookingRow = {
   id: string;
   provider_id: string;
+  provider_service_id: string;
   starts_at: string;
   ends_at: string;
   status: BookingStatus;
@@ -31,11 +34,13 @@ type BookingRow = {
   appointment_address: string | null;
   collaborator_name: string | null;
   collaborator_avatar_url: string | null;
-  provider_services: { title: string; duration_minutes: number } | null;
+  provider_services: { title: string; duration_minutes: number; business_id: string | null; is_active: boolean; archived_at: string | null } | null;
 };
 type BookingQueryRow = Omit<BookingRow, "provider_services"> & {
   provider_services: BookingRow["provider_services"] | Array<NonNullable<BookingRow["provider_services"]>>;
 };
+type ProviderBookingIdentity = { profile_id: string; business_name: string; slug: string | null; city: string; area: string | null; base_address: string | null; cover_url: string | null };
+type BusinessBookingIdentity = { id: string; name: string; address: string; city: string; area: string | null; logo_url: string | null };
 type NotificationRow = {
   id: string;
   title: string;
@@ -102,6 +107,12 @@ export function LiveDashboard({
   onSignOut: () => Promise<void>;
 }) {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [clientBookingItems, setClientBookingItems] = useState<ClientBookingItem[]>([]);
+  const [activeClientBookingItems, setActiveClientBookingItems] = useState<ClientBookingItem[]>([]);
+  const [clientBookingStats, setClientBookingStats] = useState({ upcoming: 0, pending: 0, past: 0 });
+  const [bookingPage, setBookingPage] = useState(0);
+  const [bookingsHaveMore, setBookingsHaveMore] = useState(false);
+  const [loadingMoreBookings, setLoadingMoreBookings] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [providerProfile, setProviderProfile] = useState<ProviderProfileRow | null>(null);
   const [clientProfile, setClientProfile] = useState<ClientAccountRow | null>(null);
@@ -112,7 +123,77 @@ export function LiveDashboard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [messageBooking, setMessageBooking] = useState<BookingRow | null>(null);
+  const [messageBooking, setMessageBooking] = useState<{ id: string; serviceTitle: string } | null>(null);
+
+  const clientBookingPageSize = 50;
+
+  async function decorateClientBookings(rows: readonly BookingQueryRow[]): Promise<ClientBookingItem[]> {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || rows.length === 0) return [];
+    const providerIds = [...new Set(rows.map((row) => row.provider_id))];
+    const businessIds = [...new Set(rows.map((row) => {
+      const service = Array.isArray(row.provider_services) ? row.provider_services[0] : row.provider_services;
+      return service?.business_id ?? null;
+    }).filter((id): id is string => Boolean(id)))];
+    const [providerResult, profileResult, businessResult] = await Promise.all([
+      supabase.from("provider_profiles").select("profile_id,business_name,slug,city,area,base_address,cover_url").in("profile_id", providerIds),
+      supabase.from("profiles").select("id,avatar_url").in("id", providerIds),
+      businessIds.length ? supabase.from("businesses").select("id,name,address,city,area,logo_url").in("id", businessIds) : Promise.resolve({ data: [], error: null }),
+    ]);
+    const providers = new Map(((providerResult.data ?? []) as ProviderBookingIdentity[]).map((item) => [item.profile_id, item]));
+    const avatars = new Map(((profileResult.data ?? []) as Array<{ id: string; avatar_url: string | null }>).map((item) => [item.id, item.avatar_url]));
+    const businesses = new Map(((businessResult.data ?? []) as BusinessBookingIdentity[]).map((item) => [item.id, item]));
+    return rows.map((row) => {
+      const service = Array.isArray(row.provider_services) ? row.provider_services[0] ?? null : row.provider_services;
+      const businessId = service?.business_id ?? null;
+      const business = businessId ? businesses.get(businessId) : undefined;
+      const provider = providers.get(row.provider_id);
+      const providerName = business?.name || provider?.business_name || "Professionnel";
+      const address = business
+        ? [business.address, business.area, business.city].filter(Boolean).join(", ")
+        : [provider?.base_address, provider?.area, provider?.city].filter(Boolean).join(", ");
+      return {
+        id: row.id,
+        groupId: businessId ? `business:${businessId}` : `provider:${row.provider_id}`,
+        providerId: row.provider_id,
+        providerName,
+        providerSlug: provider?.slug ?? null,
+        providerImage: business?.logo_url ?? provider?.cover_url ?? avatars.get(row.provider_id) ?? null,
+        address: address || null,
+        serviceId: row.provider_service_id,
+        serviceBookable: Boolean(service?.is_active && !service.archived_at),
+        serviceName: service?.title ?? "Prestation beauté",
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+        status: row.status,
+        amount: row.total_amount,
+        currency: row.currency,
+      };
+    });
+  }
+
+  async function loadMoreClientBookings() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || loadingMoreBookings || !bookingsHaveMore) return;
+    setLoadingMoreBookings(true);
+    try {
+      const nextPage = bookingPage + 1;
+      const start = nextPage * clientBookingPageSize;
+      const { data, error: queryError } = await supabase.from("bookings")
+        .select("id,provider_id,provider_service_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,provider_services(title,duration_minutes,business_id,is_active,archived_at)")
+        .eq("client_id", userId).order("starts_at", { ascending: false }).range(start, start + clientBookingPageSize);
+      if (queryError) throw queryError;
+      const pageRows = ((data ?? []) as unknown as BookingQueryRow[]);
+      setBookingsHaveMore(pageRows.length > clientBookingPageSize);
+      const items = await decorateClientBookings(pageRows.slice(0, clientBookingPageSize));
+      setClientBookingItems((current) => [...current, ...items]);
+      setBookingPage(nextPage);
+    } catch (caught) {
+      setError(publicErrorMessage(caught, "Impossible de charger les rendez-vous suivants."));
+    } finally {
+      setLoadingMoreBookings(false);
+    }
+  }
 
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
@@ -145,18 +226,52 @@ export function LiveDashboard({
         setPendingProviders((providerRows.data ?? []) as PendingProviderRow[]);
       } else {
         const ownerColumn = role === "client" ? "client_id" : "provider_id";
-        const { data, error: bookingError } = await supabase
-          .from("bookings")
-          .select("id,provider_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,provider_services(title,duration_minutes)")
-          .eq(ownerColumn, userId)
-          .order("starts_at", { ascending: true })
-          .limit(30);
+        let bookingQuery = supabase.from("bookings")
+          .select("id,provider_id,provider_service_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,provider_services(title,duration_minutes,business_id,is_active,archived_at)")
+          .eq(ownerColumn, userId).order("starts_at", { ascending: role === "client" && moduleKey === "bookings" ? false : true });
+        if (role === "client" && moduleKey === "bookings") bookingQuery = bookingQuery.range(0, clientBookingPageSize);
+        else bookingQuery = bookingQuery.limit(30);
+        const { data, error: bookingError } = await bookingQuery;
         if (bookingError) throw bookingError;
-        const rows = (data ?? []) as unknown as BookingQueryRow[];
-        setBookings(rows.map((booking) => ({
+        const queryRows = (data ?? []) as unknown as BookingQueryRow[];
+        const rows = role === "client" && moduleKey === "bookings" ? queryRows.slice(0, clientBookingPageSize) : queryRows;
+        const mappedBookings = rows.map((booking) => ({
           ...booking,
           provider_services: Array.isArray(booking.provider_services) ? booking.provider_services[0] ?? null : booking.provider_services,
-        })));
+        }));
+        setBookings(mappedBookings);
+        if (role === "client" && moduleKey === "bookings") {
+          setBookingPage(0);
+          setBookingsHaveMore(queryRows.length > clientBookingPageSize);
+          setClientBookingItems(await decorateClientBookings(rows));
+          const activeItems: BookingQueryRow[] = [];
+          const now = new Date().toISOString();
+          for (let offset = 0; ; offset += clientBookingPageSize) {
+            const { data: activeData, error: activeError } = await supabase.from("bookings")
+              .select("id,provider_id,provider_service_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,provider_services(title,duration_minutes,business_id,is_active,archived_at)")
+              .eq("client_id", userId).in("status", ["pending", "confirmed", "in_progress"])
+              .or(`ends_at.gte.${now},status.eq.in_progress`).order("starts_at", { ascending: true })
+              .range(offset, offset + clientBookingPageSize - 1);
+            if (activeError) throw activeError;
+            const batch = (activeData ?? []) as unknown as BookingQueryRow[];
+            activeItems.push(...batch);
+            if (batch.length < clientBookingPageSize) break;
+          }
+          setActiveClientBookingItems(await decorateClientBookings(activeItems));
+          const [upcomingCount, pendingCount, pastCount] = await Promise.all([
+            supabase.from("bookings").select("id", { count: "exact", head: true }).eq("client_id", userId).in("status", ["confirmed", "in_progress"]).or(`ends_at.gte.${now},status.eq.in_progress`),
+            supabase.from("bookings").select("id", { count: "exact", head: true }).eq("client_id", userId).eq("status", "pending").gte("ends_at", now),
+            supabase.from("bookings").select("id", { count: "exact", head: true }).eq("client_id", userId).lt("ends_at", now).neq("status", "in_progress"),
+          ]);
+          const countsError = upcomingCount.error ?? pendingCount.error ?? pastCount.error;
+          if (countsError) throw countsError;
+          setClientBookingStats({ upcoming: upcomingCount.count ?? 0, pending: pendingCount.count ?? 0, past: pastCount.count ?? 0 });
+        } else {
+          setClientBookingItems([]);
+          setActiveClientBookingItems([]);
+          setClientBookingStats({ upcoming: 0, pending: 0, past: 0 });
+          setBookingsHaveMore(false);
+        }
 
         if (role === "client") {
           const [accountResult, clientResult] = await Promise.all([
@@ -199,12 +314,36 @@ export function LiveDashboard({
     } finally {
       setLoading(false);
     }
-  }, [role, userId]);
+  }, [moduleKey, role, userId]);
 
   useEffect(() => {
     const task = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(task);
   }, [load]);
+
+  useEffect(() => {
+    if (role !== "client" || moduleKey !== "bookings") return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    let reloadTimer: number | undefined;
+    const channel = supabase.channel(`client-bookings:${userId}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "bookings",
+        filter: `client_id=eq.${userId}`,
+      }, () => {
+        if (reloadTimer !== undefined) window.clearTimeout(reloadTimer);
+        reloadTimer = window.setTimeout(() => void load(), 150);
+      })
+      .subscribe();
+    const refreshFallback = window.setInterval(() => void load(), 60_000);
+    return () => {
+      if (reloadTimer !== undefined) window.clearTimeout(reloadTimer);
+      window.clearInterval(refreshFallback);
+      void supabase.removeChannel(channel);
+    };
+  }, [load, moduleKey, role, userId]);
 
   useEffect(() => {
     if (!loading && window.location.hash.startsWith("#booking-")) document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: "center" });
@@ -240,6 +379,23 @@ export function LiveDashboard({
       return;
     }
     setFeedback("Réservation mise à jour.");
+    await load();
+  }
+
+  async function cancelClientBooking(booking: ClientBookingItem) {
+    if (!canTransitionBooking(booking.status, "cancelled_by_client")) {
+      setFeedback("Cette réservation ne peut plus être annulée depuis votre espace.");
+      return;
+    }
+    if (!window.confirm(`Annuler le rendez-vous « ${booking.serviceName} » chez ${booking.providerName} ?`)) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error: updateError } = await supabase.from("bookings").update({ status: "cancelled_by_client" }).eq("id", booking.id).eq("client_id", userId);
+    if (updateError) {
+      setFeedback(publicErrorMessage(updateError, "La réservation n’a pas pu être annulée."));
+      return;
+    }
+    setFeedback("Votre rendez-vous a été annulé.");
     await load();
   }
 
@@ -439,7 +595,14 @@ export function LiveDashboard({
           </article>
         )}
 
-        {role !== "admin" && show("dashboard", "bookings") && (
+        {role === "client" && moduleKey === "bookings" && (
+          <article className="panel" id="live-bookings">
+            <div className="panel-heading"><div><h2>Mes réservations</h2><p>Une carte par salon ou professionnel, avec l’historique complet de vos rendez-vous.</p></div><button onClick={() => void load()}>Actualiser</button></div>
+            {loading ? <div className="compact-empty" role="status">Chargement de vos réservations…</div> : <ClientBookingGroups items={[...activeClientBookingItems, ...clientBookingItems]} clientId={userId} stats={clientBookingStats} onCancel={(booking) => void cancelClientBooking(booking)} onMessage={(booking) => { setMessageBooking({ id: booking.id, serviceTitle: booking.serviceName }); window.setTimeout(() => document.getElementById("booking-conversation")?.scrollIntoView({ behavior: "smooth" }), 0); }} />}
+            {bookingsHaveMore && <button className="client-booking-load-more" type="button" onClick={() => void loadMoreClientBookings()} disabled={loadingMoreBookings}>{loadingMoreBookings ? "Chargement…" : "Charger les rendez-vous plus anciens"}</button>}
+          </article>
+        )}
+        {role !== "admin" && !(role === "client" && moduleKey === "bookings") && show("dashboard", "bookings") && (
           <article className="panel" id="live-bookings">
             <div className="panel-heading"><h2>Réservations</h2><button onClick={() => void load()}>Actualiser</button></div>
             {!loading && bookings.length === 0 && <div className="compact-empty">Aucun rendez-vous pour le moment.</div>}
@@ -463,7 +626,7 @@ export function LiveDashboard({
                   {role === "provider" && booking.status === "in_progress" && <button onClick={() => void updateStatus(booking, "completed")}>Terminer</button>}
                   {role === "client" && ["pending", "confirmed"].includes(booking.status) && <button onClick={() => void updateStatus(booking, "cancelled_by_client")}>Annuler</button>}
                   <button onClick={() => {
-                    setMessageBooking(booking);
+                    setMessageBooking({ id: booking.id, serviceTitle: booking.provider_services?.title ?? "Rendez-vous" });
                     window.setTimeout(() => document.getElementById("booking-conversation")?.scrollIntoView({ behavior: "smooth" }), 0);
                   }}>Messages</button>
                 </div>
@@ -475,7 +638,7 @@ export function LiveDashboard({
           <BookingMessages
             key={messageBooking.id}
             bookingId={messageBooking.id}
-            serviceTitle={messageBooking.provider_services?.title ?? "Prestation beauté"}
+            serviceTitle={messageBooking.serviceTitle}
             userId={userId}
             onClose={() => setMessageBooking(null)}
           />
@@ -485,3 +648,4 @@ export function LiveDashboard({
     </main>
   );
 }
+
