@@ -122,7 +122,7 @@ export function LiveDashboard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [messageBooking, setMessageBooking] = useState<BookingRow | null>(null);
+  const [messageBooking, setMessageBooking] = useState<{ id: string; serviceTitle: string } | null>(null);
 
   const clientBookingPageSize = 50;
 
@@ -347,6 +347,23 @@ export function LiveDashboard({
     await load();
   }
 
+  async function cancelClientBooking(booking: ClientBookingItem) {
+    if (!canTransitionBooking(booking.status, "cancelled_by_client")) {
+      setFeedback("Cette réservation ne peut plus être annulée depuis votre espace.");
+      return;
+    }
+    if (!window.confirm(`Annuler le rendez-vous « ${booking.serviceName} » chez ${booking.providerName} ?`)) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error: updateError } = await supabase.from("bookings").update({ status: "cancelled_by_client" }).eq("id", booking.id).eq("client_id", userId);
+    if (updateError) {
+      setFeedback(publicErrorMessage(updateError, "La réservation n’a pas pu être annulée."));
+      return;
+    }
+    setFeedback("Votre rendez-vous a été annulé.");
+    await load();
+  }
+
   async function saveProviderProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
@@ -546,7 +563,7 @@ export function LiveDashboard({
         {role === "client" && moduleKey === "bookings" && (
           <article className="panel" id="live-bookings">
             <div className="panel-heading"><div><h2>Mes réservations</h2><p>Une carte par salon ou professionnel, avec l’historique complet de vos rendez-vous.</p></div><button onClick={() => void load()}>Actualiser</button></div>
-            {loading ? <div className="compact-empty" role="status">Chargement de vos réservations…</div> : clientBookingItems.length === 0 && activeClientBookingItems.length === 0 ? <div className="compact-empty">Aucun rendez-vous pour le moment.</div> : <ClientBookingGroups items={[...activeClientBookingItems, ...clientBookingItems]} />}
+            {loading ? <div className="compact-empty" role="status">Chargement de vos réservations…</div> : clientBookingItems.length === 0 && activeClientBookingItems.length === 0 ? <div className="compact-empty">Aucun rendez-vous pour le moment.</div> : <ClientBookingGroups items={[...activeClientBookingItems, ...clientBookingItems]} clientId={userId} onCancel={(booking) => void cancelClientBooking(booking)} onMessage={(booking) => { setMessageBooking({ id: booking.id, serviceTitle: booking.serviceName }); window.setTimeout(() => document.getElementById("booking-conversation")?.scrollIntoView({ behavior: "smooth" }), 0); }} />}
             {bookingsHaveMore && <button className="client-booking-load-more" type="button" onClick={() => void loadMoreClientBookings()} disabled={loadingMoreBookings}>{loadingMoreBookings ? "Chargement…" : "Charger les rendez-vous plus anciens"}</button>}
           </article>
         )}
@@ -574,7 +591,7 @@ export function LiveDashboard({
                   {role === "provider" && booking.status === "in_progress" && <button onClick={() => void updateStatus(booking, "completed")}>Terminer</button>}
                   {role === "client" && ["pending", "confirmed"].includes(booking.status) && <button onClick={() => void updateStatus(booking, "cancelled_by_client")}>Annuler</button>}
                   <button onClick={() => {
-                    setMessageBooking(booking);
+                    setMessageBooking({ id: booking.id, serviceTitle: booking.provider_services?.title ?? "Rendez-vous" });
                     window.setTimeout(() => document.getElementById("booking-conversation")?.scrollIntoView({ behavior: "smooth" }), 0);
                   }}>Messages</button>
                 </div>
@@ -586,7 +603,7 @@ export function LiveDashboard({
           <BookingMessages
             key={messageBooking.id}
             bookingId={messageBooking.id}
-            serviceTitle={messageBooking.provider_services?.title ?? "Prestation beauté"}
+            serviceTitle={messageBooking.serviceTitle}
             userId={userId}
             onClose={() => setMessageBooking(null)}
           />

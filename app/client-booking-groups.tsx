@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { groupClientBookings, type ClientBookingItem } from "@/lib/domain/client-bookings";
+import { BookingReview } from "./booking-review";
 import "./client-booking-groups.css";
 
 const labels: Record<ClientBookingItem["status"], string> = {
@@ -14,7 +15,7 @@ const labels: Record<ClientBookingItem["status"], string> = {
 const money = (amount: number, currency: string) => `${amount.toLocaleString("fr-FR")} ${currency}`;
 const dateTime = (value: string) => new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(value));
 
-export function ClientBookingGroups({ items }: { items: readonly ClientBookingItem[] }) {
+export function ClientBookingGroups({ items, clientId, onMessage, onCancel }: { items: readonly ClientBookingItem[]; clientId: string; onMessage: (booking: ClientBookingItem) => void; onCancel: (booking: ClientBookingItem) => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const groups = groupClientBookings(items);
 
@@ -50,6 +51,11 @@ export function ClientBookingGroups({ items }: { items: readonly ClientBookingIt
             <span className={`client-booking-status client-booking-status--${booking.status === "confirmed" || booking.status === "completed" || booking.status === "in_progress" ? "confirmed" : booking.status === "pending" ? "pending" : ["declined", "cancelled_by_client", "cancelled_by_provider"].includes(booking.status) ? "closed" : "empty"}`}><i aria-hidden="true" />{labels[booking.status]}</span>
             <div><strong>{booking.serviceName}</strong><time dateTime={booking.startsAt}>{dateTime(booking.startsAt)}</time></div>
             <b>{money(booking.amount, booking.currency)}</b>
+            <div className="client-booking-timeline__actions">
+              <button type="button" onClick={() => onMessage(booking)}>Messages</button>
+              {booking.status === "completed" && <BookingReview bookingId={booking.id} clientId={clientId} providerId={booking.providerId} performer={null} />}
+              {["pending", "confirmed"].includes(booking.status) && <button type="button" className="client-booking-cancel" onClick={() => onCancel(booking)}>Annuler</button>}
+            </div>
           </li>)}
         </ol>}
       </article>;
