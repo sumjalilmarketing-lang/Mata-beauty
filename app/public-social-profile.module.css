@@ -6,3 +6,13 @@
 @media(prefers-reduced-motion:reduce){.videoTile img,.videoFrame,.videoCoverFallback{transition:none}}
 
 .videoPreview,.videoFrame,.videoCoverFallback{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .25s,opacity .2s}.videoTile video{display:block}.videoTile:hover .videoFrame,.videoTile:hover .videoCoverFallback{transform:scale(1.04)}.videoFramePlaceholder,.videoFallback{position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:linear-gradient(140deg,#f8d7e3,#d7c9cb);color:#7b2745;font-size:13px;font-weight:700}.videoFallback{width:auto;height:auto;font-size:14px;letter-spacing:.02em}.playerService{display:block;margin-top:10px;color:#4b2635;font-size:14px;font-weight:700}
+
+.ownerHub{width:min(1120px,calc(100% - 40px));margin:18px auto 24px;padding:20px;border:1px solid #f1d6e0;border-radius:18px;background:#fff;box-shadow:0 8px 24px #3913210a}
+.ownerHub h2{margin:0 0 12px;color:#24151b;font-size:18px}.ownerLinks{display:flex;flex-wrap:wrap;gap:9px}
+.ownerLinks a{display:inline-flex;align-items:center;min-height:42px;padding:9px 13px;border:1px solid #ead6de;border-radius:999px;background:#fff;color:#512039;font-weight:700;text-decoration:none}
+.ownerLinks a:hover,.ownerLinks a:focus-visible{border-color:#ad1457;background:#fff2f7;outline:2px solid #ad1457;outline-offset:2px}
+.applicationCard{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:16px;padding:16px;border-radius:14px;background:#fff3f7}
+.applicationCard h3{margin:0;color:#391321;font-size:16px}.applicationCard p{margin:5px 0 0;color:#4b3640;font-size:14px}
+.applicationCard>a{flex:none;padding:11px 16px;border-radius:10px;background:#ad1457;color:#fff;font-weight:800;text-decoration:none}
+.profileEditor{width:min(1120px,calc(100% - 40px));margin:0 auto 24px}
+@media(max-width:760px){.ownerHub{width:100%;margin:10px 0 18px;padding:16px;border-radius:0;border-left:0;border-right:0}.ownerLinks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ownerLinks a{justify-content:center;text-align:center;font-size:13px;padding:8px}.applicationCard{align-items:stretch;flex-direction:column}.profileEditor{width:100%;padding:0 12px}}

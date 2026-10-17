@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 type SearchParams = Record<string, string | string[] | undefined>;
 export default async function ClientWorkspace({ params, searchParams }: { params: Promise<{ module?: string[] }>; searchParams?: Promise<SearchParams> }) {
   const { module = [] } = await params;
+  if (module[0] === "settings") redirect("/app/profile?edit=1");
+  if (module[0] === "social-profile") redirect("/app/profile");
   if (module[0] === "discover") {
     const legacy = await searchParams;
     const first = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value;

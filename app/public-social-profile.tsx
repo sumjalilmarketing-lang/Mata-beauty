@@ -6,11 +6,12 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { PublicSocialProfileData, SocialProfilePost } from "@/lib/profiles/public-social-profile";
 import { SocialProfileVideoFrame } from "./social-profile-video-frame";
+import { ClientControlCenter } from "./client-control-center";
 import styles from "./public-social-profile.module.css";
 
 type TabKey = "videos" | "favorites" | "services" | "reviews" | "following";
 
-export function PublicSocialProfile({ profile, initialVideoId = null }: { profile: PublicSocialProfileData; initialVideoId?: string | null }) {
+export function PublicSocialProfile({ profile, initialVideoId = null, initialEditMode = false }: { profile: PublicSocialProfileData; initialVideoId?: string | null; initialEditMode?: boolean }) {
   const [tab, setTab] = useState<TabKey>("videos");
   const [selectedVideo, setSelectedVideo] = useState<SocialProfilePost | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -18,6 +19,8 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
   const [contactOpen, setContactOpen] = useState(false);
   const [videoRenewing, setVideoRenewing] = useState(false);
   const [notice, setNotice] = useState("");
+  const [editorOpen, setEditorOpen] = useState(initialEditMode);
+  const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   const profilePath = profile.kind === "client" ? "/u/" + encodeURIComponent(profile.slug)
     : profile.kind === "salon" ? "/salons/" + encodeURIComponent(profile.slug)
       : "/professional/" + encodeURIComponent(profile.slug);
@@ -36,6 +39,15 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
     }
     return () => { active = false; };
   }, [initialVideoId, profile.favorites, profile.posts]);
+
+  useEffect(() => {
+    let active = true;
+    const client = getSupabaseBrowserClient();
+    if (!client || profile.kind !== "client" || !profile.isOwner) return () => { active = false; };
+    void client.from("professional_onboarding").select("status").eq("provider_id", profile.id).maybeSingle()
+      .then(({ data }) => { if (active) setApplicationStatus(data?.status ?? null); });
+    return () => { active = false; };
+  }, [profile.id, profile.kind, profile.isOwner]);
 
   useEffect(() => {
     let active = true;
@@ -160,8 +172,8 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
 
       <div className={styles.actions}>
         {profile.kind === "client" ? profile.isOwner ? <>
-          <Link className={styles.primaryButton} href="/app/settings">Modifier le profil</Link>
-          <Link className={styles.secondaryButton} href="/app/bookings">Mes réservations</Link>
+          <button className={styles.primaryButton} type="button" aria-expanded={editorOpen} aria-controls="profile-editor" onClick={() => setEditorOpen(open => !open)}>{editorOpen ? "Fermer l’édition" : "Modifier mon profil"}</button>
+          <Link className={styles.secondaryButton} href="/app/bookings">Mes rendez-vous</Link>
           <Link className={styles.secondaryButton} href="/app/messages">Mes messages</Link>
         </> : <button className={styles.secondaryButton} type="button" onClick={() => void shareProfile()}>Partager</button> : <>
           {profile.services.length > 0 && <Link className={styles.primaryButton} href={bookingHref(firstService!.id)} onClick={openBooking}>Réserver</Link>}
@@ -170,6 +182,25 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
           {profile.isOwner && <Link className={styles.secondaryButton} href={profile.kind === "salon" ? "/salon/profile" : "/pro/profile"}>Modifier</Link>}
         </>}
       </div>
+      {profile.kind === "client" && profile.isOwner && <section className={styles.ownerHub} aria-label="Mon compte MATA Beauty">
+        <h2>Mon compte</h2>
+        <nav className={styles.ownerLinks} aria-label="Raccourcis personnels">
+          <Link href="/app/bookings">Rendez-vous et historique</Link>
+          <Link href="/app/notifications">Notifications</Link>
+          <Link href="/app/favorites">Professionnels favoris</Link>
+          <Link href="/app/inspirations">Contenus enregistrés</Link>
+          <Link href="/app/settings?edit=1">Paramètres et confidentialité</Link>
+        </nav>
+        <article className={styles.applicationCard}>
+          <div><h3>Devenir professionnel MATA Beauty</h3>
+            <p>{applicationStatus ? applicationStatus === "verified" ? "Votre activité est approuvée." : applicationStatus === "submitted" || applicationStatus === "under_review" ? "Votre candidature est en cours de vérification." : applicationStatus === "rejected" ? "Votre candidature a été refusée. Consultez votre dossier pour connaître la suite." : "Votre candidature est enregistrée." : "Déposez votre candidature depuis votre compte actuel."}</p>
+          </div>
+          <Link href={applicationStatus === "verified" ? "/pro" : "/app/application"}>{applicationStatus === "verified" ? "Espace professionnel" : applicationStatus ? "Suivre ma candidature" : "Déposer une candidature"}</Link>
+        </article>
+      </section>}
+      {profile.kind === "client" && profile.isOwner && editorOpen && <section className={styles.profileEditor} id="profile-editor" aria-label="Modifier mon profil et mes paramètres">
+        <ClientControlCenter userId={profile.id} section="settings" embedded />
+      </section>}
       {profile.salon && profile.kind === "professional" && <Link className={styles.salonLink} href={"/salons/" + encodeURIComponent(profile.salon.slug)}>
         <span>Découvrir le salon</span><strong>{profile.salon.name}</strong>{profile.salon.city && <small>{profile.salon.city}</small>}<b>›</b>
       </Link>}
