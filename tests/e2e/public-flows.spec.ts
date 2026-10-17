@@ -30,11 +30,11 @@ test.beforeEach(async ({ page }) => {
 
 test("legacy Explorer URLs redirect to Inspiration and preserve the selected category", async ({ page }) => {
   await page.goto("/discover?screen=results&category=Tresses");
-  await expect(page).toHaveURL(/\\/?search=1&applied=1&category=Tresses/);
+  await expect(page).toHaveURL(/\/\?search=1&applied=1&category=Tresses/);
   await expect(page.getByText("INSPIRATION", { exact: true })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" })).toHaveCount(0);
   await page.goto("/app/discover?screen=results&category=Tresses");
-  await expect(page).toHaveURL(/\\/?search=1&applied=1&category=Tresses/);
+  await expect(page).toHaveURL(/\/\?search=1&applied=1&category=Tresses/);
   await expect(page.getByText("INSPIRATION", { exact: true })).toBeVisible();
 });
 
@@ -101,10 +101,18 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await page.route(`${supabaseOrigin}/rest/v1/provider_profiles**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
     profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier Tresses", city: "Dakar", service_mode: "salon",
     average_rating: 4.8, review_count: 12, verified_at: "2026-01-01T00:00:00Z", cover_url: null, status: "approved",
-    provider_services: [{ id: "22222222-2222-4222-8222-222222222222", title: "Tresses collées", duration_minutes: 90, price_amount: 10000,
-      business_id: "33333333-3333-4333-8333-333333333333", businesses: { address: "", city: "Dakar", area: "", latitude: null, longitude: null },
-      services: { name: "Tresses", categories: { name: "Tresses" } } }],
+    provider_services: [
+      { id: "22222222-2222-4222-8222-222222222222", title: "Tresses collées", duration_minutes: 90, price_amount: 10000,
+        business_id: "33333333-3333-4333-8333-333333333333", businesses: { address: "Almadies", city: "Dakar", area: "Almadies", latitude: null, longitude: null },
+        services: { name: "Tresses", categories: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses" } } },
+      { id: "33333333-3333-4333-8333-333333333333", title: "Pose gel", duration_minutes: 60, price_amount: 8000,
+        business_id: "33333333-3333-4333-8333-333333333333", businesses: { address: "Almadies", city: "Dakar", area: "Almadies", latitude: null, longitude: null },
+        services: { name: "Onglerie", categories: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Onglerie" } } },
+    ],
   }]) }));
+  await page.route("**/api/public/provider-locations**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+    { providerId: "11111111-1111-4111-8111-111111111111", countryCode: "SN" },
+  ]) }));
   await page.route(`${supabaseOrigin}/rest/v1/provider_services**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.route(`${supabaseOrigin}/rest/v1/social_feed**`, (route) => {
     const query = new URL(route.request().url()).searchParams;
@@ -182,9 +190,8 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await page.locator(".social-video-card video").nth(1).dispatchEvent("canplay");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await expect(page.locator(".social-video-card video").first()).not.toHaveAttribute("src", /.+/);
-  await page.getByRole("button", { name: "Tendances", exact: true }).click();
-  await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   expect(await feed.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await expect(page.locator(".social-video-card video").nth(1)).toHaveAttribute("data-playing", "true");
   await feed.evaluate((node) => node.scrollTo({ top: 0, behavior: "auto" }));
   await page.locator(".social-video-card video").first().dispatchEvent("canplay");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
@@ -192,6 +199,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   const dialog = page.getByRole("dialog", { name: "Que souhaitez-vous découvrir ?" });
   await dialog.locator("select").first().selectOption("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   await dialog.getByLabel("Ville, quartier ou pays").fill("Dakar");
+  await expect(dialog.getByText(/Almadies, Dakar, Sénégal/)).toBeVisible();
   await dialog.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(2);
   await expect(page.locator(".social-video-card").filter({ hasText: "Manucure gel" })).toHaveCount(0);

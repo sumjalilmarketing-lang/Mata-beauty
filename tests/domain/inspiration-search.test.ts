@@ -31,6 +31,35 @@ describe("Inspiration discovery filters", () => {
       .toEqual([posts[0]]);
   });
 
+  it.each([
+    ["Coiffure femme", "category-women"],
+    ["Coiffure homme", "category-men"],
+    ["Tresses africaines", "category-braids"],
+    ["Locks", "category-locks"],
+    ["Onglerie", "category-nails"],
+    ["Cils", "category-lashes"],
+    ["Maquillage", "category-makeup"],
+    ["Spa", "category-spa"],
+  ])("returns only videos for the exact %s category id", (category, categoryId) => {
+    const provider: InspirationSearchProvider = {
+      ...providerA,
+      profileId: `provider-${categoryId}`,
+      serviceId: `service-${categoryId}`,
+      categoryId,
+      name: `Studio ${category}`,
+      specialty: category,
+      category,
+    };
+    const post: InspirationSearchPost = {
+      ...posts[0],
+      authorId: provider.profileId,
+      serviceId: provider.serviceId,
+      businessName: provider.name,
+      serviceTitle: category,
+    };
+    expect(filterInspirationPosts([post, posts[0]], [provider], filters({ categoryId }))).toEqual([post]);
+  });
+
   it("searches names without accent or case sensitivity", () => {
     expect(filterInspirationPosts(posts, [providerA, providerB], filters({ query: "elegance dakar" })))
       .toEqual([posts[0], posts[1], posts[2]]);

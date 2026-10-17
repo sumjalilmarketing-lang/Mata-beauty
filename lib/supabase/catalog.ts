@@ -61,7 +61,6 @@ type ProviderRecord = {
   cover_url: string | null;
   latitude: number | string | null;
   longitude: number | string | null;
-  profiles: { country_code: string | null } | null;
   provider_services: Array<{
     id: string;
     title: string;
@@ -73,13 +72,40 @@ type ProviderRecord = {
   }>;
 };
 
+type PublicProviderLocation = { providerId: string; countryCode: string | null };
+
+async function fetchPublicProviderLocations(profileIds: string[], signal?: AbortSignal) {
+  const locations = new Map<string, string>();
+  if (typeof window === "undefined") return locations;
+  for (let offset = 0; offset < profileIds.length; offset += 100) {
+    const ids = profileIds.slice(offset, offset + 100);
+    try {
+      const response = await fetch(`/api/public/provider-locations?ids=${encodeURIComponent(ids.join(","))}`, {
+        signal,
+        cache: "no-store",
+      });
+      if (!response.ok) continue;
+      const result: unknown = await response.json();
+      if (!Array.isArray(result)) continue;
+      for (const item of result as PublicProviderLocation[]) {
+        if (item && typeof item.providerId === "string" && typeof item.countryCode === "string" && /^[A-Z]{2}$/.test(item.countryCode)) {
+          locations.set(item.providerId, item.countryCode);
+        }
+      }
+    } catch {
+      if (signal?.aborted) break;
+    }
+  }
+  return locations;
+}
+
 export async function fetchPublishedProviders(client: SupabaseClient, providerId?: string, signal?: AbortSignal): Promise<CatalogProvider[]> {
   const records: ProviderRecord[] = [];
   for (let offset = 0; ; offset += 100) {
     let query = client
     .from("provider_profiles")
     .select(`
-      profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,cover_url,latitude,longitude,profiles(country_code),
+      profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,cover_url,latitude,longitude,
       provider_services!inner(
         id,title,duration_minutes,price_amount,business_id,
         businesses(address,city,area,latitude,longitude),
@@ -102,6 +128,7 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
   }
 
   const serviceIds = records.flatMap(provider => provider.provider_services.map(service => service.id));
+  const countryCodes = await fetchPublicProviderLocations([...new Set(records.map(provider => provider.profile_id))], signal);
   const covers = new Map<string, string>();
   const postIds = new Map<string, string>();
   // Optional enrichment: older catalog schemas can still use exact-category editorial media.
@@ -146,15 +173,15 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
       name: provider.business_name,
       specialty: service.title || service.services?.name || "Prestation beauté",
       category: service.services?.categories?.name || "Beauté",
-      area: [service.businesses?.area, service.businesses?.city ?? provider.city, countryName(provider.profiles?.country_code)]
+      area: [service.businesses?.area, service.businesses?.city ?? provider.city, countryName(countryCodes.get(provider.profile_id))]
         .filter((value): value is string => Boolean(value)).join(", "),
       address: service.businesses?.address || undefined,
       coordinates: service.businesses?.latitude != null && service.businesses.longitude != null
         ? { latitude: Number(service.businesses.latitude), longitude: Number(service.businesses.longitude) }
         : provider.latitude != null && provider.longitude != null
           ? { latitude: Number(provider.latitude), longitude: Number(provider.longitude) } : undefined,
-      countryCode: provider.profiles?.country_code ?? undefined,
-      country: countryName(provider.profiles?.country_code),
+      countryCode: countryCodes.get(provider.profile_id),
+      country: countryName(countryCodes.get(provider.profile_id)),
       price: service.price_amount,
       rating: Number(provider.average_rating),
       reviews: provider.review_count,
