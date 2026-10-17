@@ -20,7 +20,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
   const [videoRenewing, setVideoRenewing] = useState(false);
   const [notice, setNotice] = useState("");
   const [editorOpen, setEditorOpen] = useState(initialEditMode);
-  const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
+  const [applicationStatus, setApplicationStatus] = useState<string | null | "loading" | "unavailable">("loading");
   const profilePath = profile.kind === "client" ? "/u/" + encodeURIComponent(profile.slug)
     : profile.kind === "salon" ? "/salons/" + encodeURIComponent(profile.slug)
       : "/professional/" + encodeURIComponent(profile.slug);
@@ -45,7 +45,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
     const client = getSupabaseBrowserClient();
     if (!client || profile.kind !== "client" || !profile.isOwner) return () => { active = false; };
     void client.from("professional_onboarding").select("status").eq("provider_id", profile.id).maybeSingle()
-      .then(({ data }) => { if (active) setApplicationStatus(data?.status ?? null); });
+      .then(({ data, error }) => { if (active) setApplicationStatus(error ? "unavailable" : data?.status ?? null); });
     return () => { active = false; };
   }, [profile.id, profile.kind, profile.isOwner]);
 
@@ -193,7 +193,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
         </nav>
         <article className={styles.applicationCard}>
           <div><h3>Devenir professionnel MATA Beauty</h3>
-            <p>{applicationStatus ? applicationStatus === "verified" ? "Votre activité est approuvée." : applicationStatus === "submitted" || applicationStatus === "under_review" ? "Votre candidature est en cours de vérification." : applicationStatus === "rejected" ? "Votre candidature a été refusée. Consultez votre dossier pour connaître la suite." : "Votre candidature est enregistrée." : "Déposez votre candidature depuis votre compte actuel."}</p>
+            <p>{applicationStatus === "loading" ? "Chargement du statut de votre candidature…" : applicationStatus === "unavailable" ? "Le statut sera consultable dans votre dossier professionnel." : applicationStatus === "verified" ? "Votre activité est approuvée." : applicationStatus === "submitted" || applicationStatus === "under_review" ? "Votre candidature est en cours de vérification." : applicationStatus === "rejected" ? "Votre candidature a été refusée. Consultez votre dossier pour connaître la suite." : applicationStatus ? "Votre candidature est enregistrée." : "Aucune candidature n’a encore été commencée."}</p>
           </div>
           <Link href={applicationStatus === "verified" ? "/pro" : "/app/application"}>{applicationStatus === "verified" ? "Espace professionnel" : applicationStatus ? "Suivre ma candidature" : "Déposer une candidature"}</Link>
         </article>
