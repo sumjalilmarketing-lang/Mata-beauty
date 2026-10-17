@@ -38,15 +38,15 @@ export function ClientControlCenter({ userId, section = "settings", embedded = f
         await supabase.rpc("initialize_client_control_center").abortSignal(controller.signal);
         return Promise.all([
           supabase.rpc("get_my_private_profile").abortSignal(controller.signal),
-          supabase.from("client_profiles").select("city,neighborhood").eq("profile_id",userId).single().abortSignal(controller.signal),
+          supabase.from("client_profiles").select("city,neighborhood").eq("profile_id",userId).abortSignal(controller.signal).single(),
           supabase.from("follows").select("follower_id",{count:"exact",head:true}).eq("follower_id",userId).abortSignal(controller.signal),
           supabase.from("post_saves").select("post_id",{count:"exact",head:true}).eq("profile_id",userId).abortSignal(controller.signal),
           supabase.from("bookings").select("id",{count:"exact",head:true}).eq("client_id",userId).abortSignal(controller.signal),
           supabase.from("payments").select("id,amount,currency,payment_method,payment_status,provider_reference,created_at,bookings!inner(client_id,provider_services(title))").eq("bookings.client_id",userId).order("created_at",{ascending:false}).limit(20).abortSignal(controller.signal),
           supabase.from("reviews").select("id,rating,comment,provider_reply,is_visible,created_at,collaborator_name").eq("client_id",userId).order("created_at",{ascending:false}).abortSignal(controller.signal),
           supabase.from("support_tickets").select("id,subject,status,created_at").eq("requester_id",userId).order("created_at",{ascending:false}).limit(10).abortSignal(controller.signal),
-          supabase.from("profile_privacy_settings").select("*").eq("profile_id",userId).single().abortSignal(controller.signal),
-          supabase.from("profile_preferences").select("*").eq("profile_id",userId).single().abortSignal(controller.signal),
+          supabase.from("profile_privacy_settings").select("*").eq("profile_id",userId).abortSignal(controller.signal).single(),
+          supabase.from("profile_preferences").select("*").eq("profile_id",userId).abortSignal(controller.signal).single(),
         ]);
       })(),12_000,()=>controller.abort());
       if(profile.error || client.error || !profile.data || !client.data) {
