@@ -312,6 +312,30 @@ export function LiveDashboard({
   }, [load]);
 
   useEffect(() => {
+    if (role !== "client" || moduleKey !== "bookings") return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    let reloadTimer: number | undefined;
+    const channel = supabase.channel(`client-bookings:${userId}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "bookings",
+        filter: `client_id=eq.${userId}`,
+      }, () => {
+        if (reloadTimer !== undefined) window.clearTimeout(reloadTimer);
+        reloadTimer = window.setTimeout(() => void load(), 150);
+      })
+      .subscribe();
+    const refreshFallback = window.setInterval(() => void load(), 60_000);
+    return () => {
+      if (reloadTimer !== undefined) window.clearTimeout(reloadTimer);
+      window.clearInterval(refreshFallback);
+      void supabase.removeChannel(channel);
+    };
+  }, [load, moduleKey, role, userId]);
+
+  useEffect(() => {
     if (!loading && window.location.hash.startsWith("#booking-")) document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: "center" });
   }, [loading, bookings]);
 
