@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   ...(process.env.MATA_E2E_NEXT_DIST_DIR ? { distDir: process.env.MATA_E2E_NEXT_DIST_DIR } : {}),
   ...(process.env.MATA_E2E_TSCONFIG ? { typescript: { tsconfigPath: process.env.MATA_E2E_TSCONFIG } } : {}),
   poweredByHeader: false,
+  allowedDevOrigins: ["localhost", "127.0.0.1"],
   turbopack: { root: process.cwd() },
   env: {
     NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? "local",
@@ -20,7 +21,9 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     const developmentEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
-    const upgradeInsecureRequests = process.env.NODE_ENV === "production" ? "; upgrade-insecure-requests" : "";
+    const upgradeInsecureRequests = process.env.NODE_ENV === "production" && !process.env.MATA_E2E_NEXT_DIST_DIR
+      ? "; upgrade-insecure-requests"
+      : "";
     const configuredSupabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin : null;
     const documentFrameSource = configuredSupabaseOrigin ? `${configuredSupabaseOrigin}/storage/v1/object/sign/provider-documents/` : "'none'";
     const supabaseConnectSource = configuredSupabaseOrigin ? ` ${configuredSupabaseOrigin}` : "";

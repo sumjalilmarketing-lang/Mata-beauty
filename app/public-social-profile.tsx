@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { PublicSocialProfileData, SocialProfilePost } from "@/lib/profiles/public-social-profile";
 import { SocialProfileVideoFrame } from "./social-profile-video-frame";
@@ -106,6 +106,13 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
     }
   }
   function bookingHref(serviceId: string) { return "/?service=" + encodeURIComponent(serviceId); }
+  function openBooking(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    // A full navigation guarantees the root page receives the service query
+    // when Next reuses the existing client tree for a query-only route.
+    window.location.assign(event.currentTarget.href);
+  }
 
   const tabItems: { key: TabKey; label: string }[] = profile.kind === "client"
     ? [{ key: "videos", label: "Publications" }, { key: "favorites", label: "Favoris" }, ...(profile.canShowFollows ? [{ key: "following" as const, label: "Abonnements" }] : [])]
@@ -157,7 +164,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
           <Link className={styles.secondaryButton} href="/app/bookings">Mes réservations</Link>
           <Link className={styles.secondaryButton} href="/app/messages">Mes messages</Link>
         </> : <button className={styles.secondaryButton} type="button" onClick={() => void shareProfile()}>Partager</button> : <>
-          {profile.services.length > 0 && <Link className={styles.primaryButton} href={bookingHref(firstService!.id)}>Réserver</Link>}
+          {profile.services.length > 0 && <Link className={styles.primaryButton} href={bookingHref(firstService!.id)} onClick={openBooking}>Réserver</Link>}
           <button className={styles.secondaryButton} type="button" onClick={() => setContactOpen(true)}>Contacter</button>
           {!profile.isOwner && <button className={styles.followButton} type="button" disabled={followBusy} onClick={() => void follow()}>{followBusy ? "…" : isFollowing ? "Abonné ✓" : "Suivre"}</button>}
           {profile.isOwner && <Link className={styles.secondaryButton} href={profile.kind === "salon" ? "/salon/profile" : "/pro/profile"}>Modifier</Link>}
@@ -205,7 +212,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
         <button className={styles.closeButton} type="button" onClick={() => setContactOpen(false)} aria-label="Fermer">×</button>
         <span className={styles.eyebrow}>CONTACTER</span><h2 id="profile-contact-title">{profile.name}</h2>
         <p>Les échanges MATA Beauty sont rattachés aux rendez-vous afin de garder le contexte de la prestation.</p>
-        {firstService ? <Link className={styles.primaryButton} href={"/?service=" + encodeURIComponent(firstService.id)}>Réserver pour démarrer un échange</Link> : <p className={styles.empty}>Aucune prestation réservable n’est publiée pour le moment.</p>}
+        {firstService ? <Link className={styles.primaryButton} href={bookingHref(firstService.id)} onClick={openBooking}>Réserver pour démarrer un échange</Link> : <p className={styles.empty}>Aucune prestation réservable n’est publiée pour le moment.</p>}
         <Link className={styles.secondaryButton} href="/app/messages">Voir mes conversations</Link>
       </section>
     </div>}
@@ -218,7 +225,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
           {selectedVideo.authorSlug && <Link href={"/professional/" + encodeURIComponent(selectedVideo.authorSlug)}>Voir le profil professionnel</Link>}
           {selectedVideoService && <>
             <span className={styles.playerService}>{selectedVideoService.title} · {formatMoney(selectedVideoService.priceAmount, selectedVideoService.currency)}</span>
-            <Link href={bookingHref(selectedVideoService.id)}>Réserver cette prestation</Link>
+            <Link href={bookingHref(selectedVideoService.id)} onClick={openBooking}>Réserver cette prestation</Link>
           </>}
         </div>
       </div>

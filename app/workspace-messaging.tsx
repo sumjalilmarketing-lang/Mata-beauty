@@ -21,6 +21,7 @@ type ConversationRow = {
   booking_id: string | null;
   updated_at: string;
   latestMessage?: MessageRow;
+  unreadCount?: number;
 };
 type MembershipRow = { conversation_id: string; profile_id: string; last_read_at: string | null };
 type MessageRow = { conversation_id: string; body: string; created_at: string; sender_id: string };
@@ -47,18 +48,26 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true 
     async function load() {
       setLoading(true);
       setError("");
-      const bookingResult = staffMode
-        ? await authenticatedClient.rpc("list_staff_message_bookings")
-        : await authenticatedClient.from("bookings")
-          .select("id,client_id,provider_id,starts_at,status,provider_services(title)")
-          .order("starts_at", { ascending: false }).limit(100);
-      if (bookingResult.error) throw bookingResult.error;
-
-      const bookings: BookingRow[] = staffMode
-        ? ((bookingResult.data ?? []) as { id: string; starts_at: string; status: string; service_title: string | null }[])
-          .map(row => ({ id: row.id, client_id: "", provider_id: "", starts_at: row.starts_at, status: row.status, provider_services: { title: row.service_title } }))
-        : ((bookingResult.data ?? []) as unknown as BookingRow[])
-          .filter(row => row.client_id === userId || row.provider_id === userId);
+      let bookings: BookingRow[];
+      if (staffMode) {
+        const bookingResult = await authenticatedClient.rpc("list_staff_message_bookings");
+        if (bookingResult.error) throw bookingResult.error;
+        bookings = ((bookingResult.data ?? []) as { id: string; starts_at: string; status: string; service_title: string | null }[])
+          .map(row => ({ id: row.id, client_id: "", provider_id: "", starts_at: row.starts_at, status: row.status, provider_services: { title: row.service_title } }));
+      } else {
+        const pageSize = 100;
+        const allBookings: BookingRow[] = [];
+        for (let offset = 0; ; offset += pageSize) {
+          const result = await authenticatedClient.from("bookings")
+            .select("id,client_id,provider_id,starts_at,status,provider_services(title)")
+            .order("starts_at", { ascending: false }).order("id", { ascending: false }).range(offset, offset + pageSize - 1);
+          if (result.error) throw result.error;
+          const page = (result.data ?? []) as unknown as BookingRow[];
+          allBookings.push(...page);
+          if (page.length < pageSize) break;
+        }
+        bookings = allBookings.filter(row => row.client_id === userId || row.provider_id === userId);
+      }
       if (!bookings.length) { if (active) setContacts([]); return; }
 
       const { data: ownRows, error: membershipError } = await authenticatedClient.from("conversation_members")
@@ -91,7 +100,21 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true 
           const latestByConversation = new Map(latestMessageResults.flatMap(result => result.data
             ? [[result.data.conversation_id, result.data as MessageRow] as const]
             : []));
-          conversations = conversations.map(conversation => ({ ...conversation, latestMessage: latestByConversation.get(conversation.id) }));
+          const ownReadAt = new Map(ownMemberships.map(row => [row.conversation_id, row.last_read_at]));
+          const unreadResults = await Promise.all(conversations.map(conversation => {
+            let query = authenticatedClient.from("messages").select("id", { count: "exact", head: true })
+              .eq("conversation_id", conversation.id).neq("sender_id", userId).is("deleted_at", null);
+            const lastReadAt = ownReadAt.get(conversation.id);
+            if (lastReadAt) query = query.gt("created_at", lastReadAt);
+            return query;
+          }));
+          const unreadFailure = unreadResults.find(result => result.error);
+          if (unreadFailure?.error) throw unreadFailure.error;
+          conversations = conversations.map((conversation, index) => ({
+            ...conversation,
+            latestMessage: latestByConversation.get(conversation.id),
+            unreadCount: unreadResults[index]?.count ?? 0,
+          }));
         }
       }
 
@@ -118,13 +141,14 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true 
             id: conversation.id,
             updatedAt: conversation.updated_at,
             memberIds: membersByConversation.get(conversation.id) ?? [],
+            unreadCount: conversation.unreadCount ?? 0,
             ...(latestMessage ? { latestMessage: { body: latestMessage.body, createdAt: latestMessage.created_at, senderId: latestMessage.sender_id } } : {}),
           } } : {}),
         };
       });
       const grouped = staffMode
         ? groupInputs.map(row => ({
-          key: `staff-booking:${row.booking.id}`, participantId: null, isGroup: false,
+          key: `staff-booking:${row.booking.id}`, participantId: null, isGroup: false, unreadCount: 0,
           existingConversationOnly: false,
           conversationIds: [], bookings: [row.booking], latestActivityAt: row.booking.startsAt, preview: null,
         }))
@@ -135,12 +159,16 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true 
       if (contextError) throw contextError;
       const token = contextData.session?.access_token;
       if (!token) throw new Error("session_required");
-      const response = await fetch(`/api/bookings/conversation-context?bookings=${allBookingIds.join(",")}`, {
-        headers: { Authorization: `Bearer ${token}` }, cache: "no-store",
-      });
-      if (!response.ok) throw new Error("context_unavailable");
-      const contextPayload = await response.json() as { bookings: ContextRow[] };
-      const contextByBooking = new Map(contextPayload.bookings.map(row => [row.bookingId, row]));
+      const contextBatches: string[][] = [];
+      for (let index = 0; index < allBookingIds.length; index += 100) contextBatches.push(allBookingIds.slice(index, index + 100));
+      const contextPayloads = await Promise.all(contextBatches.map(async batch => {
+        const response = await fetch(`/api/bookings/conversation-context?bookings=${batch.join(",")}`, {
+          headers: { Authorization: `Bearer ${token}` }, cache: "no-store",
+        });
+        if (!response.ok) throw new Error("context_unavailable");
+        return await response.json() as { bookings: ContextRow[] };
+      }));
+      const contextByBooking = new Map(contextPayloads.flatMap(payload => payload.bookings).map(row => [row.bookingId, row]));
       const enriched: Contact[] = grouped.map(group => {
         const bookingContext = contextByBooking.get(group.bookings[0].id);
         return {
@@ -161,6 +189,20 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true 
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [requestedBooking, staffMode, userId]);
+
+  useEffect(() => {
+    const markRead = (event: Event) => {
+      const detail = (event as CustomEvent<{ conversationIds?: unknown }>).detail;
+      if (!Array.isArray(detail?.conversationIds)) return;
+      const ids = new Set(detail.conversationIds.filter((id): id is string => typeof id === "string"));
+      if (!ids.size) return;
+      setContacts(current => current.map(contact => contact.conversationIds.some(id => ids.has(id))
+        ? { ...contact, unreadCount: 0 }
+        : contact));
+    };
+    window.addEventListener("mata-conversations-read", markRead);
+    return () => window.removeEventListener("mata-conversations-read", markRead);
+  }, []);
 
   const filteredContacts = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("fr");
@@ -183,7 +225,7 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true 
             return <button key={contact.key} type="button" className={`messaging-contact${selected?.key === contact.key ? " selected" : ""}`} aria-current={selected?.key === contact.key ? "true" : undefined} onClick={() => setSelected(contact)}>
               <span className="messaging-avatar">{contact.avatarUrl ? <Image src={contact.avatarUrl} alt="" width={48} height={48} unoptimized /> : <span aria-hidden="true">{contact.name.slice(0, 1).toLocaleUpperCase("fr")}</span>}</span>
               <span className="messaging-contact-copy"><strong>{contact.name}</strong><small>{contact.preview ?? "Aucun message"}</small></span>
-              <span className="messaging-contact-meta"><time dateTime={contact.latestActivityAt}>{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(new Date(contact.latestActivityAt))}</time>{contact.bookings.length > 1 && <small>{contact.bookings.length} rendez-vous</small>}</span>
+              <span className="messaging-contact-meta"><time dateTime={contact.latestActivityAt}>{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(new Date(contact.latestActivityAt))}</time>{contact.unreadCount > 0 && <span className="messaging-unread-count" aria-label={`${contact.unreadCount} messages non lus`}>{contact.unreadCount > 99 ? "99+" : contact.unreadCount}</span>}{contact.bookings.length > 1 && <small>{contact.bookings.length} rendez-vous</small>}</span>
             </button>;
           })}
         </div>

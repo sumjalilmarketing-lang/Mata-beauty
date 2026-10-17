@@ -101,6 +101,7 @@ export function BookingMessages({
     const failure = results.find(result => result.error);
     if (failure?.error) throw failure.error;
     await loadMembers(selectedConversationIds);
+    window.dispatchEvent(new CustomEvent("mata-conversations-read", { detail: { conversationIds: selectedConversationIds } }));
   }, [loadMembers]);
 
   useEffect(() => {

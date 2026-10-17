@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { notificationDestination } from "../../lib/domain/notifications";
+import { notificationBadgeAfterRead, notificationDestination } from "../../lib/domain/notifications";
+
+describe("notification badge", () => {
+  it("decrements immediately for one newly read item and never goes below zero", () => {
+    expect(notificationBadgeAfterRead(3, 1)).toBe(2);
+    expect(notificationBadgeAfterRead(0, 1)).toBe(0);
+  });
+
+  it("clears after all notifications are marked read", () => {
+    expect(notificationBadgeAfterRead(8, null)).toBe(0);
+  });
+});
 describe("private notification destinations", () => {
   it("rejects external URLs and executable schemes", () => {
     for (const href of ["https://evil.example", "//evil.example", "javascript:alert(1)", "/app/../redirect", "/app?next=https://evil.example"]) expect(notificationDestination({ kind: "unknown", data: { href } })).toBeNull();

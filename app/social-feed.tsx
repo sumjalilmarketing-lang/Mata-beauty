@@ -9,6 +9,7 @@ import { LocationPicker } from "./location-picker";
 import { distanceKm, matchesSearch, type Coordinates } from "@/lib/domain/location";
 import { feedPrice, publicProfessionalName } from "@/lib/domain/feed-presentation";
 import { feedText } from "@/lib/domain/feed-copy";
+import { fetchPublicPostVideoMedia } from "@/lib/domain/public-post-video-media";
 
 type FeedPost = {
   id: string; authorId: string; caption: string; videoUrl: string; thumbnailUrl: string | null;
@@ -82,6 +83,15 @@ async function usableSignedUrl(bucketId: string, storagePath: string) {
 
 async function resolvePrivateMedia(row: SocialFeedRow): Promise<SocialFeedRow | null> {
   const privateItems = (row.media_items ?? []).filter((item) => item.bucket_id === "provider-social-media");
+  const privateVideo = row.post_type === "video"
+    || privateItems.some((item) => item.media_type === "video")
+    || row.video_url.includes("/provider-social-media/");
+  if (privateVideo) {
+    const media = await fetchPublicPostVideoMedia(row.id);
+    return media
+      ? { ...row, video_url: media.videoUrl, thumbnail_url: media.thumbnailUrl }
+      : { ...row, video_url: "", thumbnail_url: null, media_urls: [] };
+  }
   if (!privateItems.length) return row;
   const signedMedia = await Promise.all(privateItems.map((item) => usableSignedUrl(item.bucket_id, item.storage_path)));
   if (signedMedia.some((url) => !url)) return null;
@@ -154,6 +164,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const appliedFilter = useRef<SocialFeedFilter>("Pour toi");
   const restoredPosition = useRef(false);
   const completedViews = useRef(new Set<string>());
+  const autoRenewedVideos = useRef(new Set<string>());
   const loadingMore = useRef(false);
   const pageRequests = useRef(new AbortController());
   const initialPageReady = useRef(false);
@@ -199,6 +210,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
     if (signal.aborted || generation !== loadGeneration.current) return;
     const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
+    setVideoErrors(new Set(mapped.filter(post => post.postType === "video" && !post.videoUrl).map(post => post.id)));
     const ranked = diversifyFeed(mapped);
     setPosts(ranked);
     writeFeedCache(ranked);
@@ -243,6 +255,8 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
       if (signal.aborted || generation !== loadGeneration.current) return;
       const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
+      const unavailableVideos = mapped.filter(post => post.postType === "video" && !post.videoUrl).map(post => post.id);
+      if (unavailableVideos.length) setVideoErrors(current => new Set([...current, ...unavailableVideos]));
       setPosts((current) => { const next = diversifyFeed([...current, ...mapped.filter((item) => !current.some((existing) => existing.id === item.id))]); writeFeedCache(next); return next; });
       const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
       if (last) feedCursor.current = { publishedAt: last.published_at, id: last.id };
@@ -498,16 +512,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
 
   async function retryVideo(post: FeedPost) {
     if (videoRefreshing.has(post.id)) return;
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) { setFeedback("La vidéo ne peut pas être rechargée hors connexion."); return; }
     setVideoRefreshing((current) => new Set(current).add(post.id));
     try {
-      const { data, error } = await supabase.from("social_feed").select("*").eq("id", post.id).abortSignal(AbortSignal.timeout(15000)).maybeSingle();
-      if (error || !data) { setFeedback("Le média de cette vidéo n’est pas accessible pour le moment."); return; }
-      const refreshed = await resolvePrivateMedia(data as SocialFeedRow);
-      if (!refreshed) { setFeedback("Le média de cette vidéo n’est pas accessible pour le moment."); return; }
-      const updated = mapFeedPost(refreshed);
+      const media = await fetchPublicPostVideoMedia(post.id);
+      if (!media) { setFeedback("Le média de cette vidéo n’est pas accessible pour le moment."); return; }
+      const updated = { ...post, videoUrl: media.videoUrl, thumbnailUrl: media.thumbnailUrl };
       setPosts((current) => current.map((item) => item.id === post.id ? updated : item));
+      writeFeedCache(posts.map(item => item.id === post.id ? updated : item));
       setVideoLoading((current) => new Set(current).add(post.id));
       setVideoErrors((current) => { const next = new Set(current); next.delete(post.id); return next; });
       setFeedback("");
@@ -516,6 +527,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     } finally {
       setVideoRefreshing((current) => { const next = new Set(current); next.delete(post.id); return next; });
     }
+  }
+
+  function handleVideoError(post: FeedPost) {
+    setVideoErrors((current) => new Set(current).add(post.id));
+    if (autoRenewedVideos.current.has(post.id)) return;
+    autoRenewedVideos.current.add(post.id);
+    void retryVideo(post);
   }
 
   async function openProvider(post: FeedPost) {
@@ -539,7 +557,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}<div className="social-feed" aria-label={t("Vidéos beauté")} onScroll={(event) => { const node=event.currentTarget; const cardHeight=cards.current[0]?.getBoundingClientRect().height ?? node.clientHeight; const index=Math.round(node.scrollTop/Math.max(1,cardHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>
     {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{feedFilter === "Près de moi" ? t("Aucun créateur proche pour le moment") : feedFilter === "Tendances" ? t("Les tendances arrivent") : `${t("Aucune inspiration")} ${t(feedFilter)}`}</h1><p>{feedFilter === "Près de moi" ? t("Élargissez votre recherche ou revenez bientôt : les disponibilités locales sont actualisées en continu.") : t("Essayez une autre catégorie pour découvrir des prestations disponibles.")}</p><button onClick={() => setFeedFilter("Pour toi")}>{t("Explorer le feed")}</button></div>}
     {visiblePosts.map((post, index) => <article className="social-video-card" data-post-id={post.id} key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`${t("Publication de")} ${post.businessName}`}>
-      {post.postType === "video" ? videoErrors.has(post.id) ? <div className="video-fallback"><span>◇</span><p>{t("Cette vidéo ne peut pas être lue.")}</p><button disabled={videoRefreshing.has(post.id)} onClick={() => void retryVideo(post)}>{t(videoRefreshing.has(post.id) ? "Rechargement…" : "Réessayer")}</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={index===activeIndex || index===activeIndex+1 ? post.videoUrl : undefined} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={index===activeIndex ? "auto" : index===activeIndex+1 ? "metadata" : "none"} onLoadStart={() => setVideoLoading((current) => new Set(current).add(post.id))} onWaiting={() => setVideoLoading((current) => current.has(post.id) ? current : new Set(current).add(post.id))} onPlaying={() => setVideoLoading((current) => { if (!current.has(post.id)) return current; const next = new Set(current); next.delete(post.id); return next; })} onCanPlay={() => setVideoLoading((current) => { const next=new Set(current); next.delete(post.id); return next; })} onTimeUpdate={(event) => { const video=event.currentTarget; const ratio=video.duration ? video.currentTime/video.duration : 0; setProgress((current) => ({ ...current, [post.id]: ratio })); if (ratio>=.95 && !completedViews.current.has(post.id)) { completedViews.current.add(post.id); void getSessionHash().then((hash) => { if (pageRequests.current.signal.aborted) return; return getSupabaseBrowserClient()?.rpc("record_video_view", { target_post_id: post.id, target_session_hash: hash, target_watched_ms: Math.round(video.currentTime*1000), target_completed: true }).abortSignal(pageRequests.current.signal); }); } }} onError={() => setVideoErrors((current) => new Set(current).add(post.id))} /> : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt="Avant" width={540} height={760} unoptimized /><figcaption>{t("Avant")}</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt="Après" width={540} height={760} unoptimized /><figcaption>{t("Après")}</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
+      {post.postType === "video" ? videoErrors.has(post.id) || !post.videoUrl ? <div className="video-fallback"><span>◇</span><p>{t("Cette vidéo ne peut pas être lue.")}</p><button disabled={videoRefreshing.has(post.id)} onClick={() => void retryVideo(post)}>{t(videoRefreshing.has(post.id) ? "Rechargement…" : "Réessayer")}</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={index===activeIndex || index===activeIndex+1 ? post.videoUrl : undefined} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={index===activeIndex ? "auto" : index===activeIndex+1 ? "metadata" : "none"} onLoadStart={() => setVideoLoading((current) => new Set(current).add(post.id))} onWaiting={() => setVideoLoading((current) => current.has(post.id) ? current : new Set(current).add(post.id))} onPlaying={() => { setVideoErrors(current => { if (!current.has(post.id)) return current; const next = new Set(current); next.delete(post.id); return next; }); setVideoLoading((current) => { if (!current.has(post.id)) return current; const next = new Set(current); next.delete(post.id); return next; }); }} onCanPlay={() => setVideoLoading((current) => { const next=new Set(current); next.delete(post.id); return next; })} onTimeUpdate={(event) => { const video=event.currentTarget; const ratio=video.duration ? video.currentTime/video.duration : 0; setProgress((current) => ({ ...current, [post.id]: ratio })); if (ratio>=.95 && !completedViews.current.has(post.id)) { completedViews.current.add(post.id); void getSessionHash().then((hash) => { if (pageRequests.current.signal.aborted) return; return getSupabaseBrowserClient()?.rpc("record_video_view", { target_post_id: post.id, target_session_hash: hash, target_watched_ms: Math.round(video.currentTime*1000), target_completed: true }).abortSignal(pageRequests.current.signal); }); } }} onError={() => handleVideoError(post)} /> : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt="Avant" width={540} height={760} unoptimized /><figcaption>{t("Avant")}</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt="Après" width={540} height={760} unoptimized /><figcaption>{t("Après")}</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
       {videoLoading.has(post.id) && !videoErrors.has(post.id) && <span className="video-loading" role="status">{t("Chargement…")}</span>}
       <div className="video-shade" />
       <div className="video-progress" role="progressbar" aria-label={t("Progression de la vidéo")} aria-valuenow={Math.round((progress[post.id] ?? 0)*100)}><i style={{ transform: `scaleX(${progress[post.id] ?? 0})` }} /></div>
