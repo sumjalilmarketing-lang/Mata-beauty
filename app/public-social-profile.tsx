@@ -9,7 +9,7 @@ import { SocialProfileVideoFrame } from "./social-profile-video-frame";
 import { ClientControlCenter } from "./client-control-center";
 import styles from "./public-social-profile.module.css";
 
-type TabKey = "videos" | "favorites" | "services" | "reviews" | "following";
+type TabKey = "videos" | "favorites" | "likes" | "services" | "reviews" | "following";
 
 export function PublicSocialProfile({ profile, initialVideoId = null, initialEditMode = false }: { profile: PublicSocialProfileData; initialVideoId?: string | null; initialEditMode?: boolean }) {
   const [tab, setTab] = useState<TabKey>("videos");
@@ -24,7 +24,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
   const profilePath = profile.kind === "client" ? "/u/" + encodeURIComponent(profile.slug)
     : profile.kind === "salon" ? "/salons/" + encodeURIComponent(profile.slug)
       : "/professional/" + encodeURIComponent(profile.slug);
-  const posts = tab === "favorites" ? profile.favorites : profile.posts;
+  const posts = tab === "favorites" ? profile.favorites : tab === "likes" ? profile.likedPosts : profile.posts;
   const firstService = profile.services[0];
   const selectedVideoService = selectedVideo?.serviceId
     ? profile.services.find(service => service.id === selectedVideo.serviceId)
@@ -34,7 +34,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
   useEffect(() => {
     let active = true;
     if (initialVideoId) {
-      const found = [...profile.posts, ...profile.favorites].find(post => post.id === initialVideoId);
+      const found = [...profile.posts, ...profile.favorites, ...profile.likedPosts].find(post => post.id === initialVideoId);
       if (found) queueMicrotask(() => active && setSelectedVideo(found));
     }
     return () => { active = false; };
@@ -127,7 +127,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
   }
 
   const tabItems: { key: TabKey; label: string }[] = profile.kind === "client"
-    ? [{ key: "videos", label: "Publications" }, { key: "favorites", label: "Favoris" }, ...(profile.canShowFollows ? [{ key: "following" as const, label: "Abonnements" }] : [])]
+    ? [{ key: "videos", label: "Publications" }, { key: "favorites", label: "Enregistrés" }, ...(profile.isOwner ? [{ key: "likes" as const, label: "J’aime" }] : []), ...(profile.canShowFollows ? [{ key: "following" as const, label: "Abonnements" }] : [])]
     : [{ key: "videos", label: "Vidéos" }, { key: "services", label: "Prestations" }, { key: "reviews", label: "Avis" }];
 
   return <main className={styles.page}>
@@ -229,13 +229,13 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
     {tab === "following" && <section className={styles.followingList} aria-label="Abonnements">
       {profile.following.length ? profile.following.map(provider => <Link href={"/professional/" + encodeURIComponent(provider.slug)} key={provider.slug}><strong>{provider.name}</strong><span>{provider.city}</span></Link>) : <p className={styles.empty}>Aucun abonnement public.</p>}
     </section>}
-    {(tab === "videos" || tab === "favorites") && <section className={styles.videoGrid} aria-label={tab === "favorites" ? "Vidéos favorites" : "Publications vidéo"}>
+    {(tab === "videos" || tab === "favorites" || tab === "likes") && <section className={styles.videoGrid} aria-label={tab === "favorites" ? "Vidéos enregistrées" : tab === "likes" ? "Vidéos aimées" : "Publications vidéo"}>
       {posts.map(post => <button className={styles.videoTile} type="button" key={post.id} onClick={() => showVideo(post)} aria-label={"Ouvrir la publication " + (post.caption || post.postType)}>
         <SocialProfileVideoFrame videoUrl={post.videoUrl} thumbnailUrl={post.thumbnailUrl} />
         <span className={styles.playMark}>▶</span>
         <span className={styles.views}>{formatCount(post.viewCount)} vues</span>
       </button>)}
-      {posts.length === 0 && <div className={styles.emptyGrid}><strong>{tab === "favorites" ? "Aucune vidéo enregistrée" : profile.kind === "client" ? "Aucune publication personnelle" : "Les vidéos publiées apparaîtront ici"}</strong><p>{profile.kind === "client" ? "Les vidéos enregistrées sont visibles selon vos réglages de confidentialité." : "Seules les publications publiques et approuvées sont affichées."}</p></div>}
+      {posts.length === 0 && <div className={styles.emptyGrid}><strong>{tab === "favorites" ? "Aucune vidéo enregistrée" : tab === "likes" ? "Aucune vidéo aimée" : profile.kind === "client" ? "Aucune publication personnelle" : "Les vidéos publiées apparaîtront ici"}</strong><p>{tab === "likes" ? "Les vidéos aimées restent visibles uniquement dans votre compte." : profile.kind === "client" ? "Les vidéos enregistrées sont visibles selon vos réglages de confidentialité." : "Seules les publications publiques et approuvées sont affichées."}</p></div>}
     </section>}
 
     {contactOpen && <div className={styles.dialogBackdrop} role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setContactOpen(false); }}>

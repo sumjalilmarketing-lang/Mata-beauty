@@ -48,6 +48,7 @@ export type PublicSocialProfileData = {
   favoritesCount: number | null;
   posts: SocialProfilePost[];
   favorites: SocialProfilePost[];
+  likedPosts: SocialProfilePost[];
   following: SocialProfileLink[];
   services: SocialProfileService[];
   reviews: SocialProfileReview[];
@@ -149,6 +150,25 @@ async function publicPosts(providerId: string, author: SocialProfileLink): Promi
   })).then(items => items.filter(item => item.videoUrl !== null));
 }
 
+async function savedPostsForIds(ids: string[]): Promise<SocialProfilePost[]> {
+  const posts = await Promise.all(ids.slice(0, 24).map(async id => {
+    const { data: row } = await serviceSupabase().from("social_feed")
+      .select("id,author_id,caption,video_url,thumbnail_url,view_count,published_at,business_name,slug,post_type,provider_service_id,media_items")
+      .eq("id", id).maybeSingle();
+    if (!row) return null;
+    const author = row as unknown as FeedRow;
+    const media = resolveSocialProfileVideoMedia({ videoUrl: author.video_url, thumbnailUrl: author.thumbnail_url, mediaItems: author.media_items });
+    const signedVideoPath = media.videoBucket === "provider-social-media" ? media.videoPath : null;
+    const signedThumbnailPath = media.thumbnailBucket === "provider-social-media" ? media.thumbnailPath : null;
+    const [videoUrl, thumbnailUrl] = await Promise.all([
+      signedVideoPath ? signMedia("provider-social-media", signedVideoPath) : Promise.resolve(safeHttpUrl(author.video_url)),
+      signedThumbnailPath ? signMedia("provider-social-media", signedThumbnailPath) : Promise.resolve(safeHttpUrl(author.thumbnail_url)),
+    ]);
+    return { id: author.id, caption: author.caption ?? "", videoUrl, thumbnailUrl, postType: author.post_type, viewCount: Number(author.view_count) || 0, publishedAt: author.published_at, authorSlug: author.slug, authorName: author.business_name, serviceId: author.provider_service_id } satisfies SocialProfilePost;
+  }));
+  return posts.filter((post): post is NonNullable<typeof post> => post !== null && post.videoUrl !== null);
+}
+
 async function publicPostCount(providerId: string) {
   const { count, error } = await serviceSupabase().from("social_feed")
     .select("id", { count: "exact", head: true }).eq("author_id", providerId).eq("post_type", "video");
@@ -228,7 +248,7 @@ async function loadProfessional(lookup: string, viewerId: string | null): Promis
     rating: Number(provider.average_rating) || 0, reviewCount: Number(provider.review_count) || 0,
     followersCount: counts.followers, followingCount: counts.following, videoCount,
     favoritesCount: null,
-    posts, favorites: [], following: [], services, reviews,
+    posts, favorites: [], likedPosts: [], following: [], services, reviews,
     salon: salon ? { slug: salon.slug, name: salon.name, city: salon.city } : null,
     isOwner: viewerId === provider.profile_id, canShowFollows: true, canShowCollections: false,
   };
@@ -259,7 +279,7 @@ async function loadSalon(lookup: string, viewerId: string | null): Promise<Publi
     rating: Number(provider.average_rating) || 0, reviewCount: Number(provider.review_count) || 0,
     followersCount: counts.followers, followingCount: counts.following, videoCount,
     favoritesCount: null,
-    posts, favorites: [], following: [], services, reviews,
+    posts, favorites: [], likedPosts: [], following: [], services, reviews,
     salon: { slug: business.slug, name: business.name, city: business.city },
     isOwner: viewerId === provider.profile_id, canShowFollows: true, canShowCollections: false,
   };
@@ -305,6 +325,13 @@ async function loadClient(lookup: string, viewerId: string | null, ownerHasClien
       favorites = posts.filter((post): post is NonNullable<typeof post> => post !== null && post.videoUrl !== null);
     }
   }
+  let likedPosts: SocialProfilePost[] = [];
+  if (isOwner) {
+    const likes = await client.from("post_likes").select("post_id")
+      .eq("profile_id", profile.id).order("created_at", { ascending: false }).limit(24);
+    const ids = ((likes.data ?? []) as { post_id: string }[]).map(row => row.post_id);
+    if (ids.length) likedPosts = await savedPostsForIds(ids);
+  }
   let following: SocialProfileLink[] = [];
   let followingCount: number | null = null;
   if (canShowFollows) {
@@ -318,7 +345,7 @@ async function loadClient(lookup: string, viewerId: string | null, ownerHasClien
     kind: "client", id: profile.id, slug: profile.username?.trim() || "client-" + profile.id.slice(0, 8), name: profile.display_name?.trim() || profile.username?.trim() || "Mon profil",
     handle: "@" + (profile.username?.trim() || "client-" + profile.id.slice(0, 8)), bio: profile.bio, city: null, area: null, address: null,
     avatarUrl: safeHttpUrl(profile.avatar_url), coverUrl: null, verified: false, specialties: [], rating: null, reviewCount: 0,
-    followersCount: null, followingCount, videoCount: 0, favoritesCount, posts: [], favorites, following, services: [], reviews: [],
+    followersCount: null, followingCount, videoCount: 0, favoritesCount, posts: [], favorites, likedPosts, following, services: [], reviews: [],
     salon: null, isOwner, canShowFollows, canShowCollections,
   };
 }
