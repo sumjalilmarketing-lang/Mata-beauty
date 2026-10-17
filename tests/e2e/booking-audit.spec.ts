@@ -1,6 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-const api = "https://audit.supabase.co";
+const testPassword = randomUUID();
+
+const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "http://127.0.0.1:3161";
 const providerId = "11111111-1111-4111-8111-111111111111";
 const serviceId = "22222222-2222-4222-8222-222222222222";
 const clientId = "33333333-3333-4333-8333-333333333333";
@@ -11,6 +14,9 @@ const socialPostId = "66666666-6666-4666-8666-666666666666";
 type AuditState = {
   bookingCreated: boolean;
   currentRole: "client" | "provider" | "other";
+  currentEmail?: string;
+  sessionTokens?: Record<AuditState["currentRole"], string>;
+  invalidToken?: string;
   selectedSlot: string;
   lastBookingSource?: string | null;
 };
@@ -20,6 +26,9 @@ function json(route: Route, body: unknown, status = 200) {
 }
 
 async function mockSupabase(page: Page, state: AuditState) {
+  const sessionTokens = { client: randomUUID(), provider: randomUUID(), other: randomUUID() };
+  state.sessionTokens = sessionTokens;
+  state.invalidToken = randomUUID();
   const tomorrow = new Date();
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   const date = tomorrow.toISOString().slice(0, 10);
@@ -35,22 +44,39 @@ async function mockSupabase(page: Page, state: AuditState) {
 
     if (path === "/auth/v1/token") {
       const payload = request.postDataJSON() as { email?: string };
+      state.currentEmail = payload.email ?? "client-audit@example.test";
       state.currentRole = payload.email?.startsWith("provider") ? "provider" : payload.email?.startsWith("other") ? "other" : "client";
       const userId = state.currentRole === "provider" ? providerId : state.currentRole === "other" ? otherClientId : clientId;
       return json(route, {
-        access_token: `${state.currentRole}-token`,
+        access_token: sessionTokens[state.currentRole],
         token_type: "bearer",
         expires_in: 3600,
         expires_at: Math.floor(Date.now() / 1000) + 3600,
-        refresh_token: `${state.currentRole}-refresh`,
+        refresh_token: randomUUID(),
         user: { id: userId, email: payload.email, aud: "authenticated", role: "authenticated", user_metadata: {} },
       });
     }
+    if (path === "/auth/v1/user" && request.method() === "GET") {
+      const userId = state.currentRole === "provider" ? providerId : state.currentRole === "other" ? otherClientId : clientId;
+      return json(route, { id: userId, email: state.currentEmail ?? "client-audit@example.test", aud: "authenticated", role: "authenticated", user_metadata: {} });
+    }
     if (path === "/auth/v1/logout") return json(route, {});
+    if (path === "/rest/v1/rpc/synchronize_account_status" || path === "/rest/v1/rpc/ensure_authenticated_profile") return json(route, null);
+    if (path === "/rest/v1/rpc/request_professional_profile") return json(route, null);
+    if (path === "/rest/v1/rpc/get_my_private_profile") {
+      return json(route, {
+        role: state.currentRole === "provider" ? "provider" : "client",
+        is_suspended: false,
+        account_status: "active",
+        first_name: "Mata",
+        last_name: "Audit",
+        phone: null,
+      });
+    }
     if (path === "/rest/v1/social_feed") {
       return json(route, [{
         id: socialPostId, author_id: providerId,
-        caption: "Tresses express réalisées à Dakar", video_url: `${api}/social-sample.mp4`, thumbnail_url: null,
+        caption: "Tresses express réalisées à Dakar", video_url: "https://audit.supabase.co/social-sample.mp4", thumbnail_url: null,
         duration_seconds: 18, aspect_ratio: 0.562, allow_comments: true, is_sponsored: false,
         view_count: 120, like_count: 32, comment_count: 4, save_count: 7, share_count: 2,
         published_at: new Date().toISOString(), business_name: "Mata Audit Tresses", slug: "mata-audit-tresses",
@@ -98,11 +124,19 @@ async function mockSupabase(page: Page, state: AuditState) {
       });
     }
     if (path === "/rest/v1/provider_services") {
-      return json(route, [{ id: serviceId, title: "Tresses express", duration_minutes: 60, price_amount: 10000 }]);
+      return json(route, [{ id: serviceId, provider_id: providerId, title: "Tresses express", duration_minutes: 60, price_amount: 10000, business_id: null }]);
     }
     if (path === "/rest/v1/portfolio_items" || path === "/rest/v1/promotions" || path === "/rest/v1/notifications") return json(route, []);
     if (path === "/rest/v1/rpc/get_available_slots") {
       return json(route, state.bookingCreated ? [{ slot_start: `${date}T11:00:00Z` }] : [{ slot_start: state.selectedSlot }, { slot_start: `${date}T11:00:00Z` }]);
+    }
+    if (path === "/rest/v1/rpc/get_booking_team_availability") {
+      return json(route, {
+        teamEnabled: false,
+        slots: state.bookingCreated
+          ? [{ slot_start: `${date}T11:00:00Z` }]
+          : [{ slot_start: state.selectedSlot }, { slot_start: `${date}T11:00:00Z` }],
+      });
     }
     if (path === "/rest/v1/profiles") {
       return json(route, {
@@ -114,6 +148,7 @@ async function mockSupabase(page: Page, state: AuditState) {
         marketing_consent: false,
       });
     }
+    if (path === "/rest/v1/account_roles") return json(route, []);
     if (path === "/rest/v1/client_profiles") return json(route, { city: "Dakar", default_address: null, preferences: {} });
     if (path === "/rest/v1/bookings" && request.method() === "POST") {
       if (state.bookingCreated) return json(route, { code: "23P01", message: "slot overlap" }, 409);
@@ -123,6 +158,10 @@ async function mockSupabase(page: Page, state: AuditState) {
       return json(route, { id: bookingId }, 201);
     }
     if (path === "/rest/v1/bookings" && request.method() === "PATCH") {
+      const authorization = request.headers().authorization;
+      if (authorization !== `Bearer ${state.sessionTokens?.[state.currentRole]}`) {
+        return json(route, { code: "PGRST301", message: "JWT invalid or missing" }, 401);
+      }
       if (state.currentRole === "other") return json(route, { code: "42501", message: "permission denied" }, 403);
       return json(route, []);
     }
@@ -145,13 +184,16 @@ async function mockSupabase(page: Page, state: AuditState) {
     if (path === "/rest/v1/services") return json(route, []);
     return json(route, []);
   });
+
+  await page.route("**/api/auth/welcome", (route) => json(route, { ok: true }));
 }
 
 async function signIn(page: Page, email: string) {
   await page.getByLabel("Adresse e-mail").click();
   await page.getByLabel("Adresse e-mail").fill(email);
-  await page.getByLabel("Mot de passe").click();
-  await page.getByLabel("Mot de passe").fill("Audit-Only-123!");
+  const password = page.locator('input[type="password"]');
+  await password.click();
+  await password.fill(testPassword);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
 }
 
@@ -174,19 +216,20 @@ test.describe("audit chronométré de réservation", () => {
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await page.locator(".premium-provider-card").click(); actions += 1;
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
-    await page.getByRole("button", { name: /Tresses express/ }).click(); actions += 1;
+    await page.getByRole("link", { name: "Réserver", exact: true }).click(); actions += 1;
     await page.getByRole("button", { name: "10:00" }).click(); actions += 1;
     await expect(page.getByText("Tresses express", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
     await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click(); actions += 1;
     await page.getByLabel("Adresse e-mail").click(); actions += 1;
     await page.getByLabel("Adresse e-mail").fill("client-audit@example.test");
-    await page.getByLabel("Mot de passe").click(); actions += 1;
-    await page.getByLabel("Mot de passe").fill("Audit-Only-123!");
+    const password = page.locator('input[type="password"]');
+    await password.click(); actions += 1;
+    await password.fill(testPassword);
     await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
     await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByText(/10:00/)).toBeVisible();
+    await expect(page.getByRole("dialog").getByText(/10:00/)).toBeVisible();
     const durationMs = Date.now() - startedAt;
     expect(actions).toBe(8);
     expect(durationMs).toBeLessThan(30_000);
@@ -199,12 +242,12 @@ test.describe("audit chronométré de réservation", () => {
     const startedAt = Date.now();
     let actions = 0;
     await page.goto("/");
-    await expect(page.getByText("Tresses express", { exact: true })).toBeVisible();
+    await expect(page.getByText("Tresses express", { exact: true }).first()).toBeVisible();
     await page.getByRole("button", { name: "Réserver" }).click(); actions += 1;
     await page.getByRole("button", { name: "10:00" }).click(); actions += 1;
     await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click(); actions += 1;
     await page.getByLabel("Adresse e-mail").fill("client-social@example.test"); actions += 1;
-    await page.getByLabel("Mot de passe").fill("Audit-Only-123!"); actions += 1;
+    await page.locator('input[type="password"]').fill(testPassword); actions += 1;
     await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
     await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
@@ -248,35 +291,40 @@ test.describe("audit chronométré de réservation", () => {
     expect(capturedPaymentRequest?.attempt).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  test("retire un créneau réservé et refuse un jeton de test non vérifiable côté serveur", async ({ page }) => {
+  test("retire un créneau réservé et rejette un jeton invalide dans le fixture API", async ({ page }) => {
     const state: AuditState = { bookingCreated: true, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
     await page.goto("/");
     await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
     await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click();
     await page.locator(".premium-provider-card").click();
-    await page.getByRole("button", { name: /Tresses express/ }).click();
+    await page.getByRole("link", { name: "Réserver", exact: true }).click();
     await expect(page.getByRole("button", { name: "10:00" })).toHaveCount(0);
     await page.getByRole("button", { name: "Fermer" }).click();
-    await page.getByRole("button", { name: "Retour" }).click();
-    await page.getByRole("button", { name: "Profil" }).click();
+    await page.getByRole("button", { name: /^(?:Profil|Se connecter à MATA Beauty)$/ }).click();
     await signIn(page, "client-audit@example.test");
-    await expect(page).toHaveURL(/connexion=requise/, { timeout: 15_000 });
+    await expect.poll(() => state.currentRole).toBe("client");
+    const response = await page.evaluate(async ({ id, endpoint, token }) => fetch(`${endpoint}/rest/v1/bookings?id=eq.${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: "cancelled_by_client" }),
+    }).then((result) => result.status), { id: bookingId, endpoint: api, token: state.invalidToken });
+    expect(response).toBe(401);
     expect(state.bookingCreated).toBe(true);
   });
 
-  test("isole la réservation d’un autre utilisateur", async ({ page }) => {
+  test("le fixture API refuse la modification de réservation d’un autre utilisateur", async ({ page }) => {
     const state: AuditState = { bookingCreated: true, currentRole: "other", selectedSlot: "" };
     await mockSupabase(page, state);
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Profil" }).click();
+    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(?:Profil|Se connecter à MATA Beauty)$/ }).click();
     await signIn(page, "other-audit@example.test");
-    await expect(page).toHaveURL(/connexion=requise/, { timeout: 15_000 });
-    const response = await page.evaluate(async ({ id, endpoint }) => fetch(`${endpoint}/rest/v1/bookings?id=eq.${id}`, {
+    await expect.poll(() => state.currentRole).toBe("other");
+    const response = await page.evaluate(async ({ id, endpoint, token }) => fetch(`${endpoint}/rest/v1/bookings?id=eq.${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status: "cancelled_by_client" }),
-    }).then((result) => result.status), { id: bookingId, endpoint: api });
+    }).then((result) => result.status), { id: bookingId, endpoint: api, token: state.sessionTokens?.other });
     expect(response).toBe(403);
   });
 
@@ -287,7 +335,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
     await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click();
     await page.locator(".premium-provider-card").click();
-    await page.getByRole("button", { name: /Tresses express/ }).click();
+    await page.getByRole("link", { name: "Réserver", exact: true }).click();
     await page.getByRole("button", { name: "10:00" }).click();
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
     await page.reload();
@@ -319,7 +367,7 @@ test.describe("audit chronométré de réservation", () => {
     const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
     let unavailable = true;
-    await page.route(`${api}/rest/v1/rpc/get_available_slots`, async (route) => {
+    await page.route(`${api}/rest/v1/rpc/get_booking_team_availability`, async (route) => {
       if (unavailable) return json(route, { message: "Service unavailable" }, 503);
       return route.fallback();
     });

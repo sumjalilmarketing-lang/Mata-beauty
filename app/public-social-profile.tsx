@@ -105,7 +105,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
       if (!(error instanceof DOMException && error.name === "AbortError")) setNotice("Le partage n’a pas abouti.");
     }
   }
-  function book(serviceId: string) { window.location.assign("/?service=" + encodeURIComponent(serviceId)); }
+  function bookingHref(serviceId: string) { return "/?service=" + encodeURIComponent(serviceId); }
 
   const tabItems: { key: TabKey; label: string }[] = profile.kind === "client"
     ? [{ key: "videos", label: "Publications" }, { key: "favorites", label: "Favoris" }, ...(profile.canShowFollows ? [{ key: "following" as const, label: "Abonnements" }] : [])]
@@ -157,7 +157,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
           <Link className={styles.secondaryButton} href="/app/bookings">Mes réservations</Link>
           <Link className={styles.secondaryButton} href="/app/messages">Mes messages</Link>
         </> : <button className={styles.secondaryButton} type="button" onClick={() => void shareProfile()}>Partager</button> : <>
-          {profile.services.length > 0 && <button className={styles.primaryButton} type="button" onClick={() => book(firstService!.id)}>Réserver</button>}
+          {profile.services.length > 0 && <Link className={styles.primaryButton} href={bookingHref(firstService!.id)}>Réserver</Link>}
           <button className={styles.secondaryButton} type="button" onClick={() => setContactOpen(true)}>Contacter</button>
           {!profile.isOwner && <button className={styles.followButton} type="button" disabled={followBusy} onClick={() => void follow()}>{followBusy ? "…" : isFollowing ? "Abonné ✓" : "Suivre"}</button>}
           {profile.isOwner && <Link className={styles.secondaryButton} href={profile.kind === "salon" ? "/salon/profile" : "/pro/profile"}>Modifier</Link>}
@@ -177,7 +177,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
     {tab === "services" && <section className={styles.serviceList} aria-label="Prestations">
       {profile.services.length ? profile.services.map(service => <article className={styles.serviceCard} key={service.id}>
         <div><h2>{service.title}</h2>{service.description && <p>{service.description}</p>}<small>{service.durationMinutes} min · {formatMoney(service.priceAmount, service.currency)}</small></div>
-        <button type="button" onClick={() => book(service.id)}>Réserver</button>
+        <Link href={bookingHref(service.id)}>Réserver</Link>
       </article>) : <p className={styles.empty}>Aucune prestation active n’est publiée pour le moment.</p>}
     </section>}
     {tab === "reviews" && <section className={styles.reviewList} aria-label="Avis vérifiés">
@@ -218,7 +218,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null }: { profil
           {selectedVideo.authorSlug && <Link href={"/professional/" + encodeURIComponent(selectedVideo.authorSlug)}>Voir le profil professionnel</Link>}
           {selectedVideoService && <>
             <span className={styles.playerService}>{selectedVideoService.title} · {formatMoney(selectedVideoService.priceAmount, selectedVideoService.currency)}</span>
-            <button type="button" onClick={() => book(selectedVideoService.id)}>Réserver cette prestation</button>
+            <Link href={bookingHref(selectedVideoService.id)}>Réserver cette prestation</Link>
           </>}
         </div>
       </div>

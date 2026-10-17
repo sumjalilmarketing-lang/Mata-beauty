@@ -1,12 +1,18 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const testPort = Number(process.env.MATA_PLAYWRIGHT_PORT ?? 3160);
+const fixturePort = Number(process.env.MATA_SUPABASE_FIXTURE_PORT ?? 3161);
+const testOrigin = `http://localhost:${testPort}`;
+const fixtureOrigin = `http://127.0.0.1:${fixturePort}`;
+process.env.MATA_SUPABASE_FIXTURE_ORIGIN = fixtureOrigin;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
   reporter: "list",
   outputDir: ".next/playwright-results-pro-salon",
   use: {
-    baseURL: "http://localhost:3100",
+    baseURL: testOrigin,
     trace: "retain-on-failure",
   },
   projects: [
@@ -23,15 +29,4 @@ export default defineConfig({
     { name: "desktop-1440", use: { viewport: { width: 1440, height: 900 } } },
     { name: "widescreen", use: { viewport: { width: 1920, height: 1080 } } },
   ],
-  webServer: {
-    command: "node node_modules/next/dist/bin/next dev --port 3100",
-    url: "http://localhost:3100",
-    reuseExistingServer: false,
-    timeout: 120_000,
-    env: {
-      NEXT_PUBLIC_SUPABASE_URL: "https://audit.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "audit-public-anon-key",
-      NEXT_PUBLIC_SALON_COLLABORATOR_ACCESS_ENABLED: "false",
-    },
-  },
 });

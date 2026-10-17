@@ -140,7 +140,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   const [maxPrice, setMaxPrice] = useState("50000");
   const [notice, setNotice] = useState("");
   useEffect(() => {
-    if (notice !== "Connectez-vous pour continuer vers votre espace.") return;
+    if (notice !== "Connectez-vous pour accéder à cet espace.") return;
     const timer = window.setTimeout(() => setNotice(current => current === notice ? "" : current), 6000);
     return () => window.clearTimeout(timer);
   }, [notice]);
@@ -161,7 +161,9 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       if (!active) return;
       const provider = catalog.find(item => item.profileId === data?.provider_id);
       if (error || !data || !provider) { setNotice("Cette prestation n’est pas disponible à la réservation."); return; }
-      setRestoredBookingRequest(null); setBooking({ provider, service: data });
+      const draft = readBookingDraft();
+      const restoredRequest = draft && draft.selection.service.id === data.id ? draft.request : null;
+      setRestoredBookingRequest(restoredRequest); setBooking({ provider, service: data });
     });
     return () => { active = false; };
   }, [catalog, catalogState]);
@@ -214,7 +216,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       }
       if (parameters.get("connexion") === "requise") {
         setAuthRequest({ role: intendedRoleForDestination(returnTo), mode: "login", returnTo });
-        setNotice("Connectez-vous pour continuer vers votre espace.");
+        setNotice("Connectez-vous pour accéder à cet espace.");
       } else if (parameters.get("auth") === "reset") {
         setAuthRequest({ role: "client", mode: "reset", returnTo: "/app" });
       } else if (parameters.get("acces") === "refuse") {
