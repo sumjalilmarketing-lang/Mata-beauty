@@ -6,6 +6,7 @@ import { SupportThread } from "./support-inbox";
 import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { RequestTimeoutError, withTimeout } from "@/lib/domain/with-timeout";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 
 type Identity = { first_name: string | null; last_name: string | null; username: string | null; phone: string | null; bio: string | null; avatar_url: string | null; locale: string; city: string | null; neighborhood: string | null };
@@ -28,28 +29,43 @@ export function ClientControlCenter({ userId, section = "settings", embedded = f
   const [notice,setNotice]=useState("");
 
   const load=useCallback(async()=>{
-    const supabase=getSupabaseBrowserClient(); if(!supabase)return;
-    await supabase.rpc("initialize_client_control_center");
-    const [profile,client,followCount,saveCount,bookingCount,paymentRows,reviewRows,ticketRows,privacyRow,preferenceRow]=await Promise.all([
-      supabase.rpc("get_my_private_profile"),
-      supabase.from("client_profiles").select("city,neighborhood").eq("profile_id",userId).single(),
-      supabase.from("follows").select("follower_id",{count:"exact",head:true}).eq("follower_id",userId),
-      supabase.from("post_saves").select("post_id",{count:"exact",head:true}).eq("profile_id",userId),
-      supabase.from("bookings").select("id",{count:"exact",head:true}).eq("client_id",userId),
-      supabase.from("payments").select("id,amount,currency,payment_method,payment_status,provider_reference,created_at,bookings!inner(client_id,provider_services(title))").eq("bookings.client_id",userId).order("created_at",{ascending:false}).limit(20),
-      supabase.from("reviews").select("id,rating,comment,provider_reply,is_visible,created_at,collaborator_name").eq("client_id",userId).order("created_at",{ascending:false}),
-      supabase.from("support_tickets").select("id,subject,status,created_at").eq("requester_id",userId).order("created_at",{ascending:false}).limit(10),
-      supabase.from("profile_privacy_settings").select("*").eq("profile_id",userId).single(),
-      supabase.from("profile_preferences").select("*").eq("profile_id",userId).single(),
-    ]);
-    if(profile.error || client.error) setNotice("Votre profil est momentanément indisponible.");
-    if(profile.data&&client.data)setIdentity({...profile.data,...client.data} as Identity);
-    setCounts({follows:followCount.count??0,saves:saveCount.count??0,bookings:bookingCount.count??0});
-    setPayments((paymentRows.data??[]) as unknown as Payment[]); setReviews((reviewRows.data??[]) as Review[]); setTickets((ticketRows.data??[]) as Ticket[]);
-    if(privacyRow.data&&!Array.isArray(privacyRow.data))setPrivacy(privacyRow.data); if(preferenceRow.data&&!Array.isArray(preferenceRow.data))setPreferences({...preferenceRow.data,favorite_categories:preferenceRow.data.favorite_categories??[],preferred_styles:preferenceRow.data.preferred_styles??[],budget_min:preferenceRow.data.budget_min?.toString()??"",budget_max:preferenceRow.data.budget_max?.toString()??""});
+    setNotice("");
+    const supabase=getSupabaseBrowserClient();
+    if(!supabase){setNotice("Le service de profil est momentanément indisponible.");return;}
+    const controller=new AbortController();
+    try {
+      const [profile,client,followCount,saveCount,bookingCount,paymentRows,reviewRows,ticketRows,privacyRow,preferenceRow] = await withTimeout((async()=>{
+        await supabase.rpc("initialize_client_control_center").abortSignal(controller.signal);
+        return Promise.all([
+          supabase.rpc("get_my_private_profile").abortSignal(controller.signal),
+          supabase.from("client_profiles").select("city,neighborhood").eq("profile_id",userId).single().abortSignal(controller.signal),
+          supabase.from("follows").select("follower_id",{count:"exact",head:true}).eq("follower_id",userId).abortSignal(controller.signal),
+          supabase.from("post_saves").select("post_id",{count:"exact",head:true}).eq("profile_id",userId).abortSignal(controller.signal),
+          supabase.from("bookings").select("id",{count:"exact",head:true}).eq("client_id",userId).abortSignal(controller.signal),
+          supabase.from("payments").select("id,amount,currency,payment_method,payment_status,provider_reference,created_at,bookings!inner(client_id,provider_services(title))").eq("bookings.client_id",userId).order("created_at",{ascending:false}).limit(20).abortSignal(controller.signal),
+          supabase.from("reviews").select("id,rating,comment,provider_reply,is_visible,created_at,collaborator_name").eq("client_id",userId).order("created_at",{ascending:false}).abortSignal(controller.signal),
+          supabase.from("support_tickets").select("id,subject,status,created_at").eq("requester_id",userId).order("created_at",{ascending:false}).limit(10).abortSignal(controller.signal),
+          supabase.from("profile_privacy_settings").select("*").eq("profile_id",userId).single().abortSignal(controller.signal),
+          supabase.from("profile_preferences").select("*").eq("profile_id",userId).single().abortSignal(controller.signal),
+        ]);
+      })(),12_000,()=>controller.abort());
+      if(profile.error || client.error || !profile.data || !client.data) {
+        setNotice("Votre profil est momentanément indisponible.");
+        return;
+      }
+      setIdentity({...profile.data,...client.data} as Identity);
+      setCounts({follows:followCount.count??0,saves:saveCount.count??0,bookings:bookingCount.count??0});
+      setPayments((paymentRows.data??[]) as unknown as Payment[]);
+      setReviews((reviewRows.data??[]) as Review[]);
+      setTickets((ticketRows.data??[]) as Ticket[]);
+      if(privacyRow.data&&!Array.isArray(privacyRow.data))setPrivacy(privacyRow.data);
+      if(preferenceRow.data&&!Array.isArray(preferenceRow.data))setPreferences({...preferenceRow.data,favorite_categories:preferenceRow.data.favorite_categories??[],preferred_styles:preferenceRow.data.preferred_styles??[],budget_min:preferenceRow.data.budget_min?.toString()??"",budget_max:preferenceRow.data.budget_max?.toString()??""});
+    } catch(error) {
+      setNotice(error instanceof RequestTimeoutError
+        ? "Le chargement a dépassé le délai imparti. Vérifiez votre connexion puis réessayez."
+        : "Votre profil est momentanément indisponible.");
+    }
   },[userId]);
-  useEffect(()=>{const timer=window.setTimeout(()=>void load(),0);return()=>window.clearTimeout(timer);},[load]);
-
   const initials=useMemo(()=>`${identity?.first_name?.[0]??"M"}${identity?.last_name?.[0]??"B"}`,[identity]);
   async function saveIdentity(event:FormEvent<HTMLFormElement>){event.preventDefault();const supabase=getSupabaseBrowserClient();if(!supabase)return;const v=new FormData(event.currentTarget);const {error}=await supabase.rpc("update_client_identity",{target_first_name:String(v.get("firstName")??""),target_last_name:String(v.get("lastName")??""),target_username:String(v.get("username")??""),target_phone:String(v.get("phone")??""),target_bio:String(v.get("bio")??""),target_city:String(v.get("city")??""),target_neighborhood:String(v.get("neighborhood")??""),target_locale:String(v.get("locale")??"fr-SN")});setNotice(error?publicErrorMessage(error,"Le profil n’a pas pu être mis à jour."):"Profil mis à jour.");if(!error)await load();}
   async function uploadAvatar(file:File){const supabase=getSupabaseBrowserClient();if(!supabase||!file.size)return;if(file.size>5*1024*1024||!['image/jpeg','image/png','image/webp'].includes(file.type)){setNotice("Photo JPG, PNG ou WebP de 5 Mo maximum.");return;}const ext=file.type.split('/')[1];const path=`${userId}/avatar-${crypto.randomUUID()}.${ext}`;const uploaded=await supabase.storage.from("avatars").upload(path,file,{contentType:file.type});if(uploaded.error){setNotice(publicErrorMessage(uploaded.error,"La photo n’a pas pu être envoyée."));return;}const avatar_url=supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;const {error}=await supabase.from("profiles").update({avatar_url}).eq("id",userId);setNotice(error?publicErrorMessage(error,"La photo n’a pas pu être enregistrée."):"Photo mise à jour.");if(!error)await load();}
