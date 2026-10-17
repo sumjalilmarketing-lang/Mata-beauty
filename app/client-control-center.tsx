@@ -4,15 +4,18 @@ import Link from "next/link";
 import { SupportThread } from "./support-inbox";
 
 import Image from "next/image";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { QueryTimeoutError, withQueryTimeout } from "@/lib/domain/query-timeout";
 
 type Identity = { first_name: string | null; last_name: string | null; username: string | null; phone: string | null; bio: string | null; avatar_url: string | null; locale: string; city: string | null; neighborhood: string | null };
 type Payment = { id: string; amount: number; currency: string; payment_method: string; payment_status: string; provider_reference: string | null; created_at: string; bookings: { provider_services: { title: string } | null } | null };
 type Review = { collaborator_name: string | null; id: string; rating: number; comment: string | null; provider_reply: string | null; is_visible: boolean; created_at: string };
 type Ticket = { id: string; subject: string; status: string; created_at: string };
 type Counts = { follows: number; saves: number; bookings: number };
+type ReviewsState = "loading" | "ready" | "error";
+const REVIEWS_QUERY_TIMEOUT_MS = 12_000;
 
 const paymentLabels: Record<string,string> = { pending:"À payer", simulated_paid:"Confirmé (test)", paid_on_site:"Confirmé sur place", paid:"Confirmé", failed:"Échoué", refunded:"Remboursé", cancelled:"Annulé" };
 
@@ -21,6 +24,9 @@ export function ClientControlCenter({ userId, section = "settings", embedded = f
   const [counts,setCounts]=useState<Counts>({follows:0,saves:0,bookings:0});
   const [payments,setPayments]=useState<Payment[]>([]);
   const [reviews,setReviews]=useState<Review[]>([]);
+  const [reviewsState,setReviewsState]=useState<ReviewsState>("loading");
+  const [reviewsError,setReviewsError]=useState("");
+  const reviewsRequest=useRef<AbortController|null>(null);
   const [selectedTicket,setSelectedTicket]=useState<string|null>(null);
   const [tickets,setTickets]=useState<Ticket[]>([]);
   const [privacy,setPrivacy]=useState({profile_visibility:"limited",show_collections:false,show_follows:false,allow_personalized_recommendations:true,allow_marketing_email:false,allow_promotional_notifications:false});
@@ -28,16 +34,56 @@ export function ClientControlCenter({ userId, section = "settings", embedded = f
   const [notice,setNotice]=useState("");
 
   const load=useCallback(async()=>{
-    const supabase=getSupabaseBrowserClient(); if(!supabase)return;
+    const supabase=getSupabaseBrowserClient();
+    if(!supabase) {
+      if(section === "reviews") { setReviewsError("Le service des avis est momentanément indisponible."); setReviewsState("error"); }
+      return;
+    }
+    if(section === "reviews") {
+      reviewsRequest.current?.abort();
+      const controller = new AbortController();
+      reviewsRequest.current = controller;
+      setReviewsState("loading");
+      setReviewsError("");
+      try {
+        const result = await withQueryTimeout(
+          (signal) => supabase.from("reviews")
+            .select("id,rating,comment,provider_reply,is_visible,created_at,collaborator_name")
+            .eq("client_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(100)
+            .abortSignal(signal),
+          REVIEWS_QUERY_TIMEOUT_MS,
+          controller.signal,
+        );
+        if (reviewsRequest.current !== controller) return;
+        if (result.error) {
+          setReviewsError(publicErrorMessage(result.error, "Les avis n’ont pas pu être chargés."));
+          setReviewsState("error");
+          return;
+        }
+        setReviews((result.data ?? []) as Review[]);
+        setReviewsState("ready");
+      } catch (error) {
+        if (reviewsRequest.current !== controller) return;
+        if (error instanceof QueryTimeoutError) setReviewsError("Le chargement des avis prend trop de temps. Réessayez.");
+        else if (error instanceof DOMException && error.name === "AbortError") return;
+        else setReviewsError(publicErrorMessage(error, "Les avis n’ont pas pu être chargés."));
+        setReviewsState("error");
+      } finally {
+        if (reviewsRequest.current === controller) reviewsRequest.current = null;
+      }
+      return;
+    }
+    reviewsRequest.current?.abort();
     await supabase.rpc("initialize_client_control_center");
-    const [profile,client,followCount,saveCount,bookingCount,paymentRows,reviewRows,ticketRows,privacyRow,preferenceRow]=await Promise.all([
+    const [profile,client,followCount,saveCount,bookingCount,paymentRows,ticketRows,privacyRow,preferenceRow]=await Promise.all([
       supabase.rpc("get_my_private_profile"),
       supabase.from("client_profiles").select("city,neighborhood").eq("profile_id",userId).single(),
       supabase.from("follows").select("follower_id",{count:"exact",head:true}).eq("follower_id",userId),
       supabase.from("post_saves").select("post_id",{count:"exact",head:true}).eq("profile_id",userId),
       supabase.from("bookings").select("id",{count:"exact",head:true}).eq("client_id",userId),
       supabase.from("payments").select("id,amount,currency,payment_method,payment_status,provider_reference,created_at,bookings!inner(client_id,provider_services(title))").eq("bookings.client_id",userId).order("created_at",{ascending:false}).limit(20),
-      supabase.from("reviews").select("id,rating,comment,provider_reply,is_visible,created_at,collaborator_name").eq("client_id",userId).order("created_at",{ascending:false}),
       supabase.from("support_tickets").select("id,subject,status,created_at").eq("requester_id",userId).order("created_at",{ascending:false}).limit(10),
       supabase.from("profile_privacy_settings").select("*").eq("profile_id",userId).single(),
       supabase.from("profile_preferences").select("*").eq("profile_id",userId).single(),
@@ -45,10 +91,10 @@ export function ClientControlCenter({ userId, section = "settings", embedded = f
     if(profile.error || client.error) setNotice("Votre profil est momentanément indisponible.");
     if(profile.data&&client.data)setIdentity({...profile.data,...client.data} as Identity);
     setCounts({follows:followCount.count??0,saves:saveCount.count??0,bookings:bookingCount.count??0});
-    setPayments((paymentRows.data??[]) as unknown as Payment[]); setReviews((reviewRows.data??[]) as Review[]); setTickets((ticketRows.data??[]) as Ticket[]);
+    setPayments((paymentRows.data??[]) as unknown as Payment[]); setTickets((ticketRows.data??[]) as Ticket[]);
     if(privacyRow.data&&!Array.isArray(privacyRow.data))setPrivacy(privacyRow.data); if(preferenceRow.data&&!Array.isArray(preferenceRow.data))setPreferences({...preferenceRow.data,favorite_categories:preferenceRow.data.favorite_categories??[],preferred_styles:preferenceRow.data.preferred_styles??[],budget_min:preferenceRow.data.budget_min?.toString()??"",budget_max:preferenceRow.data.budget_max?.toString()??""});
-  },[userId]);
-  useEffect(()=>{const timer=window.setTimeout(()=>void load(),0);return()=>window.clearTimeout(timer);},[load]);
+  },[section,userId]);
+  useEffect(()=>{const timer=window.setTimeout(()=>void load(),0);return()=>{window.clearTimeout(timer);reviewsRequest.current?.abort();};},[load]);
 
   const initials=useMemo(()=>`${identity?.first_name?.[0]??"M"}${identity?.last_name?.[0]??"B"}`,[identity]);
   async function saveIdentity(event:FormEvent<HTMLFormElement>){event.preventDefault();const supabase=getSupabaseBrowserClient();if(!supabase)return;const v=new FormData(event.currentTarget);const {error}=await supabase.rpc("update_client_identity",{target_first_name:String(v.get("firstName")??""),target_last_name:String(v.get("lastName")??""),target_username:String(v.get("username")??""),target_phone:String(v.get("phone")??""),target_bio:String(v.get("bio")??""),target_city:String(v.get("city")??""),target_neighborhood:String(v.get("neighborhood")??""),target_locale:String(v.get("locale")??"fr-SN")});setNotice(error?publicErrorMessage(error,"Le profil n’a pas pu être mis à jour."):"Profil mis à jour.");if(!error)await load();}
@@ -58,6 +104,14 @@ export function ClientControlCenter({ userId, section = "settings", embedded = f
   async function createTicket(event:FormEvent<HTMLFormElement>){event.preventDefault();const supabase=getSupabaseBrowserClient();if(!supabase)return;const form=event.currentTarget;const v=new FormData(form);const launchCategory=String(v.get("category"));const enriched={requester_id:userId,subject:String(v.get("subject")),category:launchCategory,launch_category:launchCategory};let {error}=await supabase.from("support_tickets").insert(enriched);if(error?.code==="PGRST204")({error}=await supabase.from("support_tickets").insert({requester_id:userId,subject:String(v.get("subject")),category:launchCategory}));setNotice(error?publicErrorMessage(error,"La demande n’a pas pu être envoyée."):"Demande envoyée au support.");if(!error){form.reset();await load();}}
   async function requestDeletion(){if(!window.confirm("Demander la suppression du compte ? Cette demande sera vérifiée avant toute action irréversible."))return;const reason=window.prompt("Motif facultatif")??"";const supabase=getSupabaseBrowserClient();if(!supabase)return;const {error}=await supabase.rpc("request_account_deletion",{target_reason:reason});setNotice(error?publicErrorMessage(error,"La demande de suppression n’a pas pu être enregistrée."):"Demande enregistrée. Aucune donnée n’est supprimée immédiatement.");}
 
+  if(section === "reviews") return <section className="client-control-center" id="client-reviews">
+    <article className="panel"><div className="panel-heading"><div><h2>Mes avis</h2><p>Seules les réservations terminées peuvent recevoir le badge Réservation vérifiée.</p></div></div>
+      {reviewsState === "loading" ? <div className="compact-empty" role="status">Chargement de vos avis…</div>
+        : reviewsState === "error" ? <div className="compact-empty" role="alert"><p>{reviewsError}</p><button type="button" onClick={() => void load()}>Réessayer</button></div>
+        : reviews.length ? reviews.map(r=><div className="control-list-row" key={r.id}><div><strong>{'★'.repeat(r.rating)} · Réservation vérifiée</strong><small>{r.comment??"Sans commentaire"}</small>{r.collaborator_name && <small>Prestation réalisée par {r.collaborator_name}</small>}{r.provider_reply&&<p>Réponse du professionnel : {r.provider_reply}</p>}</div><span>{r.is_visible?"Publié":"Modéré"}</span></div>)
+        : <div className="compact-empty">Aucun avis publié.</div>}
+    </article>
+  </section>;
   if(!identity)return <article className="panel"><div className="compact-empty">{notice || "Chargement de votre profil…"}</div>{notice && <button onClick={() => void load()}>Réessayer</button>}</article>;
   return <section className="client-control-center" id="client-profile">
     {!embedded && section === "settings" && <article className="panel client-profile-hero"><div className="client-avatar">{identity.avatar_url?<Image src={identity.avatar_url} alt="Photo de profil" width={88} height={88} unoptimized />:initials}<label aria-label="Modifier la photo"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>e.target.files?.[0]&&void uploadAvatar(e.target.files[0])}/>＋</label></div><div><small>MON PROFIL</small><h2>{identity.first_name} {identity.last_name}</h2><p>@{identity.username??"nom_utilisateur"} · {[identity.neighborhood,identity.city].filter(Boolean).join(', ')||"Localisation à compléter"}</p><span>{identity.bio||"Ajoutez une courte bio pour personnaliser votre espace."}</span></div><button onClick={()=>document.getElementById("edit-client-profile")?.scrollIntoView({behavior:"smooth"})}>Modifier le profil</button><button onClick={()=>document.getElementById("privacy-settings")?.scrollIntoView({behavior:"smooth"})}>Paramètres</button><div className="client-profile-counts"><b>{counts.follows}<small>Suivis</small></b><b>{counts.saves}<small>Vidéos enregistrées</small></b><b>{counts.bookings}<small>Réservations</small></b></div></article>}
@@ -66,7 +120,6 @@ export function ClientControlCenter({ userId, section = "settings", embedded = f
     {section === "settings" && <article className="panel" id="edit-client-profile"><div className="panel-heading"><div><h2>Identité</h2><p>Les coordonnées privées ne sont jamais affichées publiquement.</p></div></div><form className="dashboard-form" onSubmit={e=>void saveIdentity(e)}><label>Prénom<input name="firstName" required defaultValue={identity.first_name??""}/></label><label>Nom<input name="lastName" required defaultValue={identity.last_name??""}/></label><label>Nom d’utilisateur<input name="username" required pattern="[A-Za-z0-9_]{3,30}" defaultValue={identity.username??""}/></label><label>Téléphone<input name="phone" type="tel" defaultValue={identity.phone??""}/></label><label>Ville<input name="city" defaultValue={identity.city??""}/></label><label>Quartier<input name="neighborhood" defaultValue={identity.neighborhood??""}/></label><label>Langue<select name="locale" defaultValue={identity.locale}><option value="fr-SN">Français</option><option value="en-SN">English</option></select></label><label className="wide">Bio<textarea name="bio" maxLength={280} defaultValue={identity.bio??""}/></label><button className="primary-button">Enregistrer</button></form></article>}
     {section === "settings" && <article className="panel" id="beauty-preferences"><div className="panel-heading"><div><h2>Préférences beauté</h2><p>Utilisées uniquement pour personnaliser le feed lorsque vous l’autorisez.</p></div></div><form className="dashboard-form" onSubmit={e=>void savePreferences(e)}><label className="wide">Catégories favorites<input name="categories" defaultValue={preferences.favorite_categories.join(', ')}/></label><label className="wide">Styles préférés<input name="styles" defaultValue={preferences.preferred_styles.join(', ')}/></label><label>Budget minimum<input name="budgetMin" type="number" min="0" defaultValue={preferences.budget_min}/></label><label>Budget maximum<input name="budgetMax" type="number" min="0" defaultValue={preferences.budget_max}/></label><label>Rayon (km)<input name="radius" type="number" min="1" max="200" defaultValue={preferences.radius_km}/></label><label>Lieu<select name="locationMode" defaultValue={preferences.location_mode}><option value="both">Salon ou domicile</option><option value="salon">Salon</option><option value="mobile">Domicile</option></select></label><label className="wide legal-consent"><input name="personalization" type="checkbox" defaultChecked={preferences.personalization_enabled}/><span>Activer les recommandations personnalisées</span></label><button className="primary-button">Enregistrer</button></form></article>}
     {section === "payments" && <article className="panel" id="client-payments"><div className="panel-heading"><div><h2>Mes paiements</h2><p>Historique privé lié à vos réservations.</p></div></div>{payments.length?payments.map(p=><div className="control-list-row" key={p.id}><div><strong>{p.bookings?.provider_services?.title??"Prestation beauté"}</strong><small>{new Date(p.created_at).toLocaleDateString('fr-FR')} · {p.payment_method.replaceAll('_',' ')}</small><code>{p.provider_reference??p.id.slice(0,12)}</code></div><b>{p.amount.toLocaleString('fr-FR')} {p.currency}<small>{paymentLabels[p.payment_status]??p.payment_status}</small></b></div>):<div className="compact-empty">Aucun paiement enregistré.</div>}</article>}
-    {section === "reviews" && <article className="panel" id="client-reviews"><div className="panel-heading"><div><h2>Mes avis</h2><p>Seules les réservations terminées peuvent recevoir le badge Réservation vérifiée.</p></div></div>{reviews.length?reviews.map(r=><div className="control-list-row" key={r.id}><div><strong>{'★'.repeat(r.rating)} · Réservation vérifiée</strong><small>{r.comment??"Sans commentaire"}</small>{r.collaborator_name && <small>Prestation réalisée par {r.collaborator_name}</small>}{r.provider_reply&&<p>Réponse du professionnel : {r.provider_reply}</p>}</div><span>{r.is_visible?"Publié":"Modéré"}</span></div>):<div className="compact-empty">Aucun avis publié.</div>}</article>}
     {section === "support" && <article className="panel" id="client-support"><div className="panel-heading"><div><h2>Aide et support</h2><p>Une demande privée suivie par l’équipe Mata Beauty.</p></div></div><form className="collection-form" onSubmit={e=>void createTicket(e)}><label>Catégorie<select name="category"><option value="signup">Inscription</option><option value="profile">Profil</option><option value="publication">Publication</option><option value="booking">Réservation</option><option value="payment">Paiement</option><option value="bug">Bug</option><option value="other">Autre</option></select></label><label>Objet (obligatoire)<input name="subject" required minLength={3} maxLength={160} placeholder="Décrivez brièvement votre demande"/></label><button>Envoyer</button></form>{tickets.map(t=><div className="control-list-row" key={t.id}><button onClick={()=>setSelectedTicket(t.id)}>{t.subject}</button><span>{t.status}</span></div>)}{selectedTicket && <SupportThread key={selectedTicket} ticketId={selectedTicket} onChange={load}/>}</article>}
     {section === "settings" && <article className="panel" id="privacy-settings"><div className="panel-heading"><div><h2>Confidentialité et compte</h2><p>Vos paiements, réservations, messages et tickets restent toujours privés.</p></div></div><div className="privacy-grid"><label>Visibilité du profil<select value={privacy.profile_visibility} onChange={e=>setPrivacy({...privacy,profile_visibility:e.target.value})}><option value="limited">Limitée</option><option value="public">Publique</option></select></label>{([['show_collections','Afficher mes collections'],['show_follows','Afficher mes abonnements'],['allow_personalized_recommendations','Recommandations personnalisées'],['allow_marketing_email','Emails commerciaux'],['allow_promotional_notifications','Notifications promotionnelles']] as const).map(([key,label])=><label className="legal-consent" key={key}><input type="checkbox" checked={privacy[key]} onChange={e=>setPrivacy({...privacy,[key]:e.target.checked})}/><span>{label}</span></label>)}</div><div className="privacy-actions"><button className="primary-button" onClick={()=>void savePrivacy()}>Enregistrer</button><Link href="/app/application">Ma candidature professionnelle</Link><button className="danger-button" onClick={()=>void requestDeletion()}>Demander la suppression du compte</button></div></article>}
   </section>;

@@ -454,11 +454,12 @@ test("professional and salon workspace keeps production integrations explicit an
 });
 
 test("public social profiles reuse approved production data and keep client identity private", async () => {
-  const [loader, professionalRoute, salonRoute, clientRoute, ownerRoute, statusStyles, profileView, feed, conversationContext, mediaRoute, videoAssociation, videoFrame] = await Promise.all([
+  const [loader, professionalRoute, salonRoute, clientRoute, ownerRoute, legacyOwnerRoute, statusStyles, profileView, feed, conversationContext, mediaRoute, videoAssociation, videoFrame] = await Promise.all([
     readFile(new URL("lib/profiles/public-social-profile.ts", root), "utf8"),
     readFile(new URL("app/professional/[username]/page.tsx", root), "utf8"),
     readFile(new URL("app/salons/[slug]/page.tsx", root), "utf8"),
     readFile(new URL("app/u/[username]/page.tsx", root), "utf8"),
+    readFile(new URL("app/app/profile/page.tsx", root), "utf8"),
     readFile(new URL("app/app/social-profile/page.tsx", root), "utf8"),
     readFile(new URL("app/app/social-profile/social-profile-status.module.css", root), "utf8"),
     readFile(new URL("app/public-social-profile.tsx", root), "utf8"),
@@ -488,9 +489,10 @@ test("public social profiles reuse approved production data and keep client iden
   assert.match(ownerRoute, /auth\.auth\.getUser\(\)/);
   assert.match(ownerRoute, /loadOwnClientSocialProfile/);
   assert.match(ownerRoute, /role="status"/);
-  assert.match(ownerRoute, /Mes réservations/);
+  assert.match(ownerRoute, /Mes rendez-vous/);
   assert.match(ownerRoute, /Mes messages/);
   assert.match(ownerRoute, /result\.status !== "ready"/);
+  assert.match(legacyOwnerRoute, /redirect\("\/app\/profile"\)/);
   assert.match(statusStyles, /min-height: 100dvh/);
   assert.match(statusStyles, /color: #20151b/);
   assert.match(statusStyles, /background: #fff9fb/);
