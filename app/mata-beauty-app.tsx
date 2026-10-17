@@ -25,6 +25,7 @@ type Provider = {
   id: string;
   profileId: string;
   serviceId: string;
+  categoryId?: string;
   name: string;
   specialty: string;
   category: string;
@@ -184,15 +185,22 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }, [catalog, catalogState, initialServiceId]);
 
   function setScreen(next: "feed" | "home" | "results", nextCategory = category) {
-    applyScreen(next);
     const url = new URL(window.location.href);
-    url.pathname = next === "feed" ? "/" : "/discover";
+    // Discovery now lives inside Inspiration. Keep old callers working while
+    // expressing their search in the feed URL instead of opening Explorer.
+    applyScreen("feed");
+    url.pathname = "/";
     url.search = "";
     if (next === "results") {
-      url.searchParams.set("screen", "results");
+      url.searchParams.set("search", "1");
+      url.searchParams.set("applied", "1");
       if (query) url.searchParams.set("q", query);
       if (area) url.searchParams.set("zone", area);
-      if (nextCategory !== "Toutes") url.searchParams.set("category", nextCategory);
+      if (nextCategory !== "Toutes") {
+        const categoryId = categories.find((item) => item.name === nextCategory)?.id;
+        if (categoryId) url.searchParams.set("categoryId", categoryId);
+        else url.searchParams.set("category", nextCategory);
+      }
     }
     if (`${url.pathname}${url.search}` !== `${window.location.pathname}${window.location.search}`) window.history.pushState(null, "", `${url.pathname}${url.search}`);
   }
@@ -200,7 +208,14 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   useEffect(() => {
     const restore = () => {
       const params = new URLSearchParams(window.location.search);
-      applyScreen(params.get("screen") === "results" ? "results" : window.location.pathname === "/discover" ? "home" : "feed");
+      const legacyResults = params.get("screen") === "results";
+      applyScreen("feed");
+      if (legacyResults) {
+        params.delete("screen");
+        params.set("search", "1");
+        params.set("applied", "1");
+        window.history.replaceState(window.history.state, "", `/${params.toString() ? `?${params.toString()}` : ""}`);
+      }
       setQuery(params.get("q") ?? "");
       setCategory(params.get("category") ?? "Toutes");
       try { setArea((params.get("zone") ?? window.sessionStorage.getItem("mata-location-zone") ?? "").slice(0, 120)); } catch { setArea(params.get("zone") ?? ""); }
@@ -637,11 +652,11 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       {notice && <div className={authRequest ? "toast toast-auth" : "toast"} role="status">{notice}</div>}
       <div className="premium-app-frame">
         {screen === "feed" ? <SocialFeed
+          categories={categories}
           location={feedLocation}
           authenticated={authenticated}
           authPending={authPending && !authenticated}
           onRequireAuth={() => setAuthRequest({ role: "client", mode: "login" })}
-          onDiscover={() => setScreen("home")}
           onPublish={() => openAccount("provider")}
           onOpenProvider={openSocialProvider}
           onBook={bookSocialService}
@@ -702,7 +717,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
             onProviderRegister={() => setAuthRequest({ role: "provider", mode: "register" })}
           />
         )}
-        <BottomNav authenticated={Boolean(authenticated)} active={screen === "feed" ? "inspiration" : "explore"} onExplore={() => setScreen("home")} onFeed={() => setScreen("feed")} onAccount={openClientPage} />
+        <BottomNav authenticated={Boolean(authenticated)} active="inspiration" onFeed={() => setScreen("feed")} onAccount={openClientPage} />
       </div>
 
       {showLaunchWelcome && <LaunchWelcome area={area} categories={categories} onArea={setArea} onCategory={(value) => { setCategory(value); }} onClose={() => { window.localStorage.setItem("mata-launch-welcome", "done"); setShowLaunchWelcome(false); }} />}
@@ -967,8 +982,8 @@ function BookingMicroFeedback({ bookingId }: { bookingId: string }) {
   return <aside className="micro-feedback"><strong>Votre réservation a-t-elle été simple ?</strong>{sent ? <small>Merci pour votre retour.</small> : <div><button onClick={() => void answer("yes")}>👍 Oui</button><button onClick={() => void answer("no")}>👎 Non</button></div>}</aside>;
 }
 
-function BottomNav({ authenticated, active, onExplore, onFeed, onAccount }: { authenticated: boolean; active: "explore" | "inspiration"; onExplore: () => void; onFeed: () => void; onAccount: (page: "bookings" | "messages" | "profile") => void }) {
-  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={`inspiration-nav ${active === "inspiration" ? "active" : ""}`} onClick={onFeed}><i>▶</i>Inspiration</button><button aria-label="Explorer" className={active === "explore" ? "active" : ""} onClick={onExplore}><i>⌕</i>Explorer</button><button onClick={() => onAccount("bookings")}><i>□</i>Rendez-vous</button><button onClick={() => onAccount("messages")}><i>✉</i>Messages</button><button aria-label={authenticated ? "Profil" : "Se connecter à MATA Beauty"} onClick={() => onAccount("profile")}><i aria-hidden>○</i>{authenticated ? "Profil" : "Se connecter"}</button></nav>;
+function BottomNav({ authenticated, active, onFeed, onAccount }: { authenticated: boolean; active: "inspiration"; onFeed: () => void; onAccount: (page: "bookings" | "messages" | "profile") => void }) {
+  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={`inspiration-nav ${active === "inspiration" ? "active" : ""}`} onClick={onFeed}><i>▶</i>Inspiration</button><button onClick={() => onAccount("bookings")}><i>□</i>Rendez-vous</button><button onClick={() => onAccount("messages")}><i>✉</i>Messages</button><button aria-label={authenticated ? "Profil" : "Se connecter à MATA Beauty"} onClick={() => onAccount("profile")}><i aria-hidden>○</i>{authenticated ? "Profil" : "Se connecter"}</button></nav>;
 }
 
 function formatDuration(minutes: number) {

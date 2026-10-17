@@ -5,6 +5,9 @@ export type CatalogProvider = {
   id: string;
   profileId: string;
   serviceId: string;
+  categoryId?: string;
+  countryCode?: string;
+  country?: string;
   name: string;
   specialty: string;
   category: string;
@@ -21,6 +24,12 @@ export type CatalogProvider = {
   coverUrl?: string;
   serviceMedia?: CategoryMedia;
 };
+
+function countryName(code: string | null | undefined): string | undefined {
+  if (!code) return undefined;
+  try { return new Intl.DisplayNames(["fr"], { type: "region" }).of(code) ?? code; }
+  catch { return code; }
+}
 
 export type CatalogPromotion = {
   id: string;
@@ -50,6 +59,9 @@ type ProviderRecord = {
   review_count: number;
   verified_at: string | null;
   cover_url: string | null;
+  latitude: number | string | null;
+  longitude: number | string | null;
+  profiles: { country_code: string | null } | null;
   provider_services: Array<{
     id: string;
     title: string;
@@ -57,7 +69,7 @@ type ProviderRecord = {
     price_amount: number;
     business_id: string | null;
     businesses: { address: string; city: string; area: string | null; latitude: number | null; longitude: number | null } | null;
-    services: { name: string; categories: { name: string } | null } | null;
+    services: { name: string; categories: { id: string; name: string } | null } | null;
   }>;
 };
 
@@ -67,11 +79,11 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
     let query = client
     .from("provider_profiles")
     .select(`
-      profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,cover_url,
+      profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,cover_url,latitude,longitude,profiles(country_code),
       provider_services!inner(
         id,title,duration_minutes,price_amount,business_id,
         businesses(address,city,area,latitude,longitude),
-        services(name,categories(name))
+        services(name,categories(id,name))
       )
     `)
     .eq("status", "approved")
@@ -130,13 +142,19 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
       id: service.id,
       profileId: provider.profile_id,
       serviceId: service.id,
+      categoryId: service.services?.categories?.id,
       name: provider.business_name,
       specialty: service.title || service.services?.name || "Prestation beauté",
       category: service.services?.categories?.name || "Beauté",
-      area: service.businesses ? [service.businesses.area, service.businesses.city].filter(Boolean).join(", ") : provider.city,
+      area: [service.businesses?.area, service.businesses?.city ?? provider.city, countryName(provider.profiles?.country_code)]
+        .filter((value): value is string => Boolean(value)).join(", "),
       address: service.businesses?.address || undefined,
       coordinates: service.businesses?.latitude != null && service.businesses.longitude != null
-        ? { latitude: Number(service.businesses.latitude), longitude: Number(service.businesses.longitude) } : undefined,
+        ? { latitude: Number(service.businesses.latitude), longitude: Number(service.businesses.longitude) }
+        : provider.latitude != null && provider.longitude != null
+          ? { latitude: Number(provider.latitude), longitude: Number(provider.longitude) } : undefined,
+      countryCode: provider.profiles?.country_code ?? undefined,
+      country: countryName(provider.profiles?.country_code),
       price: service.price_amount,
       rating: Number(provider.average_rating),
       reviews: provider.review_count,

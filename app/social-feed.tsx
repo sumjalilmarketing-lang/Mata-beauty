@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { diversifyFeed, matchesSocialFeedFilter, socialFeedFilters, type SocialFeedFilter } from "@/lib/domain/social-feed";
+import { diversifyFeed } from "@/lib/domain/social-feed";
+import type { CatalogCategory } from "@/lib/supabase/catalog";
+import { filterInspirationPosts, validSearchRadius, type InspirationSearchProvider } from "@/lib/domain/inspiration-search";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AuthenticatedProfile } from "./auth-modal";
 import { LocationPicker } from "./location-picker";
@@ -10,6 +12,7 @@ import { distanceKm, matchesSearch, type Coordinates } from "@/lib/domain/locati
 import { feedPrice, publicProfessionalName } from "@/lib/domain/feed-presentation";
 import { feedText } from "@/lib/domain/feed-copy";
 import { fetchPublicPostVideoMedia } from "@/lib/domain/public-post-video-media";
+import "./inspiration-search.css";
 
 type FeedPost = {
   id: string; authorId: string; caption: string; videoUrl: string; thumbnailUrl: string | null;
@@ -37,6 +40,7 @@ type SocialFeedRow = {
 type CommentRow = { id: string; author_id: string; parent_id: string | null; body: string; created_at: string; profiles: { display_name: string | null; avatar_url: string | null } | null };
 
 const FEED_BATCH_SIZE = 8;
+const FEED_RANKING_REFERENCE_TIME = Date.now();
 const FEED_CACHE_KEY = "mata-social-feed-cache-v2";
 const FEED_CACHE_TTL_MS = 5 * 60 * 1000;
 const FEED_MODE_KEY = "mata-social-feed-mode";
@@ -100,17 +104,20 @@ async function resolvePrivateMedia(row: SocialFeedRow): Promise<SocialFeedRow | 
   return { ...row, video_url: signedMedia[0]!, thumbnail_url: signedThumbnail, media_urls: signedMedia.filter((url): url is string => Boolean(url)) };
 }
 
-export function SocialFeed({ authenticated, authPending = false, onRequireAuth, onDiscover, onPublish, onOpenProvider, onBook, location }: {
-  location: { area: string; position: Coordinates | null; providers: Array<{ profileId: string; serviceId: string; area: string; address?: string; coordinates?: Coordinates }>; onChange: (area: string, position: Coordinates | null) => void };
+export function SocialFeed({ authenticated, authPending = false, onRequireAuth, onPublish, onOpenProvider, onBook, location, categories = [], collection, onDiscover }: {
+  collection?: { posts: FeedPost[]; initialPostId: string; onBack: () => void; onLoadMore: () => void };
+  location: { area: string; position: Coordinates | null; providers: InspirationSearchProvider[]; onChange: (area: string, position: Coordinates | null) => void };
+  categories?: CatalogCategory[];
   authenticated: AuthenticatedProfile | null;
   authPending?: boolean;
   onRequireAuth: () => void;
-  onDiscover: () => void;
+  onDiscover?: () => void;
   onPublish: () => void;
   onOpenProvider: (authorId: string) => void;
   onBook: (authorId: string, service: { id: string; title: string; duration_minutes: number; price_amount: number }, sourcePostId: string) => void;
 }) {
-  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const onLocationChange = location.onChange;
+  const [posts, setPosts] = useState<FeedPost[]>(collection?.posts ?? []);
   const [locale, setLocale] = useState("fr-SN");
   const t = useCallback((text: string) => feedText(text, locale), [locale]);
   useEffect(() => {
@@ -120,7 +127,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     });
     return () => { active = false; };
   }, [authenticated]);
-  const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "empty" | "error">(collection ? "ready" : "loading");
   const [feedMode, setFeedMode] = useState<FeedDisplayMode>("immersive");
   const [availabilityChecked, setAvailabilityChecked] = useState<Set<string>>(new Set());
   const [availabilityFailed, setAvailabilityFailed] = useState<Set<string>>(new Set());
@@ -132,8 +139,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [favoriteProviders, setFavoriteProviders] = useState<Set<string>>(new Set());
   const [bookingInterests, setBookingInterests] = useState<Set<string>>(new Set());
-  const [feedFilter, setFeedFilter] = useState<SocialFeedFilter>("Pour toi");
-  const [showLocation, setShowLocation] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedProviderId, setSelectedProviderId] = useState("");
+  const [radiusKm, setRadiusKm] = useState<2 | 5 | 10 | 20>(5);
+  const searchInitialized = useRef(false);
+  const pendingLegacyCategory = useRef("");
   const [commentsPost, setCommentsPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [commentText, setCommentText] = useState("");
@@ -160,8 +172,6 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const cards = useRef<Array<HTMLElement | null>>([]);
   const videos = useRef<Array<HTMLVideoElement | null>>([]);
   const availabilityRequests = useRef(new Set<string>());
-  const filterAnchor = useRef<string | null>(null);
-  const appliedFilter = useRef<SocialFeedFilter>("Pour toi");
   const restoredPosition = useRef(false);
   const completedViews = useRef(new Set<string>());
   const autoRenewedVideos = useRef(new Set<string>());
@@ -171,21 +181,76 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const loadGeneration = useRef(0);
   const feedCursor = useRef<{ publishedAt: string; id: string } | null>(null);
 
-  const visiblePosts = useMemo(() => diversifyFeed(posts
-    .filter((post) => {
-      if (feedFilter !== "Près de moi") return matchesSocialFeedFilter(feedFilter, post);
-      const provider = location.providers.find((item) => item.serviceId === post.serviceId);
-      if (location.position) { const distance = distanceKm(location.position, provider?.coordinates); return distance !== null && distance <= 25; }
-      return Boolean(location.area.trim()) && matchesSearch(location.area, `${provider?.area ?? post.city} ${provider?.address ?? ""}`);
-    })
-    .map((post) => ({ ...post,
-      distance: location.position ? distanceKm(location.position, location.providers.find((item) => item.serviceId === post.serviceId)?.coordinates) : null,
+  useEffect(() => {
+    if (searchInitialized.current) return;
+    searchInitialized.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const query = (params.get("q") ?? "").slice(0, 120);
+    const categoryId = params.get("categoryId") ?? "";
+    const providerId = params.get("providerId") ?? "";
+    pendingLegacyCategory.current = params.get("category") ?? "";
+    const requestedRadius = Number(params.get("radius"));
+    const nextRadius = [2, 5, 10, 20].includes(requestedRadius) ? validSearchRadius(requestedRadius) : 5;
+    const historyPosition = window.history.state?.mataInspirationPosition as Coordinates | undefined;
+    const validPosition = historyPosition && Number.isFinite(historyPosition.latitude) && Number.isFinite(historyPosition.longitude)
+      && Math.abs(historyPosition.latitude) <= 90 && Math.abs(historyPosition.longitude) <= 180 ? historyPosition : null;
+    const zone = (params.get("zone") ?? "").slice(0, 120);
+    const shouldOpen = params.get("search") === "1" && params.get("applied") !== "1";
+    const frame = requestAnimationFrame(() => {
+      setSearchQuery(query);
+      setSelectedCategoryId(categoryId);
+      setSelectedProviderId(providerId);
+      setRadiusKm(nextRadius);
+      if (zone || validPosition) onLocationChange(zone, validPosition);
+      setSearchOpen(shouldOpen);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [onLocationChange]);
+
+  useEffect(() => {
+    const legacyCategory = pendingLegacyCategory.current;
+    if (!legacyCategory || !categories.length) return;
+    const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr").replace(/-/g, " ").trim();
+    const normalized = normalize(legacyCategory);
+    const match = categories.find((item) => normalize(item.name) === normalized || normalize(item.slug) === normalized);
+    const frame = requestAnimationFrame(() => setSelectedCategoryId(match?.id ?? "__unavailable_category__"));
+    pendingLegacyCategory.current = "";
+    return () => cancelAnimationFrame(frame);
+  }, [categories]);
+
+  useEffect(() => {
+    if (!collection) return;
+    const index = collection.posts.findIndex((post) => post.id === collection.initialPostId);
+    const targetIndex = Math.max(0, index);
+    const frame = requestAnimationFrame(() => {
+      setPosts(collection.posts);
+      setState("ready");
+      setActiveIndex(targetIndex);
+      cards.current[targetIndex]?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+    requestAnimationFrame(() => cards.current[Math.max(0, index)]?.scrollIntoView({ block: "start" }));
+  }, [collection]);
+
+  const searchFilters = useMemo(() => ({
+    query: searchQuery,
+    categoryId: selectedCategoryId,
+    providerId: selectedProviderId,
+    area: location.position ? "" : location.area,
+    position: location.position,
+    radiusKm,
+  }), [location.area, location.position, radiusKm, searchQuery, selectedCategoryId, selectedProviderId]);
+  const activeSearch = Boolean(searchQuery.trim() || selectedCategoryId || selectedProviderId || location.area.trim() || location.position);
+  const visiblePosts = useMemo(() => {
+    const matches = collection ? collection.posts : filterInspirationPosts(posts, location.providers, searchFilters);
+    return diversifyFeed(matches.map((post) => ({ ...post,
+      distance: location.position ? distanceKm(location.position, location.providers.find((item) => item.serviceId === post.serviceId && item.profileId === post.authorId)?.coordinates) : null,
       followed: followed.has(post.authorId) || favoriteProviders.has(post.authorId),
       specialtyAffinity: liked.has(post.id) || saved.has(post.id) || [...bookingInterests].some((term) => `${post.serviceTitle ?? ""} ${post.hashtags.join(" ")}`.toLocaleLowerCase("fr").includes(term)) ? 1 : 0,
       proximityScore: 0,
-      availableSoon: Boolean((realAvailability[post.id] ?? post.availableAt) && new Date(realAvailability[post.id] ?? post.availableAt ?? 0).getTime() < Date.now()+72*3_600_000),
-    }))).sort((a, b) => feedFilter === "Près de moi" && location.position
-      ? (distanceKm(location.position, location.providers.find((item) => item.serviceId === a.serviceId)?.coordinates) ?? Infinity) - (distanceKm(location.position, location.providers.find((item) => item.serviceId === b.serviceId)?.coordinates) ?? Infinity) : 0), [bookingInterests, favoriteProviders, feedFilter, followed, liked, location, posts, realAvailability, saved]);
+      availableSoon: Boolean((realAvailability[post.id] ?? post.availableAt) && new Date(realAvailability[post.id] ?? post.availableAt ?? 0).getTime() < FEED_RANKING_REFERENCE_TIME+72*3_600_000),
+    }))).sort((a, b) => location.position ? (a.distance ?? Infinity) - (b.distance ?? Infinity) : 0);
+  }, [bookingInterests, collection, favoriteProviders, followed, liked, location, posts, realAvailability, saved, searchFilters]);
 
   const getSessionHash = useCallback(async () => {
     const session = window.sessionStorage.getItem("mata-feed-session") ?? crypto.randomUUID();
@@ -195,6 +260,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   }, []);
 
   const load = useCallback(async () => {
+    if (collection) return;
     const generation = ++loadGeneration.current;
     initialPageReady.current = false;
     const signal = pageRequests.current.signal;
@@ -236,9 +302,10 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       setFavoriteProviders(new Set((favorites ?? []).map((item) => item.provider_id)));
       setBookingInterests(new Set((bookings ?? []).flatMap((item) => { const service=item.provider_services as { title?: string } | null; return (service?.title ?? "").toLocaleLowerCase("fr").split(/\s+/).filter((word) => word.length>=4); })));
     }
-  }, [authenticated]);
+  }, [authenticated, collection]);
 
   const loadMore = useCallback(async () => {
+    if (collection) { collection.onLoadMore(); return; }
     const generation = loadGeneration.current;
     const signal = pageRequests.current.signal;
     if (!initialPageReady.current || !hasMore || loadingMore.current || signal.aborted) return;
@@ -262,11 +329,11 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       if (last) feedCursor.current = { publishedAt: last.published_at, id: last.id };
       setHasMore((data ?? []).length === FEED_BATCH_SIZE);
     } finally { loadingMore.current = false; }
-  }, [hasMore]);
+  }, [collection, hasMore]);
 
   useEffect(() => {
-    if (feedFilter === "Près de moi" && (location.area.trim() || location.position) && state === "ready" && hasMore) void loadMore();
-  }, [feedFilter, hasMore, loadMore, location.area, location.position, posts.length, state]);
+    if (!collection && activeSearch && state === "ready" && hasMore && visiblePosts.length < 4) void loadMore();
+  }, [activeSearch, collection, hasMore, loadMore, posts.length, state, visiblePosts.length]);
 
   useEffect(() => {
     const leave = () => pageRequests.current.abort();
@@ -284,12 +351,16 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     };
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (collection) return;
+    const frame = requestAnimationFrame(() => { void load(); });
+    return () => cancelAnimationFrame(frame);
+  }, [collection, load]);
 
   useEffect(() => {
     try {
       const savedMode = window.localStorage.getItem(FEED_MODE_KEY);
-      if (savedMode === "immersive" || savedMode === "premium") setFeedMode(savedMode);
+      if (savedMode === "immersive" || savedMode === "premium") requestAnimationFrame(() => setFeedMode(savedMode));
     } catch { /* Le choix de présentation reste utilisable sans stockage navigateur. */ }
   }, []);
 
@@ -315,15 +386,14 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     return () => observer.disconnect();
   }, [visiblePosts]);
 
+  const searchSignature = JSON.stringify([searchQuery, selectedCategoryId, selectedProviderId, location.area, location.position, radiusKm]);
+  const lastSearchSignature = useRef(searchSignature);
   useEffect(() => {
-    if (appliedFilter.current === feedFilter) return;
-    appliedFilter.current = feedFilter;
-    const anchorIndex = filterAnchor.current ? visiblePosts.findIndex((post) => post.id === filterAnchor.current) : -1;
-    const nextIndex = anchorIndex >= 0 ? anchorIndex : 0;
-    setActiveIndex(nextIndex);
-    filterAnchor.current = null;
-    window.requestAnimationFrame(() => cards.current[nextIndex]?.scrollIntoView({ block: "start" }));
-  }, [feedFilter, visiblePosts]);
+    if (lastSearchSignature.current === searchSignature) return;
+    lastSearchSignature.current = searchSignature;
+    setActiveIndex(0);
+    window.requestAnimationFrame(() => cards.current[0]?.scrollIntoView({ block: "start" }));
+  }, [searchSignature]);
 
   useEffect(() => {
     if (restoredPosition.current || state !== "ready" || !visiblePosts.length) return;
@@ -331,8 +401,10 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const rememberedId = window.sessionStorage.getItem("mata-feed-active-post");
     const rememberedIndex = visiblePosts.findIndex((post) => post.id === rememberedId);
     if (rememberedIndex < 0) return;
-    setActiveIndex(rememberedIndex);
-    window.requestAnimationFrame(() => cards.current[rememberedIndex]?.scrollIntoView({ block: "start" }));
+    window.requestAnimationFrame(() => {
+      setActiveIndex(rememberedIndex);
+      cards.current[rememberedIndex]?.scrollIntoView({ block: "start" });
+    });
   }, [state, visiblePosts]);
 
   useEffect(() => {
@@ -364,12 +436,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   useEffect(() => {
     const post = visiblePosts[activeIndex];
     const video = videos.current[activeIndex];
+    if (searchOpen) { videos.current.forEach((item) => item?.pause()); return; }
     if (pageVisible && post && video && !videoLoading.has(post.id) && !pausedPosts.has(post.id)) void video.play().catch(() => undefined);
-  }, [activeIndex, pageVisible, pausedPosts, videoLoading, visiblePosts]);
+  }, [activeIndex, pageVisible, pausedPosts, searchOpen, videoLoading, visiblePosts]);
 
   useEffect(() => {
     const post = visiblePosts[activeIndex];
-    if (!pageVisible || !post || !videoLoading.has(post.id) || videoErrors.has(post.id)) return;
+    if (!pageVisible || searchOpen || !post || !videoLoading.has(post.id) || videoErrors.has(post.id)) return;
     // Bound only the active player's wait: the next card deliberately loads metadata only.
     const timer = window.setTimeout(() => {
       const video = videos.current[activeIndex];
@@ -377,7 +450,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       setVideoErrors(current => new Set(current).add(post.id));
     }, 20_000);
     return () => window.clearTimeout(timer);
-  }, [activeIndex, pageVisible, videoErrors, videoLoading, visiblePosts]);
+  }, [activeIndex, pageVisible, searchOpen, videoErrors, videoLoading, visiblePosts]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -542,20 +615,88 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     onOpenProvider(post.authorId);
   }
 
-  const selectFilter = useCallback((filter: SocialFeedFilter) => {
-    filterAnchor.current = visiblePosts[activeIndex]?.id ?? null;
-    setFeedFilter(filter);
-    setShowLocation(filter === "Près de moi");
-  }, [activeIndex, visiblePosts]);
+  const categoryLabel = categories.find((item) => item.id === selectedCategoryId)?.name ?? "";
+  const selectedProvider = location.providers.find((item) => item.profileId === selectedProviderId);
+  const providerOptions = useMemo(() => {
+    const unique = new Map<string, InspirationSearchProvider>();
+    for (const provider of location.providers) {
+      if (selectedCategoryId && provider.categoryId !== selectedCategoryId) continue;
+      if (location.area.trim() && !matchesSearch(location.area, `${provider.area} ${provider.address ?? ""}`)) continue;
+      if (location.position) {
+        const distance = distanceKm(location.position, provider.coordinates);
+        if (distance === null || distance > radiusKm) continue;
+      }
+      if (searchQuery.trim() && !matchesSearch(searchQuery, `${provider.name} ${provider.specialty} ${provider.category} ${provider.area}`)) continue;
+      if (!unique.has(provider.profileId)) unique.set(provider.profileId, provider);
+    }
+    return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 5);
+  }, [location.area, location.position, location.providers, radiusKm, searchQuery, selectedCategoryId]);
+
+  function writeSearchUrl(applied: boolean, providerIdOverride = selectedProviderId) {
+    const params = new URLSearchParams();
+    if (activeSearch || providerIdOverride || (searchOpen && !applied)) params.set("search", "1");
+    if (applied) params.set("applied", "1");
+    if (searchQuery.trim()) params.set("q", searchQuery.trim().slice(0, 120));
+    if (selectedCategoryId && !selectedCategoryId.startsWith("__")) params.set("categoryId", selectedCategoryId);
+    if (providerIdOverride) params.set("providerId", providerIdOverride);
+    if (location.area.trim()) params.set("zone", location.area.trim().slice(0, 120));
+    if (location.position) params.set("radius", String(radiusKm));
+    const historyState = window.history.state && typeof window.history.state === "object" ? { ...window.history.state } : {};
+    if (location.position) historyState.mataInspirationPosition = location.position;
+    else delete historyState.mataInspirationPosition;
+    const query = params.toString();
+    window.history.replaceState(historyState, "", query ? `/?${query}` : "/");
+  }
+
+  function openSearch() {
+    setSearchOpen(true);
+    writeSearchUrl(false);
+  }
+
+  function applySearch() {
+    setSelectedCategoryId((current) => current.startsWith("__") ? "" : current);
+    writeSearchUrl(true);
+    setSearchOpen(false);
+  }
+
+  function clearSearch() {
+    setSearchQuery("");
+    setSelectedCategoryId("");
+    setSelectedProviderId("");
+    setRadiusKm(5);
+    location.onChange("", null);
+    setSearchOpen(false);
+    window.history.replaceState({}, "", "/");
+  }
+
+  const openProfessionalFromSearch = (providerId: string) => {
+    writeSearchUrl(true, providerId);
+    setSearchOpen(false);
+    onOpenProvider(providerId);
+  };
 
   const activePost = visiblePosts[activeIndex];
-  const header = useMemo(() => <header className="social-feed-header"><div className="feed-title-row"><strong>MATA</strong><span>INSPIRATION</span><div className="feed-header-actions"><button className="feed-mode-toggle" aria-label={t(feedMode === "immersive" ? "Afficher le mode Premium" : "Afficher le mode immersif")} aria-pressed={feedMode === "premium"} title={t(feedMode === "immersive" ? "Afficher le mode Premium" : "Afficher le mode immersif")} onClick={() => changeFeedMode(feedMode === "immersive" ? "premium" : "immersive")}>{t(feedMode === "immersive" ? "Premium" : "Immersif")}</button><button disabled={authPending} aria-label={t("Publier une vidéo")} onClick={onPublish}>＋</button><button aria-label={t("Rechercher")} onClick={onDiscover}>⌕</button></div></div><nav className="feed-filter-strip" aria-label={t("Filtres du feed")}>{socialFeedFilters.slice(0, 3).map((filter) => <button key={filter} aria-pressed={feedFilter === filter} className={feedFilter === filter ? "active" : ""} onClick={() => selectFilter(filter)}>{t(filter)}</button>)}</nav>{feedFilter === "Près de moi" && <button className="feed-location-toggle" onClick={() => setShowLocation((value) => !value)}>{location.position ? t("Près de vous · 25 km") : location.area || t("Choisir ma zone")} · {t("Modifier")}</button>}{showLocation && <div className="feed-location-panel"><LocationPicker autoLocate area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} /><button onClick={() => setShowLocation(false)}>{t("Voir les résultats")}</button></div>}</header>, [authPending, changeFeedMode, feedFilter, feedMode, location, onDiscover, onPublish, selectFilter, showLocation, t]);
+  const header = <header className="social-feed-header"><div className="feed-title-row">{collection ? <button type="button" aria-label="Retour aux vidéos du profil" onClick={() => { collection.onBack(); onDiscover?.(); }}>‹</button> : <><strong>MATA</strong><span>INSPIRATION</span></>}<div className="feed-header-actions">{!collection && <><button className="feed-mode-toggle" aria-label={t(feedMode === "immersive" ? "Afficher le mode Premium" : "Afficher le mode immersif")} aria-pressed={feedMode === "premium"} title={t(feedMode === "immersive" ? "Afficher le mode Premium" : "Afficher le mode immersif")} onClick={() => changeFeedMode(feedMode === "immersive" ? "premium" : "immersive")}>{t(feedMode === "immersive" ? "Premium" : "Immersif")}</button><button disabled={authPending} aria-label={t("Publier une vidéo")} onClick={onPublish}>＋</button><button aria-label={t("Rechercher")} onClick={openSearch}>⌕</button></>}</div></div>{!collection && activeSearch && <div className="inspiration-active-filters" aria-label="Filtres actifs"><span>{[categoryLabel, selectedProvider?.name, location.area, location.position ? `Autour de moi · ${radiusKm} km` : "", searchQuery].filter(Boolean).join(" · ")}</span><button type="button" onClick={clearSearch}>Effacer les filtres</button></div>}</header>;
+
+  const searchDialog = searchOpen && !collection ? <div className="inspiration-search-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) { setSearchOpen(false); writeSearchUrl(activeSearch); } }}>
+    <section className="inspiration-search-dialog" role="dialog" aria-modal="true" aria-labelledby="inspiration-search-title">
+      <header><div><span>INSPIRATION</span><h2 id="inspiration-search-title">Que souhaitez-vous découvrir ?</h2></div><button type="button" aria-label="Fermer la recherche" onClick={() => { setSearchOpen(false); writeSearchUrl(activeSearch); }}>×</button></header>
+      <form onSubmit={(event) => { event.preventDefault(); applySearch(); }}>
+        <label className="inspiration-search-field">Professionnel, salon ou prestation<input autoFocus maxLength={120} value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setSelectedProviderId(""); }} placeholder="Ex. Aïssatou Beauty, tresses…" /></label>
+        <label className="inspiration-search-field">Prestation<select value={selectedCategoryId.startsWith("__") ? "" : selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedProviderId(""); }}><option value="">Toutes les prestations</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        {categories.length === 0 && <p className="inspiration-search-note">Les catégories publiées seront disponibles dès que le catalogue aura chargé.</p>}
+        <LocationPicker area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} radiusKm={radiusKm} onRadiusChange={setRadiusKm} />
+        {providerOptions.length > 0 && <div className="inspiration-provider-suggestions"><strong>Professionnels correspondants</strong>{providerOptions.map((provider) => <button type="button" key={provider.profileId} aria-pressed={selectedProviderId === provider.profileId} onClick={() => openProfessionalFromSearch(provider.profileId)}><span><b>{provider.name}</b><small>{provider.specialty} · {provider.area}</small></span><i>Profil ›</i></button>)}</div>}
+        <footer><button type="button" className="inspiration-search-clear" onClick={clearSearch}>Effacer</button><button type="submit" className="inspiration-search-submit">Afficher les vidéos</button></footer>
+      </form>
+    </section>
+  </div> : null;
 
   if (state === "loading") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}<div className="feed-skeleton" role="status" aria-label={t("Chargement du feed")} /></section>;
-  if (state !== "ready") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}<div className="social-feed-empty"><span>▶</span><h1>{state === "error" ? t("Le feed est indisponible") : t("Les premières inspirations arrivent bientôt.")}</h1><p>{state === "error" ? t("Réessayez dans quelques instants.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={state === "error" ? () => void load() : onDiscover}>{state === "error" ? t("Réessayer") : t("Découvrir les professionnels")}</button></div></section>;
+  if (state !== "ready") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="social-feed-empty"><span>▶</span><h1>{state === "error" ? t("Le feed est indisponible") : t("Les premières inspirations arrivent bientôt.")}</h1><p>{state === "error" ? t("Réessayez dans quelques instants.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={state === "error" ? () => void load() : openSearch}>{state === "error" ? t("Réessayer") : t("Rechercher une prestation")}</button></div></section>;
 
-  return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}<div className="social-feed" aria-label={t("Vidéos beauté")} onScroll={(event) => { const node=event.currentTarget; const cardHeight=cards.current[0]?.getBoundingClientRect().height ?? node.clientHeight; const index=Math.round(node.scrollTop/Math.max(1,cardHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>
-    {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{feedFilter === "Près de moi" ? t("Aucun créateur proche pour le moment") : feedFilter === "Tendances" ? t("Les tendances arrivent") : `${t("Aucune inspiration")} ${t(feedFilter)}`}</h1><p>{feedFilter === "Près de moi" ? t("Élargissez votre recherche ou revenez bientôt : les disponibilités locales sont actualisées en continu.") : t("Essayez une autre catégorie pour découvrir des prestations disponibles.")}</p><button onClick={() => setFeedFilter("Pour toi")}>{t("Explorer le feed")}</button></div>}
+  return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="social-feed" aria-label={t("Vidéos beauté")} onScroll={(event) => { const node=event.currentTarget; const cardHeight=cards.current[0]?.getBoundingClientRect().height ?? node.clientHeight; const index=Math.round(node.scrollTop/Math.max(1,cardHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>
+    {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{activeSearch ? "Aucune vidéo pour ces filtres" : t("Les premières inspirations arrivent bientôt.")}</h1><p>{activeSearch ? "Aucun contenu publié ne correspond à cette prestation, ce professionnel ou cette zone." : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={activeSearch ? clearSearch : openSearch}>{activeSearch ? "Voir toutes les vidéos" : "Rechercher une prestation"}</button></div>}
     {visiblePosts.map((post, index) => <article className="social-video-card" data-post-id={post.id} key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`${t("Publication de")} ${post.businessName}`}>
       {post.postType === "video" ? videoErrors.has(post.id) || !post.videoUrl ? <div className="video-fallback"><span>◇</span><p>{t("Cette vidéo ne peut pas être lue.")}</p><button disabled={videoRefreshing.has(post.id)} onClick={() => void retryVideo(post)}>{t(videoRefreshing.has(post.id) ? "Rechargement…" : "Réessayer")}</button></div> : <video ref={(node) => { videos.current[index]=node; }} src={index===activeIndex || index===activeIndex+1 ? post.videoUrl : undefined} poster={post.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload={index===activeIndex ? "auto" : index===activeIndex+1 ? "metadata" : "none"} onLoadStart={() => setVideoLoading((current) => new Set(current).add(post.id))} onWaiting={() => setVideoLoading((current) => current.has(post.id) ? current : new Set(current).add(post.id))} onPlaying={() => { setVideoErrors(current => { if (!current.has(post.id)) return current; const next = new Set(current); next.delete(post.id); return next; }); setVideoLoading((current) => { if (!current.has(post.id)) return current; const next = new Set(current); next.delete(post.id); return next; }); }} onCanPlay={() => setVideoLoading((current) => { const next=new Set(current); next.delete(post.id); return next; })} onTimeUpdate={(event) => { const video=event.currentTarget; const ratio=video.duration ? video.currentTime/video.duration : 0; setProgress((current) => ({ ...current, [post.id]: ratio })); if (ratio>=.95 && !completedViews.current.has(post.id)) { completedViews.current.add(post.id); void getSessionHash().then((hash) => { if (pageRequests.current.signal.aborted) return; return getSupabaseBrowserClient()?.rpc("record_video_view", { target_post_id: post.id, target_session_hash: hash, target_watched_ms: Math.round(video.currentTime*1000), target_completed: true }).abortSignal(pageRequests.current.signal); }); } }} onError={() => handleVideoError(post)} /> : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt="Avant" width={540} height={760} unoptimized /><figcaption>{t("Avant")}</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt="Après" width={540} height={760} unoptimized /><figcaption>{t("Après")}</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
       {videoLoading.has(post.id) && !videoErrors.has(post.id) && <span className="video-loading" role="status">{t("Chargement…")}</span>}

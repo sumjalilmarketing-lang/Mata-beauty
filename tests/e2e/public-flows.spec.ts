@@ -10,10 +10,16 @@ test.beforeEach(async ({ page }) => {
 test.beforeEach(async ({ page }) => {
   await page.route(`${supabaseOrigin}/auth/v1/authorize**`, (route) => route.fulfill({ status: 204 }));
   await page.route("**/api/auth/providers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ google: true }) }));
-  await page.route(`${supabaseOrigin}/rest/v1/categories**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 }]) }));
+  await page.route(`${supabaseOrigin}/rest/v1/categories**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+    { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 },
+    { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Onglerie", slug: "onglerie", icon: "◇", sort_order: 2 },
+  ]) }));
   await page.route(`${supabaseOrigin}/rest/v1/provider_profiles**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
     profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier Tresses", city: "Dakar", service_mode: "salon", average_rating: 4.8, review_count: 12, verified_at: "2026-01-01T00:00:00Z", cover_url: null,
-    provider_services: [{ id: "22222222-2222-4222-8222-222222222222", title: "Tresses collées", duration_minutes: 90, price_amount: 10000, services: { name: "Tresses collées", categories: { name: "Tresses" } } }],
+    provider_services: [
+      { id: "22222222-2222-4222-8222-222222222222", title: "Tresses collées", duration_minutes: 90, price_amount: 10000, services: { name: "Tresses collées", categories: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses" } } },
+      { id: "33333333-3333-4333-8333-333333333333", title: "Pose gel", duration_minutes: 60, price_amount: 8000, services: { name: "Pose gel", categories: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Onglerie" } } },
+    ],
   }]) }));
   await page.route(`${supabaseOrigin}/rest/v1/promotions**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   page.on("pageerror", (error) => { throw error; });
@@ -22,17 +28,14 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("premium home opens a real category results screen", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
-  await expect(page.getByRole("heading", { name: "Explorer", exact: true })).toBeVisible();
-  await expect(page.getByPlaceholder("Que recherchez-vous ?")).toBeVisible();
-  const tressesCategory = page.locator(".photo-category-grid button").filter({ hasText: "Tresses" });
-  await expect(tressesCategory).toBeVisible();
-  await expect(page.getByText("Awa Signature", { exact: true })).toHaveCount(0);
-  await tressesCategory.click();
-  await expect(page.getByRole("heading", { name: "Tresses", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Tresses collées" })).toBeVisible();
+test("legacy Explorer URLs redirect to Inspiration and preserve the selected category", async ({ page }) => {
+  await page.goto("/discover?screen=results&category=Tresses");
+  await expect(page).toHaveURL(/\\/?search=1&applied=1&category=Tresses/);
+  await expect(page.getByText("INSPIRATION", { exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" })).toHaveCount(0);
+  await page.goto("/app/discover?screen=results&category=Tresses");
+  await expect(page).toHaveURL(/\\/?search=1&applied=1&category=Tresses/);
+  await expect(page.getByText("INSPIRATION", { exact: true })).toBeVisible();
 });
 
 test("authentication has no fake preview mode", async ({ page }) => {
@@ -54,13 +57,15 @@ test("registration requires explicit legal consent", async ({ page }) => {
   await expect(consent).toBeChecked();
 });
 
-test("mobile bottom navigation works without horizontal overflow", async ({ page }) => {
+test("mobile bottom navigation opens Inspiration search without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/");
   const navigation = page.getByRole("navigation", { name: "Navigation de l’application" });
   await expect(navigation).toBeVisible();
-  await navigation.getByRole("button", { name: "Explorer" }).click();
-  await expect(page.getByPlaceholder("Que recherchez-vous ?")).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "Inspiration" })).toBeVisible();
+  await page.getByRole("button", { name: "Rechercher", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Que souhaitez-vous découvrir ?" })).toBeVisible();
+  await page.getByRole("button", { name: "Fermer la recherche" }).click();
   const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(hasOverflow).toBe(false);
 });
@@ -69,7 +74,7 @@ test("primary mobile navigation keeps comfortable touch targets", async ({ page 
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/");
   const buttons = page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button");
-  await expect(buttons).toHaveCount(5);
+  await expect(buttons).toHaveCount(4);
   for (const button of await buttons.all()) {
     const box = await button.boundingBox();
     expect(box, "Le bouton principal doit être visible").not.toBeNull();
@@ -115,6 +120,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
       { ...base, id: "66666666-6666-4666-8666-666666666666", caption: "Première transformation", video_url: "https://audit.supabase.co/one.mp4" },
       { ...base, id: "77777777-7777-4777-8777-777777777777", caption: "Deuxième transformation", video_url: "https://audit.supabase.co/two.mp4", published_at: new Date(Date.now()-1000).toISOString() },
+      { ...base, id: "88888888-8888-4888-8888-888888888888", caption: "Manucure gel", provider_service_id: "33333333-3333-4333-8333-333333333333", service_title: "Pose gel", video_url: "https://audit.supabase.co/nails.mp4", published_at: new Date(Date.now()-2000).toISOString() },
     ]) });
   });
   await page.route("**/api/public/social-posts/*/media", (route) => {
@@ -124,7 +130,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   });
   await page.goto("/");
   const feed = page.locator(".social-feed");
-  await expect(page.locator(".social-video-card")).toHaveCount(2, { timeout: 15_000 });
+  await expect(page.locator(".social-video-card")).toHaveCount(3, { timeout: 15_000 });
   expect(requestedBatch).toBe("8");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await page.getByRole("button", { name: "Réserver", exact: true }).first().click();
@@ -182,13 +188,15 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await feed.evaluate((node) => node.scrollTo({ top: 0, behavior: "auto" }));
   await page.locator(".social-video-card video").first().dispatchEvent("canplay");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
-  await page.getByRole("button", { name: "Près de moi", exact: true }).click();
-  await page.getByLabel("Ville ou quartier").fill("Dakar");
-  await page.getByRole("button", { name: "Voir les résultats", exact: true }).click();
+  await page.getByRole("button", { name: "Rechercher", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Que souhaitez-vous découvrir ?" });
+  await dialog.locator("select").first().selectOption("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  await dialog.getByLabel("Ville, quartier ou pays").fill("Dakar");
+  await dialog.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(2);
-  await expect(page.getByRole("navigation", { name: "Filtres du feed" }).getByRole("button")).toHaveCount(3);
-  await page.getByRole("button", { name: "Tendances", exact: true }).click();
-  await expect(page.locator(".social-video-card")).toHaveCount(2);
+  await expect(page.locator(".social-video-card").filter({ hasText: "Manucure gel" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Effacer les filtres" }).click();
+  await expect(page.locator(".social-video-card")).toHaveCount(3);
 });
 
 test("Google login starts a real OAuth request with a fixed callback", async ({ page }) => {
