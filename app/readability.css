@@ -13,6 +13,21 @@
   --ui-focus: #74114f;
   color-scheme: light;
 }
+.client-support-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid #8b7482;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #24131f;
+}
+.client-support-contact strong { width: 100%; color: #24131f; }
+.client-support-contact a { color: #76244d; font-weight: 700; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.client-support-contact span { color: #5b4b55; font-size: 13px; }
 @media (prefers-color-scheme: dark) {
   .super-admin-shell {
     --ui-surface: #2d1226;

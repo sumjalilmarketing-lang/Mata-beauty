@@ -147,11 +147,12 @@ test("the admin login keeps readable colors on its white surface", async () => {
 });
 
 test("the Super Admin control center is protected by RBAC and audited RPCs", async () => {
-  const [migration, adminPage, adminApp, clientCenter] = await Promise.all([
+  const [migration, adminPage, adminApp, clientCenter, readability] = await Promise.all([
     readFile(new URL("supabase/migrations/20260725233000_super_admin_control_center.sql", root), "utf8"),
     readFile(new URL("app/admin/page.tsx", root), "utf8"),
     readFile(new URL("app/super-admin.tsx", root), "utf8"),
     readFile(new URL("app/client-control-center.tsx", root), "utf8"),
+    readFile(new URL("app/readability.css", root), "utf8"),
   ]);
 
   for (const role of ["super_admin", "support", "moderator", "verification_agent", "finance", "content_manager"]) {
@@ -178,6 +179,7 @@ test("the Super Admin control center is protected by RBAC and audited RPCs", asy
   assert.match(adminApp, /Ce réglage reste en lecture seule tant que le service ne l’applique pas/);
   assert.doesNotMatch(adminApp, /platform-name|booking-minimum-notice|booking-cancellation-window/);
   assert.match(clientCenter, /client-support-contact/);
+  assert.match(readability, /\.client-support-contact/);
   assert.match(adminApp, /admin_update_setting/);
   assert.match(adminApp, /settings\.update/);
 });
