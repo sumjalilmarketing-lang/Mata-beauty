@@ -67,7 +67,7 @@ export function ProfessionalDocuments({ providerId, review = false, readOnly = f
     setNotice(result.error ? publicErrorMessage(result.error, "Le complément n’a pas pu être enregistré.") : "Complément demandé. Le candidat a été notifié.");
     if (!result.error) { await load(); onChange?.(); }
   }
-  return <article className="panel"><h2>Documents professionnels</h2><p>Les quatre documents sont obligatoires. Ils restent privés et servent à vérifier votre activité.</p>
+  return <article className="panel professional-documents-panel"><h2>Documents professionnels</h2><p>Les quatre documents sont obligatoires. Ils restent privés et servent à vérifier votre activité.</p>
     {!loading && <p>{documents.filter(document => document.status !== "rejected").length}/4 documents reçus</p>}
     {notice && <p role="status">{notice}</p>}{loading ? <p>Chargement…</p> : Object.entries(kinds).map(([kind, label]) => {
       const document = documents.find(item => item.kind === kind);

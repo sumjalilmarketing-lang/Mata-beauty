@@ -1,0 +1,128 @@
+[
+  {
+    "label": "before",
+    "width": 320,
+    "scrollWidth": 320,
+    "overflow": false,
+    "contrast": [
+      {
+        "impact": "serious",
+        "count": 6
+      }
+    ],
+    "colorViolationCount": 6
+  },
+  {
+    "label": "after",
+    "width": 320,
+    "scrollWidth": 320,
+    "overflow": false,
+    "contrast": [],
+    "colorViolationCount": 0
+  },
+  {
+    "label": "before",
+    "width": 375,
+    "scrollWidth": 375,
+    "overflow": false,
+    "contrast": [
+      {
+        "impact": "serious",
+        "count": 6
+      }
+    ],
+    "colorViolationCount": 6
+  },
+  {
+    "label": "after",
+    "width": 375,
+    "scrollWidth": 375,
+    "overflow": false,
+    "contrast": [],
+    "colorViolationCount": 0
+  },
+  {
+    "label": "before",
+    "width": 390,
+    "scrollWidth": 390,
+    "overflow": false,
+    "contrast": [
+      {
+        "impact": "serious",
+        "count": 6
+      }
+    ],
+    "colorViolationCount": 6
+  },
+  {
+    "label": "after",
+    "width": 390,
+    "scrollWidth": 390,
+    "overflow": false,
+    "contrast": [],
+    "colorViolationCount": 0
+  },
+  {
+    "label": "before",
+    "width": 768,
+    "scrollWidth": 768,
+    "overflow": false,
+    "contrast": [
+      {
+        "impact": "serious",
+        "count": 6
+      }
+    ],
+    "colorViolationCount": 6
+  },
+  {
+    "label": "after",
+    "width": 768,
+    "scrollWidth": 768,
+    "overflow": false,
+    "contrast": [],
+    "colorViolationCount": 0
+  },
+  {
+    "label": "before",
+    "width": 1024,
+    "scrollWidth": 1024,
+    "overflow": false,
+    "contrast": [
+      {
+        "impact": "serious",
+        "count": 6
+      }
+    ],
+    "colorViolationCount": 6
+  },
+  {
+    "label": "after",
+    "width": 1024,
+    "scrollWidth": 1024,
+    "overflow": false,
+    "contrast": [],
+    "colorViolationCount": 0
+  },
+  {
+    "label": "before",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "overflow": false,
+    "contrast": [
+      {
+        "impact": "serious",
+        "count": 6
+      }
+    ],
+    "colorViolationCount": 6
+  },
+  {
+    "label": "after",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "overflow": false,
+    "contrast": [],
+    "colorViolationCount": 0
+  }
+]
