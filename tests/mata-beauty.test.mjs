@@ -168,6 +168,12 @@ test("the Super Admin control center is protected by RBAC and audited RPCs", asy
   assert.match(adminApp, /Compte non autorisé/);
   assert.match(adminApp, /PermissionGuard/);
   assert.match(adminApp, /ConfirmationModal/);
+  assert.doesNotMatch(adminApp, /JSON\.stringify\(setting\.value/);
+  for (const field of ["platform-name", "platform-locale", "platform-country", "platform-currency", "platform-timezone", "booking-minimum-notice", "booking-cancellation-window", "support-email", "support-phone"]) {
+    assert.match(adminApp, new RegExp(field));
+  }
+  assert.match(adminApp, /admin_update_setting/);
+  assert.match(adminApp, /settings\.update/);
 });
 
 test("the social video layer is server-counted, attributable, storage-isolated, and protected by RLS", async () => {
