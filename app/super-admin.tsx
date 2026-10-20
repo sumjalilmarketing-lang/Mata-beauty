@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 19122)
+Total output lines: 1006
+
 "use client";
 import { PasswordField } from "@/app/password-field";
 
@@ -499,269 +502,7 @@ function AdminModule({
   if (module === "providers") return <ProvidersModule context={context} verificationOnly={false} notify={notify} />;
   if (module === "bookings" || module === "calendar") return <BookingsModule context={context} calendar={module === "calendar"} notify={notify} />;
   if (module === "categories" || module === "services") return <CatalogModule services={module === "services"} notify={notify} />;
-  if (module === "payments" || module === "commissions") return <FinanceModule section={module} />;
-  if (module === "content") return <SocialContentModule context={context} notify={notify} />;
-  if (module === "audit") return <AuditModule context={context} />;
-  if (module === "administrators" || module === "roles") return <InternalTeam matrixOnly={module === "roles"} />;
-  if (module === "settings" || module === "maintenance") return <SettingsModule context={context} maintenance={module === "maintenance"} notify={notify} />;
-  return <OperationalModule module={module} context={context} />;
-}
-
-function Overview({ context, setModule }: { context: AdminContext; setModule: (module: ModuleKey) => void }) {
-  const [metrics, setMetrics] = useState<Metrics | null>(null);
-  useEffect(() => {
-    void getSupabaseBrowserClient()?.rpc("get_admin_dashboard").then(({ data }) => setMetrics(data as Metrics | null));
-  }, []);
-  if (!metrics) return <LoadingSkeleton />;
-  const bookingTotal = metrics.bookings_confirmed + metrics.bookings_cancelled;
-  const cancellationRate = bookingTotal ? Math.round((metrics.bookings_cancelled / bookingTotal) * 100) : 0;
-  return <>
-    <section className="admin-metric-grid">{metricDefinitions.map((definition) =>
-      <article className={definition.tone ?? ""} key={definition.key}><small>{definition.label}</small><strong>{definition.currency ? formatCurrency(metrics[definition.key]) : metrics[definition.key]}</strong><span>↗ Données Supabase</span></article>,
-    )}</section>
-    <section className="admin-dashboard-grid">
-      <article className="admin-panel admin-chart-panel"><div className="admin-panel-heading"><div><p>Activité réelle</p><h2>Réservations enregistrées</h2></div></div>
-        <dl className="admin-kpi-list"><div><dt>Cette semaine</dt><dd>{metrics.bookings_week}</dd></div><div><dt>Confirmées</dt><dd>{metrics.bookings_confirmed}</dd></div><div><dt>Annulées</dt><dd>{metrics.bookings_cancelled}</dd></div></dl>
-      </article>
-      <article className="admin-panel"><div className="admin-panel-heading"><div><p>Qualité opérationnelle</p><h2>Indicateurs clés</h2></div></div>
-        <dl className="admin-kpi-list"><div><dt>Taux d’annulation</dt><dd>{cancellationRate}%</dd></div><div><dt>Panier moyen</dt><dd>{formatCurrency(metrics.average_order)}</dd></div><div><dt>Nouveaux comptes semaine</dt><dd>{metrics.users_week}</dd></div></dl>
-      </article>
-      <article className="admin-panel urgent-panel"><div className="admin-panel-heading"><div><p>À traiter</p><h2>Alertes opérationnelles</h2></div></div>
-        <PermissionGuard permission="documents.review" context={context}><button onClick={() => setModule("verification")}><span>Validations prestataires</span><strong>{metrics.providers_pending}</strong></button></PermissionGuard>
-        <PermissionGuard permission="reports.manage" context={context}><button onClick={() => setModule("reports")}><span>Signalements ouverts</span><strong>{metrics.reports_open}</strong></button></PermissionGuard>
-        <PermissionGuard permission="reports.manage" context={context}><button onClick={() => setModule("disputes")}><span>Litiges ouverts</span><strong>{metrics.disputes_open}</strong></button></PermissionGuard>
-        <PermissionGuard permission="support.manage" context={context}><button onClick={() => setModule("support")}><span>Tickets support</span><strong>{metrics.tickets_open}</strong></button></PermissionGuard>
-      </article>
-    </section>
-    <PermissionGuard permission="settings.update" context={context}><div className="admin-security-banner"><span>⌾</span><div><strong>Contrôles sensibles actifs</strong><p>Les suspensions, validations, changements de rôle, réservations et paramètres exigent une justification et créent un journal d’audit.</p></div></div></PermissionGuard>
-  </>;
-}
-
-function UsersModule({ context, notify }: { context: AdminContext; notify: (message: string) => void }) {
-  const [rows, setRows] = useState<UserRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [confirmation, setConfirmation] = useState<UserRow | null>(null);
-
-  const load = useCallback(async () => {
-    const { data } = await getSupabaseBrowserClient()!.rpc("admin_list_users", { search_term: query || null });
-    setRows((data ?? []) as UserRow[]);
-    setLoading(false);
-  }, [query]);
-  useEffect(() => { void Promise.resolve().then(load); }, [load]);
-  const visible = useMemo(() => rows.filter((row) => roleFilter === "all" || row.account_role === roleFilter), [roleFilter, rows]);
-
-  return <>
-    <div className="admin-filter-bar"><div className="admin-inline-search">⌕<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom, e-mail ou téléphone" /></div><label>Rôle<select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}><option value="all">Tous les rôles</option><option value="client">Clients</option><option value="provider">Prestataires</option><option value="admin">Administrateurs</option></select></label><span>{visible.length} comptes</span></div>
-    {loading ? <LoadingSkeleton /> : <div className="admin-table-wrap" role="region" aria-label="Utilisateurs" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Utilisateur</th><th>Rôle</th><th>Ville</th><th>Inscription</th><th>Activité</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{visible.map((row) =>
-      <tr key={row.user_id}><td><strong>{row.display_name || "Sans nom"}</strong><small>{row.email}<br />{row.phone || "Téléphone non renseigné"}</small></td><td><StatusBadge value={row.account_role} /></td><td>{row.city || "—"}</td><td>{formatDate(row.created_at)}<small>Dernière connexion : {formatDate(row.last_sign_in_at)}</small></td><td>{row.bookings_count} réservation(s)<small>{row.reports_count} signalement(s)</small></td><td><StatusBadge value={row.is_suspended ? "suspended" : "active"} /></td><td><PermissionGuard permission="users.suspend" context={context}><button className={row.is_suspended ? "table-action positive" : "table-action danger"} onClick={() => setConfirmation(row)}>{row.is_suspended ? "Réactiver" : "Suspendre"}</button></PermissionGuard></td></tr>,
-    )}</tbody></table></div>}
-    {confirmation && <ConfirmationModal title={confirmation.is_suspended ? "Réactiver ce compte ?" : "Suspendre ce compte ?"} description={`${confirmation.display_name || confirmation.email} sera ${confirmation.is_suspended ? "de nouveau autorisé" : "immédiatement bloqué"}.`} dangerous={!confirmation.is_suspended} onCancel={() => setConfirmation(null)} onConfirm={async (reason) => {
-      const { error } = await getSupabaseBrowserClient()!.rpc("admin_set_user_suspension", { target_user_id: confirmation.user_id, suspended: !confirmation.is_suspended, reason });
-      if (error) notify(publicErrorMessage(error, "Le compte n’a pas pu être mis à jour.")); else notify("Compte mis à jour et action journalisée.");
-      setConfirmation(null);
-      await load();
-    }} />}
-  </>;
-}
-
-function ProvidersModule({ context, verificationOnly, notify }: { context: AdminContext; verificationOnly: boolean; notify: (message: string) => void }) {
-  const [opened, setOpened] = useState<string | null>(null);
-  const [rows, setRows] = useState<ProviderRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [confirmation, setConfirmation] = useState<{ row: ProviderRow; status: "approved" | "rejected" | "suspended" } | null>(null);
-  const load = useCallback(async () => {
-    let request = getSupabaseBrowserClient()!.from("provider_profiles").select("profile_id,business_name,city,status,average_rating,review_count,created_at").order("created_at", { ascending: false }).limit(200);
-    if (verificationOnly) request = request.eq("status", "pending_review");
-    const { data } = await request;
-    setRows((data ?? []) as ProviderRow[]);
-    setLoading(false);
-  }, [verificationOnly]);
-  useEffect(() => { void Promise.resolve().then(load); }, [load]);
-  if (loading) return <LoadingSkeleton />;
-  return <><div className="admin-filter-bar"><span>{rows.length} prestataires autorisés</span></div>
-    {rows.length ? <div className="admin-table-wrap" role="region" aria-label="Professionnels" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Prestataire</th><th>Ville</th><th>Note</th><th>Inscription</th><th>Statut</th><th>Décision</th></tr></thead><tbody>{rows.map((row) =>
-      <tr key={row.profile_id}><td><strong>{row.business_name}</strong></td><td>{row.city}</td><td>★ {Number(row.average_rating).toFixed(1)}<small>{row.review_count} avis</small></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.status} /></td><td><button className="table-action" onClick={() => setOpened(row.profile_id)}>Examiner le dossier</button>{row.status === "approved" && <PermissionGuard permission="providers.suspend" context={context}><button className="table-action danger" onClick={() => setConfirmation({ row, status: "suspended" })}>Suspendre le compte</button></PermissionGuard>}{row.status === "suspended" && <PermissionGuard permission="providers.suspend" context={context}><PermissionGuard permission="providers.verify" context={context}><button className="table-action positive" onClick={() => setConfirmation({ row, status: "approved" })}>Réactiver le professionnel</button></PermissionGuard></PermissionGuard>}</td></tr>,
-    )}</tbody></table></div> : <EmptyState title="File de vérification à jour" description="Aucun prestataire ne correspond aux filtres sélectionnés." />}
-    {opened && <article className="admin-panel dossier-container"><button className="table-action" onClick={() => setOpened(null)}>Fermer le dossier</button><ProviderReview key={opened} providerId={opened} /><p>Les candidatures en attente sont traitées dans « Validations professionnelles ».</p></article>}
-    {confirmation && <ConfirmationModal title={`${confirmation.status === "approved" ? "Approuver" : confirmation.status === "rejected" ? "Rejeter" : "Suspendre"} ${confirmation.row.business_name} ?`} description="La décision sera appliquée immédiatement et enregistrée dans le journal d’audit." dangerous={confirmation.status !== "approved"} onCancel={() => setConfirmation(null)} onConfirm={async (reason) => {
-      const { error } = await getSupabaseBrowserClient()!.rpc("admin_set_provider_status", { target_provider_id: confirmation.row.profile_id, next_status: confirmation.status, reason });
-      notify(error ? publicErrorMessage(error, "La décision n’a pas pu être appliquée.") : "Décision appliquée et journalisée.");
-      setConfirmation(null);
-      await load();
-    }} />}
-  </>;
-}
-
-function BookingsModule({ context, calendar, notify }: { context: AdminContext; calendar: boolean; notify: (message: string) => void }) {
-  const [rows, setRows] = useState<BookingRow[]>([]);
-  const [confirmation, setConfirmation] = useState<BookingRow | null>(null);
-  useEffect(() => {
-    void getSupabaseBrowserClient()!.from("bookings").select("id,starts_at,status,total_amount,currency,location_mode,provider_profiles(business_name),provider_services(title,duration_minutes)").order("starts_at", { ascending: false }).limit(200).then(({ data }) => setRows((data ?? []) as unknown as BookingRow[]));
-  }, []);
-  if (calendar) return <div className="admin-calendar"><div className="calendar-toolbar"><strong>Prochaines réservations</strong></div><div className="calendar-grid">{["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((day) => <strong key={day}>{day}</strong>)}{rows.slice(0, 14).map((row) => <article key={row.id}><small>{new Date(row.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" })}</small><span>{relationOne(row.provider_services)?.title || "Prestation"}</span><StatusBadge value={row.status} /></article>)}</div></div>;
-  return <><div className="admin-filter-bar"><span>{rows.length} réservations autorisées</span></div><div className="admin-table-wrap" role="region" aria-label="Réservations" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Référence</th><th>Prestation</th><th>Prestataire</th><th>Date</th><th>Prix</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{rows.map((row) =>
-    <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code></td><td><strong>{relationOne(row.provider_services)?.title || "Prestation"}</strong><small>{relationOne(row.provider_services)?.duration_minutes || "—"} min · {row.location_mode}</small></td><td>{relationOne(row.provider_profiles)?.business_name || "—"}</td><td>{formatDate(row.starts_at)}</td><td>{formatCurrency(row.total_amount)}</td><td><StatusBadge value={row.status} /></td><td><PermissionGuard permission="bookings.update" context={context}><button className="table-action danger" onClick={() => setConfirmation(row)}>Modifier</button></PermissionGuard></td></tr>,
-  )}</tbody></table></div>{confirmation && <ConfirmationModal title="Annuler administrativement cette réservation ?" description="Le statut sera modifié avec justification et les parties conserveront l’historique." dangerous onCancel={() => setConfirmation(null)} onConfirm={async (reason) => {
-    const { error } = await getSupabaseBrowserClient()!.rpc("admin_update_booking_status", { target_booking_id: confirmation.id, next_status: "cancelled_by_provider", reason });
-    notify(error ? publicErrorMessage(error, "La réservation n’a pas pu être mise à jour.") : "Réservation mise à jour et auditée.");
-    setRows((current) => current.map((row) => row.id === confirmation.id ? { ...row, status: "cancelled_by_provider" } : row));
-    setConfirmation(null);
-  }} />}</>;
-}
-
-export function CatalogModule({ services, notify }: { services: boolean; notify: (message: string) => void }) {
-  const [rows, setRows] = useState<CatalogRow[]>([]);
-  const [editing, setEditing] = useState<CatalogRow | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [loadError, setLoadError] = useState("");
-  const load = useCallback(() => {
-    const request = services
-      ? getSupabaseBrowserClient()!.from("provider_services").select("id,title,is_active,duration_minutes,price_amount").order("created_at", { ascending: false }).limit(200)
-      : getSupabaseBrowserClient()!.from("categories").select("id,name,slug,description,icon,image_url,parent_id,is_active,sort_order").order("sort_order");
-    void request.abortSignal(AbortSignal.timeout(10000)).then(({ data, error }) => {
-      setLoadError(error ? publicErrorMessage(error, "Le catalogue est indisponible.") : "");
-      setRows((data ?? []) as CatalogRow[]);
-    });
-  }, [services]);
-  useEffect(() => { load(); }, [load]);
-
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true);
-    const form = event.currentTarget;
-    const values = new FormData(form);
-    const name = String(values.get("name") ?? "").trim();
-    const slug = String(values.get("slug") ?? "").trim().toLowerCase();
-    const { error } = await getSupabaseBrowserClient()!.rpc("admin_manage_category", {
-      target_action: editing ? "update" : "create", target_category_id: editing?.id ?? null,
-      target_name: name, target_slug: slug, target_description: String(values.get("description") ?? ""),
-      target_icon: String(values.get("icon") ?? ""), target_image_url: String(values.get("imageUrl") ?? ""),
-      target_parent_id: String(values.get("parentId") ?? "") || null,
-      target_sort_order: Number(values.get("sortOrder") ?? 0), target_is_active: values.get("active") === "on",
-    });
-    setBusy(false);
-    if (error) { notify(publicErrorMessage(error, "La catégorie n’a pas pu être enregistrée.")); return; }
-    notify(editing ? "Catégorie modifiée et journalisée." : "Catégorie créée et disponible dans l’application.");
-    form.reset(); setEditing(null); load();
-  }
-
-  async function action(row: CatalogRow, kind: "set_active" | "delete") {
-    if (kind === "delete" && !window.confirm(`Supprimer « ${row.name} » ? Cette action sera refusée si des dépendances existent.`)) return;
-    setBusy(true);
-    const { error } = await getSupabaseBrowserClient()!.rpc("admin_manage_category", {
-      target_action: kind, target_category_id: row.id, target_name: null, target_slug: null,
-      target_description: null, target_icon: null, target_image_url: null, target_parent_id: null,
-      target_sort_order: row.sort_order ?? 0, target_is_active: kind === "set_active" ? !row.is_active : row.is_active,
-    });
-    setBusy(false);
-    notify(error ? publicErrorMessage(error, "L’action n’a pas pu être appliquée.") : kind === "delete" ? "Catégorie supprimée et action auditée." : "Visibilité mise à jour.");
-    if (!error) { setEditing(null); load(); }
-  }
-
-  if (loadError) return <section><p role="alert">{loadError}</p><button onClick={load}>Réessayer</button></section>;
-  if (services) return <><div className="admin-filter-bar"><span>{rows.length} prestations réelles · modification depuis l’espace prestataire</span></div><div className="admin-table-wrap" role="region" aria-label="Prestations" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Prestation</th><th>Durée</th><th>Prix</th><th>Statut</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.title}</strong></td><td>{row.duration_minutes} min</td><td>{formatCurrency(row.price_amount || 0)}</td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div></>;
-
-  const topLevel = rows.filter((row) => !row.parent_id && row.id !== editing?.id);
-  return <>
-    <form className="admin-catalog-form" onSubmit={save} key={editing?.id ?? "new"}>
-      <header><div><p>Catalogue dynamique</p><h2>{editing ? "Modifier la catégorie" : "Créer une catégorie"}</h2></div>{editing && <button type="button" className="table-action" onClick={() => setEditing(null)}>Annuler</button>}</header>
-      <label>Nom<input name="name" required minLength={2} maxLength={80} defaultValue={editing?.name ?? ""} /></label>
-      <label>Slug<input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" defaultValue={editing?.slug ?? ""} /></label>
-      <label>Icône<input name="icon" maxLength={80} defaultValue={editing?.icon ?? ""} /></label>
-      <label>Ordre<input name="sortOrder" type="number" min={0} max={10000} defaultValue={editing?.sort_order ?? rows.length} /></label>
-      <label>Catégorie parente<select name="parentId" defaultValue={editing?.parent_id ?? ""}><option value="">Aucune</option>{topLevel.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
-      <label>URL de l’image<input name="imageUrl" type="url" defaultValue={editing?.image_url ?? ""} /></label>
-      <label className="wide">Description<textarea name="description" maxLength={1000} defaultValue={editing?.description ?? ""} /></label>
-      <label className="catalog-checkbox"><input name="active" type="checkbox" defaultChecked={editing?.is_active ?? true} /> Visible dans l’application</label>
-      <button className="primary" disabled={busy}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : "Créer"}</button>
-    </form>
-    <div className="admin-table-wrap" role="region" aria-label="Liste des catégories" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Catégorie</th><th>Slug</th><th>Parent</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.icon} {row.name}</strong><small>{row.description || "Sans description"}</small></td><td>{row.slug}</td><td>{rows.find((parent) => parent.id === row.parent_id)?.name ?? "—"}</td><td>{row.sort_order}</td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td><td><button className="table-action" onClick={() => setEditing(row)}>Modifier</button><button className="table-action" disabled={busy} onClick={() => void action(row, "set_active")}>{row.is_active ? "Masquer" : "Réactiver"}</button><button className="table-action danger" disabled={busy} onClick={() => void action(row, "delete")}>Supprimer</button></td></tr>)}</tbody></table></div>
-  </>;
-}
-
-function FinanceModule({ section }: { section: "payments" | "commissions" }) {
-  const [payments, setPayments] = useState<FinanceRow[]>([]);
-  useEffect(() => {
-    if (section === "payments") void getSupabaseBrowserClient()!.from("payments").select("id,booking_id,payment_status,payment_method,amount,currency,is_test,created_at").order("created_at", { ascending: false }).limit(200).then(({ data }) => setPayments((data ?? []) as FinanceRow[]));
-  }, [section]);
-  if (section !== "payments") return <OperationalFinance section={section} />;
-  return <><div className="admin-filter-bar"><span>{payments.length} paiements · lecture sécurisée</span></div><div className="admin-table-wrap" role="region" aria-label="Paiements" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Référence</th><th>Réservation</th><th>Méthode</th><th>Montant</th><th>Date</th><th>Statut</th></tr></thead><tbody>{payments.map((row) => <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code>{row.is_test && <small>Mode test</small>}</td><td><code>{row.booking_id.slice(0, 8)}</code></td><td>{row.payment_method}</td><td><strong>{formatCurrency(row.amount)}</strong></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.payment_status} /></td></tr>)}</tbody></table></div></>;
-}
-
-function OperationalFinance({ section }: { section: "commissions" }) {
-  const [rules, setRules] = useState<CommissionRuleRow[]>([]);
-  const [entries, setEntries] = useState<CommissionEntryRow[]>([]);
-  useEffect(() => {
-    if (section !== "commissions") return;
-    const client = getSupabaseBrowserClient()!;
-    void Promise.all([
-      client.from("commission_rules").select("id,name,rate,is_active,valid_from,valid_until").order("valid_from", { ascending: false }),
-      client.from("platform_commissions").select("id,payment_id,rate,amount,currency,created_at").order("created_at", { ascending: false }).limit(200),
-    ]).then(([ruleResult, entryResult]) => {
-      setRules((ruleResult.data ?? []) as CommissionRuleRow[]);
-      setEntries((entryResult.data ?? []) as CommissionEntryRow[]);
-    });
-  }, [section]);
-  const total = entries.reduce((sum, row) => sum + row.amount, 0);
-  return <><section className="admin-metric-grid"><article><span>Commissions enregistrées</span><strong>{entries.length}</strong><small>Écritures réelles</small></article><article><span>Total Mata Beauty</span><strong>{formatCurrency(total)}</strong><small>Registre Supabase</small></article><article><span>Règles actives</span><strong>{rules.filter((row) => row.is_active).length}</strong><small>Calcul serveur</small></article></section><div className="admin-table-wrap" role="region" aria-label="Règles de commission" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Règle</th><th>Taux</th><th>Validité</th><th>Statut</th></tr></thead><tbody>{rules.map((row) => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td>{formatDate(row.valid_from)}<small>{row.valid_until ? `jusqu’au ${formatDate(row.valid_until)}` : "Sans échéance"}</small></td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div><div className="admin-table-wrap commission-entries" role="region" aria-label="Écritures de commission" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Écriture</th><th>Paiement</th><th>Taux</th><th>Commission</th><th>Date</th></tr></thead><tbody>{entries.map((row) => <tr key={row.id}><td><code>{row.id.slice(0,8)}</code></td><td><code>{row.payment_id.slice(0,8)}</code></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td><strong>{formatCurrency(row.amount)}</strong></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div></>;
-}
-
-function AuditModule({ context }: { context: AdminContext }) {
-  const [rows, setRows] = useState<AuditRow[]>([]);
-  useEffect(() => {
-    if (context.is_super_admin || context.permissions.includes("audit.read")) void getSupabaseBrowserClient()!.from("audit_logs").select("id,action,entity_type,entity_id,after_data,created_at").order("created_at", { ascending: false }).limit(250).then(({ data }) => setRows((data ?? []) as AuditRow[]));
-  }, [context]);
-  return <><div className="admin-filter-bar"><span>Journal non modifiable · {rows.length} événements récents</span></div><div className="audit-timeline">{rows.map((row) => <article key={row.id}><i /><div><strong>{row.action}</strong><small>{row.entity_type} · {row.entity_id?.slice(0, 8) || "global"}</small><p>{typeof row.after_data?.justification === "string" ? row.after_data.justification : "Action système"}</p></div><time>{formatDate(row.created_at)}</time></article>)}</div></>;
-}
-
-function SocialContentModule({ context, notify }: { context: AdminContext; notify: (message: string) => void }) {
-  const [rows, setRows] = useState<SocialPostRow[]>([]);
-  const [metrics, setMetrics] = useState<SocialMetrics | null>(null);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const [launchSelected, setLaunchSelected] = useState<Set<string>>(new Set());
-  const [confirmation, setConfirmation] = useState<{ row: SocialPostRow; action: "approve" | "hide" | "remove" | "restore" | "warn" | "feature" } | null>(null);
-
-  const load = useCallback(async () => {
-    const supabase = getSupabaseBrowserClient()!;
-    const [{ data: postData }, { data: metricData }, selection] = await Promise.all([
-      supabase.from("posts").select("id,author_id,caption,status,post_type,thumbnail_url,is_sponsored,view_count,like_count,comment_count,share_count,published_at,created_at,provider_profiles!posts_author_id_fkey(business_name,city)").order("created_at", { ascending: false }).limit(250),
-      supabase.rpc("get_social_admin_dashboard"),
-      supabase.from("launch_feed_selection").select("post_id").eq("is_active", true),
-    ]);
-    setRows((postData ?? []) as unknown as SocialPostRow[]);
-    setMetrics((metricData ?? null) as SocialMetrics | null);
-    setLaunchSelected(new Set((selection.data ?? []).map((item) => item.post_id)));
-    setLoading(false);
-  }, []);
-  useEffect(() => { void Promise.resolve().then(load); }, [load]);
-
-  const visible = useMemo(() => rows.filter((row) =>
-    (statusFilter === "all" || row.status === statusFilter) && (typeFilter === "all" || row.post_type === typeFilter),
-  ), [rows, statusFilter, typeFilter]);
-
-  async function toggleLaunchSelection(row: SocialPostRow) {
-    const supabase=getSupabaseBrowserClient()!;
-    const user=await supabase.auth.getUser();
-    const selected=launchSelected.has(row.id);
-    const result=selected ? await supabase.from("launch_feed_selection").delete().eq("post_id",row.id) : await supabase.from("launch_feed_selection").upsert({post_id:row.id,label:"Sélection lancement",content_origin:"provider",sort_order:launchSelected.size,is_active:true,selected_by:user.data.user?.id});
-    notify(result.error?publicErrorMessage(result.error,"La sélection lancement nécessite la migration Phase 2."):selected?"Contenu retiré de la sélection lancement.":"Contenu ajouté à la sélection lancement.");
-    if(!result.error)await load();
-  }
-
-  if (loading) return <LoadingSkeleton />;
-  return <>
-    {metrics && <section className="admin-metric-grid">
-      {[
-        ["Publications aujourd’hui", metrics.posts_today], ["Publiées", metrics.published], ["À contrôler", metrics.pending],
-        ["Signalées", metrics.reported], ["Vues", metrics.views], ["Réservations générées", metrics.bookings],
-        ["Clics Réserver", metrics.booking_clicks], ["CA généré", metrics.gross_amount === null ? null : formatCurrency(metrics.gross_amount)],
-      ].filter(([, value]) => value !== null).map(([labelValue, value]) => <article key={String(labelValue)}><span>{labelValue}</span><strong>{typeof value === "number" ? value.toLocaleString("fr-FR") : value}</strong><small>Données Supabase</small></article>)}
-    </section>}
-    <div className="admin-filter-bar">
-      <select aria-label="Filtrer par statut" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tous les statuts</option><option value="published">Publiées</option><option value="draft">Brouillons</option><option value="scheduled">Programmées</option><option value="hidden">Masquées</option><option value="deleted">Retirées</option></select>
+  if (module === "payments" || module === "commissions") retur…7122 tokens truncated…} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tous les statuts</option><option value="published">Publiées</option><option value="draft">Brouillons</option><option value="scheduled">Programmées</option><option value="hidden">Masquées</option><option value="deleted">Retirées</option></select>
       <select aria-label="Filtrer par format" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Tous les formats</option><option value="video">Vidéos</option><option value="photo">Photos</option><option value="before_after">Avant / Après</option><option value="promotion">Promotions</option><option value="availability">Disponibilités</option></select>
       <span>{visible.length} publication(s)</span>
     </div>
@@ -853,6 +594,11 @@ function SettingsModule({ context, maintenance, notify }: { context: AdminContex
   }
 
   async function saveSetting(key: PlatformSettingKey, reason: string) {
+    if (key !== "support") {
+      notify("Ce réglage reste en lecture seule tant que le service ne l’applique pas.");
+      setSettingToSave(null);
+      return;
+    }
     const value = drafts[key] as PlatformSettingValue | undefined;
     if (!value) { notify("Le réglage n’a pas pu être chargé ; actualisez la page avant de modifier."); return; }
     const invalid = validatePlatformSetting(key, value);
@@ -881,23 +627,18 @@ function SettingsModule({ context, maintenance, notify }: { context: AdminContex
   if (!maintenance) return <section className="admin-settings">
     <header className="admin-settings-header"><div><p className="admin-kicker">Configuration de la plateforme</p><h2>Paramètres généraux</h2><p>Les valeurs proviennent de <code>app_settings</code>. Les enregistrements sont contrôlés côté base et journalisés.</p></div><button className="secondary" disabled={loading} onClick={() => setRevision(value => value + 1)}>Actualiser</button></header>
     {!canUpdate && <p className="admin-settings-readonly" role="status">Lecture seule : votre rôle ne possède pas la permission <code>settings.update</code>.</p>}
-    <div className="admin-settings-note"><strong>Prise en compte fonctionnelle</strong><span>Cette interface enregistre uniquement les champs déjà présents dans le backend. Les règles métier qui ne lisent pas encore ces valeurs restent inchangées ; l’enregistrement ne modifie pas à lui seul les réservations, la devise des transactions ou les libellés affichés ailleurs.</span></div>
+    <div className="admin-settings-note"><strong>État des réglages</strong><span>Les coordonnées support sont utilisées dans l’espace Aide. Le nom, la langue et la région restent informatifs, car l’application utilise actuellement une identité, une devise et un fuseau fixes. Les règles de réservation restent en lecture seule tant que le serveur ne les applique pas.</span></div>
     <div className="admin-settings-grid">
-      {drafts.application && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Plateforme</p><h3>Identité et région</h3></div><span className="admin-setting-key">application</span></div><div className="admin-settings-fields">
-        <label htmlFor="platform-name">Nom de la plateforme<input id="platform-name" value={drafts.application.name} maxLength={80} disabled={!canUpdate} onChange={event => updateDraft("application", "name", event.target.value)} /></label>
-        <label htmlFor="platform-locale">Langue<select id="platform-locale" value={drafts.application.locale} disabled={!canUpdate} onChange={event => updateDraft("application", "locale", event.target.value)}><option value="fr-SN">Français (Sénégal)</option><option value="en-SN">Anglais (Sénégal)</option></select></label>
-        <label htmlFor="platform-country">Pays<select id="platform-country" value={drafts.application.country} disabled={!canUpdate} onChange={event => updateDraft("application", "country", event.target.value)}><option value="SN">Sénégal</option></select></label>
-        <label htmlFor="platform-currency">Devise<select id="platform-currency" value={drafts.application.currency} disabled={!canUpdate} onChange={event => updateDraft("application", "currency", event.target.value)}><option value="XOF">XOF · Franc CFA</option></select></label>
-        <label htmlFor="platform-timezone">Fuseau horaire<select id="platform-timezone" value={drafts.application.timezone} disabled={!canUpdate} onChange={event => updateDraft("application", "timezone", event.target.value)}><option value="Africa/Dakar">Africa/Dakar</option></select></label>
-      </div><p className="admin-setting-help">Valeurs sauvegardées dans la configuration existante. Les écrans et services métier concernés ne seront affectés que lorsqu’ils consomment ce réglage.</p><PermissionGuard permission="settings.update" context={context}><div className="admin-setting-actions"><button className="primary" onClick={() => setSettingToSave("application")}>Enregistrer l’identité</button></div></PermissionGuard></article>}
-      {drafts.booking && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Rendez-vous</p><h3>Règles de réservation</h3></div><span className="admin-setting-key">booking</span></div><div className="admin-settings-fields">
-        <label htmlFor="booking-minimum-notice">Préavis minimum <span>(minutes)</span><input id="booking-minimum-notice" type="number" min={0} max={43200} step={1} value={drafts.booking.minimum_notice_minutes} disabled={!canUpdate} onChange={event => updateDraft("booking", "minimum_notice_minutes", event.target.value === "" ? 0 : Number(event.target.value))} /></label>
-        <label htmlFor="booking-cancellation-window">Délai d’annulation <span>(heures)</span><input id="booking-cancellation-window" type="number" min={0} max={8760} step={1} value={drafts.booking.cancellation_window_hours} disabled={!canUpdate} onChange={event => updateDraft("booking", "cancellation_window_hours", event.target.value === "" ? 0 : Number(event.target.value))} /></label>
-      </div><p className="admin-setting-help">Cette valeur de configuration existe déjà. Le moteur de réservation utilise ses règles serveur actuelles tant qu’une intégration explicite à cette clé n’est pas déployée.</p><PermissionGuard permission="settings.update" context={context}><div className="admin-setting-actions"><button className="primary" onClick={() => setSettingToSave("booking")}>Enregistrer les règles</button></div></PermissionGuard></article>}
+      {drafts.application && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Plateforme</p><h3>Identité et région</h3></div><span className="admin-setting-key">application</span></div><dl className="admin-settings-values">
+        <div><dt>Nom de la plateforme</dt><dd>{drafts.application.name}</dd></div><div><dt>Langue disponible</dt><dd>{drafts.application.locale}</dd></div><div><dt>Pays</dt><dd>{drafts.application.country}</dd></div><div><dt>Devise</dt><dd>{drafts.application.currency}</dd></div><div><dt>Fuseau horaire</dt><dd>{drafts.application.timezone}</dd></div>
+      </dl><p className="admin-setting-help">Informations de référence en lecture seule. Le produit utilise actuellement Mata Beauty, le français, le XOF et Africa/Dakar ; modifier ces métadonnées ne changerait ni l’interface ni les transactions.</p></article>}
+      {drafts.booking && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Rendez-vous</p><h3>Règles de réservation</h3></div><span className="admin-setting-key">booking</span></div><dl className="admin-settings-values">
+        <div><dt>Préavis minimum</dt><dd>{drafts.booking.minimum_notice_minutes} min</dd></div><div><dt>Délai d’annulation</dt><dd>{drafts.booking.cancellation_window_hours} h</dd></div>
+      </dl><p className="admin-setting-help">Ces valeurs sont enregistrées dans la configuration, mais le serveur ne les applique pas encore. Elles sont donc en lecture seule et ne peuvent pas être présentées comme une règle active.</p></article>}
       {drafts.support && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Contact</p><h3>Coordonnées support</h3></div><span className="admin-setting-key">support</span></div><div className="admin-settings-fields">
         <label htmlFor="support-email">Adresse e-mail<input id="support-email" type="email" autoComplete="email" required value={drafts.support.email} disabled={!canUpdate} onChange={event => updateDraft("support", "email", event.target.value)} /></label>
         <label htmlFor="support-phone">Téléphone<input id="support-phone" type="tel" autoComplete="tel" maxLength={40} value={drafts.support.phone} disabled={!canUpdate} onChange={event => updateDraft("support", "phone", event.target.value)} /></label>
-      </div><p className="admin-setting-help">Les coordonnées enregistrées ici n’affectent que les surfaces reliées à cette configuration.</p><PermissionGuard permission="settings.update" context={context}><div className="admin-setting-actions"><button className="primary" onClick={() => setSettingToSave("support")}>Enregistrer les coordonnées</button></div></PermissionGuard></article>}
+      </div><p className="admin-setting-help">Après enregistrement, ces coordonnées sont affichées dans la rubrique Aide de l’espace client.</p><PermissionGuard permission="settings.update" context={context}><div className="admin-setting-actions"><button className="primary" onClick={() => setSettingToSave("support")}>Enregistrer les coordonnées</button></div></PermissionGuard></article>}
       {!drafts.application && !drafts.booking && !drafts.support && <EmptyState title="Aucun réglage structuré disponible" description="Aucune des clés générales prises en charge par cette interface n’est présente." />}
     </div>
     {settings.some(setting => !isPlatformSettingKey(setting.key)) && <p className="admin-settings-readonly">Les autres réglages sont volontairement exclus de cette page structurée.</p>}
