@@ -33,4 +33,11 @@ describe("booking rules", () => {
     expect(canClientCancel(new Date("2026-07-27T12:00:00.000Z"), now)).toBe(true);
     expect(canClientCancel(new Date("2026-07-25T20:00:00.000Z"), now)).toBe(false);
   });
+
+  it("uses the configured cancellation window", () => {
+    const now = new Date("2026-07-25T12:00:00.000Z");
+    expect(canClientCancel(new Date("2026-07-26T11:00:00.000Z"), now, 24)).toBe(false);
+    expect(canClientCancel(new Date("2026-07-26T12:00:00.000Z"), now, 24)).toBe(true);
+    expect(canClientCancel(new Date("2026-07-27T11:00:00.000Z"), now, 48)).toBe(false);
+  });
 });

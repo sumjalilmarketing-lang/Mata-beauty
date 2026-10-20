@@ -803,6 +803,7 @@ function SettingsModule({ context, maintenance, notify }: { context: AdminContex
   const [settings, setSettings] = useState<{ key: string; description: string | null; value: unknown }[]>([]);
   const [drafts, setDrafts] = useState<Partial<PlatformSettingsMap>>({});
   const [settingToSave, setSettingToSave] = useState<PlatformSettingKey | null>(null);
+  const [bookingRulesEnforced, setBookingRulesEnforced] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -817,11 +818,16 @@ function SettingsModule({ context, maintenance, notify }: { context: AdminContex
     }
     let query = client.from("app_settings").select("key,description,value");
     query = maintenance ? query.eq("key", "maintenance") : query.eq("is_sensitive", false);
-    void query.order("key").abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).then(({ data, error: failure }) => {
+    const loadSettings = query.order("key").abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]));
+    const checkBookingEnforcement = canUpdate
+      ? client.rpc("get_booking_settings_enforcement_status")
+      : Promise.resolve({ data: false, error: null });
+    void Promise.all([loadSettings, checkBookingEnforcement]).then(([{ data, error: failure }, enforcement]) => {
       if (controller.signal.aborted) return;
       setLoading(false);
       if (failure) { setSettings([]); setError(publicErrorMessage(failure, "Les paramètres sont indisponibles.")); return; }
       setSettings(data ?? []);
+      setBookingRulesEnforced(!enforcement.error && enforcement.data === true);
       const nextDrafts: Partial<PlatformSettingsMap> = {};
       for (const row of data ?? []) {
         if (!isPlatformSettingKey(row.key)) continue;
@@ -842,7 +848,7 @@ function SettingsModule({ context, maintenance, notify }: { context: AdminContex
       if (value?.message) setMessage(value.message);
     });
     return () => controller.abort();
-  }, [revision, maintenance]);
+  }, [revision, maintenance, canUpdate]);
 
   function updateDraft<K extends PlatformSettingKey, F extends keyof PlatformSettingsMap[K]>(key: K, field: F, value: PlatformSettingsMap[K][F]) {
     setDrafts(previous => {
@@ -853,6 +859,16 @@ function SettingsModule({ context, maintenance, notify }: { context: AdminContex
   }
 
   async function saveSetting(key: PlatformSettingKey, reason: string) {
+    if (key === "application") {
+      notify("L’identité et la région restent en lecture seule : ces valeurs ne pilotent pas encore les services de la plateforme.");
+      setSettingToSave(null);
+      return;
+    }
+    if (key === "booking" && !bookingRulesEnforced) {
+      notify("Les règles de réservation restent en lecture seule tant que leur contrôle serveur n’est pas installé.");
+      setSettingToSave(null);
+      return;
+    }
     const value = drafts[key] as PlatformSettingValue | undefined;
     if (!value) { notify("Le réglage n’a pas pu être chargé ; actualisez la page avant de modifier."); return; }
     const invalid = validatePlatformSetting(key, value);
@@ -881,19 +897,15 @@ function SettingsModule({ context, maintenance, notify }: { context: AdminContex
   if (!maintenance) return <section className="admin-settings">
     <header className="admin-settings-header"><div><p className="admin-kicker">Configuration de la plateforme</p><h2>Paramètres généraux</h2><p>Les valeurs proviennent de <code>app_settings</code>. Les enregistrements sont contrôlés côté base et journalisés.</p></div><button className="secondary" disabled={loading} onClick={() => setRevision(value => value + 1)}>Actualiser</button></header>
     {!canUpdate && <p className="admin-settings-readonly" role="status">Lecture seule : votre rôle ne possède pas la permission <code>settings.update</code>.</p>}
-    <div className="admin-settings-note"><strong>Prise en compte fonctionnelle</strong><span>Cette interface enregistre uniquement les champs déjà présents dans le backend. Les règles métier qui ne lisent pas encore ces valeurs restent inchangées ; l’enregistrement ne modifie pas à lui seul les réservations, la devise des transactions ou les libellés affichés ailleurs.</span></div>
+    <div className="admin-settings-note"><strong>Prise en compte fonctionnelle</strong><span>L’identité et la région sont affichées en lecture seule. Les règles de réservation ne deviennent modifiables qu’après confirmation du contrôle serveur ; dans une Preview sans migration, elles restent verrouillées. Les coordonnées support sont utilisées dans l’espace Aide.</span></div>
     <div className="admin-settings-grid">
-      {drafts.application && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Plateforme</p><h3>Identité et région</h3></div><span className="admin-setting-key">application</span></div><div className="admin-settings-fields">
-        <label htmlFor="platform-name">Nom de la plateforme<input id="platform-name" value={drafts.application.name} maxLength={80} disabled={!canUpdate} onChange={event => updateDraft("application", "name", event.target.value)} /></label>
-        <label htmlFor="platform-locale">Langue<select id="platform-locale" value={drafts.application.locale} disabled={!canUpdate} onChange={event => updateDraft("application", "locale", event.target.value)}><option value="fr-SN">Français (Sénégal)</option><option value="en-SN">Anglais (Sénégal)</option></select></label>
-        <label htmlFor="platform-country">Pays<select id="platform-country" value={drafts.application.country} disabled={!canUpdate} onChange={event => updateDraft("application", "country", event.target.value)}><option value="SN">Sénégal</option></select></label>
-        <label htmlFor="platform-currency">Devise<select id="platform-currency" value={drafts.application.currency} disabled={!canUpdate} onChange={event => updateDraft("application", "currency", event.target.value)}><option value="XOF">XOF · Franc CFA</option></select></label>
-        <label htmlFor="platform-timezone">Fuseau horaire<select id="platform-timezone" value={drafts.application.timezone} disabled={!canUpdate} onChange={event => updateDraft("application", "timezone", event.target.value)}><option value="Africa/Dakar">Africa/Dakar</option></select></label>
-      </div><p className="admin-setting-help">Valeurs sauvegardées dans la configuration existante. Les écrans et services métier concernés ne seront affectés que lorsqu’ils consomment ce réglage.</p><PermissionGuard permission="settings.update" context={context}><div className="admin-setting-actions"><button className="primary" onClick={() => setSettingToSave("application")}>Enregistrer l’identité</button></div></PermissionGuard></article>}
-      {drafts.booking && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Rendez-vous</p><h3>Règles de réservation</h3></div><span className="admin-setting-key">booking</span></div><div className="admin-settings-fields">
+      {drafts.application && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Plateforme</p><h3>Identité et région</h3></div><span className="admin-setting-key">application</span></div><dl className="admin-settings-values">
+        <div><dt>Nom de la plateforme</dt><dd>{drafts.application.name}</dd></div><div><dt>Langue</dt><dd>{drafts.application.locale}</dd></div><div><dt>Pays</dt><dd>{drafts.application.country}</dd></div><div><dt>Devise</dt><dd>{drafts.application.currency}</dd></div><div><dt>Fuseau horaire</dt><dd>{drafts.application.timezone}</dd></div>
+      </dl><p className="admin-setting-help">Lecture seule : ces valeurs de référence ne pilotent pas encore les services applicatifs et les transactions.</p></article>}
+      {drafts.booking && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Rendez-vous</p><h3>Règles de réservation</h3></div><span className="admin-setting-key">booking</span></div>{bookingRulesEnforced ? <div className="admin-settings-fields">
         <label htmlFor="booking-minimum-notice">Préavis minimum <span>(minutes)</span><input id="booking-minimum-notice" type="number" min={0} max={43200} step={1} value={drafts.booking.minimum_notice_minutes} disabled={!canUpdate} onChange={event => updateDraft("booking", "minimum_notice_minutes", event.target.value === "" ? 0 : Number(event.target.value))} /></label>
-        <label htmlFor="booking-cancellation-window">Délai d’annulation <span>(heures)</span><input id="booking-cancellation-window" type="number" min={0} max={8760} step={1} value={drafts.booking.cancellation_window_hours} disabled={!canUpdate} onChange={event => updateDraft("booking", "cancellation_window_hours", event.target.value === "" ? 0 : Number(event.target.value))} /></label>
-      </div><p className="admin-setting-help">Cette valeur de configuration existe déjà. Le moteur de réservation utilise ses règles serveur actuelles tant qu’une intégration explicite à cette clé n’est pas déployée.</p><PermissionGuard permission="settings.update" context={context}><div className="admin-setting-actions"><button className="primary" onClick={() => setSettingToSave("booking")}>Enregistrer les règles</button></div></PermissionGuard></article>}
+        <label htmlFor="booking-cancellation-window">Délai avant lequel le client peut annuler <span>(heures)</span><input id="booking-cancellation-window" type="number" min={0} max={8760} step={1} value={drafts.booking.cancellation_window_hours} disabled={!canUpdate} onChange={event => updateDraft("booking", "cancellation_window_hours", event.target.value === "" ? 0 : Number(event.target.value))} /></label>
+      </div> : <dl className="admin-settings-values"><div><dt>Préavis minimum</dt><dd>{drafts.booking.minimum_notice_minutes} min</dd></div><div><dt>Fenêtre d’annulation</dt><dd>{drafts.booking.cancellation_window_hours} h avant le rendez-vous</dd></div></dl>}<p className="admin-setting-help">{bookingRulesEnforced ? "Ces règles sont contrôlées côté base à la création du rendez-vous et lors d’une annulation par le client. Les disponibilités respectent aussi le préavis." : "Lecture seule : le contrôle serveur des règles n’est pas installé dans cet environnement."}</p>{bookingRulesEnforced && <PermissionGuard permission="settings.update" context={context}><div className="admin-setting-actions"><button className="primary" disabled={!canUpdate} onClick={() => setSettingToSave("booking")}>Enregistrer les règles</button></div></PermissionGuard>}</article>}
       {drafts.support && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Contact</p><h3>Coordonnées support</h3></div><span className="admin-setting-key">support</span></div><div className="admin-settings-fields">
         <label htmlFor="support-email">Adresse e-mail<input id="support-email" type="email" autoComplete="email" required value={drafts.support.email} disabled={!canUpdate} onChange={event => updateDraft("support", "email", event.target.value)} /></label>
         <label htmlFor="support-phone">Téléphone<input id="support-phone" type="tel" autoComplete="tel" maxLength={40} value={drafts.support.phone} disabled={!canUpdate} onChange={event => updateDraft("support", "phone", event.target.value)} /></label>

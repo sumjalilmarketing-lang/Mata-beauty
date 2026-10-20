@@ -147,8 +147,9 @@ test("the admin login keeps readable colors on its white surface", async () => {
 });
 
 test("the Super Admin control center is protected by RBAC and audited RPCs", async () => {
-  const [migration, adminPage, adminApp] = await Promise.all([
+  const [migration, bookingRulesMigration, adminPage, adminApp] = await Promise.all([
     readFile(new URL("supabase/migrations/20260725233000_super_admin_control_center.sql", root), "utf8"),
+    readFile(new URL("supabase/migrations/20261020230610_apply_platform_booking_settings.sql", root), "utf8"),
     readFile(new URL("app/admin/page.tsx", root), "utf8"),
     readFile(new URL("app/super-admin.tsx", root), "utf8"),
   ]);
@@ -169,11 +170,24 @@ test("the Super Admin control center is protected by RBAC and audited RPCs", asy
   assert.match(adminApp, /PermissionGuard/);
   assert.match(adminApp, /ConfirmationModal/);
   assert.doesNotMatch(adminApp, /JSON\.stringify\(setting\.value/);
-  for (const field of ["platform-name", "platform-locale", "platform-country", "platform-currency", "platform-timezone", "booking-minimum-notice", "booking-cancellation-window", "support-email", "support-phone"]) {
+  for (const field of ["booking-minimum-notice", "booking-cancellation-window", "support-email", "support-phone"]) {
     assert.match(adminApp, new RegExp(field));
   }
+  assert.match(adminApp, /Identité et région/);
+  assert.match(adminApp, /admin-settings-values/);
+  assert.match(adminApp, /Lecture seule : le contrôle serveur des règles n’est pas installé/);
   assert.match(adminApp, /admin_update_setting/);
   assert.match(adminApp, /settings\.update/);
+  assert.match(adminApp, /get_booking_settings_enforcement_status/);
+  assert.match(adminApp, /bookingRulesEnforced/);
+  assert.doesNotMatch(adminApp, /setSettingToSave\("application"\)/);
+  assert.match(bookingRulesMigration, /bookings_00_platform_booking_notice/);
+  assert.match(bookingRulesMigration, /bookings_00_platform_cancellation_window/);
+  assert.match(bookingRulesMigration, /booking_private\.read_platform_booking_rules/);
+  assert.match(bookingRulesMigration, /minimum_notice_minutes/);
+  assert.match(bookingRulesMigration, /cancellation_window_hours/);
+  assert.match(bookingRulesMigration, /get_booking_settings_enforcement_status/);
+  assert.match(bookingRulesMigration, /revoke all on function booking_private\.read_platform_booking_rules\(\) from public, anon, authenticated/);
 });
 
 test("the social video layer is server-counted, attributable, storage-isolated, and protected by RLS", async () => {

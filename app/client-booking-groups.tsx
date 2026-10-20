@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { clientBookingStatusTone, groupClientBookings, type ClientBookingItem } from "@/lib/domain/client-bookings";
+import { canClientCancel } from "@/lib/domain/booking";
 import { BookingReview } from "./booking-review";
 import "./client-booking-groups.css";
 
@@ -15,7 +16,7 @@ const labels: Record<ClientBookingItem["status"], string> = {
 const money = (amount: number, currency: string) => `${amount.toLocaleString("fr-FR")} ${currency}`;
 const dateTime = (value: string) => new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(value));
 
-export function ClientBookingGroups({ items, clientId, stats, hasMore, loadingMore, onLoadMore, onMessage, onCancel }: { items: readonly ClientBookingItem[]; clientId: string; stats: { upcoming: number; pending: number; past: number }; hasMore: boolean; loadingMore: boolean; onLoadMore: () => void; onMessage: (booking: ClientBookingItem) => void; onCancel: (booking: ClientBookingItem) => void }) {
+export function ClientBookingGroups({ items, clientId, stats, cancellationWindowHours, hasMore, loadingMore, onLoadMore, onMessage, onCancel }: { items: readonly ClientBookingItem[]; clientId: string; stats: { upcoming: number; pending: number; past: number }; cancellationWindowHours: number; hasMore: boolean; loadingMore: boolean; onLoadMore: () => void; onMessage: (booking: ClientBookingItem) => void; onCancel: (booking: ClientBookingItem) => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const groups = groupClientBookings(items);
 
@@ -61,7 +62,7 @@ export function ClientBookingGroups({ items, clientId, stats, hasMore, loadingMo
             <div className="client-booking-timeline__actions">
               <button type="button" onClick={() => onMessage(booking)}>Messages</button>
               {booking.status === "completed" && <BookingReview bookingId={booking.id} clientId={clientId} providerId={booking.providerId} performer={null} />}
-              {["pending", "confirmed"].includes(booking.status) && <button type="button" className="client-booking-cancel" onClick={() => onCancel(booking)}>Annuler</button>}
+              {["pending", "confirmed"].includes(booking.status) && <button type="button" className="client-booking-cancel" disabled={!canClientCancel(new Date(booking.startsAt), new Date(), cancellationWindowHours)} onClick={() => onCancel(booking)}>Annuler</button>}{["pending", "confirmed"].includes(booking.status) && !canClientCancel(new Date(booking.startsAt), new Date(), cancellationWindowHours) && <small>Annulation possible au moins {cancellationWindowHours} h avant le rendez-vous.</small>}
             </div>
           </li>)}
         </ol>}
