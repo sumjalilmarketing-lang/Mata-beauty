@@ -62,6 +62,10 @@ async function stopServer(child) {
 }
 
 export default async function globalSetup() {
+  // scripts/test-e2e.mjs owns a production-mode Next server on this port.
+  // Do not start a second dev server over the managed server.
+  if (process.env.MATA_E2E_MANAGED_SERVER === "true") return;
+
   if (!(await isPortFree())) {
     throw new Error(`Le port ${port} est déjà utilisé. Aucun serveur existant n’a été réutilisé ni arrêté.`);
   }

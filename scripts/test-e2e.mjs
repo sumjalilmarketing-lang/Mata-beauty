@@ -96,7 +96,7 @@ function runPlaywright(args) {
   return new Promise((resolveExit, reject) => {
     testProcess = spawn(process.execPath, [resolve(root, "node_modules/@playwright/test/cli.js"), "test", ...cliArgs], {
       cwd: root,
-      env: process.env,
+      env: { ...process.env, MATA_E2E_MANAGED_SERVER: "true" },
       stdio: "inherit",
       windowsHide: true,
     });
