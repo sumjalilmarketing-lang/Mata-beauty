@@ -174,6 +174,10 @@ test("the Super Admin control center is protected by RBAC and audited RPCs", asy
   }
   assert.match(adminApp, /admin_update_setting/);
   assert.match(adminApp, /settings\.update/);
+  assert.match(adminApp, /id="booking-minimum-notice"[^>]*disabled readOnly/);
+  assert.match(adminApp, /id="booking-cancellation-window"[^>]*disabled readOnly/);
+  assert.match(adminApp, /Lecture seule : ces valeurs ne sont pas encore appliquées par les contrôles serveur de réservation/);
+  assert.doesNotMatch(adminApp, /onClick=\{\(\) => setSettingToSave\("booking"\)\}/);
 });
 
 test("the social video layer is server-counted, attributable, storage-isolated, and protected by RLS", async () => {
