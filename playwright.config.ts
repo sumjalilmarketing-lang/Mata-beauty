@@ -1,22 +1,20 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const testPort = Number(process.env.MATA_PLAYWRIGHT_PORT ?? 3160);
-const fixturePort = Number(process.env.MATA_SUPABASE_FIXTURE_PORT ?? 3161);
-const testOrigin = `http://127.0.0.1:${testPort}`;
-const fixtureOrigin = `http://127.0.0.1:${fixturePort}`;
-process.env.MATA_SUPABASE_FIXTURE_ORIGIN = fixtureOrigin;
+// A stable port keeps Playwright workers and global setup on the same origin.
+// Global setup fails safely if another process already owns it.
+const localPort = Number(process.env.MATA_PLAYWRIGHT_PORT ?? 4173);
+process.env.MATA_PLAYWRIGHT_PORT = String(localPort);
+const localBaseUrl = `http://127.0.0.1:${localPort}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
+  // Keep browser-driven pages deterministic on constrained local runners.
+  workers: 2,
   reporter: "list",
-  outputDir: ".next/playwright-results-pro-salon",
+  globalSetup: "./scripts/playwright-global-setup.mjs",
   use: {
-    baseURL: testOrigin,
-    // The app's PWA worker can take ownership of requests and bypass
-    // Playwright's page.route fixtures. Block it in these deterministic
-    // browser/API tests; PWA behavior is exercised separately.
-    serviceWorkers: "block",
+    baseURL: localBaseUrl,
     trace: "retain-on-failure",
   },
   projects: [

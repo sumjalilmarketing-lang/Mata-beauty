@@ -30,7 +30,6 @@ const module = (key: string, label: string, icon: string, group: string, descrip
 const clientModules = [
   module("dashboard", "Dashboard", "⌂", "Essentiel", "Vos rendez-vous, messages, rappels et actions prioritaires.", { primary: true }),
   module("feed", "Feed", "▶", "Essentiel", "Les vidéos et inspirations publiées par les professionnels.", { primary: true, resource: "videos" }),
-  module("discover", "Découvrir", "⌕", "Essentiel", "Recherchez des prestations, professionnels et salons.", { primary: true, resource: "providers" }),
   module("bookings", "Réservations", "▣", "Activité", "À venir, en attente, terminées et annulées.", { primary: true, resource: "bookings" }),
   module("messages", "Messages", "✉", "Activité", "Toutes vos conversations liées aux rendez-vous.", { primary: true, resource: "messages" }),
   module("payments", "Paiements", "¤", "Activité", "Historique, paiements à terminer et remboursements.", { resource: "payments" }),
@@ -223,12 +222,12 @@ export function workspaceHref(space: WorkspaceSpaceKey, moduleKey = "dashboard")
 }
 
 export const simpleNavigation = {
-  client: ["feed", "discover", "bookings", "messages", "profile"],
+  client: ["feed", "bookings", "messages", "profile"],
   pro: ["dashboard", "videos", "services", "team", "agenda", "messages", "revenue", "public-profile"],
 } as const;
 
 export function navigationLabel(space: WorkspaceSpaceKey, item: WorkspaceModule) {
-  if (space === "client") return ({ feed: "Inspiration", discover: "Explorer", bookings: "Rendez-vous", inspirations: "Inspirations enregistrées" } as Record<string, string>)[item.key] ?? item.label;
+  if (space === "client") return ({ feed: "Inspiration", bookings: "Rendez-vous", inspirations: "Inspirations enregistrées" } as Record<string, string>)[item.key] ?? item.label;
   if (space === "pro" && item.key === "public-profile") return "Profil";
   return item.label;
 }

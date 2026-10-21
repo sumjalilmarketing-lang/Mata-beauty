@@ -65,6 +65,10 @@ describe("Inspiration discovery filters", () => {
       .toEqual([posts[0], posts[1], posts[2]]);
   });
 
+  it("does not trust a cached city when a linked service has no verified location", () => {
+    expect(filterInspirationPosts([posts[0]], [], filters({ area: "Dakar" }))).toEqual([]);
+  });
+
   it("combines category, neighborhood and provider identity without merging homonyms", () => {
     expect(filterInspirationPosts(posts, [providerA, providerB], filters({
       categoryId: "category-braids", area: "Almadies", providerId: "provider-a",

@@ -55,7 +55,10 @@ export function filterInspirationPosts<T extends InspirationSearchPost>(
       const distance = distanceKm(filters.position, provider?.coordinates);
       if (distance === null || distance > filters.radiusKm) return false;
     } else if (filters.area.trim()) {
-      const place = `${provider?.area ?? post.city} ${provider?.address ?? ""} ${post.city}`;
+      // For a service-linked publication, require the current location for
+      // that exact author/service pair. Falling back to the cached feed city
+      // can include a video from a different city when the catalogue is late.
+      const place = provider ? `${provider.area} ${provider.address ?? ""}` : post.serviceId ? "" : post.city;
       if (!matchesSearch(filters.area, place)) return false;
     }
 

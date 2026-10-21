@@ -19,7 +19,7 @@
     "test:profile:remote": "node scripts/verify-client-profile-remote.mjs",
     "test:messaging:ui:remote": "playwright test --config playwright.remote.config.ts",
     "test:e2e": "node scripts/test-e2e.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern work --ignore-pattern outputs",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern work --ignore-pattern outputs --ignore-pattern .codex-worktrees/**",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
