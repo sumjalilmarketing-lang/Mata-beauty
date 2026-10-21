@@ -60,35 +60,38 @@ test("nearby uses commercial coordinates and excludes unknown locations (simulat
     })),
   }]) }));
   await page.goto("/");
-  await page.getByRole("button", { name: "Près de moi", exact: true }).click();
-  await expect(page.getByText("Résultats dans un rayon de 25 km", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: "Voir les résultats", exact: true }).click();
+  await page.getByRole("button", { name: "Rechercher", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Que souhaitez-vous découvrir ?" });
+  await dialog.getByRole("button", { name: "Utiliser ma position", exact: true }).click();
+  await expect(dialog.getByRole("status")).toContainText("Résultats dans un rayon de 5 km");
+  await dialog.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(1);
   await expect(page.locator(".social-video-card")).toHaveAttribute("data-post-id", "00000000-0000-4000-8000-000000000000");
   await expect(page.locator('.social-video-card img[alt="Inspiration 1"]')).toBeVisible();
 });
 
-test("nearby permission refusal offers a manual zone and keeps it in Explorer (simulated position)", async ({ page }) => {
+test("nearby permission refusal offers a manual zone inside Inspiration search (simulated position)", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "geolocation", { value: { getCurrentPosition: (_success: PositionCallback, failure: PositionErrorCallback) => failure({ code: 1, message: "denied", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }) } });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Près de moi", exact: true }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Localisation refusée" })).toBeVisible();
-  await expect(page.getByLabel("Ville ou quartier")).toBeInViewport();
-  await expect(page.getByRole("button", { name: "Voir les résultats", exact: true })).toBeInViewport();
-  await expect(page.getByRole("navigation", { name: "Filtres du feed" })).toBeInViewport();
-  await page.getByLabel("Ville ou quartier").fill("Dakar");
-  await page.getByRole("button", { name: "Voir les résultats", exact: true }).click();
-  await expect(page.locator(".social-video-card")).toHaveCount(3);
-  await page.getByRole("button", { name: "Dakar · Modifier" }).click();
-  await page.getByLabel("Ville ou quartier").fill("Thiès");
-  await page.getByRole("button", { name: "Voir les résultats", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Aucun créateur proche pour le moment" })).toBeVisible();
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
-  await expect(page.getByLabel("Ville ou quartier")).toHaveValue("Thiès");
-  await page.getByRole("button", { name: "Effacer la localisation" }).click();
-  await expect(page.getByLabel("Ville ou quartier")).toHaveValue("");
+  await page.getByRole("button", { name: "Rechercher", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Que souhaitez-vous découvrir ?" });
+  await dialog.getByRole("button", { name: "Utiliser ma position", exact: true }).click();
+  await expect(dialog.getByRole("status")).toContainText("Localisation refusée");
+  const zone = dialog.getByLabel("Ville, quartier ou pays");
+  await expect(zone).toBeInViewport();
+  await expect(dialog.getByRole("button", { name: "Afficher les vidéos", exact: true })).toBeInViewport();
+  await zone.fill("Dakar");
+  await dialog.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
+  await expect(page.getByLabel("Filtres actifs")).toContainText("Dakar");
+  await page.getByRole("button", { name: "Rechercher", exact: true }).click();
+  const reopened = page.getByRole("dialog", { name: "Que souhaitez-vous découvrir ?" });
+  await expect(reopened.getByLabel("Ville, quartier ou pays")).toHaveValue("Dakar");
+  await reopened.getByRole("button", { name: "Effacer la localisation", exact: true }).click();
+  await expect(reopened.getByLabel("Ville, quartier ou pays")).toHaveValue("");
+  await reopened.getByRole("button", { name: "Effacer", exact: true }).click();
+  await expect(page.getByLabel("Filtres actifs")).toHaveCount(0);
 });
 
 test("desktop wheel reaches the feed from both the content and side margins", async ({ page }) => {
@@ -152,13 +155,16 @@ test("collaborator invitations stay disabled and discard stale link tokens until
   await expect(page).toHaveURL(/\/salon\/invitation\/accept$/);
 });
 
-test("Explorer survives refresh and browser back", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
-  await expect(page.getByRole("heading", { name: "Explorer", exact: true })).toBeVisible();
+test("legacy Explorer URL redirects to Inspiration and survives refresh", async ({ page }) => {
+  await page.route(`${supabaseOrigin}/rest/v1/categories**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+    { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses", slug: "tresses", icon: "≋", sort_order: 1 },
+  ]) }));
+  await page.goto("/discover?screen=results&category=Tresses");
+  await expect(page).toHaveURL(/\/?search=1&applied=1&category=Tresses/);
+  await expect(page.getByRole("button", { name: "Rechercher", exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Explorer", exact: true })).toBeVisible();
-  await page.goBack();
-  await expect(page.getByRole("navigation", { name: "Filtres du feed" })).toBeVisible();
+  await expect(page).toHaveURL(/\/?search=1&applied=1&category=Tresses/);
+  await expect(page.getByLabel("Filtres actifs")).toContainText("Tresses");
 });
+
 

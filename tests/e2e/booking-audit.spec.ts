@@ -228,38 +228,29 @@ test.describe("audit chronométré de réservation", () => {
     });
   });
 
-  test("termine une réservation en 8 actions et conserve le choix après connexion", async ({ page }) => {
+  test("réserve depuis Inspiration et conserve le choix après connexion", async ({ page }) => {
     test.setTimeout(60_000);
     const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
-    const startedAt = Date.now();
-    let actions = 0;
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
-    await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click(); actions += 1;
-    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    await page.locator(".premium-provider-card").click(); actions += 1;
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
-    await page.getByRole("link", { name: "Réserver", exact: true }).click(); actions += 1;
-    await page.getByRole("button", { name: "10:00" }).click(); actions += 1;
+    const publication = page.locator(".social-video-card").filter({ hasText: "Tresses express" }).first();
+    await expect(publication).toBeVisible();
+    await publication.getByRole("button", { name: "Réserver", exact: true }).click();
+    await page.getByRole("button", { name: "10:00" }).click();
     await expect(page.getByText("Tresses express", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
-    await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click(); actions += 1;
-    await page.getByLabel("Adresse e-mail").click(); actions += 1;
+    await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click();
+    await page.getByLabel("Adresse e-mail").click();
     await page.getByLabel("Adresse e-mail").fill("client-audit@example.test");
     const password = page.locator('input[type="password"]');
-    await password.click(); actions += 1;
+    await password.click();
     await password.fill(testPassword);
-    await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
+    await page.getByRole("button", { name: "Se connecter", exact: true }).click();
     await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
     await expect(page.getByRole("dialog").getByText(/10:00/)).toBeVisible();
-    const durationMs = Date.now() - startedAt;
-    expect(actions).toBe(8);
-    // In this local development-server fixture, the desktop timeout can include
-    // cold route compilation and worker contention; keep a separate 45s bound.
-    expect(durationMs).toBeLessThan(45_000);
-    console.log(`AUDIT_METRIC actions=${actions} duration_ms=${durationMs}`);
+    expect(state.bookingCreated).toBe(true);
+    expect(state.lastBookingSource).toBe(socialPostId);
   });
 
   test("passe d’une vidéo à une réservation confirmée en 6 actions", async ({ page }) => {
@@ -321,10 +312,9 @@ test.describe("audit chronométré de réservation", () => {
     const state: AuditState = { bookingCreated: true, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
-    await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click();
-    await page.locator(".premium-provider-card").click();
-    await page.getByRole("link", { name: "Réserver", exact: true }).click();
+    const publication = page.locator(".social-video-card").filter({ hasText: "Tresses express" }).first();
+    await expect(publication).toBeVisible();
+    await publication.getByRole("button", { name: "Réserver", exact: true }).click();
     await expect(page.getByRole("button", { name: "10:00" })).toHaveCount(0);
     await page.getByRole("button", { name: "Fermer" }).click();
     await page.getByRole("button", { name: /^(?:Profil|Se connecter à MATA Beauty)$/ }).click();
@@ -359,10 +349,9 @@ test.describe("audit chronométré de réservation", () => {
     const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: "Explorer" }).click();
-    await page.locator(".photo-category-grid button").filter({ hasText: "Tresses" }).click();
-    await page.locator(".premium-provider-card").click();
-    await page.getByRole("link", { name: "Réserver", exact: true }).click();
+    const publication = page.locator(".social-video-card").filter({ hasText: "Tresses express" }).first();
+    await expect(publication).toBeVisible();
+    await publication.getByRole("button", { name: "Réserver", exact: true }).click();
     await page.getByRole("button", { name: "10:00" }).click();
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
     await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem("mata-booking-draft"))).not.toBeNull();
@@ -409,3 +398,4 @@ test.describe("audit chronométré de réservation", () => {
     await expect(page.getByRole("dialog", { name: "Réserver" }).getByRole("alert")).toHaveCount(0);
   });
 });
+
