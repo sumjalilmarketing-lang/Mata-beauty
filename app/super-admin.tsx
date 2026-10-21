@@ -309,6 +309,7 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
   const [context, setContext] = useState<AdminContext | null>(null);
   const [sessionState, setSessionState] = useState<"loading" | "anonymous" | "unauthorized" | "mfa" | "ready">("loading");
   const [activeModule, setActiveModule] = useState<ModuleKey>(initialModule);
+  const [moduleRefresh, setModuleRefresh] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [globalQuery, setGlobalQuery] = useState("");
@@ -425,8 +426,8 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
       </header>
       <div className="admin-page">
         {notice && <div className="admin-toast" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
-        <div className="admin-page-heading"><div><p>Mata Beauty · Administration</p><h1>{current.label}</h1></div><div className="admin-page-actions"><button className="primary" onClick={() => window.location.reload()}>Actualiser</button></div></div>
-        <AdminModule module={effectiveModule} context={context} setModule={setActiveModule} notify={setNotice} />
+        <div className="admin-page-heading"><div><p>Mata Beauty · Administration</p><h1>{current.label}</h1></div><div className="admin-page-actions"><button className="primary" onClick={() => setModuleRefresh((value) => value + 1)}>Actualiser</button></div></div>
+        <AdminModule key={`${effectiveModule}:${moduleRefresh}`} module={effectiveModule} context={context} setModule={setActiveModule} notify={setNotice} />
       </div>
     </section>
   </main>;
