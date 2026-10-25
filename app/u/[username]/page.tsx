@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
-  return { title: `@${username} · MATA Beauty`, description: "Profil client MATA Beauty" };
+  return { title: `@${username} · MATA Beauty`, description: "Profil client MATA Beauty", robots: { index: false, follow: true, noarchive: true } };
 }
 
 export default async function ClientSocialProfilePage({ params, searchParams }: { params: Promise<{ username: string }>; searchParams?: Promise<{ video?: string }> }) {

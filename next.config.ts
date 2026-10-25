@@ -27,6 +27,10 @@ const nextConfig: NextConfig = {
     const configuredSupabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin : null;
     const documentFrameSource = configuredSupabaseOrigin ? `${configuredSupabaseOrigin}/storage/v1/object/sign/provider-documents/` : "'none'";
     const supabaseConnectSource = configuredSupabaseOrigin ? ` ${configuredSupabaseOrigin}` : "";
+    const noIndexHeaders = ["/app/:path*", "/admin/:path*", "/auth/:path*", "/finance/:path*", "/moderation/:path*", "/onboarding/:path*", "/operations/:path*", "/pro/:path*", "/salon/:path*", "/staff/:path*", "/support-agent/:path*"].map(source => ({
+      source,
+      headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
+    }));
     return [{
       source: "/:path*",
       headers: [
@@ -39,7 +43,7 @@ const nextConfig: NextConfig = {
     }, {
       source: "/images/categories/:path*",
       headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
-    }];
+    }, ...noIndexHeaders];
   },
 };
 

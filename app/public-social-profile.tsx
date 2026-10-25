@@ -8,6 +8,7 @@ import type { PublicSocialProfileData, SocialProfilePost } from "@/lib/profiles/
 import { SocialProfileVideoFrame } from "./social-profile-video-frame";
 import { ClientControlCenter } from "./client-control-center";
 import styles from "./public-social-profile.module.css";
+import { publicMetadataImage } from "@/lib/public-image";
 
 type TabKey = "videos" | "favorites" | "likes" | "services" | "reviews" | "following";
 
@@ -38,7 +39,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
       if (found) queueMicrotask(() => active && setSelectedVideo(found));
     }
     return () => { active = false; };
-  }, [initialVideoId, profile.favorites, profile.posts]);
+  }, [initialVideoId, profile.favorites, profile.likedPosts, profile.posts]);
 
   useEffect(() => {
     let active = true;
@@ -130,7 +131,32 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
     ? [{ key: "videos", label: "Publications" }, { key: "favorites", label: "Enregistrés" }, ...(profile.isOwner ? [{ key: "likes" as const, label: "J’aime" }] : []), ...(profile.canShowFollows ? [{ key: "following" as const, label: "Abonnements" }] : [])]
     : [{ key: "videos", label: "Vidéos" }, { key: "services", label: "Prestations" }, { key: "reviews", label: "Avis" }];
 
+  const structuredProfile = profile.kind === "client" ? null : {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    url: `https://mata-beauty.com${profilePath}`,
+    mainEntity: {
+      "@type": profile.kind === "salon" ? "BeautySalon" : "HealthAndBeautyBusiness",
+      name: profile.name,
+      url: `https://mata-beauty.com${profilePath}`,
+      ...(profile.bio ? { description: profile.bio } : {}),
+      ...(profile.city ? { areaServed: { "@type": "City", name: profile.city } } : {}),
+      ...(profile.avatarUrl ? { image: publicMetadataImage(profile.avatarUrl) } : {}),
+      ...(profile.services.length ? { hasOfferCatalog: {
+        "@type": "OfferCatalog",
+        name: "Prestations publiées",
+        itemListElement: profile.services.map(service => ({
+          "@type": "Offer",
+          itemOffered: { "@type": "Service", name: service.title, ...(service.description ? { description: service.description } : {}) },
+          ...(service.currency && /^[A-Z]{3}$/.test(service.currency) ? { price: service.priceAmount, priceCurrency: service.currency } : {}),
+          url: `https://mata-beauty.com/service/${encodeURIComponent(service.id)}`,
+        })),
+      } } : {}),
+    },
+  };
+
   return <main className={styles.page}>
+    {structuredProfile && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredProfile).replace(/</g, "\\u003c") }} />}
     <header className={styles.topbar}>
       <Link href="/" className={styles.back}>‹ <span>Découvrir</span></Link>
       <Link href="/" className={styles.brand}>MATA <i>BEAUTY</i></Link>
@@ -214,8 +240,8 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     {tab === "services" && <section className={styles.serviceList} aria-label="Prestations">
       {profile.services.length ? profile.services.map(service => <article className={styles.serviceCard} key={service.id}>
-        <div><h2>{service.title}</h2>{service.description && <p>{service.description}</p>}<small>{service.durationMinutes} min · {formatMoney(service.priceAmount, service.currency)}</small></div>
-        <Link href={bookingHref(service.id)}>Réserver</Link>
+        <div><h2><Link href={`/service/${encodeURIComponent(service.id)}`}>{service.title}</Link></h2>{service.description && <p>{service.description}</p>}<small>{service.durationMinutes} min · {formatMoney(service.priceAmount, service.currency)}</small></div>
+        <div className={styles.serviceActions}><Link href={`/service/${encodeURIComponent(service.id)}`}>Détails</Link><Link href={bookingHref(service.id)} onClick={openBooking}>Réserver</Link></div>
       </article>) : <p className={styles.empty}>Aucune prestation active n’est publiée pour le moment.</p>}
     </section>}
     {tab === "reviews" && <section className={styles.reviewList} aria-label="Avis vérifiés">

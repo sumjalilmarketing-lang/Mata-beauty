@@ -5,10 +5,11 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 
 test("the public experience is a real booking application", async () => {
-  const [page, app, layout] = await Promise.all([
+  const [page, app, layout, homeSeoDirectory] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
+    readFile(new URL("app/home-seo-directory.tsx", root), "utf8"),
   ]);
   assert.match(page, /MataBeautyApp/);
   assert.match(app, /<h1>Explorer<\/h1>/);
@@ -21,7 +22,8 @@ test("the public experience is a real booking application", async () => {
   assert.match(app, /Votre rendez-vous est créé/);
   assert.doesNotMatch(app, /Awa Signature|Demande simulée|Mode démonstration/);
   assert.match(layout, /Mata Beauty/);
-  assert.match(layout, /mata-category-atlas\.webp/);
+  assert.match(layout, /og\.png/);
+  assert.match(homeSeoDirectory, /categoryId=\$\{encodeURIComponent\(category\.id\)\}/);
   assert.doesNotMatch(page + layout, /codex-preview|SkeletonPreview/);
 });
 

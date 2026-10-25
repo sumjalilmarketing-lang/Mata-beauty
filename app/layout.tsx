@@ -6,7 +6,9 @@ import "./readability.css";
 export const metadata: Metadata = {
   title: { default: "Mata Beauty — Réservez votre beauté à Dakar", template: "%s · Mata Beauty" },
   description: "Recherchez et réservez des prestations beauté auprès de professionnels vérifiés au Sénégal.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  metadataBase: new URL("https://mata-beauty.com"),
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
   applicationName: "Mata Beauty",
   keywords: ["beauté Dakar", "coiffure Sénégal", "tresses Dakar", "maquillage", "onglerie", "réservation beauté"],
   icons: { icon: "/brand/icon-64.png", shortcut: "/brand/icon-64.png", apple: "/brand/icon-192.png" },
@@ -16,9 +18,9 @@ export const metadata: Metadata = {
     description: "Trouvez un professionnel, consultez ses disponibilités et réservez votre rendez-vous.",
     type: "website",
     locale: "fr_SN",
-    images: [{ url: "/images/categories/mata-category-atlas.webp", width: 1984, height: 792, alt: "Les univers beauté de Mata Beauty." }],
+    images: [{ url: "/og.png", width: 1731, height: 908, alt: "Mata Beauty — prestations beauté à Dakar et au Sénégal." }],
   },
-  twitter: { card: "summary_large_image", title: "Mata Beauty", description: "Réservez votre beauté au Sénégal.", images: ["/images/categories/mata-category-atlas.webp"] },
+  twitter: { card: "summary_large_image", title: "Mata Beauty", description: "Réservez votre beauté au Sénégal.", images: ["/og.png"] },
 };
 
 export const viewport: Viewport = { themeColor: "#5b0b45", colorScheme: "light dark" };
