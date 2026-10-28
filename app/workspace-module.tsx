@@ -118,7 +118,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (deletionQueue) return <AccountDeletionQueue />;
   if (categoryManagement) return <section>{notice && <p role="status">{notice}</p>}<CatalogModule services={false} notify={setNotice} /></section>;
   if (supportInbox) return <SupportInbox key={module.key} filter={module.key} userId={userId} />;
-  if (module.key === "notifications") return <NotificationCenter userId={userId} />;
+  if (module.key === "notifications") return <NotificationCenter userId={userId} space={space} />;
   if (focused) return <LiveDashboard role={space === "client" ? "client" : "provider"} userId={userId} displayName="" moduleKey={module.key} onBack={() => window.location.assign("/")} onSignOut={async () => { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/"); }} />;
   if (onboardingInbox) return <OnboardingQueue moduleKey={module.key === "onboarding" ? "dashboard" : module.key} />;
   if (space === "pro" && module.key === "team") return <SalonControlCenter module={module} userId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />;

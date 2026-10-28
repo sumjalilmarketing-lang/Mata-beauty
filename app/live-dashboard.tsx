@@ -14,7 +14,8 @@ import { ClientControlCenter } from "./client-control-center";
 import { ProviderLaunchChecklist } from "./provider-launch-checklist";
 import { ProfessionalDocuments } from "./professional-documents";
 import { ReferralCard } from "./referral-card";
-import { NotificationCenter } from "./notification-center";
+import { NotificationBadge, NotificationCenter } from "./notification-center";
+import { notificationVisibleInSpace } from "@/lib/domain/notifications";
 import { BookingReview } from "./booking-review";
 import { ClientBookingGroups } from "./client-booking-groups";
 import type { ClientBookingItem } from "@/lib/domain/client-bookings";
@@ -45,6 +46,8 @@ type NotificationRow = {
   id: string;
   title: string;
   body: string;
+  kind: string;
+  data: Record<string, unknown>;
   read_at: string | null;
   created_at: string;
 };
@@ -303,12 +306,13 @@ export function LiveDashboard({
       }
       const { data: notificationData, error: notificationError } = await supabase
         .from("notifications")
-        .select("id,title,body,read_at,created_at")
+        .select("id,title,body,kind,data,read_at,created_at")
         .eq("profile_id", userId)
         .order("created_at", { ascending: false })
         .limit(10);
       if (notificationError) throw notificationError;
-      setNotifications((notificationData ?? []) as NotificationRow[]);
+      const notificationSpace = role === "provider" ? "pro" : role;
+      setNotifications(((notificationData ?? []) as NotificationRow[]).filter(item => notificationVisibleInSpace(item, notificationSpace)));
     } catch (caught) {
       setError(publicErrorMessage(caught, "Impossible de charger le tableau de bord."));
     } finally {
@@ -509,7 +513,7 @@ export function LiveDashboard({
           <button className="active" onClick={() => void load()}>⌂ Vue d’ensemble</button>
           {role !== "admin" && <button onClick={() => document.getElementById("live-bookings")?.scrollIntoView({ behavior: "smooth" })}>▣ Réservations</button>}
           {role !== "admin" && <button onClick={() => document.getElementById(messageBooking ? "booking-conversation" : "live-bookings")?.scrollIntoView({ behavior: "smooth" })}>✉ Messages</button>}
-          <button onClick={() => document.getElementById("live-notifications")?.scrollIntoView({ behavior: "smooth" })}>◌ Notifications <i>{notifications.filter((item) => !item.read_at).length}</i></button>
+          <button onClick={() => document.getElementById("live-notifications")?.scrollIntoView({ behavior: "smooth" })}>◌ Notifications <NotificationBadge space={role === "provider" ? "pro" : role} /></button>
         </nav>
         <button className="back-link" onClick={() => void onSignOut()}>Se déconnecter</button>
       </aside>}
@@ -643,7 +647,7 @@ export function LiveDashboard({
             onClose={() => setMessageBooking(null)}
           />
         )}
-        {show("notifications") && <article className="panel notifications-panel" id="live-notifications"><NotificationCenter userId={userId} /></article>}
+        {show("notifications") && <article className="panel notifications-panel" id="live-notifications"><NotificationCenter userId={userId} space={role === "client" ? "client" : role === "admin" ? "admin" : "pro"} /></article>}
       </section>
     </main>
   );

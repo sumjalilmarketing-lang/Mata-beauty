@@ -422,7 +422,7 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
             }}><StatusBadge value={result.entity_type} /><span><strong>{result.title}</strong><small>{result.subtitle}</small></span></button>,
           )}</div>}
         </div>
-        <div className="admin-top-actions"><span className="secure-indicator">● Sécurisé</span>{visibleNavigation.some(item => item.key === "notifications") && <button aria-label="Notifications" onClick={() => setActiveModule("notifications")}>◌<NotificationBadge /></button>}<button aria-label="Ouvrir le journal d’audit" onClick={() => setActiveModule("audit")}>≣</button></div>
+        <div className="admin-top-actions"><span className="secure-indicator">● Sécurisé</span>{visibleNavigation.some(item => item.key === "notifications") && <button aria-label="Notifications" onClick={() => setActiveModule("notifications")}>◌<NotificationBadge space="admin" /></button>}<button aria-label="Ouvrir le journal d’audit" onClick={() => setActiveModule("audit")}>≣</button></div>
       </header>
       <div className="admin-page">
         {notice && <div className="admin-toast" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
@@ -495,7 +495,7 @@ function AdminModule({
   if (module === "comments") return <CommentModeration />;
   if (module === "support") return <SupportInbox />;
   if (module === "users") return context.is_super_admin ? <ManagedAccounts /> : <UsersModule context={context} notify={notify} />;
-  if (module === "notifications") return <NotificationCenter />;
+  if (module === "notifications") return <NotificationCenter space="admin" />;
   if (module === "verification") return <OnboardingQueue moduleKey="dashboard" />;
   if (module === "providers") return <ProvidersModule context={context} verificationOnly={false} notify={notify} />;
   if (module === "bookings" || module === "calendar") return <BookingsModule context={context} calendar={module === "calendar"} notify={notify} />;
