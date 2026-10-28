@@ -26,6 +26,7 @@ const nextConfig: NextConfig = {
       : "";
     const configuredSupabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin : null;
     const documentFrameSource = configuredSupabaseOrigin ? `${configuredSupabaseOrigin}/storage/v1/object/sign/provider-documents/` : "'none'";
+    const mapFrameSource = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY ? " https://www.google.com" : "";
     const supabaseConnectSource = configuredSupabaseOrigin ? ` ${configuredSupabaseOrigin}` : "";
     const noIndexHeaders = ["/app/:path*", "/admin/:path*", "/auth/:path*", "/finance/:path*", "/moderation/:path*", "/onboarding/:path*", "/operations/:path*", "/pro/:path*", "/salon/:path*", "/staff/:path*", "/support-agent/:path*"].map(source => ({
       source,
@@ -38,7 +39,7 @@ const nextConfig: NextConfig = {
         { key: "X-Frame-Options", value: "DENY" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), payment=()" },
-        { key: "Content-Security-Policy", value: `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; frame-src ${documentFrameSource}; object-src 'none'; form-action 'self' https://app.paydunya.com; img-src 'self' data: blob: https:; media-src 'self' blob: https://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'${developmentEval}; connect-src 'self'${supabaseConnectSource} https://*.supabase.co wss://*.supabase.co https://app.paydunya.com${upgradeInsecureRequests}` },
+        { key: "Content-Security-Policy", value: `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; frame-src ${documentFrameSource}${mapFrameSource}; object-src 'none'; form-action 'self' https://app.paydunya.com; img-src 'self' data: blob: https:; media-src 'self' blob: https://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'${developmentEval}; connect-src 'self'${supabaseConnectSource} https://*.supabase.co wss://*.supabase.co https://app.paydunya.com${upgradeInsecureRequests}` },
       ],
     }, {
       source: "/images/categories/:path*",

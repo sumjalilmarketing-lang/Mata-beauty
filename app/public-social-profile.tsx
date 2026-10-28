@@ -9,6 +9,7 @@ import { SocialProfileVideoFrame } from "./social-profile-video-frame";
 import { ClientControlCenter } from "./client-control-center";
 import styles from "./public-social-profile.module.css";
 import { publicMetadataImage } from "@/lib/public-image";
+import { ProviderMap } from "./location-ui";
 
 type TabKey = "videos" | "favorites" | "likes" | "services" | "reviews" | "following";
 
@@ -231,6 +232,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
         <span>Découvrir le salon</span><strong>{profile.salon.name}</strong>{profile.salon.city && <small>{profile.salon.city}</small>}<b>›</b>
       </Link>}
       {profile.kind === "client" && !profile.isOwner && <p className={styles.privacyNote}>Les réservations, coordonnées et informations de compte restent privées.</p>}
+      {profile.kind !== "client" && <ProviderMap name={profile.name} address={profile.address} latitude={profile.latitude} longitude={profile.longitude} />}
     </section>
 
     <nav className={styles.tabs} aria-label="Contenu du profil">

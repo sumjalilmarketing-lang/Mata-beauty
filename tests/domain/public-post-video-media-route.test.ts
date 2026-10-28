@@ -26,7 +26,7 @@ class QueryBuilder {
 
 function clientFor(input: { data: unknown; error?: unknown; signingError?: unknown }) {
   const query = new QueryBuilder(input.data, input.error ?? null);
-  const createSignedUrl = vi.fn(async (path: string, _expiresIn: number) => ({
+  const createSignedUrl = vi.fn(async (path: string) => ({
     data: { signedUrl: `https://qjdwxdbvrxedyfolnpol.supabase.co/storage/v1/object/sign/provider-social-media/${path === videoPath ? "video-token" : "thumbnail-token"}` },
     error: path === videoPath ? input.signingError ?? null : null,
   }));

@@ -36,6 +36,8 @@ export type PublicSocialProfileData = {
   city: string | null;
   area: string | null;
   address: string | null;
+  latitude: number | null;
+  longitude: number | null;
   avatarUrl: string | null;
   coverUrl: string | null;
   verified: boolean;
@@ -68,6 +70,10 @@ type ProviderRow = {
   average_rating: number | string;
   review_count: number;
   verified_at: string | null;
+  base_address: string | null;
+  area: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 type BusinessRow = {
   id: string;
@@ -80,6 +86,8 @@ type BusinessRow = {
   address: string | null;
   cover_url: string | null;
   logo_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 type FeedRow = {
   id: string;
@@ -222,7 +230,7 @@ async function reviewsFor(providerId: string) {
 async function loadProfessional(lookup: string, viewerId: string | null): Promise<PublicSocialProfileData | null> {
   const client = serviceSupabase();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookup);
-  let query = client.from("provider_profiles").select("profile_id,business_name,slug,bio,city,cover_url,average_rating,review_count,verified_at")
+  let query = client.from("provider_profiles").select("profile_id,business_name,slug,bio,city,area,base_address,latitude,longitude,cover_url,average_rating,review_count,verified_at")
     .eq("status", "approved");
   query = isUuid ? query.eq("profile_id", lookup) : query.eq("slug", lookup.toLowerCase());
   const { data, error } = await query.maybeSingle();
@@ -242,7 +250,8 @@ async function loadProfessional(lookup: string, viewerId: string | null): Promis
   return {
     kind: "professional", id: provider.profile_id, slug: provider.slug, name: provider.business_name,
     handle: publicHandle(identity.data?.username, provider.business_name),
-    bio: provider.bio, city: provider.city, area: null, address: null,
+    bio: provider.bio, city: provider.city, area: provider.area, address: provider.base_address,
+    latitude: provider.latitude, longitude: provider.longitude,
     avatarUrl: safeHttpUrl(identity.data?.avatar_url), coverUrl: safeHttpUrl(provider.cover_url),
     verified: Boolean(provider.verified_at), specialties,
     rating: Number(provider.average_rating) || 0, reviewCount: Number(provider.review_count) || 0,
@@ -256,7 +265,7 @@ async function loadProfessional(lookup: string, viewerId: string | null): Promis
 
 async function loadSalon(lookup: string, viewerId: string | null): Promise<PublicSocialProfileData | null> {
   const client = serviceSupabase();
-  const { data, error } = await client.from("businesses").select("id,owner_id,slug,name,description,city,area,address,cover_url,logo_url")
+  const { data, error } = await client.from("businesses").select("id,owner_id,slug,name,description,city,area,address,latitude,longitude,cover_url,logo_url")
     .eq("slug", lookup.toLowerCase()).eq("status", "approved").eq("is_active", true).is("archived_at", null).maybeSingle();
   if (error || !data) return null;
   const business = data as unknown as BusinessRow;
@@ -275,6 +284,7 @@ async function loadSalon(lookup: string, viewerId: string | null): Promise<Publi
   return {
     kind: "salon", id: provider.profile_id, slug: business.slug, name: business.name, handle: publicHandle(business.slug, business.name),
     bio: business.description, city: business.city, area: business.area, address: business.address,
+    latitude: business.latitude, longitude: business.longitude,
     avatarUrl: safeHttpUrl(business.logo_url), coverUrl: safeHttpUrl(business.cover_url), verified: Boolean(provider.verified_at), specialties,
     rating: Number(provider.average_rating) || 0, reviewCount: Number(provider.review_count) || 0,
     followersCount: counts.followers, followingCount: counts.following, videoCount,
@@ -343,7 +353,7 @@ async function loadClient(lookup: string, viewerId: string | null, ownerHasClien
   }
   return {
     kind: "client", id: profile.id, slug: profile.username?.trim() || "client-" + profile.id.slice(0, 8), name: profile.display_name?.trim() || profile.username?.trim() || "Mon profil",
-    handle: "@" + (profile.username?.trim() || "client-" + profile.id.slice(0, 8)), bio: profile.bio, city: null, area: null, address: null,
+    handle: "@" + (profile.username?.trim() || "client-" + profile.id.slice(0, 8)), bio: profile.bio, city: null, area: null, address: null, latitude: null, longitude: null,
     avatarUrl: safeHttpUrl(profile.avatar_url), coverUrl: null, verified: false, specialties: [], rating: null, reviewCount: 0,
     followersCount: null, followingCount, videoCount: 0, favoritesCount, posts: [], favorites, likedPosts, following, services: [], reviews: [],
     salon: null, isOwner, canShowFollows, canShowCollections,

@@ -560,7 +560,9 @@ test("release candidate automates scheduled posts and centralizes commissions", 
 test("server health verifies Supabase service access without exposing secrets", async () => {
   const route = await readFile(new URL("app/api/health/server/route.ts", root), "utf8");
   assert.match(route, /serviceSupabase\(\)/);
-  assert.match(route, /serviceRole: true/);
+  assert.match(route, /Response\.json\(\{ ok: true \}/);
+  assert.doesNotMatch(route, /serviceRole:/);
+  assert.doesNotMatch(route, /database:/);
   assert.match(route, /Cache-Control/);
   assert.doesNotMatch(route, /process\.env\.SUPABASE_SERVICE_ROLE_KEY/);
   assert.doesNotMatch(route, /JSON\.stringify\(process\.env/);
