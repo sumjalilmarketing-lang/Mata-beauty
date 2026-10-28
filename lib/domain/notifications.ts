@@ -15,7 +15,7 @@ function notificationSpace(item: Pick<NotificationItem, "kind" | "data">): Notif
   const extraAdminRoute = typeof explicitHref === "string" && /^\/(?:support|support-agent|finance|operations)(?:\/|$)/.test(explicitHref) ? explicitHref : null;
   // This legacy trigger sends the same event kind to both booking participants without a destination.
   // Keep it in the two participant spaces instead of misclassifying every event as a client notice.
-  if (item.kind === "booking_status_changed" && typeof explicitHref !== "string") return "booking_shared";
+  if (item.kind === "booking_status_changed" && (typeof explicitHref !== "string" || notificationDestination(item) !== explicitHref)) return "booking_shared";
   const destination = notificationDestination(item) ?? extraAdminRoute;
   const path = destination?.split(/[?#]/, 1)[0] ?? "";
   if (path === "/app" || path.startsWith("/app/")) return "client";

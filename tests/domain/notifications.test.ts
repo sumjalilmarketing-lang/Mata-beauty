@@ -56,6 +56,9 @@ describe("workspace-scoped notifications", () => {
     expect(notificationVisibleInSpace(notice, "admin")).toBe(false);
     expect(notificationDestination(notice, "client")).toBe("/app/bookings#booking-123e4567-e89b-42d3-a456-426614174000");
     expect(notificationDestination(notice, "pro")).toBe("/pro/bookings#booking-123e4567-e89b-42d3-a456-426614174000");
+    const invalidDestination = item("booking_status_changed", "https://example.invalid", { booking_id: "123e4567-e89b-42d3-a456-426614174000" });
+    expect(notificationVisibleInSpace(invalidDestination, "pro")).toBe(true);
+    expect(notificationVisibleInSpace(invalidDestination, "admin")).toBe(false);
   });
 
   it("normalizes app role and administrative workspace keys", () => {
