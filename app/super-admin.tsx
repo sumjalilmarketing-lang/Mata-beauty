@@ -198,6 +198,19 @@ const navigation = [
 ] as const;
 type ModuleKey = typeof navigation[number]["key"];
 
+const adminNavigationGroups: ReadonlyArray<{ key: string; label: string; icon: string; moduleKeys: readonly ModuleKey[] }> = [
+  { key: "pilotage", label: "Pilotage", icon: "◉", moduleKeys: ["overview", "launch", "cohort", "statistics"] },
+  { key: "users-access", label: "Utilisateurs & accès", icon: "♙", moduleKeys: ["users", "providers", "salons", "verification", "administrators", "roles"] },
+  { key: "activity-services", label: "Activité & prestations", icon: "▣", moduleKeys: ["categories", "services", "bookings", "calendar"] },
+  { key: "finance", label: "Finances", icon: "¤", moduleKeys: ["payments", "commissions", "payouts"] },
+  { key: "communication-quality", label: "Communication & qualité", icon: "✉", moduleKeys: ["notifications", "reviews", "comments", "reports", "disputes", "support", "content", "promotions"] },
+  { key: "configuration-security", label: "Configuration & sécurité", icon: "⚙", moduleKeys: ["settings", "security", "audit", "maintenance", "platform-health"] },
+];
+
+function groupForModule(key: ModuleKey) {
+  return adminNavigationGroups.find((group) => group.moduleKeys.includes(key))?.key ?? adminNavigationGroups[0].key;
+}
+
 const adminRoleLabels: Record<string, string> = {
   super_admin: "Super administrateur",
   admin: "Administrateur",
@@ -312,6 +325,7 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
   const [moduleRefresh, setModuleRefresh] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState(() => groupForModule(initialModule));
   const [globalQuery, setGlobalQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [notice, setNotice] = useState("");
@@ -344,10 +358,31 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
         return;
       }
       setContext(next);
-      setActiveModule((current) => {
-        const currentItem = navigation.find((item) => item.key === current);
-        return currentItem && canAccessModule(next, currentItem.key, currentItem.permission) ? current : landingModule(next);
-      });
+      let preferredModule = initialModule;
+      if (initialModule === "overview") {
+        try {
+          const storedModule = window.localStorage.getItem("mata-admin-last-module");
+          const storedItem = navigation.find((item) => item.key === storedModule);
+          if (storedItem && canAccessModule(next, storedItem.key, storedItem.permission)) preferredModule = storedItem.key;
+        } catch {
+          // Navigation persistence is optional; the current route remains usable if storage is unavailable.
+        }
+      }
+      const nextModule = canAccessModule(next, preferredModule, navigation.find((item) => item.key === preferredModule)?.permission ?? "")
+        ? preferredModule
+        : landingModule(next);
+      setActiveModule(nextModule);
+      let preferredGroup = groupForModule(nextModule);
+      try {
+        const storedGroup = window.localStorage.getItem("mata-admin-open-group");
+        if (adminNavigationGroups.some((group) => group.key === storedGroup && group.moduleKeys.some((key) => {
+          const item = navigation.find((entry) => entry.key === key);
+          return item && canAccessModule(next, item.key, item.permission);
+        }))) preferredGroup = storedGroup ?? preferredGroup;
+      } catch {
+        // Navigation persistence is optional; the current route remains usable if storage is unavailable.
+      }
+      setExpandedGroup(preferredGroup);
       await supabase.rpc("record_admin_session", { client_user_agent: window.navigator.userAgent });
       setSessionState("ready");
     } catch {
@@ -355,11 +390,20 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
       setSessionState("anonymous");
       setNotice("Connexion au service momentanément indisponible. Réessayez.");
     }
-  }, []);
+  }, [initialModule]);
 
   useEffect(() => {
     void Promise.resolve().then(resolveSession);
   }, [resolveSession]);
+
+  useEffect(() => {
+    if (!mobileNav) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileNav(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileNav]);
 
   useEffect(() => {
     if (!context || globalQuery.trim().length < 2) {
@@ -383,6 +427,20 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
     setSessionState("anonymous");
   }
 
+  function navigateToModule(moduleKey: ModuleKey) {
+    const item = navigation.find((entry) => entry.key === moduleKey);
+    if (!item || (context && !canAccessModule(context, item.key, item.permission))) return;
+    setActiveModule(moduleKey);
+    setExpandedGroup(groupForModule(moduleKey));
+    setMobileNav(false);
+    try {
+      window.localStorage.setItem("mata-admin-last-module", moduleKey);
+      window.localStorage.setItem("mata-admin-open-group", groupForModule(moduleKey));
+    } catch {
+      // Navigation persistence is optional.
+    }
+  }
+
   if (sessionState === "loading") return <main className="admin-auth-shell"><LoadingSkeleton /></main>;
   if (sessionState === "anonymous") return <AdminLogin onAuthenticated={resolveSession} configured={getSupabaseConfiguration().configured} />;
   if (sessionState === "mfa") return <AdminMfa onVerified={resolveSession} onSignOut={signOut} />;
@@ -392,23 +450,56 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
   const visibleNavigation = navigation.filter((item) => canAccessModule(context, item.key, item.permission));
   const effectiveModule = visibleNavigation.some((item) => item.key === activeModule) ? activeModule : landingModule(context);
   const current = navigation.find((item) => item.key === effectiveModule) ?? visibleNavigation[0];
+  const visibleGroups = adminNavigationGroups.map((group) => ({
+    ...group,
+    items: visibleNavigation.filter((item) => group.moduleKeys.includes(item.key)),
+  })).filter((group) => group.items.length > 0);
+  const currentGroup = visibleGroups.find((group) => group.moduleKeys.includes(effectiveModule));
   const roleLabel = context.is_super_admin ? adminRoleLabels.super_admin : context.roles.map((role) => adminRoleLabels[role] ?? role).join(", ");
   const roleInitials = context.is_super_admin ? "SA" : context.roles.includes("verification_agent") ? "ON" : context.roles[0]?.slice(0, 2).toUpperCase() ?? "AD";
 
   return <main className={`super-admin-shell ${collapsed ? "collapsed" : ""}`}>
-    <aside className={`admin-sidebar ${mobileNav ? "mobile-open" : ""}`}>
-      <button className="admin-brand" onClick={() => setActiveModule(landingModule(context))}><Image src="/brand/mata-app-icon.webp" alt="" width={42} height={42} unoptimized /><strong>MATA<small>CONTROL CENTER</small></strong></button>
+    {mobileNav && <button className="admin-mobile-scrim" aria-label="Fermer la navigation" onClick={() => setMobileNav(false)} />}
+    <aside id="admin-sidebar" className={`admin-sidebar ${mobileNav ? "mobile-open" : ""}`}>
+      <button className="admin-brand" onClick={() => navigateToModule(landingModule(context))}><Image src="/brand/mata-app-icon.webp" alt="" width={42} height={42} unoptimized /><strong>MATA<small>CONTROL CENTER</small></strong></button>
       <div className="admin-role-card"><i>{roleInitials}</i><span><strong>{roleLabel}</strong><small>Accès sécurisé</small></span></div>
-      <nav aria-label="Navigation Super Admin">{visibleNavigation.map((item) =>
-        <button key={item.key} className={activeModule === item.key ? "active" : ""} onClick={() => { setActiveModule(item.key); setMobileNav(false); }} title={item.label}>
-          <i>{item.icon}</i><span>{item.label}</span>
-        </button>,
-      )}</nav>
+      <nav aria-label="Navigation Super Admin">{visibleGroups.map((group) => {
+        const isOpen = expandedGroup === group.key;
+        const containsCurrent = group.moduleKeys.includes(effectiveModule);
+        return <section className="admin-nav-group" key={group.key}>
+          <button
+            type="button"
+            className={`admin-nav-group-trigger ${containsCurrent ? "group-active" : ""}`}
+            aria-label={group.label}
+            aria-expanded={isOpen}
+            aria-controls={`admin-nav-group-${group.key}`}
+            title={group.label}
+            onClick={() => {
+              setCollapsed(false);
+              setExpandedGroup(isOpen ? "" : group.key);
+              try { window.localStorage.setItem("mata-admin-open-group", isOpen ? "" : group.key); } catch { /* Storage is optional. */ }
+            }}
+          ><i aria-hidden="true">{group.icon}</i><span>{group.label}</span><b aria-hidden="true" className="admin-nav-chevron">⌄</b></button>
+          <div id={`admin-nav-group-${group.key}`} className={`admin-nav-group-content ${isOpen ? "is-open" : ""}`} aria-hidden={!isOpen} inert={!isOpen}>
+            <div className="admin-nav-group-links">{group.items.map((item) =>
+              <button
+                key={item.key}
+                type="button"
+                className={effectiveModule === item.key ? "active" : ""}
+                aria-label={item.label}
+                aria-current={effectiveModule === item.key ? "page" : undefined}
+                onClick={() => navigateToModule(item.key)}
+                title={item.label}
+              ><i aria-hidden="true">{item.icon}</i><span>{item.label}</span></button>,
+            )}</div>
+          </div>
+        </section>;
+      })}</nav>
       <button className="admin-signout" onClick={() => void signOut()}><i>↪</i><span>Se déconnecter</span></button>
     </aside>
     <section className="admin-workspace">
       <header className="admin-topbar">
-        <button className="admin-menu-button" aria-label="Ouvrir le menu" onClick={() => setMobileNav((value) => !value)}>☰</button>
+        <button className="admin-menu-button" aria-label={mobileNav ? "Fermer le menu" : "Ouvrir le menu"} aria-expanded={mobileNav} aria-controls="admin-sidebar" onClick={() => setMobileNav((value) => !value)}>☰</button>
         <button className="admin-collapse" aria-label="Replier la navigation" onClick={() => setCollapsed((value) => !value)}>◀</button>
         <div className="admin-global-search">
           <span>⌕</span>
@@ -416,17 +507,17 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
           {searchResults.length > 0 && <div className="admin-search-results">{searchResults.map((result) =>
             <button key={`${result.entity_type}-${result.entity_id}`} onClick={() => {
               const target: ModuleKey = result.entity_type === "user" ? "users" : result.entity_type === "provider" ? "providers" : result.entity_type === "booking" ? "bookings" : result.entity_type === "payment" ? "payments" : result.entity_type === "ticket" ? "support" : "promotions";
-              setActiveModule(target);
+              navigateToModule(target);
               setSearchResults([]);
               setGlobalQuery("");
             }}><StatusBadge value={result.entity_type} /><span><strong>{result.title}</strong><small>{result.subtitle}</small></span></button>,
           )}</div>}
         </div>
-        <div className="admin-top-actions"><span className="secure-indicator">● Sécurisé</span>{visibleNavigation.some(item => item.key === "notifications") && <button aria-label="Notifications" onClick={() => setActiveModule("notifications")}>◌<NotificationBadge /></button>}<button aria-label="Ouvrir le journal d’audit" onClick={() => setActiveModule("audit")}>≣</button></div>
+        <div className="admin-top-actions"><span className="secure-indicator">● Sécurisé</span>{visibleNavigation.some(item => item.key === "notifications") && <button aria-label="Notifications" onClick={() => navigateToModule("notifications")}>◌<NotificationBadge /></button>}<button aria-label="Ouvrir le journal d’audit" onClick={() => navigateToModule("audit")}>≣</button></div>
       </header>
       <div className="admin-page">
         {notice && <div className="admin-toast" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
-        <div className="admin-page-heading"><div><p>Mata Beauty · Administration</p><h1>{current.label}</h1></div><div className="admin-page-actions"><button className="primary" onClick={() => setModuleRefresh((value) => value + 1)}>Actualiser</button></div></div>
+        <div className="admin-page-heading"><div><p className="admin-breadcrumb"><span>Mata Beauty</span><span aria-hidden="true">/</span><span>Super Admin</span><span aria-hidden="true">/</span><span>{currentGroup?.label ?? "Administration"}</span></p><h1>{current.label}</h1></div><div className="admin-page-actions"><button className="primary" onClick={() => setModuleRefresh((value) => value + 1)}>Actualiser</button></div></div>
         <AdminModule key={`${effectiveModule}:${moduleRefresh}`} module={effectiveModule} context={context} setModule={setActiveModule} notify={setNotice} />
       </div>
     </section>
