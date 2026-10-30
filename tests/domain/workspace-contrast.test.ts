@@ -6,6 +6,10 @@ const workspaceCss = readFileSync(
   fileURLToPath(new URL("../../app/workspace.css", import.meta.url)),
   "utf8",
 );
+const socialProfileCss = readFileSync(
+  fileURLToPath(new URL("../../app/public-social-profile.module.css", import.meta.url)),
+  "utf8",
+);
 
 function cssColor(rule: string, property: string): string {
   const value = rule.match(new RegExp(`${property}:\\s*(#[0-9a-fA-F]{3,8})`))?.[1];
@@ -81,5 +85,11 @@ describe("professional workspace contrast contract", () => {
   it("keeps the completed step checkmark legible", () => {
     const completeIcon = rule(".workspace-layout:is(.workspace-pro,.workspace-salon) .professional-progress li.complete:before");
     expect(contrastRatio(cssColor(completeIcon, "color"), cssColor(completeIcon, "background"))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("keeps the public social profile primary action readable", () => {
+    const profileTokens = socialProfileCss.match(/\.page\s*\{([^}]+)\}/)?.[1];
+    if (!profileTokens) throw new Error("Missing public social profile color tokens");
+    expect(contrastRatio("#ffffff", cssColor(profileTokens, "--pink"))).toBeGreaterThanOrEqual(4.5);
   });
 });

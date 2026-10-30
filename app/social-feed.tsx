@@ -438,12 +438,12 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     if (pageVisible && post && video && !videoLoading.has(post.id) && !pausedPosts.has(post.id)) void video.play().catch(() => undefined);
   }, [activeIndex, pageVisible, pausedPosts, searchOpen, videoLoading, visiblePosts]);
 
-  const retryVideo = useCallback(async (post: FeedPost) => {
-    if (videoRefreshing.has(post.id)) return;
+  const retryVideo = useCallback(async (post: FeedPost): Promise<boolean> => {
+    if (videoRefreshing.has(post.id)) return false;
     setVideoRefreshing((current) => new Set(current).add(post.id));
     try {
       const media = await fetchPublicPostVideoMedia(post.id);
-      if (!media) { setFeedback("Le média de cette vidéo n’est pas accessible pour le moment."); return; }
+      if (!media) { setFeedback("Le média de cette vidéo n’est pas accessible pour le moment."); return false; }
       const updated = { ...post, videoUrl: media.videoUrl, thumbnailUrl: media.thumbnailUrl };
       setPosts((current) => current.map((item) => item.id === post.id ? updated : item));
       writeFeedCache(posts.map((item) => item.id === post.id ? updated : item));
@@ -451,8 +451,10 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       setVideoLoading((current) => new Set(current).add(post.id));
       setVideoErrors((current) => { const next = new Set(current); next.delete(post.id); return next; });
       setFeedback("");
+      return true;
     } catch {
       setFeedback("Cette vidéo n’a pas pu être rechargée. Vérifiez votre connexion.");
+      return false;
     } finally {
       setVideoRefreshing((current) => { const next = new Set(current); next.delete(post.id); return next; });
     }
@@ -614,10 +616,14 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   }
 
   function handleVideoError(post: FeedPost) {
-    setVideoErrors((current) => new Set(current).add(post.id));
-    if (autoRenewedVideos.current.has(post.id)) return;
+    if (autoRenewedVideos.current.has(post.id)) {
+      setVideoErrors((current) => new Set(current).add(post.id));
+      return;
+    }
     autoRenewedVideos.current.add(post.id);
-    void retryVideo(post);
+    void retryVideo(post).then((refreshed) => {
+      if (!refreshed) setVideoErrors((current) => new Set(current).add(post.id));
+    });
   }
 
   async function openProvider(post: FeedPost) {

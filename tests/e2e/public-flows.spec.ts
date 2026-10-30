@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+// Keep route fixtures deterministic across WebKit and Chromium; these tests
+// exercise application flows rather than the separately tested PWA worker.
+test.use({ serviceWorkers: "block" });
+
 const testSupabaseOrigin = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://audit.supabase.co";
 
 test.beforeEach(async ({ page }) => {
@@ -167,7 +171,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await expect(page.locator(".social-video-card")).toHaveCount(3);
 });
 
-test("video states distinguish waiting, loading, ready and confirmed errors, with signed URL retry (simulated media)", async ({ page, browserName }) => {
+test("video states distinguish waiting, loading, ready and confirmed errors, with signed URL retry (simulated media)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     window.addEventListener("error", (event) => {
@@ -185,13 +189,14 @@ test("video states distinguish waiting, loading, ready and confirmed errors, wit
       retryCounts[postId] = (retryCounts[postId] ?? 0) + 1;
       window.sessionStorage.setItem("video-retry-counts", JSON.stringify(retryCounts));
       if (postId.startsWith("8888")) await new Promise((resolve) => window.setTimeout(resolve, 400));
-      if (postId.startsWith("8888") || retryCounts[postId] === 1) {
+      if (postId.startsWith("8888") || retryCounts[postId] === 2) {
         return new Response(JSON.stringify({ error: "temporary media signing failure" }), { status: 503, headers: { "Content-Type": "application/json" } });
       }
       return new Response(JSON.stringify({ videoUrl: "https://audit.supabase.co/retry.mp4", thumbnailUrl: null }), { status: 200, headers: { "Content-Type": "application/json" } });
     };
   });
   await page.route("https://audit.supabase.co/*.mp4", (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
+  await page.route(`${testSupabaseOrigin}/*.mp4`, (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
   await page.route(`${testSupabaseOrigin}/rest/v1/social_feed**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
     {
       id: "66666666-6666-4666-8666-666666666666", author_id: "11111111-1111-4111-8111-111111111111",
@@ -229,14 +234,20 @@ test("video states distinguish waiting, loading, ready and confirmed errors, wit
   await page.locator(".social-video-card").first().locator("video").dispatchEvent("canplay");
   await expect(page.locator(".social-video-card").first()).toHaveAttribute("data-video-state", "ready");
 
-  await page.locator(".social-video-card").first().locator("video").dispatchEvent("error");
+  const firstVideo = page.locator(".social-video-card").first().locator("video");
+  await firstVideo.dispatchEvent("error");
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("video-retry-counts") ?? "{}")["66666666-6666-4666-8666-666666666666"])).toBe(1);
+  await expect(page.locator(".social-video-card").first().getByRole("alert")).toHaveCount(0);
+  await firstVideo.dispatchEvent("canplay");
+  await expect(page.locator(".social-video-card").first()).toHaveAttribute("data-video-state", "ready");
+  await firstVideo.dispatchEvent("error");
   await expect(page.locator(".social-video-card").first().getByRole("alert")).toContainText("Cette vidéo ne peut pas être lue");
   const retryButton = page.locator(".social-video-card").first().getByRole("button", { name: "Réessayer", exact: true });
   await expect(retryButton).toBeVisible();
   await page.evaluate(() => window.localStorage.setItem("suppress-test-media-errors", "true"));
   await expect(retryButton).toBeEnabled();
   await retryButton.click();
-  await expect.poll(() => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("video-retry-counts") ?? "{}")["66666666-6666-4666-8666-666666666666"])).toBe(2);
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("video-retry-counts") ?? "{}")["66666666-6666-4666-8666-666666666666"])).toBe(3);
 
   const feed = page.locator(".social-feed");
   await feed.evaluate((node) => node.scrollTo({ top: node.clientHeight * 2, behavior: "auto" }));
@@ -253,13 +264,6 @@ test("video states distinguish waiting, loading, ready and confirmed errors, wit
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await page.reload();
   await expect(page.locator(".social-feed-shell")).toBeVisible();
-  if (browserName === "webkit") {
-    // The local PostgREST fixture does not replay its mocked feed after a hard
-    // WebKit navigation; production mobile reload playback remains separately
-    // checked on the live site when an authenticated/real media session exists.
-    await expect(page.locator(".social-feed-empty")).toBeVisible();
-    return;
-  }
   await expect(page.locator(".social-video-card")).toHaveCount(3);
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
 });
