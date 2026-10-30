@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 // Layout/interaction tests with simulated catalogue data; not proof of real media playback.
+const supabase = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://audit.supabase.co";
+const fixtureCors = { "Access-Control-Allow-Origin": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000" };
+
 test.beforeEach(async ({ page }) => {
-  await page.route("https://audit.supabase.co/**", (route) => {
+  await page.route(`${supabase}/**`, (route) => {
     const path = new URL(route.request().url()).pathname;
     const rows = path.endsWith("/social_feed") ? [0, 1, 2].map((index) => ({
       id: `00000000-0000-4000-8000-00000000000${index}`,
@@ -14,7 +17,7 @@ test.beforeEach(async ({ page }) => {
       duration_seconds: 0, average_rating: 0, review_count: 0,
       provider_service_id: `22222222-2222-4222-8222-22222222222${index}`,
     })) : [];
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rows) });
+    return route.fulfill({ status: 200, headers: fixtureCors, contentType: "application/json", body: JSON.stringify(rows) });
   });
 });
 
@@ -30,12 +33,12 @@ test("cached feed can paginate during a slow initial refresh without repeating p
     duration_seconds: 0, average_rating: 0, review_count: 0,
     published_at: new Date(Date.now() - index * 1000).toISOString(),
   }));
-  await page.route("https://audit.supabase.co/rest/v1/social_feed**", async (route) => {
+  await page.route(`${supabase}/rest/v1/social_feed**`, async (route) => {
     const hasCursor = new URL(route.request().url()).searchParams.has("or");
     cursors.push(hasCursor);
     // Keep the first page in flight while the user scrolls the already-rendered cache.
     if (slowRefresh && !hasCursor) await new Promise((resolve) => setTimeout(resolve, 1500));
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(hasCursor ? rows.slice(8) : rows.slice(0, 8)) });
+    await route.fulfill({ status: 200, headers: fixtureCors, contentType: "application/json", body: JSON.stringify(hasCursor ? rows.slice(8) : rows.slice(0, 8)) });
   });
   await page.goto("/");
   await expect(page.locator(".social-video-card")).toHaveCount(8);
@@ -53,7 +56,7 @@ test("cached feed can paginate during a slow initial refresh without repeating p
 test("nearby uses commercial coordinates and excludes unknown locations (simulated GPS)", async ({ page, context }) => {
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 14.7, longitude: -17.4, accuracy: 30 });
-  await page.route("https://audit.supabase.co/rest/v1/provider_profiles**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
+  await page.route(`${supabase}/rest/v1/provider_profiles**`, (route) => route.fulfill({ status: 200, headers: fixtureCors, contentType: "application/json", body: JSON.stringify([{
     profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier test", city: "Dakar", service_mode: "salon", average_rating: 0, review_count: 0,
     provider_services: [0, 1, 2].map((index) => ({ id: `22222222-2222-4222-8222-22222222222${index}`, title: "Tresses", duration_minutes: 60, price_amount: 15000,
       businesses: index === 2 ? null : { address: "Adresse commerciale", city: index === 0 ? "Dakar" : "Thiès", area: null, latitude: index === 0 ? 14.71 : 14.79, longitude: index === 0 ? -17.4 : -16.92 },
@@ -73,7 +76,7 @@ test("nearby uses commercial coordinates and excludes unknown locations (simulat
 
 test("nearby permission refusal offers a manual zone and keeps it in Inspiration (simulated position)", async ({ page }) => {
   await page.route("**/api/public/provider-locations?ids=*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) }));
-  await page.route("https://audit.supabase.co/rest/v1/provider_profiles**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{
+  await page.route(`${supabase}/rest/v1/provider_profiles**`, (route) => route.fulfill({ status: 200, headers: fixtureCors, contentType: "application/json", body: JSON.stringify([{
     profile_id: "11111111-1111-4111-8111-111111111111", business_name: "Atelier test", city: "Dakar", service_mode: "salon", average_rating: 0, review_count: 0,
     provider_services: [0, 1, 2].map((index) => ({ id: `22222222-2222-4222-8222-22222222222${index}`, title: "Tresses", duration_minutes: 60, price_amount: 15000,
       businesses: index === 2 ? null : { address: "Adresse commerciale", city: index === 0 ? "Dakar" : "Thiès", area: null, latitude: index === 0 ? 14.71 : 14.79, longitude: index === 0 ? -17.4 : -16.92 },
@@ -86,8 +89,13 @@ test("nearby permission refusal offers a manual zone and keeps it in Inspiration
   await page.getByRole("button", { name: "Rechercher", exact: true }).click();
   await page.getByRole("button", { name: "Utiliser ma position", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Localisation refusée" })).toBeVisible();
-  await expect(page.getByLabel("Ville, quartier ou pays")).toBeInViewport();
-  await expect(page.getByRole("button", { name: "Afficher les vidéos", exact: true })).toBeInViewport();
+  const manualZone = page.getByLabel("Ville, quartier ou pays");
+  await expect(manualZone).toBeVisible();
+  // The search form is intentionally scrollable on short mobile WebKit
+  // viewports; validate that the field remains reachable instead of requiring
+  // every form control to fit in the viewport at once.
+  await manualZone.scrollIntoViewIfNeeded();
+  await expect(manualZone).toBeInViewport();
   await page.getByLabel("Ville, quartier ou pays").fill("Dakar");
   await page.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(2);

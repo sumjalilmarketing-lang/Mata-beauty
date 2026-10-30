@@ -17,6 +17,10 @@ describe("booking rules", () => {
     expect(() => calculateBookingQuote(10.5)).toThrow(/entier/);
   });
 
+  it.each(["EUR", "USD", "GBP", "CAD"] as const)("preserves the selected %s currency without conversion", (currency) => {
+    expect(calculateBookingQuote(75, 12, currency)).toEqual({ serviceAmount: 75, travelFee: 12, totalAmount: 87, currency });
+  });
+
   it("calculates the service end", () => {
     const start = new Date("2026-07-28T14:30:00.000Z");
     expect(calculateBookingEnd(start, 90).toISOString()).toBe("2026-07-28T16:00:00.000Z");

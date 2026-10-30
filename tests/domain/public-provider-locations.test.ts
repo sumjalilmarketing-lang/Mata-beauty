@@ -28,12 +28,11 @@ function query(data: unknown, error: object | null = null) {
   return { chain, calls };
 }
 
-function service(approved: unknown, locations: unknown, approvedError: object | null = null, locationError: object | null = null) {
+function service(approved: unknown, approvedError: object | null = null) {
   const approvedQuery = query(approved, approvedError);
-  const locationQuery = query(locations, locationError);
-  const from = vi.fn((table: string) => table === "provider_profiles" ? approvedQuery.chain : locationQuery.chain);
+  const from = vi.fn(() => approvedQuery.chain);
   mocks.service.mockReturnValue({ from });
-  return { from, approvedQuery: approvedQuery.calls, locationQuery: locationQuery.calls };
+  return { from, approvedQuery: approvedQuery.calls };
 }
 
 const request = (ids: string) => new Request(`https://mata-beauty.com/api/public/provider-locations?ids=${encodeURIComponent(ids)}`);
@@ -47,24 +46,25 @@ describe("public professional location metadata", () => {
     expect(mocks.service).not.toHaveBeenCalled();
   });
 
-  it("returns only country codes for approved providers among the requested IDs", async () => {
-    const db = service([{ profile_id: approvedId }], [
-      { id: approvedId, country_code: "SN" },
-      { id: otherId, country_code: "FR" },
-      { id: approvedId, country_code: "Senegal" },
+  it("returns only establishment country codes for approved providers", async () => {
+    const db = service([
+      { profile_id: approvedId, country_code: "FR" },
+      { profile_id: otherId, country_code: null },
+      { profile_id: approvedId, country_code: "France" },
     ]);
     const response = await GET(request(`${approvedId},${otherId}`));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual([{ providerId: approvedId, countryCode: "SN" }]);
+    expect(await response.json()).toEqual([{ providerId: approvedId, countryCode: "FR" }]);
     expect(db.approvedQuery.eq).toHaveBeenCalledWith("status", "approved");
     expect(db.approvedQuery.in).toHaveBeenCalledWith("profile_id", [approvedId, otherId]);
-    expect(db.locationQuery.in).toHaveBeenCalledWith("id", [approvedId]);
+    expect(db.from).toHaveBeenCalledTimes(1);
+    expect(db.from).toHaveBeenCalledWith("provider_profiles");
     expect(response.headers.get("cache-control")).toContain("s-maxage=300");
   });
 
   it("fails closed without leaking database errors", async () => {
-    service(null, [], { message: "private database detail" });
+    service(null, { message: "private database detail" });
     const response = await GET(request(approvedId));
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: "provider_locations_unavailable" });

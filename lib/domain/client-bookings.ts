@@ -8,6 +8,7 @@ export type ClientBookingItem = {
   providerSlug: string | null;
   providerImage: string | null;
   address: string | null;
+  timeZone?: string;
   serviceId: string;
   serviceBookable: boolean;
   serviceName: string;

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const supabase = "https://audit.supabase.co";
+const supabase = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://audit.supabase.co";
 const superAdminContext = {
   is_super_admin: true,
   roles: ["super_admin"],

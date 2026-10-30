@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { generateAvailableSlots } from "../../lib/domain/availability";
+import { zonedWallTimeAt } from "../../lib/domain/time-zone";
 
 const mondayRule = [{ weekday: 1, startsAt: "09:00", endsAt: "13:00", intervalMinutes: 30 }];
 
-describe("availability generation in Africa/Dakar", () => {
+describe("availability generation in provider timezone", () => {
+  it.each([
+    ["Dakar", "Africa/Dakar", "2026-06-15T09:00:00.000Z"],
+    ["Paris", "Europe/Paris", "2026-06-15T07:00:00.000Z"],
+    ["New York", "America/New_York", "2026-06-15T13:00:00.000Z"],
+    ["Brussels", "Europe/Brussels", "2026-06-15T07:00:00.000Z"],
+    ["Madrid", "Europe/Madrid", "2026-06-15T07:00:00.000Z"],
+  ])("keeps working hours local for %s", (_city, timeZone, expected) => {
+    const slots = generateAvailableSlots({
+      date: "2026-06-15", timeZone, rules: mondayRule, durationMinutes: 60,
+      now: new Date("2026-06-14T00:00:00Z"), minimumNoticeMinutes: 0,
+    });
+    expect(slots[0]?.startsAt.toISOString()).toBe(expected);
+  });
+
   it("fits the duration inside opening hours", () => {
     const slots = generateAvailableSlots({
       date: "2026-07-27",
@@ -43,5 +58,43 @@ describe("availability generation in Africa/Dakar", () => {
       minimumNoticeMinutes: 0,
     });
     expect(slots.some((slot) => slot.startsAt.toISOString().includes("10:00"))).toBe(true);
+  });
+
+  it("generates France availability in local wall time and stores UTC instants", () => {
+    const slots = generateAvailableSlots({
+      date: "2026-06-15",
+      timeZone: "Europe/Paris",
+      rules: mondayRule,
+      durationMinutes: 60,
+      now: new Date("2026-06-14T00:00:00Z"),
+      minimumNoticeMinutes: 0,
+    });
+    expect(slots[0]?.startsAt.toISOString()).toBe("2026-06-15T07:00:00.000Z");
+  });
+
+  it("omits nonexistent spring-forward times and includes both repeated fall-back instants", () => {
+    const sunday = [{ weekday: 0, startsAt: "01:00", endsAt: "04:00", intervalMinutes: 30 }];
+    const spring = generateAvailableSlots({
+      date: "2026-03-29", timeZone: "Europe/Paris", rules: sunday, durationMinutes: 30,
+      now: new Date("2026-03-28T00:00:00Z"), minimumNoticeMinutes: 0,
+    });
+    expect(spring.map((slot) => zonedWallTimeAt(slot.startsAt, "Europe/Paris").hour)).not.toContain(2);
+
+    const fall = generateAvailableSlots({
+      date: "2026-10-25", timeZone: "Europe/Paris", rules: sunday, durationMinutes: 30,
+      now: new Date("2026-10-24T00:00:00Z"), minimumNoticeMinutes: 0,
+    });
+    expect(fall.filter((slot) => {
+      const wall = zonedWallTimeAt(slot.startsAt, "Europe/Paris");
+      return wall.hour === 2 && wall.minute === 30;
+    })).toHaveLength(2);
+  });
+
+  it("moves New York salon hours with daylight saving changes", () => {
+    const sunday = [{ weekday: 0, startsAt: "09:00", endsAt: "12:00", intervalMinutes: 30 }];
+    const before = generateAvailableSlots({ date: "2026-03-01", timeZone: "America/New_York", rules: sunday, durationMinutes: 30, now: new Date("2026-02-28T00:00:00Z"), minimumNoticeMinutes: 0 });
+    const after = generateAvailableSlots({ date: "2026-03-15", timeZone: "America/New_York", rules: sunday, durationMinutes: 30, now: new Date("2026-03-14T00:00:00Z"), minimumNoticeMinutes: 0 });
+    expect(before[0]?.startsAt.toISOString()).toBe("2026-03-01T14:00:00.000Z");
+    expect(after[0]?.startsAt.toISOString()).toBe("2026-03-15T13:00:00.000Z");
   });
 });

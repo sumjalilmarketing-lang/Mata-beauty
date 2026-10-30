@@ -12,9 +12,15 @@ import { ensureAuthenticatedProfile, type AuthenticatedProfile } from "@/lib/aut
 import { safeOAuthDestination } from "@/lib/auth/redirect";
 import { isGoogleAuthEnabled } from "@/lib/auth/providers";
 import { getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
+import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from "@/lib/domain/international";
 
 const authSchema = z.object({
   displayName: z.string().trim().max(80).optional(),
+  countryCode: z.union([z.literal(""), z.string().regex(/^[A-Z]{2}$/)]).optional(),
+  region: z.string().trim().max(120).optional(),
+  city: z.string().trim().max(120).optional(),
+  phone: z.string().trim().optional(),
+  language: z.enum(["fr", "en", "es"]).optional(),
   email: z.email("Adresse e-mail invalide."),
   password: z.string().optional(),
   confirmation: z.string().optional(),
@@ -52,7 +58,7 @@ export function AuthModal({
     formState: { errors, isSubmitting },
   } = useForm<AuthValues>({
     resolver: zodResolver(authSchema),
-    defaultValues: { displayName: "", email: "", password: "", confirmation: "", acceptLegal: false },
+    defaultValues: { displayName: "", countryCode: "", region: "", city: "", phone: "", language: "fr", email: "", password: "", confirmation: "", acceptLegal: false },
   });
 
   const passwordValue = useWatch({ control, name: "password" });
@@ -94,6 +100,11 @@ export function AuthModal({
           setFeedback("Les mots de passe ne correspondent pas.");
           return;
         }
+        if (!values.countryCode) { setFeedback("Choisissez votre pays de résidence."); return; }
+        if (values.phone && !/^\+[1-9]\d{7,14}$/.test(values.phone)) {
+          setFeedback("Utilisez le format téléphonique international E.164, par exemple +221771234567.");
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email: values.email,
           password: values.password,
@@ -102,6 +113,11 @@ export function AuthModal({
             data: {
               professional_intent: false,
               display_name: values.displayName?.trim() || values.email.split("@")[0],
+              country_code: values.countryCode,
+              region: values.region?.trim() || null,
+              city: values.city?.trim() || null,
+              phone_e164: values.phone || null,
+              locale: `${values.language ?? "fr"}-${values.countryCode}`,
               legal_accepted: true,
             },
           },
@@ -213,6 +229,13 @@ export function AuthModal({
               <input autoComplete="name" {...register("displayName")} />
             </label>
           )}
+          {mode === "register" && <>
+            <label>Pays de résidence<select required aria-label="Pays de résidence" {...register("countryCode")}><option value="">Choisir un pays</option>{SUPPORTED_COUNTRIES.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select></label>
+            <label>Région ou État<input autoComplete="address-level1" maxLength={120} {...register("region")} /></label>
+            <label>Ville<input autoComplete="address-level2" maxLength={120} {...register("city")} /></label>
+            <label>Téléphone international<input type="tel" autoComplete="tel" placeholder="+221771234567" inputMode="tel" {...register("phone")} /></label>
+            <label>Langue préférée<select {...register("language")}>{SUPPORTED_LANGUAGES.map(language => <option key={language.code} value={language.code}>{language.label}</option>)}</select></label>
+          </>}
           <label>
             Adresse e-mail
             <input type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} {...register("email")} />

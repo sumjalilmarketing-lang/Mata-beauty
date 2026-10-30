@@ -39,8 +39,8 @@ type BookingRow = {
 type BookingQueryRow = Omit<BookingRow, "provider_services"> & {
   provider_services: BookingRow["provider_services"] | Array<NonNullable<BookingRow["provider_services"]>>;
 };
-type ProviderBookingIdentity = { profile_id: string; business_name: string; slug: string | null; city: string; area: string | null; base_address: string | null; cover_url: string | null };
-type BusinessBookingIdentity = { id: string; name: string; address: string; city: string; area: string | null; logo_url: string | null };
+type ProviderBookingIdentity = { profile_id: string; business_name: string; slug: string | null; city: string; area: string | null; base_address: string | null; cover_url: string | null; country_code: string | null; timezone: string | null };
+type BusinessBookingIdentity = { id: string; name: string; address: string; city: string; area: string | null; logo_url: string | null; timezone: string | null };
 type NotificationRow = {
   id: string;
   title: string;
@@ -53,6 +53,9 @@ type ProviderProfileRow = {
   business_name: string;
   bio: string | null;
   city: string;
+  country_code: string | null;
+  timezone: string | null;
+  currency: string | null;
   service_mode: "salon" | "mobile" | "both";
   status: ProviderStatus;
   activity_type: "independent" | "salon" | "barber_shop" | "makeup_artist" | "hairdresser" | "nail_artist" | "esthetician" | "care_specialist" | "other";
@@ -117,7 +120,7 @@ export function LiveDashboard({
   const [providerProfile, setProviderProfile] = useState<ProviderProfileRow | null>(null);
   const [clientProfile, setClientProfile] = useState<ClientAccountRow | null>(null);
   const [pendingProviders, setPendingProviders] = useState<PendingProviderRow[]>([]);
-  const [ownServices, setOwnServices] = useState<Array<{ id: string; title: string; price_amount: number; duration_minutes: number }>>([]);
+  const [ownServices, setOwnServices] = useState<Array<{ id: string; title: string; price_amount: number; duration_minutes: number; currency: string }>>([]);
   const [baseServices, setBaseServices] = useState<BaseServiceRow[]>([]);
   const [adminMetrics, setAdminMetrics] = useState({ users: 0, providersPending: 0, reportsOpen: 0 });
   const [loading, setLoading] = useState(true);
@@ -136,9 +139,9 @@ export function LiveDashboard({
       return service?.business_id ?? null;
     }).filter((id): id is string => Boolean(id)))];
     const [providerResult, profileResult, businessResult] = await Promise.all([
-      supabase.from("provider_profiles").select("profile_id,business_name,slug,city,area,base_address,cover_url").in("profile_id", providerIds),
+      supabase.from("provider_profiles").select("profile_id,business_name,slug,city,area,base_address,cover_url,country_code,timezone").in("profile_id", providerIds),
       supabase.from("profiles").select("id,avatar_url").in("id", providerIds),
-      businessIds.length ? supabase.from("businesses").select("id,name,address,city,area,logo_url").in("id", businessIds) : Promise.resolve({ data: [], error: null }),
+      businessIds.length ? supabase.from("businesses").select("id,name,address,city,area,logo_url,timezone").in("id", businessIds) : Promise.resolve({ data: [], error: null }),
     ]);
     const providers = new Map(((providerResult.data ?? []) as ProviderBookingIdentity[]).map((item) => [item.profile_id, item]));
     const avatars = new Map(((profileResult.data ?? []) as Array<{ id: string; avatar_url: string | null }>).map((item) => [item.id, item.avatar_url]));
@@ -160,6 +163,7 @@ export function LiveDashboard({
         providerSlug: provider?.slug ?? null,
         providerImage: business?.logo_url ?? provider?.cover_url ?? avatars.get(row.provider_id) ?? null,
         address: address || null,
+        timeZone: business?.timezone ?? provider?.timezone ?? (provider?.country_code === "SN" ? "Africa/Dakar" : "UTC"),
         serviceId: row.provider_service_id,
         serviceBookable: Boolean(service?.is_active && !service.archived_at),
         serviceName: service?.title ?? "Prestation beauté",
@@ -287,11 +291,11 @@ export function LiveDashboard({
           const [profileResult, serviceResult, ownResult] = await Promise.all([
             supabase
               .from("provider_profiles")
-              .select("profile_id,business_name,bio,city,service_mode,status,activity_type,years_experience,base_address,languages,cancellation_policy,onboarding_progress")
+              .select("profile_id,business_name,bio,city,country_code,timezone,currency,service_mode,status,activity_type,years_experience,base_address,languages,cancellation_policy,onboarding_progress")
               .eq("profile_id", userId)
               .maybeSingle(),
             supabase.from("services").select("id,name").eq("is_active", true).order("name"),
-            supabase.from("provider_services").select("id,title,price_amount,duration_minutes").eq("provider_id", userId).eq("is_active", true).order("title"),
+            supabase.from("provider_services").select("id,title,price_amount,duration_minutes,currency").eq("provider_id", userId).eq("is_active", true).order("title"),
           ]);
           if (profileResult.error) throw profileResult.error;
           if (serviceResult.error) throw serviceResult.error;
@@ -359,9 +363,10 @@ export function LiveDashboard({
     }
     const confirmed = bookings.filter((booking) => booking.status === "confirmed").length;
     const completed = bookings.filter((booking) => booking.status === "completed");
-    const revenue = completed.reduce((sum, booking) => sum + booking.total_amount, 0);
+    const revenue = Object.entries(completed.reduce<Record<string, number>>((sum, booking) => ({ ...sum, [booking.currency]: (sum[booking.currency] ?? 0) + booking.total_amount }), {}))
+      .map(([currency, amount]) => new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount)).join(" · ") || "—";
     return role === "provider"
-      ? [[String(bookings.length), "Réservations"], [String(confirmed), "Confirmées"], [`${revenue.toLocaleString("fr-FR")} F`, "Revenus théoriques"]]
+      ? [[String(bookings.length), "Réservations"], [String(confirmed), "Confirmées"], [revenue, "Revenus théoriques"]]
       : [[String(bookings.filter((booking) => new Date(booking.starts_at) >= new Date()).length), "À venir"], [String(completed.length), "Terminées"], [String(notifications.filter((item) => !item.read_at).length), "Notifications non lues"]];
   }, [adminMetrics, bookings, notifications, role]);
 
@@ -458,6 +463,7 @@ export function LiveDashboard({
 
   async function addProviderService(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!providerProfile?.currency) { setFeedback("Enregistrez d’abord le pays, le fuseau horaire et la devise de facturation de votre profil."); return; }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const form = event.currentTarget;
@@ -472,7 +478,7 @@ export function LiveDashboard({
       title,
       duration_minutes: durationMinutes,
       price_amount: priceAmount,
-      currency: "XOF",
+      currency: providerProfile.currency,
     });
     if (insertError) setFeedback(insertError.message);
     else {
@@ -500,6 +506,8 @@ export function LiveDashboard({
   }
 
   const show = (...keys: string[]) => !moduleKey || keys.includes(moduleKey);
+  const dashboardTimeZone = providerProfile?.timezone ?? (providerProfile?.country_code === "SN" ? "Africa/Dakar" : "UTC");
+
   return (
     <main className={moduleKey ? "focused-dashboard" : "dashboard"}>
       {!moduleKey && <aside className="sidebar">
@@ -567,13 +575,13 @@ export function LiveDashboard({
               <button className="primary-button" type="submit">Enregistrer le profil</button>
             </form>
             <ProfessionalDocuments providerId={userId} /></>}
-            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <div className="control-list-row" key={service.id}><strong>{service.title}</strong><span>{service.duration_minutes} min · {service.price_amount.toLocaleString("fr-FR")} FCFA</span></div>)}<Link href="/pro/videos">Retour au Studio</Link><form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
+            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <div className="control-list-row" key={service.id}><strong>{service.title}</strong><span>{service.duration_minutes} min · {new Intl.NumberFormat("fr-FR", { style: "currency", currency: service.currency, maximumFractionDigits: 0 }).format(service.price_amount)}</span></div>)}<Link href="/pro/videos">Retour au Studio</Link>{!providerProfile?.currency && <p role="alert">Complétez d’abord le pays, le fuseau horaire et la devise de votre activité avant de publier des tarifs.</p>}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
               <h3 className="wide">Ajouter une prestation</h3>
               <label>Type<select name="serviceId" required defaultValue=""><option value="" disabled>Choisir</option>{baseServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
               <label>Nom affiché<input name="title" required minLength={2} /></label>
               <label>Durée (minutes)<input name="durationMinutes" type="number" required min={15} max={720} step={15} /></label>
-              <label>Prix (FCFA)<input name="priceAmount" type="number" required min={0} step={500} /></label>
-              <button className="primary-button" type="submit">Ajouter la prestation</button>
+              <label>Prix ({providerProfile?.currency ?? "devise à définir"})<input name="priceAmount" type="number" required min={0} step={1} disabled={!providerProfile?.currency} /></label>
+              <button className="primary-button" type="submit" disabled={!providerProfile?.currency}>Ajouter la prestation</button>
             </form></>}
           </article>}
           </>
@@ -608,12 +616,12 @@ export function LiveDashboard({
             {!loading && bookings.length === 0 && <div className="compact-empty">Aucun rendez-vous pour le moment.</div>}
             {bookings.map((booking) => (
               <div className="appointment live-appointment" key={booking.id} id={`booking-${booking.id}`}>
-                <span className="date-block">{new Intl.DateTimeFormat("fr-SN", { day: "2-digit", month: "short", timeZone: "Africa/Dakar" }).format(new Date(booking.starts_at))}</span>
+                <span className="date-block">{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", ...(role === "provider" ? { timeZone: dashboardTimeZone } : {}) }).format(new Date(booking.starts_at))}</span>
                 <div>
                   <strong>{booking.provider_services?.title ?? "Prestation beauté"}</strong>
                   {booking.collaborator_name && <small>{booking.collaborator_avatar_url && <Image unoptimized src={booking.collaborator_avatar_url} alt="" width={36} height={36} />} Prestation assurée par {booking.collaborator_name}</small>}
                   {role === "client" && booking.status === "completed" && <BookingReview bookingId={booking.id} clientId={userId} providerId={booking.provider_id} performer={booking.collaborator_name} />}
-                  <small>{new Intl.DateTimeFormat("fr-SN", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(booking.starts_at))} · {booking.provider_services?.duration_minutes ?? Math.round((new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60000)} min</small>
+                  <small>{new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: role === "provider" ? dashboardTimeZone : undefined }).format(new Date(booking.starts_at))} · {booking.provider_services?.duration_minutes ?? Math.round((new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60000)} min</small>
                   <small>{booking.location_mode === "client_address" ? booking.appointment_address : "Chez le professionnel"} · {booking.total_amount.toLocaleString("fr-FR")} {booking.currency}</small>
                 </div>
                 <span className={booking.status === "confirmed" ? "status confirmed" : "status pending"}>{{ pending: "En attente", confirmed: "Confirmé", in_progress: "En cours", completed: "Terminé", declined: "Refusé", cancelled_by_client: "Annulé", cancelled_by_provider: "Annulé", no_show: "Absence", disputed: "Litige" }[booking.status] ?? "Rendez-vous"}</span>

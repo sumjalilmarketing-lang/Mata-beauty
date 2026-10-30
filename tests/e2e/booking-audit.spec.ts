@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-const api = "https://audit.supabase.co";
+const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://audit.supabase.co";
+const appOrigin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 const providerId = "11111111-1111-4111-8111-111111111111";
 const serviceId = "22222222-2222-4222-8222-222222222222";
 const clientId = "33333333-3333-4333-8333-333333333333";
@@ -16,7 +17,12 @@ type AuditState = {
 };
 
 function json(route: Route, body: unknown, status = 200) {
-  return route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+  return route.fulfill({
+    status,
+    headers: { "Access-Control-Allow-Origin": appOrigin },
+    contentType: "application/json",
+    body: JSON.stringify(body),
+  });
 }
 
 async function mockSupabase(page: Page, state: AuditState) {
@@ -36,7 +42,7 @@ async function mockSupabase(page: Page, state: AuditState) {
       return route.fulfill({
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": "http://localhost:3000",
+          "Access-Control-Allow-Origin": appOrigin,
           "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
         },
@@ -67,7 +73,7 @@ async function mockSupabase(page: Page, state: AuditState) {
     if (path === "/rest/v1/social_feed") {
       return json(route, [{
         id: socialPostId, author_id: providerId,
-        caption: "Tresses express réalisées à Dakar", video_url: `${api}/social-sample.mp4`, thumbnail_url: null,
+        caption: "Tresses express réalisées à Dakar", video_url: `${appOrigin}/social-sample.mp4`, thumbnail_url: null,
         duration_seconds: 18, aspect_ratio: 0.562, allow_comments: true, is_sponsored: false,
         view_count: 120, like_count: 32, comment_count: 4, save_count: 7, share_count: 2,
         published_at: new Date().toISOString(), business_name: "Mata Audit Tresses", slug: "mata-audit-tresses",
@@ -81,6 +87,8 @@ async function mockSupabase(page: Page, state: AuditState) {
         profile_id: providerId,
         business_name: "Mata Audit Tresses",
         city: "Dakar",
+        country_code: "SN",
+        timezone: "Africa/Dakar",
         service_mode: "both",
         average_rating: 4.9,
         review_count: 48,
@@ -91,6 +99,7 @@ async function mockSupabase(page: Page, state: AuditState) {
           title: "Tresses express",
           duration_minutes: 60,
           price_amount: 10000,
+          currency: "XOF",
           services: { name: "Tresses", categories: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses" } },
         }],
       }]);
@@ -150,10 +159,10 @@ async function mockSupabase(page: Page, state: AuditState) {
     if (path === "/rest/v1/client_profiles") return json(route, { city: "Dakar", default_address: null, preferences: {} });
     if (path === "/rest/v1/bookings" && request.method() === "POST") {
       if (state.bookingCreated) return json(route, { code: "23P01", message: "slot overlap" }, 409);
-      const payload = request.postDataJSON() as { source_post_id?: string | null };
+      const payload = request.postDataJSON() as { source_post_id?: string | null; starts_at?: string };
       state.lastBookingSource = payload.source_post_id ?? null;
       state.bookingCreated = true;
-      return json(route, { id: bookingId }, 201);
+      return json(route, { id: bookingId, starts_at: payload.starts_at, collaborator_name: null, collaborator_avatar_url: null }, 201);
     }
     if (path === "/rest/v1/bookings" && request.method() === "PATCH") {
       if (state.currentRole === "other") return json(route, { code: "42501", message: "permission denied" }, 403);
@@ -188,7 +197,7 @@ async function signIn(page: Page, email: string) {
 }
 
 async function expectAuthenticatedSession(page: Page) {
-  await expect.poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === "sb-audit-auth-token")).toBe(true);
+  await expect(page).toHaveURL(/\/app\/profile$/);
 }
 
 async function openFirstFeedBooking(page: Page) {
@@ -222,8 +231,8 @@ test.describe("audit chronométré de réservation", () => {
     await page.locator(".social-video-card").first().locator(".feed-book").click(); actions += 1;
     await page.getByRole("button", { name: "10:00" }).click(); actions += 1;
     await expect(page.getByRole("dialog", { name: "Réserver" }).getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
-    await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click(); actions += 1;
+    await expect(page.getByRole("button", { name: /Confirmer.*10.*000.*F\s*CFA/ })).toBeVisible();
+    await page.getByRole("button", { name: /Confirmer.*10.*000.*F\s*CFA/ }).click(); actions += 1;
     await page.getByLabel("Adresse e-mail").fill("client-audit@example.test");
     await page.locator('input[name="password"]').fill("Audit-Only-123!");
     await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
@@ -245,7 +254,7 @@ test.describe("audit chronométré de réservation", () => {
     await expect(page.getByText("Tresses express", { exact: true }).first()).toBeVisible();
     await page.locator(".social-video-card").first().locator(".feed-book").click(); actions += 1;
     await page.getByRole("button", { name: "10:00" }).click(); actions += 1;
-    await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click(); actions += 1;
+    await page.getByRole("button", { name: /Confirmer.*10.*000.*F\s*CFA/ }).click(); actions += 1;
     await page.getByLabel("Adresse e-mail").fill("client-social@example.test"); actions += 1;
     await page.locator('input[name="password"]').fill("Audit-Only-123!"); actions += 1;
     await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
@@ -282,7 +291,7 @@ test.describe("audit chronométré de réservation", () => {
     await openFirstFeedBooking(page);
     await page.getByRole("button", { name: "10:00" }).click();
     await page.getByLabel("Wave").check();
-    await page.getByRole("button", { name: /Continuer vers la sandbox.*10.*000 FCFA/ }).click();
+    await page.getByRole("button", { name: /Continuer vers la sandbox.*10.*000.*F\s*CFA/ }).click();
     await signIn(page, "client-payment@example.test");
 
     await expect(page).toHaveURL("https://app.paydunya.com/sandbox-checkout/invoice/test_invoice_1");
@@ -296,7 +305,7 @@ test.describe("audit chronométré de réservation", () => {
     await mockSupabase(page, state);
     await page.goto("/");
     await openFirstFeedBooking(page);
-    await expect(page.getByRole("button", { name: "10:00" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /10:00/ })).toHaveCount(0);
     await page.getByRole("button", { name: "Fermer" }).click();
     await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /Se connecter à MATA Beauty|Profil/ }).click();
     await signIn(page, "client-audit@example.test");
@@ -309,11 +318,14 @@ test.describe("audit chronométré de réservation", () => {
     await mockSupabase(page, state);
     await page.goto("/");
     await openFirstFeedBooking(page);
-    await page.getByRole("button", { name: "11:00", exact: true }).click();
-    await page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ }).click();
+    await page.getByRole("button", { name: /11:00/ }).click();
+    await page.getByRole("button", { name: /Confirmer.*10.*000.*F\s*CFA/ }).click();
     await expect(page.getByRole("dialog", { name: "Se connecter" })).toBeVisible();
     await signIn(page, "other-audit@example.test");
-    await expectAuthenticatedSession(page);
+    // Signing in from the booking modal keeps the user on the booking page;
+    // the auth handoff does not redirect to the profile route.
+    await expect(page.getByRole("dialog", { name: "Se connecter" })).toHaveCount(0);
+    expect(state.currentRole).toBe("other");
     await expect(page.getByText("Ce créneau vient d’être réservé.")).toBeVisible();
     const response = await page.evaluate(async ({ id, endpoint }) => fetch(`${endpoint}/rest/v1/bookings?id=eq.${id}`, {
       method: "PATCH",
@@ -329,12 +341,12 @@ test.describe("audit chronométré de réservation", () => {
     await page.goto("/");
     await openFirstFeedBooking(page);
     await page.getByRole("button", { name: "10:00" }).click();
-    await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Confirmer.*10.*000.*F\s*CFA/ })).toBeVisible();
     await page.reload();
     await expect(page.getByRole("dialog", { name: "Réserver" })).toBeVisible();
     await expect(page.getByRole("dialog", { name: "Réserver" }).getByText("Tresses express", { exact: true })).toBeVisible();
     await expect(page.getByText(/10:00/)).toBeVisible();
-    await expect(page.getByRole("button", { name: /Confirmer.*10.*000 FCFA/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Confirmer.*10.*000.*F\s*CFA/ })).toBeVisible();
   });
 
   test("réserve une publication arrivée après le chargement du catalogue", async ({ page }) => {
@@ -351,7 +363,7 @@ test.describe("audit chronométré de réservation", () => {
     await openFirstFeedBooking(page);
     await expect(page.getByRole("dialog", { name: "Réserver" })).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "10:00", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /10:00/ })).toBeVisible();
     expect(targetedReads).toBeGreaterThan(0);
   });
 
@@ -369,7 +381,7 @@ test.describe("audit chronométré de réservation", () => {
     await expect(page.getByText("Aucun créneau publié ce jour.", { exact: false })).toHaveCount(0);
     unavailable = false;
     await page.getByRole("dialog", { name: "Réserver" }).getByRole("button", { name: "Réessayer", exact: true }).click();
-    await expect(page.getByRole("button", { name: "10:00", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /10:00/ })).toBeVisible();
     await expect(page.getByRole("dialog", { name: "Réserver" }).getByRole("alert")).toHaveCount(0);
   });
 });

@@ -4,6 +4,7 @@ export type InspirationSearchProvider = {
   profileId: string;
   serviceId: string;
   categoryId?: string;
+  countryCode?: string;
   country?: string;
   name: string;
   specialty: string;
@@ -26,6 +27,7 @@ export type InspirationSearchPost = {
 export type InspirationSearchFilters = {
   query: string;
   categoryId: string;
+  countryCode?: string;
   providerId: string;
   area: string;
   position: Coordinates | null;
@@ -33,7 +35,7 @@ export type InspirationSearchFilters = {
 };
 
 const hasFilters = (filters: InspirationSearchFilters) => Boolean(
-  filters.query.trim() || filters.categoryId || filters.providerId || filters.area.trim() || filters.position,
+  filters.query.trim() || filters.categoryId || filters.countryCode || filters.providerId || filters.area.trim() || filters.position,
 );
 
 export function filterInspirationPosts<T extends InspirationSearchPost>(
@@ -49,6 +51,7 @@ export function filterInspirationPosts<T extends InspirationSearchPost>(
       : undefined;
 
     if (filters.providerId && post.authorId !== filters.providerId) return false;
+    if (filters.countryCode && provider?.countryCode?.toUpperCase() !== filters.countryCode.toUpperCase()) return false;
     if (filters.categoryId && (!provider || provider.categoryId !== filters.categoryId)) return false;
 
     if (filters.position) {

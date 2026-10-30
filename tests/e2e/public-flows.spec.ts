@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 test.use({ serviceWorkers: "block" });
 
 const testSupabaseOrigin = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://audit.supabase.co";
+const testAppOrigin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem("mata-launch-welcome", "done"));
@@ -61,6 +62,37 @@ test("registration requires explicit legal consent", async ({ page }) => {
   await expect(consent).toBeChecked();
 });
 
+test("international registration sends the selected country, locale, phone and location to Auth", async ({ page }) => {
+  let signupMetadata: Record<string, unknown> | null = null;
+  await page.route(`${testSupabaseOrigin}/auth/v1/signup**`, async route => {
+    const payload = route.request().postDataJSON() as { data?: Record<string, unknown>; email?: string };
+    signupMetadata = payload.data ?? null;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      user: { id: "88888888-8888-4888-8888-888888888888", aud: "authenticated", role: "authenticated", email: payload.email, app_metadata: { provider: "email", providers: ["email"] }, user_metadata: signupMetadata, identities: [] },
+      session: null,
+    }) });
+  });
+  await page.goto("/");
+  await profileNavButton(page).click();
+  await page.getByRole("button", { name: "Créer un compte", exact: true }).click();
+  await page.getByLabel("Nom complet").fill("Compte test Madrid");
+  const country = page.getByLabel("Pays de résidence");
+  await expect(country).toHaveValue("");
+  await country.selectOption("ES");
+  await page.getByLabel("Région ou État").fill("Communauté de Madrid");
+  await page.getByLabel("Ville", { exact: true }).fill("Madrid");
+  await page.getByLabel("Téléphone international").fill("+34600000000");
+  await page.getByLabel("Langue préférée").selectOption("es");
+  await page.getByLabel("Adresse e-mail").fill("madrid@example.com");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("MataMadrid2026!");
+  await page.getByLabel("Confirmer le mot de passe").fill("MataMadrid2026!");
+  await page.getByRole("checkbox", { name: "Accepter les conditions générales et la politique de confidentialité" }).check();
+  await page.getByRole("button", { name: "Créer le compte", exact: true }).click();
+  await expect.poll(() => signupMetadata).not.toBeNull();
+  expect(signupMetadata).toMatchObject({ country_code: "ES", region: "Communauté de Madrid", city: "Madrid", phone_e164: "+34600000000", locale: "es-ES" });
+  await expect(page.getByRole("dialog")).toContainText("Consultez votre boîte e-mail");
+});
+
 test("mobile bottom navigation works without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/");
@@ -72,6 +104,58 @@ test("mobile bottom navigation works without horizontal overflow", async ({ page
   await page.getByRole("button", { name: "Fermer la recherche" }).click();
   const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(hasOverflow).toBe(false);
+});
+
+test("Inspiration country filter uses public provider ISO codes", async ({ page }) => {
+  await page.addInitScript(() => {
+    HTMLMediaElement.prototype.play = function () { this.dataset.playing = "true"; return Promise.resolve(); };
+    HTMLMediaElement.prototype.pause = function () { this.dataset.playing = "false"; };
+    // This test drives media events directly; avoid turning a deliberately
+    // synthetic MP4 response into a browser-decoder error before assertions.
+    Object.defineProperty(HTMLVideoElement.prototype, "src", {
+      configurable: true,
+      get() { return this.dataset.testMediaSrc ?? ""; },
+      set(value: string) { this.dataset.testMediaSrc = value; },
+    });
+    const nativeSetAttribute = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (name, value) {
+      if (this instanceof HTMLMediaElement && name.toLowerCase() === "src") {
+        this.dataset.testMediaSrc = value;
+        return;
+      }
+      nativeSetAttribute.call(this, name, value);
+    };
+    HTMLMediaElement.prototype.load = function () {};
+    // This test drives media events directly; avoid turning a deliberately
+    // synthetic MP4 response into a browser-decoder error before assertions.
+    Object.defineProperty(HTMLMediaElement.prototype, "src", {
+      configurable: true,
+      get() { return this.dataset.testMediaSrc ?? ""; },
+      set(value: string) { this.dataset.testMediaSrc = value; },
+    });
+    HTMLMediaElement.prototype.load = function () {};
+  });
+  const providerFrance = "11111111-1111-4111-8111-111111111111";
+  const providerSenegal = "44444444-4444-4444-8444-444444444444";
+  const serviceFrance = "22222222-2222-4222-8222-222222222222";
+  const serviceSenegal = "55555555-5555-4555-8555-555555555555";
+  await page.route(`${testSupabaseOrigin}/rest/v1/provider_profiles**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+    { profile_id: providerFrance, business_name: "Studio Paris", city: "Paris", country_code: "FR", timezone: "Europe/Paris", service_mode: "salon", average_rating: 0, review_count: 0, verified_at: null, cover_url: null, provider_services: [{ id: serviceFrance, title: "Manucure", duration_minutes: 60, price_amount: 30, currency: "EUR", services: { name: "Manucure", categories: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Onglerie" } } }] },
+    { profile_id: providerSenegal, business_name: "Studio Dakar", city: "Dakar", country_code: "SN", timezone: "Africa/Dakar", service_mode: "salon", average_rating: 0, review_count: 0, verified_at: null, cover_url: null, provider_services: [{ id: serviceSenegal, title: "Tresses", duration_minutes: 60, price_amount: 10000, currency: "XOF", services: { name: "Tresses", categories: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Coiffure" } } }] },
+  ]) }));
+  await page.route(`${testSupabaseOrigin}/rest/v1/social_feed**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+    { id: "66666666-6666-4666-8666-666666666666", author_id: providerFrance, caption: "Manucure Paris", video_url: `${testAppOrigin}/paris.mp4`, thumbnail_url: null, duration_seconds: 10, view_count: 0, like_count: 0, comment_count: 0, save_count: 0, share_count: 0, published_at: new Date().toISOString(), business_name: "Studio Paris", slug: "studio-paris", city: "Paris", verified_at: null, avatar_url: null, cover_url: null, is_sponsored: false, provider_service_id: serviceFrance, service_title: "Manucure", duration_minutes: 60, price_amount: 30, currency: "EUR", average_rating: 0, review_count: 0, hashtags: [], post_type: "video" },
+    { id: "77777777-7777-4777-8777-777777777777", author_id: providerSenegal, caption: "Tresses Dakar", video_url: `${testAppOrigin}/dakar.mp4`, thumbnail_url: null, duration_seconds: 10, view_count: 0, like_count: 0, comment_count: 0, save_count: 0, share_count: 0, published_at: new Date(Date.now() - 1000).toISOString(), business_name: "Studio Dakar", slug: "studio-dakar", city: "Dakar", verified_at: null, avatar_url: null, cover_url: null, is_sponsored: false, provider_service_id: serviceSenegal, service_title: "Tresses", duration_minutes: 60, price_amount: 10000, currency: "XOF", average_rating: 0, review_count: 0, hashtags: [], post_type: "video" },
+  ]) }));
+
+  await page.goto("/");
+  await expect(page.locator(".social-video-card")).toHaveCount(2, { timeout: 15000 });
+  await page.getByRole("button", { name: "Rechercher" }).click();
+  await page.getByLabel("Pays", { exact: true }).selectOption("FR");
+  await page.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
+  await expect(page.locator(".social-video-card")).toHaveCount(1);
+  await expect(page.locator(".social-video-card")).toContainText("Studio Paris");
+  await expect(page.locator(".social-video-card")).not.toContainText("Studio Dakar");
 });
 
 test("primary mobile navigation keeps comfortable touch targets", async ({ page }) => {
@@ -97,7 +181,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
     HTMLMediaElement.prototype.pause = function () { this.dataset.playing = "false"; };
   });
   const requestedBatches: string[] = [];
-  await page.route("https://audit.supabase.co/*.mp4", (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
+  await page.route(`${testAppOrigin}/*.mp4`, (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
   await page.route(`${testSupabaseOrigin}/rest/v1/rpc/get_available_slots**`, (route) => route.fulfill({
     status: 200, contentType: "application/json", body: JSON.stringify([{ slot_start: "2026-08-17T10:00:00+00:00" }]),
   }));
@@ -126,9 +210,9 @@ test("Inspiration swipes vertically with one active player, filters and an eight
       duration_minutes: 90, price_amount: 10000, currency: "XOF", average_rating: 4.8, review_count: 12, hashtags: ["tresses", "dakar"],
     };
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
-      { ...base, id: "66666666-6666-4666-8666-666666666666", caption: "Première transformation", video_url: "https://audit.supabase.co/one.mp4" },
-      { ...base, id: "77777777-7777-4777-8777-777777777777", caption: "Deuxième transformation", video_url: "https://audit.supabase.co/two.mp4", published_at: new Date(Date.now()-1000).toISOString() },
-      { ...base, id: "88888888-8888-4888-8888-888888888888", caption: "Manucure gel", provider_service_id: "33333333-3333-4333-8333-333333333333", service_title: "Pose gel", video_url: "https://audit.supabase.co/nails.mp4", published_at: new Date(Date.now()-2000).toISOString() },
+      { ...base, id: "66666666-6666-4666-8666-666666666666", caption: "Première transformation", video_url: `${testAppOrigin}/one.mp4` },
+      { ...base, id: "77777777-7777-4777-8777-777777777777", caption: "Deuxième transformation", video_url: `${testAppOrigin}/two.mp4`, published_at: new Date(Date.now()-1000).toISOString() },
+      { ...base, id: "88888888-8888-4888-8888-888888888888", caption: "Manucure gel", provider_service_id: "33333333-3333-4333-8333-333333333333", service_title: "Pose gel", video_url: `${testAppOrigin}/nails.mp4`, published_at: new Date(Date.now()-2000).toISOString() },
     ]) });
   });
   await page.goto("/");
@@ -179,6 +263,14 @@ test("video states distinguish waiting, loading, ready and confirmed errors, wit
     }, true);
     HTMLMediaElement.prototype.play = function () { this.dataset.playing = "true"; return Promise.resolve(); };
     HTMLMediaElement.prototype.pause = function () { this.dataset.playing = "false"; };
+    // This scenario dispatches media lifecycle events itself. Keep its
+    // synthetic byte fixture out of the browser's native decoder.
+    Object.defineProperty(HTMLMediaElement.prototype, "src", {
+      configurable: true,
+      get() { return this.dataset.testMediaSrc ?? ""; },
+      set(value: string) { this.dataset.testMediaSrc = value; },
+    });
+    HTMLMediaElement.prototype.load = function () {};
     const nativeFetch = window.fetch.bind(window);
     const retryCounts: Record<string, number> = {};
     window.fetch = async (input, init) => {
@@ -195,22 +287,21 @@ test("video states distinguish waiting, loading, ready and confirmed errors, wit
       return new Response(JSON.stringify({ videoUrl: "https://audit.supabase.co/retry.mp4", thumbnailUrl: null }), { status: 200, headers: { "Content-Type": "application/json" } });
     };
   });
-  await page.route("https://audit.supabase.co/*.mp4", (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
   await page.route(`${testSupabaseOrigin}/*.mp4`, (route) => route.fulfill({ status: 200, contentType: "video/mp4", body: Buffer.from([0, 0, 0, 20, 102, 116, 121, 112]) }));
   await page.route(`${testSupabaseOrigin}/rest/v1/social_feed**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
     {
       id: "66666666-6666-4666-8666-666666666666", author_id: "11111111-1111-4111-8111-111111111111",
       caption: "État du lecteur", business_name: "Atelier Tresses", slug: "atelier-tresses", city: "Dakar",
-      video_url: "https://audit.supabase.co/first.mp4", thumbnail_url: "/brand/icon-192.png",
-      media_urls: ["https://audit.supabase.co/first.mp4"], published_at: new Date().toISOString(), view_count: 0,
+      video_url: `${testAppOrigin}/first.mp4`, thumbnail_url: "/brand/icon-192.png",
+      media_urls: [`${testAppOrigin}/first.mp4`], published_at: new Date().toISOString(), view_count: 0,
       like_count: 0, comment_count: 0, save_count: 0, share_count: 0, duration_seconds: 12,
       average_rating: 0, review_count: 0, provider_service_id: null,
     },
     {
       id: "77777777-7777-4777-8777-777777777777", author_id: "11111111-1111-4111-8111-111111111111",
       caption: "Vidéo hors écran", business_name: "Atelier Tresses", slug: "atelier-tresses", city: "Dakar",
-      video_url: "https://audit.supabase.co/second.mp4", thumbnail_url: "/brand/icon-192.png",
-      media_urls: ["https://audit.supabase.co/second.mp4"], published_at: new Date(Date.now() - 1000).toISOString(), view_count: 0,
+      video_url: `${testAppOrigin}/second.mp4`, thumbnail_url: "/brand/icon-192.png",
+      media_urls: [`${testAppOrigin}/second.mp4`], published_at: new Date(Date.now() - 1000).toISOString(), view_count: 0,
       like_count: 0, comment_count: 0, save_count: 0, share_count: 0, duration_seconds: 12,
       average_rating: 0, review_count: 0, provider_service_id: null,
     },
@@ -297,7 +388,7 @@ test("a protected destination survives the authentication handoff", async ({ pag
 test("password recovery does not require the old password", async ({ page }) => {
   await page.goto("/?auth=reset");
   await expect(page.getByRole("heading", { name: "Mot de passe oublié" })).toBeVisible();
-  await page.getByLabel("Adresse e-mail").fill("client@example.test");
+  await page.getByLabel("Adresse e-mail").fill("client@example.com");
   const recoveryRequest = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith("/recover"));
   await page.getByRole("button", { name: "Envoyer le lien" }).click();
   await recoveryRequest;

@@ -12,6 +12,8 @@ export type ResolvedAddress = GeoPoint & {
   formattedAddress: string;
   city: string;
   area: string;
+  countryCode?: string;
+  region?: string;
 };
 
 export function validGeoPoint(point: GeoPoint) {

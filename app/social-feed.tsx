@@ -142,6 +142,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedCountryCode, setSelectedCountryCode] = useState("");
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [radiusKm, setRadiusKm] = useState<2 | 5 | 10 | 20>(5);
   const searchInitialized = useRef(false);
@@ -188,6 +189,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const params = new URLSearchParams(window.location.search);
     const query = (params.get("q") ?? "").slice(0, 120);
     const categoryId = params.get("categoryId") ?? "";
+    const countryCode = (params.get("country") ?? "").toUpperCase();
     const providerId = params.get("providerId") ?? "";
     pendingLegacyCategory.current = params.get("category") ?? "";
     const requestedRadius = Number(params.get("radius"));
@@ -200,6 +202,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const frame = requestAnimationFrame(() => {
       setSearchQuery(query);
       setSelectedCategoryId(categoryId);
+      setSelectedCountryCode(countryCode);
       setSelectedProviderId(providerId);
       setRadiusKm(nextRadius);
       if (zone || validPosition) onLocationChange(zone, validPosition);
@@ -236,12 +239,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const searchFilters = useMemo(() => ({
     query: searchQuery,
     categoryId: selectedCategoryId,
+    countryCode: selectedCountryCode,
     providerId: selectedProviderId,
     area: location.position ? "" : location.area,
     position: location.position,
     radiusKm,
-  }), [location.area, location.position, radiusKm, searchQuery, selectedCategoryId, selectedProviderId]);
-  const activeSearch = Boolean(searchQuery.trim() || selectedCategoryId || selectedProviderId || location.area.trim() || location.position);
+  }), [location.area, location.position, radiusKm, searchQuery, selectedCategoryId, selectedCountryCode, selectedProviderId]);
+  const activeSearch = Boolean(searchQuery.trim() || selectedCategoryId || selectedCountryCode || selectedProviderId || location.area.trim() || location.position);
   const visiblePosts = useMemo(() => {
     const matches = collection ? collection.posts : filterInspirationPosts(posts, location.providers, searchFilters);
     return diversifyFeed(matches.map((post) => ({ ...post,
@@ -384,7 +388,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     return () => observer.disconnect();
   }, [visiblePosts]);
 
-  const searchSignature = JSON.stringify([searchQuery, selectedCategoryId, selectedProviderId, location.area, location.position, radiusKm]);
+  const searchSignature = JSON.stringify([searchQuery, selectedCategoryId, selectedCountryCode, selectedProviderId, location.area, location.position, radiusKm]);
   const lastSearchSignature = useRef(searchSignature);
   useEffect(() => {
     if (lastSearchSignature.current === searchSignature) return;
@@ -633,11 +637,18 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   }
 
   const categoryLabel = categories.find((item) => item.id === selectedCategoryId)?.name ?? "";
+  const countryLabel = selectedCountryCode ? new Intl.DisplayNames([locale], { type: "region" }).of(selectedCountryCode) ?? selectedCountryCode : "";
   const selectedProvider = location.providers.find((item) => item.profileId === selectedProviderId);
+  const countryOptions = useMemo(() => {
+    const codes = [...new Set(location.providers.map((provider) => provider.countryCode).filter((code): code is string => Boolean(code && /^[A-Z]{2}$/.test(code))))];
+    const names = new Intl.DisplayNames([locale], { type: "region" });
+    return codes.sort((left, right) => (names.of(left) ?? left).localeCompare(names.of(right) ?? right, locale));
+  }, [location.providers, locale]);
   const providerOptions = useMemo(() => {
     const unique = new Map<string, InspirationSearchProvider>();
     for (const provider of location.providers) {
       if (selectedCategoryId && provider.categoryId !== selectedCategoryId) continue;
+      if (selectedCountryCode && provider.countryCode !== selectedCountryCode) continue;
       if (location.area.trim() && !matchesSearch(location.area, `${provider.area} ${provider.address ?? ""}`)) continue;
       if (location.position) {
         const distance = distanceKm(location.position, provider.coordinates);
@@ -647,7 +658,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       if (!unique.has(provider.profileId)) unique.set(provider.profileId, provider);
     }
     return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 5);
-  }, [location.area, location.position, location.providers, radiusKm, searchQuery, selectedCategoryId]);
+  }, [location.area, location.position, location.providers, radiusKm, searchQuery, selectedCategoryId, selectedCountryCode]);
 
   function writeSearchUrl(applied: boolean, providerIdOverride = selectedProviderId) {
     const params = new URLSearchParams();
@@ -655,6 +666,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     if (applied) params.set("applied", "1");
     if (searchQuery.trim()) params.set("q", searchQuery.trim().slice(0, 120));
     if (selectedCategoryId && !selectedCategoryId.startsWith("__")) params.set("categoryId", selectedCategoryId);
+    if (selectedCountryCode) params.set("country", selectedCountryCode);
     if (providerIdOverride) params.set("providerId", providerIdOverride);
     if (location.area.trim()) params.set("zone", location.area.trim().slice(0, 120));
     if (location.position) params.set("radius", String(radiusKm));
@@ -679,6 +691,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   function clearSearch() {
     setSearchQuery("");
     setSelectedCategoryId("");
+    setSelectedCountryCode("");
     setSelectedProviderId("");
     setRadiusKm(5);
     location.onChange("", null);
@@ -693,7 +706,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   };
 
   const activePost = visiblePosts[activeIndex];
-  const header = <header className="social-feed-header"><div className="feed-title-row">{collection ? <button type="button" aria-label="Retour aux vidéos du profil" onClick={() => { collection.onBack(); onDiscover?.(); }}>‹</button> : <><strong>MATA</strong><span>INSPIRATION</span></>}<div className="feed-header-actions">{!collection && <><button className="feed-mode-toggle" aria-label={t(feedMode === "immersive" ? "Afficher le mode Premium" : "Afficher le mode immersif")} aria-pressed={feedMode === "premium"} title={t(feedMode === "immersive" ? "Afficher le mode Premium" : "Afficher le mode immersif")} onClick={() => changeFeedMode(feedMode === "immersive" ? "premium" : "immersive")}>{t(feedMode === "immersive" ? "Premium" : "Immersif")}</button><button disabled={authPending} aria-label={t("Publier une vidéo")} onClick={onPublish}>＋</button><button aria-label={t("Rechercher")} onClick={openSearch}>⌕</button></>}</div></div>{!collection && activeSearch && <div className="inspiration-active-filters" aria-label="Filtres actifs"><span>{[categoryLabel, selectedProvider?.name, location.area, location.position ? `Autour de moi · ${radiusKm} km` : "", searchQuery].filter(Boolean).join(" · ")}</span><button type="button" onClick={clearSearch}>Effacer les filtres</button></div>}</header>;
+  const header = <header className="social-feed-header"><div className="feed-title-row">{collection ? <button type="button" aria-label="Retour aux vidéos du profil" onClick={() => { collection.onBack(); onDiscover?.(); }}>‹</button> : <><strong>MATA</strong><span>INSPIRATION</span></>}<div className="feed-header-actions">{!collection && <><button className="feed-mode-toggle" aria-label={t(feedMode === "immersive" ? "Afficher le mode Premium" : "Afficher le mode immersif")} aria-pressed={feedMode === "premium"} title={t(feedMode === "immersive" ? "Afficher le mode Premium" : "Afficher le mode immersif")} onClick={() => changeFeedMode(feedMode === "immersive" ? "premium" : "immersive")}>{t(feedMode === "immersive" ? "Premium" : "Immersif")}</button><button disabled={authPending} aria-label={t("Publier une vidéo")} onClick={onPublish}>＋</button><button aria-label={t("Rechercher")} onClick={openSearch}>⌕</button></>}</div></div>{!collection && activeSearch && <div className="inspiration-active-filters" aria-label="Filtres actifs"><span>{[categoryLabel, countryLabel, selectedProvider?.name, location.area, location.position ? `Autour de moi · ${radiusKm} km` : "", searchQuery].filter(Boolean).join(" · ")}</span><button type="button" onClick={clearSearch}>Effacer les filtres</button></div>}</header>;
 
   const searchDialog = searchOpen && !collection ? <div className="inspiration-search-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) { setSearchOpen(false); writeSearchUrl(activeSearch); } }}>
     <section className="inspiration-search-dialog" role="dialog" aria-modal="true" aria-labelledby="inspiration-search-title">
@@ -701,6 +714,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       <form onSubmit={(event) => { event.preventDefault(); applySearch(); }}>
         <label className="inspiration-search-field">Professionnel, salon ou prestation<input autoFocus maxLength={120} value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setSelectedProviderId(""); }} placeholder="Ex. Aïssatou Beauty, tresses…" /></label>
         <label className="inspiration-search-field">Prestation<select value={selectedCategoryId.startsWith("__") ? "" : selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedProviderId(""); }}><option value="">Toutes les prestations</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="inspiration-search-field">Pays<select aria-label="Pays" value={selectedCountryCode} onChange={(event) => { setSelectedCountryCode(event.target.value); setSelectedProviderId(""); }}><option value="">Tous les pays avec des professionnels publiés</option>{countryOptions.map((code) => <option key={code} value={code}>{new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code}</option>)}</select></label>
         {categories.length === 0 && <p className="inspiration-search-note">Les catégories publiées seront disponibles dès que le catalogue aura chargé.</p>}
         <LocationPicker area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} radiusKm={radiusKm} onRadiusChange={setRadiusKm} />
         {providerOptions.length > 0 && <div className="inspiration-provider-suggestions"><strong>Professionnels correspondants</strong>{providerOptions.map((provider) => <button type="button" key={provider.profileId} aria-pressed={selectedProviderId === provider.profileId} onClick={() => openProfessionalFromSearch(provider.profileId)}><span><b>{provider.name}</b><small>{provider.specialty} · {provider.area}</small></span><i>Profil ›</i></button>)}</div>}

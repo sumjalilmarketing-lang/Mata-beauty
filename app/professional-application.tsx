@@ -7,8 +7,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ProfessionalDocuments } from "./professional-documents";
 import { applicationStatusLabels } from "./client-profile";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { SUPPORTED_COUNTRIES, SUPPORTED_TIME_ZONES } from "@/lib/domain/international";
 
-type Candidate = { business_name: string; bio: string | null; city: string; base_address: string | null; latitude: number | null; longitude: number | null; service_mode: string; activity_type: string; years_experience: number; languages: string[]; cancellation_policy: string | null; onboarding_progress: number };
+type Candidate = { business_name: string; bio: string | null; city: string; country_code: string | null; region: string | null; timezone: string | null; currency: string | null; base_address: string | null; latitude: number | null; longitude: number | null; service_mode: string; activity_type: string; years_experience: number; languages: string[]; cancellation_policy: string | null; onboarding_progress: number };
 type Application = { status: string; rejection_reason: string | null };
 
 export function ProfessionalApplication({ userId }: { userId: string }) {
@@ -24,13 +25,16 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
   const applicationForm = useRef<HTMLFormElement>(null);
   const load = useCallback(async () => {
     const client = getSupabaseBrowserClient(); if (!client) { setState("error"); return; }
-    const [profile, dossier, identity] = await Promise.all([
-      client.from("provider_profiles").select("business_name,bio,city,base_address,latitude,longitude,service_mode,activity_type,years_experience,languages,cancellation_policy,onboarding_progress").eq("profile_id", userId).maybeSingle(),
+    const [profile, dossier, identity, services] = await Promise.all([
+      client.from("provider_profiles").select("business_name,bio,city,country_code,region,timezone,currency,base_address,latitude,longitude,service_mode,activity_type,years_experience,languages,cancellation_policy,onboarding_progress").eq("profile_id", userId).maybeSingle(),
       client.from("professional_onboarding").select("status,rejection_reason").eq("provider_id", userId).maybeSingle(),
       client.from("profiles").select("avatar_url").eq("id", userId).maybeSingle(),
+      client.from("provider_services").select("currency").eq("provider_id", userId),
     ]);
     if (profile.error || dossier.error || identity.error) { setState("error"); return; }
-    setCandidate(profile.data); setApplication(dossier.data); setState("ready");
+    const serviceCurrencies = [...new Set((services.data ?? []).map((service) => service.currency).filter((currency): currency is string => Boolean(currency)))];
+    setCandidate(profile.data ? { ...profile.data, currency: profile.data.currency ?? (serviceCurrencies.length === 1 ? serviceCurrencies[0] : null) } : null);
+    setApplication(dossier.data); setState("ready");
     setAvatarUrl(identity.data?.avatar_url ?? null);
   }, [userId]);
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
@@ -57,12 +61,29 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
       target_cancellation_policy: String(values.get("cancellation")),
     });
     if (error) { setBusy(false); setNotice(publicErrorMessage(error, "Les informations n’ont pas pu être enregistrées.")); return; }
+    const { error: locationError } = await client.rpc("save_professional_global_location", {
+      target_country_code: String(values.get("countryCode")), target_region: String(values.get("region") ?? ""),
+      target_timezone: String(values.get("timezone")), target_currency: String(values.get("currency")),
+    });
+    if (locationError) { setBusy(false); setNotice(publicErrorMessage(locationError, "Le fuseau, le pays et la devise n’ont pas pu être enregistrés. Réessayez.")); return; }
     const updates = await Promise.all([
       client.from("provider_profiles").update({ latitude, longitude }).eq("profile_id", userId),
       phone ? client.from("profiles").update({ phone }).eq("id", userId) : Promise.resolve({ error: null }),
     ]);
     const secondaryError = updates.find(result => result.error)?.error;
     setBusy(false); setNotice(secondaryError ? "Le profil professionnel est enregistré, mais la position ou le contact n’a pas pu être mis à jour. Réessayez." : "Informations enregistrées. Complétez les quatre documents avant l’envoi.");
+    if (!error) await load();
+  }
+  async function saveApprovedLocation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (busy) return;
+    const client = getSupabaseBrowserClient(); if (!client) return;
+    const values = new FormData(event.currentTarget); setBusy(true); setNotice("");
+    const { error } = await client.rpc("save_professional_global_location", {
+      target_country_code: String(values.get("countryCode")), target_region: String(values.get("region") ?? ""),
+      target_timezone: String(values.get("timezone")), target_currency: String(values.get("currency")),
+    });
+    setBusy(false);
+    setNotice(error ? publicErrorMessage(error, "La localisation n’a pas pu être enregistrée. Vérifiez la devise des prestations existantes.") : "Pays, fuseau horaire et devise enregistrés. Les anciens rendez-vous conservent leurs instants UTC.");
     if (!error) await load();
   }
   async function submit() {
@@ -126,6 +147,10 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
         <label>Votre structure<select name="activity" defaultValue={candidate.activity_type || "independent"}><option value="independent">Professionnel indépendant</option><option value="salon">Salon de beauté</option><option value="barber_shop">Barber shop</option><option value="hairdresser">Coiffure</option><option value="makeup_artist">Maquillage</option><option value="nail_artist">Onglerie</option><option value="esthetician">Esthétique</option><option value="care_specialist">Soins</option><option value="other">Autre activité</option></select><small>Le salon reste une organisation rattachée à votre compte professionnel, pas un compte séparé.</small></label>
         <label className="wide">Présentation<textarea name="bio" minLength={40} maxLength={2000} defaultValue={candidate.bio ?? ""} required /></label>
         <label>Ville<input name="city" minLength={2} defaultValue={candidate.city} required /></label>
+        <label>Pays<select name="countryCode" defaultValue={candidate.country_code ?? ""} required><option value="">Choisir un pays</option>{SUPPORTED_COUNTRIES.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select></label>
+        <label>Région ou État<input name="region" maxLength={120} defaultValue={candidate.region ?? ""} /></label>
+        <label>Fuseau horaire IANA<select name="timezone" defaultValue={candidate.timezone ?? ""} required><option value="">Choisir un fuseau</option>{SUPPORTED_TIME_ZONES.map(zone => <option key={zone} value={zone}>{zone}</option>)}</select><small>Les horaires de réservation seront interprétés dans ce fuseau.</small></label>
+        <label>Devise des tarifs<select name="currency" defaultValue={candidate.currency ?? (candidate.country_code === "SN" ? "XOF" : "")} required><option value="">Choisir une devise</option><option value="XOF">XOF · Franc CFA</option><option value="EUR">EUR · Euro</option><option value="USD">USD · Dollar US</option><option value="GBP">GBP · Livre sterling</option><option value="CAD">CAD · Dollar canadien</option></select></label>
         <label>Adresse professionnelle<input name="address" minLength={4} defaultValue={candidate.base_address ?? ""} required /></label>
         <label>Téléphone international<input name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="+221 77 123 45 67" /><small>Nous n’affichons pas le numéro déjà enregistré. Un numéro saisi ici le mettra à jour ; laissez vide pour le conserver.</small></label>
         <label>Lieu des prestations<select name="serviceMode" defaultValue={candidate.service_mode}><option value="salon">Chez le professionnel</option><option value="mobile">À domicile</option><option value="both">Les deux</option></select></label>
@@ -136,6 +161,13 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
         <label>Langues parlées<input name="languages" defaultValue={candidate.languages.join(", ")} required /></label>
         <label className="wide">Conditions d’annulation<textarea name="cancellation" minLength={20} defaultValue={candidate.cancellation_policy ?? ""} required /></label>
         <button disabled={busy}>Enregistrer les informations</button>
+      </form></article>}
+      {application?.status === "verified" && <article className="panel professional-onboarding-panel"><h2>Localisation internationale</h2><p>Confirmez le lieu réel de votre activité. Le fuseau règle les futurs créneaux; les rendez-vous déjà enregistrés ne changent pas. Les tarifs ne sont jamais convertis automatiquement.</p><form className="dashboard-form" onSubmit={event => void saveApprovedLocation(event)}>
+        <label>Pays<select name="countryCode" defaultValue={candidate.country_code ?? ""} required><option value="">Choisir un pays</option>{SUPPORTED_COUNTRIES.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select></label>
+        <label>Région ou État<input name="region" maxLength={120} defaultValue={candidate.region ?? ""} /></label>
+        <label>Fuseau horaire IANA<select name="timezone" defaultValue={candidate.timezone ?? ""} required><option value="">Choisir un fuseau</option>{SUPPORTED_TIME_ZONES.map(zone => <option key={zone} value={zone}>{zone}</option>)}</select></label>
+        <label>Devise des tarifs<select name="currency" defaultValue={candidate.currency ?? ""} required><option value="">Choisir une devise</option><option value="XOF">XOF · Franc CFA</option><option value="EUR">EUR · Euro</option><option value="USD">USD · Dollar US</option><option value="GBP">GBP · Livre sterling</option><option value="CAD">CAD · Dollar canadien</option></select><small>Changer la devise est refusé tant que des prestations enregistrées utilisent une autre devise.</small></label>
+        <button className="primary-button" disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer la localisation"}</button>
       </form></article>}
       <ProfessionalDocuments providerId={userId} readOnly={!editable} onBusyChange={setDocumentBusy} />
       {editable && <article className="panel"><p>{documentBusy ? "Attendez la fin de l’envoi du document avant de transmettre le dossier." : "Vérifiez les informations et vos quatre documents avant de transmettre le dossier."}</p><button className="primary-button" disabled={busy || documentBusy || candidate.onboarding_progress < 100} onClick={() => void submit()}>{busy ? "Envoi…" : "Envoyer mon dossier"}</button></article>}

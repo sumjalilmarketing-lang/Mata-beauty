@@ -77,7 +77,8 @@ type BookingRow = {
   total_amount: number;
   currency: string;
   location_mode: string;
-  provider_profiles: { business_name: string } | Array<{ business_name: string }> | null;
+  provider_profiles: { business_name: string; timezone: string | null; country_code: string | null } | Array<{ business_name: string; timezone: string | null; country_code: string | null }> | null;
+  businesses: { timezone: string | null; country_code: string | null } | Array<{ timezone: string | null; country_code: string | null }> | null;
   provider_services: { title: string; duration_minutes: number } | Array<{ title: string; duration_minutes: number }> | null;
 };
 
@@ -257,8 +258,14 @@ function formatCurrency(value: number) {
   return `${new Intl.NumberFormat("fr-FR").format(value)} FCFA`;
 }
 
-function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }) : "Jamais";
+function formatDate(value: string | null, timeZone = "Africa/Dakar") {
+  return value ? new Date(value).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone }) : "Jamais";
+}
+
+function bookingTimeZone(row: BookingRow) {
+  const business = relationOne(row.businesses);
+  const provider = relationOne(row.provider_profiles);
+  return business?.timezone ?? provider?.timezone ?? ((business?.country_code ?? provider?.country_code) === "SN" ? "Africa/Dakar" : "UTC");
 }
 
 function relationOne<T>(value: T | T[] | null): T | null {
@@ -690,11 +697,11 @@ function BookingsModule({ context, calendar, notify }: { context: AdminContext; 
   const [rows, setRows] = useState<BookingRow[]>([]);
   const [confirmation, setConfirmation] = useState<BookingRow | null>(null);
   useEffect(() => {
-    void getSupabaseBrowserClient()!.from("bookings").select("id,starts_at,status,total_amount,currency,location_mode,provider_profiles(business_name),provider_services(title,duration_minutes)").order("starts_at", { ascending: false }).limit(200).then(({ data }) => setRows((data ?? []) as unknown as BookingRow[]));
+    void getSupabaseBrowserClient()!.from("bookings").select("id,starts_at,status,total_amount,currency,location_mode,businesses(timezone,country_code),provider_profiles(business_name,timezone,country_code),provider_services(title,duration_minutes)").order("starts_at", { ascending: false }).limit(200).then(({ data }) => setRows((data ?? []) as unknown as BookingRow[]));
   }, []);
-  if (calendar) return <div className="admin-calendar"><div className="calendar-toolbar"><strong>Prochaines réservations</strong></div><div className="calendar-grid">{["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((day) => <strong key={day}>{day}</strong>)}{rows.slice(0, 14).map((row) => <article key={row.id}><small>{new Date(row.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dakar" })}</small><span>{relationOne(row.provider_services)?.title || "Prestation"}</span><StatusBadge value={row.status} /></article>)}</div></div>;
+  if (calendar) return <div className="admin-calendar"><div className="calendar-toolbar"><strong>Prochaines réservations · heure locale de chaque établissement</strong></div><div className="calendar-grid">{["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((day) => <strong key={day}>{day}</strong>)}{rows.slice(0, 14).map((row) => <article key={row.id}><small>{new Date(row.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: bookingTimeZone(row) })}</small><span>{relationOne(row.provider_services)?.title || "Prestation"}</span><StatusBadge value={row.status} /></article>)}</div></div>;
   return <><div className="admin-filter-bar"><span>{rows.length} réservations autorisées</span></div><div className="admin-table-wrap" role="region" aria-label="Réservations" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Référence</th><th>Prestation</th><th>Prestataire</th><th>Date</th><th>Prix</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{rows.map((row) =>
-    <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code></td><td><strong>{relationOne(row.provider_services)?.title || "Prestation"}</strong><small>{relationOne(row.provider_services)?.duration_minutes || "—"} min · {row.location_mode}</small></td><td>{relationOne(row.provider_profiles)?.business_name || "—"}</td><td>{formatDate(row.starts_at)}</td><td>{formatCurrency(row.total_amount)}</td><td><StatusBadge value={row.status} /></td><td><PermissionGuard permission="bookings.update" context={context}><button className="table-action danger" onClick={() => setConfirmation(row)}>Modifier</button></PermissionGuard></td></tr>,
+    <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code></td><td><strong>{relationOne(row.provider_services)?.title || "Prestation"}</strong><small>{relationOne(row.provider_services)?.duration_minutes || "—"} min · {row.location_mode}</small></td><td>{relationOne(row.provider_profiles)?.business_name || "—"}</td><td>{formatDate(row.starts_at, bookingTimeZone(row))}</td><td>{formatCurrency(row.total_amount)}</td><td><StatusBadge value={row.status} /></td><td><PermissionGuard permission="bookings.update" context={context}><button className="table-action danger" onClick={() => setConfirmation(row)}>Modifier</button></PermissionGuard></td></tr>,
   )}</tbody></table></div>{confirmation && <ConfirmationModal title="Annuler administrativement cette réservation ?" description="Le statut sera modifié avec justification et les parties conserveront l’historique." dangerous onCancel={() => setConfirmation(null)} onConfirm={async (reason) => {
     const { error } = await getSupabaseBrowserClient()!.rpc("admin_update_booking_status", { target_booking_id: confirmation.id, next_status: "cancelled_by_provider", reason });
     notify(error ? publicErrorMessage(error, "La réservation n’a pas pu être mise à jour.") : "Réservation mise à jour et auditée.");

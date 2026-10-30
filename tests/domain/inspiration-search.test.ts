@@ -3,11 +3,13 @@ import { filterInspirationPosts, validSearchRadius, type InspirationSearchFilter
 
 const providerA: InspirationSearchProvider = {
   profileId: "provider-a", serviceId: "service-braids", categoryId: "category-braids",
+  countryCode: "SN",
   name: "Élégance Dakar", specialty: "Tresses africaines", category: "Tresses",
   area: "Dakar, Almadies", address: "Rue des Tresses", coordinates: { latitude: 14.74, longitude: -17.51 },
 };
 const providerB: InspirationSearchProvider = {
   profileId: "provider-b", serviceId: "service-nails", categoryId: "category-nails",
+  countryCode: "FR",
   name: "Élégance Dakar", specialty: "Manucure", category: "Onglerie",
   area: "Dakar, Plateau", address: "Place de l’Indépendance", coordinates: { latitude: 14.67, longitude: -17.43 },
 };
@@ -29,6 +31,11 @@ describe("Inspiration discovery filters", () => {
   it("filters by the exact service category id and matching author/service pair", () => {
     expect(filterInspirationPosts(posts, [providerA, providerB], filters({ categoryId: "category-braids" })))
       .toEqual([posts[0]]);
+  });
+
+  it("filters by the provider ISO country code and excludes unknown locations", () => {
+    expect(filterInspirationPosts(posts, [providerA, providerB], filters({ countryCode: "FR" }))).toEqual([posts[1]]);
+    expect(filterInspirationPosts(posts, [providerA], filters({ countryCode: "FR" }))).toEqual([]);
   });
 
   it.each([

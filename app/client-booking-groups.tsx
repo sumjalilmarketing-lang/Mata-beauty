@@ -13,7 +13,7 @@ const labels: Record<ClientBookingItem["status"], string> = {
 };
 
 const money = (amount: number, currency: string) => `${amount.toLocaleString("fr-FR")} ${currency}`;
-const dateTime = (value: string) => new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(value));
+const dateTime = (value: string, timeZone = "UTC") => new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(value));
 
 export function ClientBookingGroups({ items, clientId, stats, hasMore, loadingMore, onLoadMore, onMessage, onCancel }: { items: readonly ClientBookingItem[]; clientId: string; stats: { upcoming: number; pending: number; past: number }; hasMore: boolean; loadingMore: boolean; onLoadMore: () => void; onMessage: (booking: ClientBookingItem) => void; onCancel: (booking: ClientBookingItem) => void }) {
   const [open, setOpen] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export function ClientBookingGroups({ items, clientId, stats, hasMore, loadingMo
         </div>
         <div className="client-booking-card__summary">
           <div><strong>{group.activeCount}</strong><span>{group.activeCount === 1 ? "rendez-vous actif" : "rendez-vous actifs"}</span></div>
-          {upcoming ? <p><b>{upcoming.status === "in_progress" ? "Rendez-vous en cours" : "Prochain rendez-vous"}</b><br />{dateTime(upcoming.startsAt)} · {upcoming.serviceName}</p> : <p>Aucun rendez-vous à venir.</p>}
+          {upcoming ? <p><b>{upcoming.status === "in_progress" ? "Rendez-vous en cours" : "Prochain rendez-vous"}</b><br />{dateTime(upcoming.startsAt, upcoming.timeZone)} · {upcoming.serviceName}</p> : <p>Aucun rendez-vous à venir.</p>}
         </div>
         <div className="client-booking-card__actions">
           <button type="button" className="client-booking-history-toggle" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : group.id)}>{expanded ? "Masquer l’historique" : `Voir l’historique (${group.bookings.length})`}</button>
@@ -56,7 +56,7 @@ export function ClientBookingGroups({ items, clientId, stats, hasMore, loadingMo
         {expanded && <ol className="client-booking-timeline" aria-label={`Historique des rendez-vous chez ${group.providerName}`}>
           {group.bookings.map((booking) => <li key={booking.id} id={`booking-${booking.id}`}>
             <span className={`client-booking-status client-booking-status--${clientBookingStatusTone(booking.status)}`}><i aria-hidden="true" />{labels[booking.status]}</span>
-            <div><strong>{booking.serviceName}</strong><time dateTime={booking.startsAt}>{dateTime(booking.startsAt)}</time></div>
+            <div><strong>{booking.serviceName}</strong><time dateTime={booking.startsAt}>{dateTime(booking.startsAt, booking.timeZone)}</time></div>
             <b>{money(booking.amount, booking.currency)}</b>
             <div className="client-booking-timeline__actions">
               <button type="button" onClick={() => onMessage(booking)}>Messages</button>

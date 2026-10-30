@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { localDateAt, localDateTimeInputToInstant } from "@/lib/domain/time-zone";
 
 type Member = { id: string; display_name: string; first_name: string | null; public_last_name: string | null; title: string | null; avatar_url: string | null; specialties: string[]; buffer_minutes: number; is_active: boolean; is_bookable: boolean; archived_at: string | null };
 type Service = { id: string; title: string; business_id: string | null };
@@ -30,7 +31,7 @@ function normalizePermissions(values: string[]) {
 const weekdays = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const statusNames: Record<string, string> = { pending: "En attente", confirmed: "Confirmé", in_progress: "En cours", completed: "Terminé", declined: "Refusé", cancelled_by_client: "Annulé par le client", cancelled_by_provider: "Annulé par le salon", no_show: "Absence", disputed: "Litige" };
 const api = () => { const client = getSupabaseBrowserClient(); if (!client) throw new Error("Connexion indisponible"); return client; };
-const time = (value: string) => new Date(value).toLocaleTimeString("fr-FR", { timeZone: "Africa/Dakar", hour: "2-digit", minute: "2-digit" });
+const time = (value: string, timeZone = "UTC") => new Date(value).toLocaleTimeString("fr-FR", { timeZone, hour: "2-digit", minute: "2-digit" });
 async function requestTeamApi<T>(businessId: string, method: "GET" | "POST", body?: Record<string, unknown>): Promise<T> {
   const client = api(); const { data } = await client.auth.getSession();
   if (!data.session?.access_token) throw new Error("Reconnectez-vous pour gérer les accès.");
@@ -57,7 +58,7 @@ export function ProviderTeamAgenda({ userId }: { userId: string }) {
   return businessId ? <TeamAgenda businessId={businessId} /> : null;
 }
 
-type StaffAppointment = { id: string; starts_at: string; ends_at: string; status: string; service_title: string; client_name: string };
+type StaffAppointment = { id: string; starts_at: string; ends_at: string; status: string; service_title: string; client_name: string; time_zone: string };
 type StaffService = { id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; currency: string; is_active: boolean };
 export function StaffServices() {
   const [services, setServices] = useState<StaffService[]>([]);
@@ -81,11 +82,11 @@ function formatStaffPrice(amount: number, currency: string) {
 
 export function StaffAgenda({ canManage }: { canManage: boolean }) {
   const [rows, setRows] = useState<StaffAppointment[]>([]);
-  const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Dakar" }).format(new Date()));
+  const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA").format(new Date()));
   const [loading, setLoading] = useState(true), [busyId, setBusyId] = useState<string | null>(null), [feedback, setFeedback] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
-    const result = await api().rpc("get_staff_booking_agenda", { from_date: date, days: 7 });
+    const result = await api().rpc("get_staff_booking_agenda_global", { from_date: date, days: 7 });
     if (result.error) { setFeedback("Les rendez-vous autorisés n’ont pas pu être chargés."); setRows([]); }
     else { setFeedback(""); setRows((result.data ?? []) as StaffAppointment[]); }
     setLoading(false);
@@ -100,9 +101,9 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
     setBusyId(null);
   }
   return <section className="workspace-content"><div className="workspace-intro"><div><span>Espace collaborateur</span><h2>Mes rendez-vous</h2><p>Seuls les rendez-vous attribués à votre compte sont affichés.</p></div></div>
-    {feedback && <p role="status">{feedback}</p>}<article className="workspace-panel salon-panel"><label>Semaine à partir du<input type="date" value={date} onChange={event => setDate(event.target.value)} /></label>
+    {feedback && <p role="status">{feedback}</p>}<article className="workspace-panel salon-panel"><label>Semaine à partir du<input type="date" value={date} onChange={event => setDate(event.target.value)} /></label><p>Les heures sont affichées selon le fuseau de chaque salon.</p>
       {loading && <p role="status">Chargement des rendez-vous…</p>}{!loading && rows.length === 0 && <p>Aucun rendez-vous attribué pour cette période.</p>}
-      <div className="salon-list">{rows.map(row => <div key={row.id}><div><strong>{row.service_title}</strong><small>{row.client_name} · {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(row.starts_at))} · {statusNames[row.status] ?? row.status}</small></div>
+      <div className="salon-list">{rows.map(row => <div key={row.id}><div><strong>{row.service_title}</strong><small>{row.client_name} · {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: row.time_zone }).format(new Date(row.starts_at))} · {statusNames[row.status] ?? row.status}</small></div>
         {canManage && row.status === "pending" && <><button disabled={busyId === row.id} onClick={() => void transition(row, "confirmed")}>Confirmer</button><button disabled={busyId === row.id} onClick={() => void transition(row, "declined")}>Refuser</button></>}
         {canManage && row.status === "confirmed" && <button disabled={busyId === row.id} onClick={() => void transition(row, "in_progress")}>Démarrer</button>}
         {canManage && row.status === "in_progress" && <button disabled={busyId === row.id} onClick={() => void transition(row, "completed")}>Terminer</button>}
@@ -115,7 +116,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
   const [qualifications, setQualifications] = useState<Qualification[]>([]), [hours, setHours] = useState<Hours[]>([]), [absences, setAbsences] = useState<Absence[]>([]);
   const [selected, setSelected] = useState<Member | null>(null), [editing, setEditing] = useState(false);
   const [staffAccess, setStaffAccess] = useState<TeamAccess[]>([]), [invitations, setInvitations] = useState<TeamInvitation[]>([]), [audit, setAudit] = useState<TeamAudit[]>([]);
-  const [enabled, setEnabled] = useState(false), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
+  const [enabled, setEnabled] = useState(false), [timeZone, setTimeZone] = useState("Africa/Dakar"), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const inFlight = useRef(false);
   const savedMemberId = useRef<string | null>(null);
   const [revision, setRevision] = useState(0);
@@ -124,13 +125,13 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     const [people, offers, business, accessResult] = await Promise.all([
       client.from("collaborators").select("id,display_name,first_name,public_last_name,title,avatar_url,specialties,buffer_minutes,is_active,is_bookable,archived_at").eq("business_id", businessId).order("display_name"),
       client.from("provider_services").select("id,title,business_id").eq("provider_id", ownerId).is("archived_at", null),
-      client.from("businesses").select("team_booking_enabled").eq("id", businessId).single(),
+      client.from("businesses").select("team_booking_enabled,timezone,country_code").eq("id", businessId).single(),
       collaboratorAccessEnabled ? requestTeamApi<{ access: TeamAccess[]; invitations: TeamInvitation[]; audit: TeamAudit[] }>(businessId, "GET") : Promise.resolve({ access: [], invitations: [], audit: [] }),
     ]);
     for (const result of [people, offers, business]) if (result.error) throw result.error;
     setStaffAccess(accessResult.access); setInvitations(accessResult.invitations); setAudit(accessResult.audit);
     const next = (people.data ?? []) as Member[];
-    setMembers(next); setServices(((offers.data ?? []) as Service[]).filter(s => !s.business_id || s.business_id === businessId)); setEnabled(Boolean(business.data?.team_booking_enabled));
+    setMembers(next); setServices(((offers.data ?? []) as Service[]).filter(s => !s.business_id || s.business_id === businessId)); setEnabled(Boolean(business.data?.team_booking_enabled)); setTimeZone(business.data?.timezone ?? (business.data?.country_code === "SN" ? "Africa/Dakar" : "UTC"));
     if (next.length) {
       const ids = next.map(m => m.id);
       const [skills, windows, exceptions] = await Promise.all([
@@ -178,15 +179,16 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
   async function calendar(event: FormEvent<HTMLFormElement>, exception: boolean) {
     event.preventDefault(); if (!selected) return; const formElement = event.currentTarget, values = new FormData(formElement);
     await mutate(async () => {
-      const payload: Record<string, string | number> = exception ? { collaborator_id: selected.id, starts_at: `${values.get("starts")}Z`, ends_at: `${values.get("ends")}Z`, kind: String(values.get("kind")), reason: String(values.get("reason") ?? "") }
-        : { collaborator_id: selected.id, weekday: Number(values.get("weekday")), starts_at: String(values.get("starts")), ends_at: String(values.get("ends")), slot_interval_minutes: 30 };
+      const startValue = String(values.get("starts") ?? ""), endValue = String(values.get("ends") ?? "");
+      const payload: Record<string, string | number> = exception ? { collaborator_id: selected.id, starts_at: localDateTimeInputToInstant(startValue, timeZone, "start").toISOString(), ends_at: localDateTimeInputToInstant(endValue, timeZone, "end").toISOString(), kind: String(values.get("kind")), reason: String(values.get("reason") ?? "") }
+        : { collaborator_id: selected.id, weekday: Number(values.get("weekday")), starts_at: startValue, ends_at: endValue, slot_interval_minutes: 30 };
       const result = await api().from(exception ? "collaborator_exceptions" : "collaborator_hours").insert(payload);
       if (result.error) throw result.error; formElement.reset();
     }, "Disponibilités enregistrées. Les éventuels rendez-vous à réaffecter sont signalés dans l’agenda.");
   }
   if (loading) return <p role="status">Chargement de l’équipe…</p>;
   return <div className="team-management">
-    <header><h2>Mon équipe</h2><p>Les fiches d’équipe gèrent les prestations et les horaires. Les accès de compte sont séparés et limités aux permissions attribuées côté serveur. Les horaires sont affichés à l’heure du Sénégal.</p></header>
+    <header><h2>Mon équipe</h2><p>Les fiches d’équipe gèrent les prestations et les horaires. Les accès de compte sont séparés et limités aux permissions attribuées côté serveur. Les horaires suivent le fuseau du salon ({timeZone}).</p></header>
     {message && <p className="salon-feedback" role="status">{message}</p>}
     {!collaboratorAccessEnabled && <p className="salon-feedback" role="status">Les invitations, rôles de compte et permissions sont désactivés jusqu’à validation et application de la migration de sécurité.</p>}
     {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><h3>Inviter un collaborateur</h3><p>Le lien est à usage unique, envoyé à l’adresse indiquée et expire après 48 heures.</p>
@@ -232,20 +234,24 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
       <form className="salon-form" onSubmit={event => void calendar(event, false)}><label>Jour<select name="weekday">{weekdays.map((day, index) => <option key={day} value={index}>{day}</option>)}</select></label><label>Début<input name="starts" type="time" required /></label><label>Fin<input name="ends" type="time" required /></label><button disabled={busy}>Ajouter une plage</button></form>
       {hours.filter(h => h.collaborator_id === selected.id).map(h => <div className="team-toolbar" key={h.id}><span>{weekdays[h.weekday]} : {h.starts_at.slice(0, 5)}–{h.ends_at.slice(0, 5)}</span><button disabled={busy} onClick={() => void mutate(async () => { const r = await api().from("collaborator_hours").delete().eq("id", h.id); if (r.error) throw r.error; }, "Plage retirée.")}>Retirer la plage</button></div>)}
       <h4>Absence ou horaires particuliers</h4><form className="salon-form" onSubmit={event => void calendar(event, true)}><label>Type<select name="kind"><option value="leave">Congé</option><option value="rest">Repos</option><option value="absence">Absence exceptionnelle</option><option value="hours">Horaires particuliers de la journée</option></select></label><label>Motif<input name="reason" maxLength={240} /></label><label>Du<input name="starts" type="datetime-local" required /></label><label>Au<input name="ends" type="datetime-local" required /></label><button disabled={busy}>Enregistrer l’exception</button></form>
-      {absences.filter(a => a.collaborator_id === selected.id).map(a => <div className="team-toolbar" key={a.id}><span>{a.starts_at.slice(0, 10)} {time(a.starts_at)} → {a.ends_at.slice(0, 10)} {time(a.ends_at)} · {a.reason || (a.kind === "hours" ? "Horaires particuliers" : "Indisponibilité")}</span><button disabled={busy} onClick={() => void mutate(async () => { const r = await api().from("collaborator_exceptions").delete().eq("id", a.id); if (r.error) throw r.error; }, "Exception retirée.")}>Retirer l’exception</button></div>)}
+      {absences.filter(a => a.collaborator_id === selected.id).map(a => <div className="team-toolbar" key={a.id}><span>{new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeZone }).format(new Date(a.starts_at))} {time(a.starts_at,timeZone)} → {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeZone }).format(new Date(a.ends_at))} {time(a.ends_at,timeZone)} · {a.reason || (a.kind === "hours" ? "Horaires particuliers" : "Indisponibilité")}</span><button disabled={busy} onClick={() => void mutate(async () => { const r = await api().from("collaborator_exceptions").delete().eq("id", a.id); if (r.error) throw r.error; }, "Exception retirée.")}>Retirer l’exception</button></div>)}
     </article>}
-    <TeamAgenda businessId={businessId} revision={revision} />
+    <TeamAgenda businessId={businessId} timeZone={timeZone} revision={revision} />
   </div>;
 }
 
-export function TeamAgenda({ businessId, revision = 0 }: { businessId: string; revision?: number }) {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10)), [filter, setFilter] = useState("");
+export function TeamAgenda({ businessId, timeZone = "UTC", revision = 0 }: { businessId: string; timeZone?: string; revision?: number }) {
+  const [date, setDate] = useState(() => localDateAt(new Date(), timeZone)), [filter, setFilter] = useState("");
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [rows, setRows] = useState<Appointment[]>([]), [message, setMessage] = useState("");
   const [selected, setSelected] = useState<Appointment | null>(null), [candidates, setCandidates] = useState<Candidate[]>([]), [history, setHistory] = useState<Assignment[]>([]), [busy, setBusy] = useState(false);
   const [reassigning, setReassigning] = useState(false);
   const lock = useRef(false);
   const load = useCallback(async () => { const r = await api().rpc("get_team_agenda", { target_business_id: businessId, from_date: date, days: 7 }); if (r.error) throw r.error; setRows((r.data ?? []) as Appointment[]); setCurrentTime(Date.now()); }, [businessId, date]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDate(localDateAt(new Date(), timeZone)), 0);
+    return () => window.clearTimeout(timer);
+  }, [timeZone]);
   useEffect(() => { const timer = window.setTimeout(() => void load().catch(error => setMessage(publicErrorMessage(error, "Agenda indisponible."))), 0); return () => window.clearTimeout(timer); }, [load, revision]);
   useEffect(() => { const timer = window.setInterval(() => setCurrentTime(Date.now()), 30000); return () => window.clearInterval(timer); }, []);
   const canReassign = (row: Appointment, at = currentTime) => ["pending", "confirmed"].includes(row.status) && Date.parse(row.starts_at) > at;
@@ -265,11 +271,11 @@ export function TeamAgenda({ businessId, revision = 0 }: { businessId: string; r
     finally { lock.current = false; setBusy(false); }
   }
   const people = [...new Map(rows.map(row => [row.collaborator_id ?? "pending", row.collaborator_name ?? "À affecter"])).entries()];
-  return <article className="workspace-panel salon-panel"><h2>Agenda par collaborateur</h2><p>Semaine à partir de la date choisie · heure du Sénégal.</p>
+  return <article className="workspace-panel salon-panel"><h2>Agenda par collaborateur</h2><p>Semaine à partir de la date choisie · heure du salon ({timeZone}).</p>
     <div className="salon-form"><label>Début de semaine<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label><label>Employé<select value={filter} onChange={e => setFilter(e.target.value)}><option value="">Tous</option>{people.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label><button onClick={() => void load().catch(error => setMessage(publicErrorMessage(error, "Actualisation impossible.")))}>Actualiser</button></div>
     {message && <p role="status">{message}</p>}
     <div className="team-cards">{people.filter(([id]) => !filter || filter === id).map(([id, name]) => <section key={id}><h3>{name}</h3>{rows.filter(row => (row.collaborator_id ?? "pending") === id).map(row => <article className="team-appointment" key={row.id} id={`booking-${row.id}`}>
-      <strong>{row.client_name} · {row.service_title}</strong><p>{row.starts_at.slice(0, 10)} · {time(row.starts_at)}–{time(row.ends_at)} · {Math.round((Date.parse(row.ends_at) - Date.parse(row.starts_at)) / 60000)} min</p><p>{statusNames[row.status] ?? row.status}</p>
+      <strong>{row.client_name} · {row.service_title}</strong><p>{new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeZone }).format(new Date(row.starts_at))} · {time(row.starts_at, timeZone)}–{time(row.ends_at, timeZone)} · {Math.round((Date.parse(row.ends_at) - Date.parse(row.starts_at)) / 60000)} min</p><p>{statusNames[row.status] ?? row.status}</p>
       {row.assignment_conflict && <p role="alert">Indisponibilité : réaffectation à prévoir. Contactez le client pour convenir d’un autre créneau si nécessaire.</p>}
       <button onClick={() => void open(row, false)}>Voir l’historique</button>
       {canReassign(row) && <button onClick={() => void open(row, true)}>Réaffecter</button>}

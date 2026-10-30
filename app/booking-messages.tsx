@@ -58,13 +58,19 @@ export function BookingMessages({
   const [error, setError] = useState(supabase ? "" : "Supabase n’est pas configuré.");
   const [refreshError, setRefreshError] = useState("");
   const [context, setContext] = useState<{ name: string; startsAt: string; status: string; profilePath?: string | null } | null>(null);
+  const [timeZone, setTimeZone] = useState("UTC");
   const [contextError, setContextError] = useState("");
   const sendingRef = useRef(false);
   const loadingOlderRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
   const olderScroll = useRef<{ height: number; top: number } | null>(null);
-  const dateTime = useMemo(() => new Intl.DateTimeFormat("fr-SN", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }), []);
+  const dateTime = useMemo(() => new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone }), [timeZone]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!supabase) return;

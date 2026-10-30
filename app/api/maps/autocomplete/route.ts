@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-const querySchema = z.object({ input: z.string().trim().min(3).max(180), sessionToken: z.string().uuid().optional() });
+const querySchema = z.object({ input: z.string().trim().min(3).max(180), sessionToken: z.string().uuid().optional(), countryCode: z.string().regex(/^[A-Za-z]{2}$/).optional(), languageCode: z.string().regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/).optional() });
 
 export async function GET(request: Request) {
   const key = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!key) return NextResponse.json({ suggestions: [], configured: false }, { status: 503 });
   const url = new URL(request.url);
-  const parsed = querySchema.safeParse({ input: url.searchParams.get("input"), sessionToken: url.searchParams.get("sessionToken") ?? undefined });
+  const parsed = querySchema.safeParse({ input: url.searchParams.get("input"), sessionToken: url.searchParams.get("sessionToken") ?? undefined, countryCode: url.searchParams.get("countryCode") ?? undefined, languageCode: url.searchParams.get("languageCode") ?? undefined });
   if (!parsed.success) return NextResponse.json({ error: "Recherche d’adresse invalide." }, { status: 400 });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6000);
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const response = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": "suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat" },
-      body: JSON.stringify({ input: parsed.data.input, includedRegionCodes: ["sn"], languageCode: "fr", regionCode: "SN", sessionToken: parsed.data.sessionToken }),
+      body: JSON.stringify({ input: parsed.data.input, ...(parsed.data.countryCode ? { includedRegionCodes: [parsed.data.countryCode.toLowerCase()] } : {}), languageCode: parsed.data.languageCode ?? "fr", ...(parsed.data.countryCode ? { regionCode: parsed.data.countryCode.toUpperCase() } : {}), sessionToken: parsed.data.sessionToken }),
       signal: controller.signal,
       cache: "no-store",
     });
