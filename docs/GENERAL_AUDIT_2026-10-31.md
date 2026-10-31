@@ -24,7 +24,7 @@ NO-GO pour un lancement international. La disponibilité du site national ne con
 | P1 avant promesse internationale | Langues | html lang=fr ; choix fr/en/es proposés, mais feedText ne traduit que l'anglais avec repli français et nombreuses vues en français | Définir les langues réellement lancées ; compléter UI, erreurs, notifications et contenus légaux ; vérifier langue déclarée et navigation |
 | P2 | SEO international | Métadonnées racine ciblent Dakar/Sénégal et Open Graph fr_SN | Préparer pages/localisation et métadonnées adaptées aux marchés ; éviter de supprimer le ciblage national sans stratégie |
 | P2 | Assurance qualité continue | Aucun dossier .github dans le checkout ; contrôles actuellement exécutés manuellement | Vérifier les CI externes et ajouter une barrière qualité sur le commit candidat ; ne pas assimiler READY Vercel à une recette réussie |
-| À vérifier | Dépendances | pnpm audit --prod lancé, aucun résultat JSON exploitable à la rédaction | Pas de déclaration « zéro vulnérabilité » ; obtenir et analyser un rapport fournisseur complet |
+| P0 avant lancement | Dépendances | pnpm audit --prod terminé : 15 avis, dont 5 critiques, 6 élevés, 3 modérés et 1 faible | Mettre à niveau et retester Next.js, Sharp, Zod et source-map-js ; vérifier l'applicabilité de chaque avis |
 | À vérifier | Sauvegarde / restauration | Aucun exercice de restauration effectué dans cette intervention | Vérifier sauvegarde récente, restauration isolée et procédure de rollback applicatif et de données avant migration Production |
 
 ## Éléments positifs vérifiés
@@ -54,3 +54,22 @@ Références fournisseur : https://supabase.com/docs/guides/database/database-li
 5. Vérifier sauvegarde/restauration et coordonner schéma/code ; déployer le commit testé puis contrôler le domaine et les erreurs runtime.
 
 Le GO ne sera justifié qu'après clôture des P0 et des conditions pertinentes P1 avec preuves. Les champs réservés à la recette non exécutée ne doivent jamais être présentés comme PASS.
+
+## Résultat final du contrôle des dépendances
+
+Rapport pnpm audit --prod : 15 avis (5 critiques, 6 élevés, 3 modérés, 1 faible), sur l'arbre runtime déclaré. Ce résultat ne démontre aucune compromission et ne permet pas de considérer tous les avis comme exploitables sur Vercel.
+
+| Dépendance | Version du projet | Version corrigée selon les avis les plus récents du rapport |
+| --- | --- | --- |
+| Next.js | 16.2.11 | >=16.4.1 |
+| Sharp | 0.35.0 | >=0.35.5 |
+| Zod | 4.4.3 résolue | >=4.6.6 |
+| source-map-js | version transitive signalée <1.2.2 | >=1.2.2 |
+
+Références remontées par le registre :
+- Next.js : https://github.com/advisories/GHSA-2464-fhr4-w9xw ; https://github.com/advisories/GHSA-673q-mjm6-r5xr ; https://github.com/advisories/GHSA-p3m5-59mp-jv5r
+- Sharp : https://github.com/advisories/GHSA-wq5f-xc86-pv6w
+- Zod : https://github.com/advisories/GHSA-mrhx-c7xc-m3w5
+- source-map-js : https://github.com/advisories/GHSA-68fv-2mgg-jv7q
+
+La mise à niveau n'a pas été effectuée dans cet audit. Elle doit inclure les dépendances compatibles, le lockfile, tous les contrôles du projet et une nouvelle recette, plutôt qu'un déploiement automatique d'une version supposée corrigée.
