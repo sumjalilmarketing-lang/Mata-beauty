@@ -136,10 +136,12 @@ export function LiveDashboard({
       return service?.business_id ?? null;
     }).filter((id): id is string => Boolean(id)))];
     const [providerResult, profileResult, businessResult] = await Promise.all([
-      supabase.from("provider_profiles").select("profile_id,business_name,slug,city,area,base_address,cover_url").in("profile_id", providerIds),
+      supabase.from("provider_profiles").select("profile_id,business_name,slug,city,base_address,cover_url").in("profile_id", providerIds),
       supabase.from("profiles").select("id,avatar_url").in("id", providerIds),
       businessIds.length ? supabase.from("businesses").select("id,name,address,city,area,logo_url").in("id", businessIds) : Promise.resolve({ data: [], error: null }),
     ]);
+    if (providerResult.error) throw providerResult.error;
+    if (businessResult.error) throw businessResult.error;
     const providers = new Map(((providerResult.data ?? []) as ProviderBookingIdentity[]).map((item) => [item.profile_id, item]));
     const avatars = new Map(((profileResult.data ?? []) as Array<{ id: string; avatar_url: string | null }>).map((item) => [item.id, item.avatar_url]));
     const businesses = new Map(((businessResult.data ?? []) as BusinessBookingIdentity[]).map((item) => [item.id, item]));
@@ -151,7 +153,7 @@ export function LiveDashboard({
       const providerName = business?.name || provider?.business_name || "Professionnel";
       const address = business
         ? [business.address, business.area, business.city].filter(Boolean).join(", ")
-        : [provider?.base_address, provider?.area, provider?.city].filter(Boolean).join(", ");
+        : [provider?.base_address, provider?.city].filter(Boolean).join(", ");
       return {
         id: row.id,
         groupId: businessId ? `business:${businessId}` : `provider:${row.provider_id}`,
@@ -500,8 +502,9 @@ export function LiveDashboard({
   }
 
   const show = (...keys: string[]) => !moduleKey || keys.includes(moduleKey);
+  const DashboardContainer = moduleKey ? "section" : "main";
   return (
-    <main className={moduleKey ? "focused-dashboard" : "dashboard"}>
+    <DashboardContainer className={moduleKey ? "focused-dashboard" : "dashboard"}>
       {!moduleKey && <aside className="sidebar">
         <button className="brand brand-button" onClick={onBack}><span className="brand-mark">M</span><span>Mata <i>Beauty</i></span></button>
         <p className="role-pill">Espace {role}</p>
@@ -645,7 +648,7 @@ export function LiveDashboard({
         )}
         {show("notifications") && <article className="panel notifications-panel" id="live-notifications"><NotificationCenter userId={userId} /></article>}
       </section>
-    </main>
+    </DashboardContainer>
   );
 }
 
