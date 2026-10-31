@@ -56,3 +56,7 @@ Précontrôle supplémentaire en lecture seule : aucun service actif d’un salo
 - La connexion normale du propriétaire du dossier fictif est préparée dans Chrome, sans saisie ni lecture de mot de passe. Son authentification et les quatre pièces TEST restent nécessaires pour soumettre puis approuver le dossier par le parcours normal. La session Super Admin ne doit pas être utilisée pour créer un dossier professionnel à la place de ce propriétaire.
 
 Décision maintenue : **NO-GO international public complet**, jusqu’à la clôture des parcours navigateur, de la concurrence et de la préparation coordonnée du candidat Production. La version nationale publiée reste en place ; aucun schéma ou compte de Supabase Production n’a été modifié pendant ce point de reprise.
+
+## Actualisation du correctif d’authentification
+
+La source internationale courante est maintenant `6feaa7bd7836c3b388e5942e658f9684585a7807`, sur la Preview isolée `dpl_7JSQnvsRFw7W546P6mSjac2NJHdm` READY. La Production nationale est sur `67358b2d09d0d9feefdb6cd57e77f717b003143c`, déploiement `dpl_A8bjqtpzfUN83wvXe3V8ZbSjFjTS` READY. Les changements portent uniquement sur la confirmation et les messages d’authentification ; aucune source SQL parmi les onze migrations n’a changé. Voir AUTH_EMAIL_RECOVERY_2026-10-31.md pour les preuves et limites. Le compte fictif sans mot de passe disponible et sans boîte de réception contrôlée reste un blocage de recette ; répéter la récupération sur cette adresse ne le résout pas.
