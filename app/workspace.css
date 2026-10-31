@@ -162,3 +162,5 @@
 .workspace-layout:is(.workspace-pro,.workspace-salon) .workspace-nav-group a>span { color: #62505a; }
 .workspace-layout .workspace-account { background: linear-gradient(135deg,#86124f,#b52165); }
 .workspace-layout .workspace-quick-publish { background: linear-gradient(135deg,#86124f,#b52165); }
+
+.workspace-layout .launch-checklist .panel-heading>strong,.workspace-layout .professional-photo { color:#fff; background:linear-gradient(135deg,#86124f,#b52165); }
