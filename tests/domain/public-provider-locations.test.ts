@@ -47,20 +47,32 @@ describe("public professional location metadata", () => {
     expect(mocks.service).not.toHaveBeenCalled();
   });
 
-  it("returns only country codes for approved providers among the requested IDs", async () => {
-    const db = service([{ profile_id: approvedId }], [
-      { id: approvedId, country_code: "SN" },
-      { id: otherId, country_code: "FR" },
-      { id: approvedId, country_code: "Senegal" },
-    ]);
+  it("uses the establishment's country and never the owner's private profile", async () => {
+    const db = service([
+      { profile_id: approvedId, country_code: "FR" },
+      { profile_id: otherId, country_code: "Senegal" },
+    ], [{ id: approvedId, country_code: "SN" }]);
     const response = await GET(request(`${approvedId},${otherId}`));
-
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual([{ providerId: approvedId, countryCode: "SN" }]);
+    expect(await response.json()).toEqual([{ providerId: approvedId, countryCode: "FR" }]);
     expect(db.approvedQuery.eq).toHaveBeenCalledWith("status", "approved");
     expect(db.approvedQuery.in).toHaveBeenCalledWith("profile_id", [approvedId, otherId]);
-    expect(db.locationQuery.in).toHaveBeenCalledWith("id", [approvedId]);
+    expect(db.from.mock.calls.every(([table]) => table === "provider_profiles")).toBe(true);
     expect(response.headers.get("cache-control")).toContain("s-maxage=300");
+  });
+
+  it("omits unknown countries on the legacy schema without reading personal profiles", async () => {
+    const db = service(null, [{ id: approvedId, country_code: "SN" }], { code: "42703", message: "column does not exist" });
+    const response = await GET(request(approvedId));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([]);
+    expect(db.from).toHaveBeenCalledTimes(1);
+    expect(db.from).toHaveBeenCalledWith("provider_profiles");
+  });
+
+  it("does not publish unrequested or invalid country records", async () => {
+    service([{ profile_id: otherId, country_code: "US" }, { profile_id: approvedId, country_code: null }], []);
+    expect(await (await GET(request(approvedId))).json()).toEqual([]);
   });
 
   it("fails closed without leaking database errors", async () => {

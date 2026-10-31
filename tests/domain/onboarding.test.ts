@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateProfessionalOnboardingProgress, canSubmitProfessionalOnboarding } from "../../lib/domain/onboarding";
+import { calculateProfessionalOnboardingProgress, canSubmitProfessionalOnboarding, countReceivedProfessionalDocuments } from "../../lib/domain/onboarding";
 
 const complete = {
   businessName: "Mata Studio",
@@ -20,5 +20,20 @@ describe("professional onboarding", () => {
     const draft = { ...complete, address: "", cancellationPolicy: "" };
     expect(calculateProfessionalOnboardingProgress(draft)).toBe(50);
     expect(canSubmitProfessionalOnboarding(draft)).toBe(false);
+  });
+
+  it("requires four distinct required document types", () => {
+    expect(countReceivedProfessionalDocuments([])).toBe(0);
+    expect(countReceivedProfessionalDocuments(Array.from({ length: 4 }, () => ({ kind: "identity", status: "approved" })))).toBe(1);
+    expect(countReceivedProfessionalDocuments([{ kind: "other", status: "approved" }])).toBe(0);
+  });
+  it("counts documents awaiting review without claiming they are approved", () => {
+    const documents = ["identity", "business_registration", "qualification", "address_proof"].map(kind => ({ kind, status: "pending" }));
+    expect(countReceivedProfessionalDocuments(documents)).toBe(4);
+  });
+  it("requires replacement of a rejected latest version", () => {
+    const documents = [{ kind: "identity", status: "rejected" }, { kind: "identity", status: "approved" }, { kind: "qualification", status: "pending" }];
+    expect(countReceivedProfessionalDocuments(documents)).toBe(1);
+    expect(countReceivedProfessionalDocuments([{ kind: "identity", status: "unknown" }])).toBe(0);
   });
 });

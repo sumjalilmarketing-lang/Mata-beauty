@@ -329,7 +329,7 @@ test("the audit hardening keeps identity verification, booking prices, and sandb
   for (const route of [releaseRoute, createRoute, refundRoute, webhookRoute]) {
     assert.match(route, /SECURITY_CONTROL_UNAVAILABLE/);
   }
-  assert.match(paymentServer, /VERCEL_ENV !== "production"/);
+  assert.match(paymentServer, /resolveApplicationOrigin/);
   assert.match(createRoute, /applicationOrigin\(request\)/);
   assert.match(createRoute, /PAYMENT_SANDBOX_UNAVAILABLE/);
   assert.match(createRoute, /checkoutUrlForReference/);
