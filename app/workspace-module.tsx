@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatRecordedMoney } from "@/lib/domain/admin-money";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { WorkspaceModule, WorkspaceSpaceKey } from "@/lib/navigation/spaces";
@@ -31,23 +32,23 @@ type ResourceDefinition = { table: string; select: string; title: (row: Row) => 
 
 const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, ResourceDefinition>> = {
   bookings: { table: "bookings", select: "id,status,starts_at,total_amount", title: (row) => `Rendez-vous ${shortId(row.id)}`, meta: (row) => `${label(row.status)} · ${date(row.starts_at)}` },
-  payments: { table: "payments", select: "id,payment_status,amount,gross_amount,platform_fee,professional_net_amount,created_at", title: (row) => `${money(row.gross_amount ?? row.amount)}`, meta: (row) => `${label(row.payment_status)} · Commission ${money(row.platform_fee)} · Net ${money(row.professional_net_amount)} · ${date(row.created_at)}` },
+  payments: { table: "payments", select: "id,payment_status,amount,gross_amount,platform_fee,professional_net_amount,currency,created_at", title: (row) => `${money(row.gross_amount ?? row.amount, row.currency)}`, meta: (row) => `${label(row.payment_status)} · Commission ${money(row.platform_fee, row.currency)} · Net ${money(row.professional_net_amount, row.currency)} · ${date(row.created_at)}` },
   notifications: { table: "notifications", select: "id,title,body,created_at,read_at", title: (row) => text(row.title, "Notification"), meta: (row) => `${text(row.body, "")} · ${date(row.created_at)}` },
   messages: { table: "messages", select: "id,body,created_at", title: (row) => text(row.body, "Message"), meta: (row) => date(row.created_at) },
   profiles: { table: "profiles", select: "id,first_name,last_name,role", title: (row) => `${text(row.first_name, "Compte")} ${text(row.last_name, "")}`.trim(), meta: (row) => label(row.role) },
   providers: { table: "provider_profiles", select: "profile_id,business_name,status,city", title: (row) => text(row.business_name, "Professionnel"), meta: (row) => `${label(row.status)} · ${text(row.city, "Ville non renseignée")}` },
   businesses: { table: "businesses", select: "id,name,status,city", title: (row) => text(row.name, "Salon"), meta: (row) => `${label(row.status)} · ${text(row.city, "Ville non renseignée")}` },
   collaborators: { table: "collaborators", select: "id,display_name,title,is_active", title: (row) => text(row.display_name, "Collaborateur"), meta: (row) => `${text(row.title, "Équipe")} · ${row.is_active ? "Actif" : "Inactif"}` },
-  services: { table: "provider_services", select: "id,title,price_amount,is_active", title: (row) => text(row.title, "Prestation"), meta: (row) => `${money(row.price_amount)} · ${row.is_active ? "Active" : "Inactive"}` },
+  services: { table: "provider_services", select: "id,title,price_amount,currency,is_active", title: (row) => text(row.title, "Prestation"), meta: (row) => `${money(row.price_amount, row.currency)} · ${row.is_active ? "Active" : "Inactive"}` },
   videos: { table: "posts", select: "id,caption,status,created_at", title: (row) => text(row.caption, "Publication"), meta: (row) => `${label(row.status)} · ${date(row.created_at)}` },
   reviews: { table: "reviews", select: "id,rating,comment,is_visible,created_at", title: (row) => `${text(row.rating, "–")}/5 · ${text(row.comment, "Avis")}`, meta: (row) => `${row.is_visible ? "Visible" : "Masqué"} · ${date(row.created_at)}` },
   reports: { table: "reports", select: "id,reason,status,created_at", title: (row) => text(row.reason, "Demande"), meta: (row) => `${label(row.status)} · ${date(row.created_at)}` },
   audit: { table: "audit_logs", select: "id,action,created_at", title: (row) => label(row.action), meta: (row) => date(row.created_at) },
-  wallets: { table: "wallet_balances", select: "wallet_id,professional_id,currency,pending_balance,available_balance,total_earned,total_paid_out", title: (row) => `Professionnel ${shortId(row.professional_id)}`, meta: (row) => `Disponible ${money(row.available_balance)} · En attente ${money(row.pending_balance)} · Versé ${money(row.total_paid_out)}` },
-  payouts: { table: "payouts", select: "id,provider_id,amount,currency,status,created_at", title: (row) => `${money(row.amount)} · ${label(row.status)}`, meta: (row) => `Professionnel ${shortId(row.provider_id)} · ${date(row.created_at)}` },
+  wallets: { table: "wallet_balances", select: "wallet_id,professional_id,currency,pending_balance,available_balance,total_earned,total_paid_out", title: (row) => `Professionnel ${shortId(row.professional_id)}`, meta: (row) => `Disponible ${money(row.available_balance, row.currency)} · En attente ${money(row.pending_balance, row.currency)} · Versé ${money(row.total_paid_out, row.currency)}` },
+  payouts: { table: "payouts", select: "id,provider_id,amount,currency,status,created_at", title: (row) => `${money(row.amount, row.currency)} · ${label(row.status)}`, meta: (row) => `Professionnel ${shortId(row.provider_id)} · ${date(row.created_at)}` },
   reconciliation: { table: "reconciliation_runs", select: "id,provider,environment,status,matched_count,mismatch_count,missing_count,started_at", title: (row) => `${text(row.provider, "Fournisseur")} · ${label(row.status)}`, meta: (row) => `${text(row.environment, "")} · Écarts ${Number(row.mismatch_count)} · Manquants ${Number(row.missing_count)} · ${date(row.started_at)}` },
   "financial-events": { table: "financial_security_events", select: "id,event_type,severity,transaction_reference,created_at", title: (row) => `${label(row.event_type)} · ${label(row.severity)}`, meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` },
-  commissions: { table: "platform_commissions", select: "id,payment_id,rate,amount,currency,created_at", title: (row) => `${money(row.amount)} · ${Number(row.rate)} %`, meta: (row) => `Paiement ${shortId(row.payment_id)} · ${date(row.created_at)}` },
+  commissions: { table: "platform_commissions", select: "id,payment_id,rate,amount,currency,created_at", title: (row) => `${money(row.amount, row.currency)} · ${Number(row.rate)} %`, meta: (row) => `Paiement ${shortId(row.payment_id)} · ${date(row.created_at)}` },
   disputes: { table: "disputes", select: "id,booking_id,priority,status,reason,created_at", title: (row) => `${text(row.reason, "Litige")} · ${label(row.status)}`, meta: (row) => `${label(row.priority)} · ${date(row.created_at)}` },
   sessions: { table: "admin_sessions", select: "id,user_id,signed_in_at,last_seen_at,mfa_verified,revoked_at", title: (row) => `Compte ${shortId(row.user_id)} · ${row.revoked_at ? "Révoquée" : "Enregistrée"}`, meta: (row) => `MFA ${row.mfa_verified ? "vérifié" : "non vérifié"} · Dernière activité ${date(row.last_seen_at)}` },
   promotions: { table: "promotions", select: "id,title,status,is_active,starts_at,ends_at", title: (row) => text(row.title, "Promotion"), meta: (row) => `${label(row.status)} · ${row.is_active ? "Active" : "Inactive"} · ${date(row.starts_at)} → ${date(row.ends_at)}` },
@@ -60,7 +61,7 @@ const fraudAlerts: ResourceDefinition = { table: "fraud_alerts", select: "id,ale
 const onboardingHistory: ResourceDefinition = { table: "onboarding_events", select: "id,provider_id,action,reason,created_at", title: (row) => `${label(row.action)} · ${shortId(row.provider_id)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
 const moderationHistory: ResourceDefinition = { table: "moderation_actions", select: "id,target_id,action,reason,created_at", title: (row) => `${label(row.action)} · ${shortId(row.target_id)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
 const financialHistory: ResourceDefinition = { table: "financial_audit_log", select: "id,action,transaction_reference,created_at", title: (row) => label(row.action), meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` };
-const refunds: ResourceDefinition = { table: "refunds", select: "id,payment_id,amount,status,reason,created_at", title: (row) => `${money(row.amount)} · ${label(row.status)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
+const refunds: ResourceDefinition = { table: "refunds", select: "id,payment_id,amount,status,reason,created_at,payments(currency)", title: (row) => `${money(row.amount, paymentCurrency(row.payments))} · ${label(row.status)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
 
 export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved, staffCanReply, staffCanManageBookings, collaboratorAccessEnabled = false }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean; staffCanReply: boolean; staffCanManageBookings: boolean; collaboratorAccessEnabled?: boolean }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
@@ -163,4 +164,8 @@ function text(value: unknown, fallback: string) { return typeof value === "strin
 function label(value: unknown) { return text(value, "Non renseigné").replaceAll("_", " "); }
 function shortId(value: unknown) { return text(value, "").slice(0, 8).toUpperCase(); }
 function date(value: unknown) { if (typeof value !== "string") return "Date non renseignée"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "Date non renseignée" : new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(parsed); }
-function money(value: unknown) { const amount = typeof value === "number" ? value : Number(value); return Number.isFinite(amount) ? new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 }).format(amount) : "Montant non renseigné"; }
+function paymentCurrency(value: unknown) {
+  const payment = Array.isArray(value) ? value[0] : value;
+  return payment && typeof payment === "object" && "currency" in payment ? payment.currency : null;
+}
+function money(value: unknown, currency: unknown) { return formatRecordedMoney(value, currency); }

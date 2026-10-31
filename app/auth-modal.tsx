@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { authErrorMessage } from "@/lib/auth/errors";
+import { requestEmailSignIn } from "@/lib/auth/email-sign-in";
 import { meetsPasswordPolicy, passwordPolicyMessage } from "@/lib/auth/password-policy";
 import { ensureAuthenticatedProfile, type AuthenticatedProfile } from "@/lib/auth/profile";
 import { safeOAuthDestination } from "@/lib/auth/redirect";
@@ -28,7 +29,7 @@ const authSchema = z.object({
 });
 
 type AuthValues = z.infer<typeof authSchema>;
-type AuthMode = "login" | "register" | "reset";
+type AuthMode = "login" | "register" | "reset" | "confirm" | "email-link";
 export type { AuthenticatedProfile } from "@/lib/auth/profile";
 
 export function AuthModal({
@@ -74,6 +75,21 @@ export function AuthModal({
     }
     submitting.current = true;
     try {
+      if (mode === "email-link") {
+        await requestEmailSignIn(supabase.auth, values.email, window.location.origin);
+        setFeedback("Si un compte correspond à cette adresse, un lien de connexion vous sera envoyé. Ouvrez le lien le plus récent dans ce navigateur. La vérification MFA reste nécessaire pour les accès internes.");
+        return;
+      }
+      if (mode === "confirm") {
+        const { error } = await supabase.auth.resend({
+          type: "signup",
+          email: values.email,
+          options: { emailRedirectTo: `${window.location.origin}/auth/confirm` },
+        });
+        if (error) throw error;
+        setFeedback("Si une inscription attend une confirmation à cette adresse, un nouveau lien vous sera envoyé. Consultez aussi vos courriers indésirables et utilisez le lien le plus récent.");
+        return;
+      }
       if (mode === "reset") {
         const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
           redirectTo: `${window.location.origin}/auth/update-password`,
@@ -124,8 +140,8 @@ export function AuthModal({
         });
         if (error) throw error;
         if (!data.session) {
-          setFeedback("Consultez votre boîte e-mail pour confirmer votre inscription. Si vous possédez déjà un compte, connectez-vous ou utilisez « Mot de passe oublié ».");
-          setMode("login");
+          setFeedback("Consultez votre boîte e-mail pour confirmer votre inscription. Vous pouvez demander un nouveau lien ci-dessous. Si votre compte est déjà confirmé, connectez-vous.");
+          setMode("confirm");
           reset({ ...values, password: "", confirmation: "" });
           return;
         }
@@ -201,7 +217,7 @@ export function AuthModal({
     }
   }
 
-  const title = mode === "login" ? "Se connecter" : mode === "register" ? "Créer votre compte Client" : "Mot de passe oublié";
+  const title = mode === "email-link" ? "Recevoir un lien de connexion" : mode === "login" ? "Se connecter" : mode === "register" ? "Créer votre compte Client" : mode === "confirm" ? "Confirmer votre adresse e-mail" : "Mot de passe oublié";
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -210,19 +226,19 @@ export function AuthModal({
         <div className="auth-brand"><span>M</span><div><strong>MATA</strong><small>BEAUTY</small></div></div>
         <p className="eyebrow">Compte sécurisé</p>
         <h2 id="auth-title">{title}</h2>
-        <p className="auth-lead">{mode === "login" ? "Retrouvez vos rendez-vous, favoris et recommandations personnalisées." : mode === "register" ? "Rejoignez l’expérience beauté premium pensée pour vous." : "Nous vous aidons à retrouver rapidement votre espace."}</p>
+        <p className="auth-lead">{mode === "login" ? "Retrouvez vos rendez-vous, favoris et recommandations personnalisées." : mode === "register" ? "Rejoignez l’expérience beauté premium pensée pour vous." : mode === "confirm" ? "Recevez un nouveau lien pour terminer votre inscription." : mode === "email-link" ? "Connectez-vous avec un lien envoyé à votre adresse e-mail." : "Nous vous aidons à retrouver rapidement votre espace."}</p>
         {!configuration.configured && (
           <div className="configuration-warning" role="alert">
             La connexion sécurisée est momentanément indisponible. Réessayez ultérieurement.
           </div>
         )}
-        {mode !== "reset" && <>
+        {(mode === "login" || mode === "register") && <>
           <button className="google-auth-button" type="button" onClick={() => void continueWithGoogle()} disabled={googleLoading || isSubmitting || !configuration.configured}>
             <span aria-hidden="true">G</span>{googleLoading ? "Ouverture de Google…" : "Continuer avec Google"}
           </button>
           <div className="auth-divider"><span>ou avec votre e-mail</span></div>
         </>}
-        <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
+        <form onSubmit={(event) => void handleSubmit(submit, () => setFeedback(""))(event)} noValidate>
           {mode === "register" && (
             <label>
               Nom complet
@@ -241,7 +257,7 @@ export function AuthModal({
             <input type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} {...register("email")} />
             {errors.email && <small className="field-error">{errors.email.message}</small>}
           </label>
-          {mode !== "reset" && (
+          {(mode === "login" || mode === "register") && (
             <label>
               Mot de passe
               <PasswordField
@@ -259,13 +275,15 @@ export function AuthModal({
           </>}
           {feedback && <p className="auth-feedback" role="status">{feedback}</p>}
           <button className="primary-button full" type="submit" disabled={isSubmitting || googleLoading || !configuration.configured}>
-            {isSubmitting ? "Veuillez patienter…" : mode === "login" ? "Se connecter" : mode === "register" ? "Créer le compte" : "Envoyer le lien"}
+            {isSubmitting ? "Veuillez patienter…" : mode === "login" ? "Se connecter" : mode === "register" ? "Créer le compte" : mode === "confirm" ? "Renvoyer la confirmation" : "Envoyer le lien"}
           </button>
         </form>
         <div className="auth-links">
-          {mode !== "login" && <button onClick={() => setMode("login")}>Déjà inscrit ? Se connecter</button>}
-          {mode === "login" && <button onClick={() => setMode("register")}>Créer un compte</button>}
-          {mode === "login" && <button onClick={() => setMode("reset")}>Mot de passe oublié</button>}
+          {mode !== "login" && <button onClick={() => { setFeedback(""); setMode("login"); }}>Déjà inscrit ? Se connecter</button>}
+          {mode === "login" && <button onClick={() => { setFeedback(""); setMode("register"); }}>Créer un compte</button>}
+          {mode === "login" && <button onClick={() => { setFeedback(""); setMode("reset"); }}>Mot de passe oublié</button>}
+          {mode === "login" && <button disabled={isSubmitting || googleLoading} onClick={() => { setFeedback(""); setMode("email-link"); }}>Recevoir un lien de connexion</button>}
+          {mode !== "confirm" && mode !== "register" && <button onClick={() => { setFeedback(""); setMode("confirm"); }}>Renvoyer la confirmation</button>}
         </div>
       </section>
     </div>

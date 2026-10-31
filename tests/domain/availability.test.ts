@@ -97,4 +97,24 @@ describe("availability generation in provider timezone", () => {
     expect(before[0]?.startsAt.toISOString()).toBe("2026-03-01T14:00:00.000Z");
     expect(after[0]?.startsAt.toISOString()).toBe("2026-03-15T13:00:00.000Z");
   });
+  it.each([
+    ["Europe/Paris", "2027-03-28", "2027-03-28T00:00:00.000Z"],
+    ["America/New_York", "2027-03-14", "2027-03-14T06:00:00.000Z"],
+  ])("fits elapsed duration before closing across the spring gap in %s", (timeZone, date, expected) => {
+    const slots = generateAvailableSlots({ date, timeZone,
+      rules: [{ weekday: 0, startsAt: "01:00", endsAt: "03:00", intervalMinutes: 30 }],
+      durationMinutes: 60, now: new Date("2027-01-01T00:00:00Z"), minimumNoticeMinutes: 0 });
+    expect(slots.map(slot => slot.startsAt.toISOString())).toEqual([expected]);
+  });
+
+  it("keeps the first repeated 02:30 when its elapsed duration still fits before closing", () => {
+    const slots = generateAvailableSlots({ date: "2027-10-31", timeZone: "Europe/Paris",
+      rules: [{ weekday: 0, startsAt: "01:00", endsAt: "03:00", intervalMinutes: 30 }],
+      durationMinutes: 60, now: new Date("2027-01-01T00:00:00Z"), minimumNoticeMinutes: 0 });
+    expect(slots.map(slot => slot.startsAt.toISOString())).toEqual([
+      "2027-10-30T23:00:00.000Z", "2027-10-30T23:30:00.000Z", "2027-10-31T00:00:00.000Z",
+      "2027-10-31T00:30:00.000Z", "2027-10-31T01:00:00.000Z",
+    ]);
+  });
+
 });

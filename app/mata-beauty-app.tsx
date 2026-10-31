@@ -264,7 +264,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       }
       if (authError) {
         const messages: Record<string, string> = {
-          email_link_invalid: "Le lien de confirmation est expiré, déjà utilisé ou invalide. Connectez-vous si votre adresse est déjà confirmée, ou demandez un nouveau lien depuis « Mot de passe oublié ».",
+          email_link_invalid: "Le lien de confirmation est expiré, déjà utilisé ou invalide. Connectez-vous si votre adresse est déjà confirmée, ou choisissez « Renvoyer la confirmation » pour terminer votre inscription.",
           email_confirmation_unavailable: "La confirmation est momentanément indisponible. Réessayez votre lien dans quelques instants.",
           google_cancelled: "Connexion Google annulée.", google_provider_error: "Google n’a pas pu autoriser la connexion.",
           invalid_callback: "Retour Google invalide.", oauth_exchange_failed: "La session Google a expiré. Recommencez.",

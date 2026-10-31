@@ -38,8 +38,8 @@ export async function HomeSeoDirectory() {
     "@type": "WebSite",
     name: "MATA Beauty",
     url: "https://mata-beauty.com/",
-    inLanguage: "fr-SN",
-    description: "Découvrez et réservez des prestations beauté auprès de professionnels au Sénégal.",
+    inLanguage: "fr",
+    description: "Découvrez et réservez des prestations beauté auprès des professionnels et salons publiés sur MATA Beauty.",
   };
 
   return <>

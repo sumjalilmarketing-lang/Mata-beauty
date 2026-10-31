@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { resolveApplicationOrigin } from "@/lib/auth/application-origin";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 
 function publicConfiguration() {
@@ -45,11 +46,12 @@ export function requestFingerprint(value: unknown) {
 }
 
 export function applicationOrigin(request: Request) {
-  const vercelUrl = process.env.VERCEL_URL;
-  if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production" && vercelUrl) {
-    return `https://${vercelUrl}`;
-  }
-  return process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+  return resolveApplicationOrigin(request.url, {
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_URL: process.env.VERCEL_URL,
+    VERCEL_BRANCH_URL: process.env.VERCEL_BRANCH_URL,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  });
 }
 
 export function hasTrustedOrigin(request: Request) {
