@@ -110,3 +110,8 @@ Un deuxième blocage de récupération est confirmé : le Dashboard affiche le s
 La correction des retours empêche les futurs liens autorisés de repartir sur localhost ; elle ne change pas le mot de passe enregistré et ne résout pas le refus invalid_credentials. La récupération complète exige soit un accès Admin Auth officiel correctement provisionné, soit une boîte dédiée accessible et un circuit SMTP de test autorisé. Les outils de gestion disponibles ne proposent pas l’API Admin Auth de rotation du mot de passe. Ne pas remplacer les hashes par SQL, ni créer d’endpoint privilégié de dépannage pour contourner les contrôles.
 
 Recette et GO restent non validés. Le correctif de configuration est réalisé ; ni réception d’e-mail ni connexion réussie du professionnel n’ont été observées. La mise en place du canal de récupération et du destinataire doit précéder toute nouvelle tentative de réinitialisation.
+
+
+## Audit technique complémentaire du retour d’invitation
+
+Le modèle d’invitation de test utilise ConfirmationURL (retour implicite par défaut), tandis que la page dédiée /auth/update-password restaure explicitement les retours avant initialisation PKCE. Le callback /auth/confirm dépend encore du service_role pour identifier une invitation interne ; cette dépendance reste à corriger et la clé serveur de test demeure vide. Les limites d’envoi et les renvois successifs doivent également faire partie des vérifications de récupération. Aucun identifiant de messagerie, destinataire réel ou détail privé de récupération n’est publié dans ce rapport.
