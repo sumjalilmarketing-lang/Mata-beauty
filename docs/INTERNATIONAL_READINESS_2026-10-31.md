@@ -115,3 +115,8 @@ Recette et GO restent non validés. Le correctif de configuration est réalisé 
 ## Audit technique complémentaire du retour d’invitation
 
 Le modèle d’invitation de test utilise ConfirmationURL (retour implicite par défaut), tandis que la page dédiée /auth/update-password restaure explicitement les retours avant initialisation PKCE. Le callback /auth/confirm dépend encore du service_role pour identifier une invitation interne ; cette dépendance reste à corriger et la clé serveur de test demeure vide. Les limites d’envoi et les renvois successifs doivent également faire partie des vérifications de récupération. Aucun identifiant de messagerie, destinataire réel ou détail privé de récupération n’est publié dans ce rapport.
+
+
+## Mise à jour — recette serveur internationale et audit général
+
+Le rapport `INTERNATIONAL_COMPLETION_AUDIT_2026-10-31.md` détaille quatre défauts reproduits puis corrigés exclusivement dans le projet test : éligibilité/calendrier lors des insertions de réservation, notifications d’affectation en heure locale, résultat SQL de la liste des comptes collaborateurs, et respect des jours fermés d’un salon sans équipe. Les tests d’intégration SQL des quatre rôles, Paris/EUR et New York/USD, annulation/libération, révocation et DST passent. Ils utilisent des fixtures annulées par rollback et ne constituent pas des connexions Auth ou une approbation dans l’interface. Le défaut d’insertion indépendante précédemment suspecté est désormais reproduit et corrigé dans le test. Le GO public complet reste suspendu aux contrôles navigateur authentifiés et à la concurrence entre transactions distinctes.
