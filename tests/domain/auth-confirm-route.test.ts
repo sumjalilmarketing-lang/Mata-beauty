@@ -26,6 +26,30 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("email confirmation route", () => {
+  it.each(["email", "signup"])("verifies a %s confirmation before opening the profile", async (type) => {
+    const result = await GET(new Request(`${origin}/auth/confirm?type=${type}&token_hash=test-hash`));
+    expect(mocks.verifyOtp).toHaveBeenCalledWith({ type, token_hash: "test-hash" });
+    expect(result.headers.get("location")).toBe(`${origin}/app/profile?auth=email_confirmed`);
+    expect(result.headers.get("cache-control")).toBe("no-store");
+    expect(result.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(mocks.rpc).toHaveBeenCalledWith("synchronize_account_status");
+    expect(mocks.service).not.toHaveBeenCalled();
+  });
+  it.each(["email_change", "sms", "unknown"])("refuses an unsupported %s token without session or profile access", async (type) => {
+    const result = await GET(new Request(`${origin}/auth/confirm?type=${type}&token_hash=test-hash`));
+    expect(result.headers.get("location")).toContain("auth_error=email_link_invalid");
+    expect(mocks.verifyOtp).not.toHaveBeenCalled();
+    expect(mocks.exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mocks.getUser).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("does not accept an expired email confirmation", async () => {
+    mocks.verifyOtp.mockResolvedValue({ error: { code: "otp_expired" } });
+    const result = await GET(new Request(`${origin}/auth/confirm?type=email&token_hash=expired`));
+    expect(result.headers.get("location")).toContain("auth_error=email_link_invalid");
+    expect(mocks.getUser).not.toHaveBeenCalled();
+    expect(mocks.welcome).not.toHaveBeenCalled();
+  });
   it("lets an ordinary invite reach password setup without an administrative key", async () => {
     const result = await GET(new Request(`${origin}/auth/confirm?type=invite&token_hash=test-hash`));
     expect(result.headers.get("location")).toBe(`${origin}/auth/update-password?mode=invite`);
