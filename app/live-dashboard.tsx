@@ -506,10 +506,11 @@ export function LiveDashboard({
   }
 
   const show = (...keys: string[]) => !moduleKey || keys.includes(moduleKey);
+  const DashboardContainer = moduleKey ? "section" : "main";
   const dashboardTimeZone = providerProfile?.timezone ?? (providerProfile?.country_code === "SN" ? "Africa/Dakar" : "UTC");
 
   return (
-    <main className={moduleKey ? "focused-dashboard" : "dashboard"}>
+    <DashboardContainer className={moduleKey ? "focused-dashboard" : "dashboard"}>
       {!moduleKey && <aside className="sidebar">
         <button className="brand brand-button" onClick={onBack}><span className="brand-mark">M</span><span>Mata <i>Beauty</i></span></button>
         <p className="role-pill">Espace {role}</p>
@@ -653,7 +654,7 @@ export function LiveDashboard({
         )}
         {show("notifications") && <article className="panel notifications-panel" id="live-notifications"><NotificationCenter userId={userId} /></article>}
       </section>
-    </main>
+    </DashboardContainer>
   );
 }
 
