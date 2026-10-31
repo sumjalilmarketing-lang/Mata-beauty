@@ -1,6 +1,6 @@
 # Bascule internationale de Mata Beauty — opération préparée
 
-État : plan préparé, **aucune migration Production exécutée**. Domaine mata-beauty.com ; Supabase Production `qjdwxdbvrxedyfolnpol`. Source internationale relue : code e4ff2c8c3421623e7311575b2d86dfe1e0e9424e et migrations ci-dessous, déjà appliquées dans mata-beauty-global-test.
+État : plan préparé, **aucune migration Production exécutée**. Domaine mata-beauty.com ; Supabase Production `qjdwxdbvrxedyfolnpol`. Source internationale relue : code 183b4266c7f182b7584ee9301a2d7a0b875ebc32 et migrations ci-dessous, déjà appliquées dans mata-beauty-global-test.
 
 L’instruction initiale de la mission était : « N’effectue aucune modification sur Supabase Production. » Une exception explicite à cette limite est nécessaire avant l’exécution de ces opérations sur cette base. La connexion MFA à l’administration n’accorde pas à elle seule cette exception.
 
