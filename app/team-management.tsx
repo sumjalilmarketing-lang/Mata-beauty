@@ -46,16 +46,17 @@ async function requestTeamApi<T>(businessId: string, method: "GET" | "POST", bod
 
 export function ProviderTeamAgenda({ userId }: { userId: string }) {
   const [businessId, setBusinessId] = useState<string | null>(null);
+  const [timeZone, setTimeZone] = useState("UTC");
   const [error, setError] = useState(false);
   useEffect(() => {
     let active = true;
-    void api().from("businesses").select("id").eq("owner_id", userId).is("archived_at", null).order("created_at").limit(1).maybeSingle().then(result => {
-      if (active) { setError(Boolean(result.error)); setBusinessId(result.data?.id ?? null); }
+    void api().from("businesses").select("id,timezone").eq("owner_id", userId).is("archived_at", null).order("created_at").limit(1).maybeSingle().then(result => {
+      if (active) { setError(Boolean(result.error)); setBusinessId(result.data?.id ?? null); setTimeZone(result.data?.timezone ?? "UTC"); }
     });
     return () => { active = false; };
   }, [userId]);
   if (error) return <p role="alert">L’agenda d’équipe n’a pas pu être chargé.</p>;
-  return businessId ? <TeamAgenda businessId={businessId} /> : null;
+  return businessId ? <TeamAgenda businessId={businessId} timeZone={timeZone} /> : null;
 }
 
 type StaffAppointment = { id: string; starts_at: string; ends_at: string; status: string; service_title: string; client_name: string; time_zone: string };

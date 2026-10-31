@@ -39,7 +39,7 @@ type BookingRow = {
 type BookingQueryRow = Omit<BookingRow, "provider_services"> & {
   provider_services: BookingRow["provider_services"] | Array<NonNullable<BookingRow["provider_services"]>>;
 };
-type ProviderBookingIdentity = { profile_id: string; business_name: string; slug: string | null; city: string; area: string | null; base_address: string | null; cover_url: string | null; country_code: string | null; timezone: string | null };
+type ProviderBookingIdentity = { profile_id: string; business_name: string; slug: string | null; city: string; base_address: string | null; cover_url: string | null; country_code: string | null; timezone: string | null };
 type BusinessBookingIdentity = { id: string; name: string; address: string; city: string; area: string | null; logo_url: string | null; timezone: string | null };
 type NotificationRow = {
   id: string;
