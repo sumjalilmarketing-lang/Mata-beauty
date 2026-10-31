@@ -73,3 +73,11 @@ Références remontées par le registre :
 - source-map-js : https://github.com/advisories/GHSA-68fv-2mgg-jv7q
 
 La mise à niveau n'a pas été effectuée dans cet audit. Elle doit inclure les dépendances compatibles, le lockfile, tous les contrôles du projet et une nouvelle recette, plutôt qu'un déploiement automatique d'une version supposée corrigée.
+
+## Remédiation des dépendances exécutée
+
+Versions appliquées : Next.js/eslint-config-next 16.4.1, Sharp 0.35.5, Zod 4.6.6, source-map-js 1.2.2. L'audit runtime pnpm audit --prod passe de 15 avis à zéro avis connu (63 dépendances déclarées, 78 optionnelles). La table de vulnérabilités précédente décrit l'état avant correction, pas le nouveau candidat.
+
+Version nationale : correctif isolé 055796f88915e797233509a8c2540e205a6b5cfd basé sur e4919bb, sans migration internationale. 177 tests, 26 contrôles smoke de structure, TypeScript et build local PASS ; lint zéro erreur, huit avertissements existants de navigation. Déploiement Vercel dpl_C5Q6FTDYjLxs9ngHKVzfmQag5jSv lancé avec autorisation utilisateur, vérification du domaine en cours à cette étape du rapport.
+
+Version internationale : mêmes versions de dépendances ; 207 tests, TypeScript et build PASS ; lint mêmes huit avertissements. Les autres NO-GO restent applicables. Aucun paiement réel, aucun changement de données Production.
