@@ -37,3 +37,11 @@ Code publié : `2790d5887218a94342d82943c27c885c73768684`. Déploiement `dpl_G8j
 Accueil et feed chargés dans Chrome. Recherche publique vérifiée : Vaulx en Velin apparaît sans pays erroné. Le contrôle administratif de production affiche la vérification MFA obligatoire. Les parcours administratifs après cette étape ne sont pas annoncés comme recettés en production. Aucun log error/fatal retourné dans la fenêtre initiale de 15 minutes examinée.
 
 Retour arrière disponible vers le déploiement précédent `dpl_AqAzfBc3F2aiyBBCYW4WWZ9C7Pb2`, code `73ec38c04e6dc98cdc189cd9fae5cac80e33d5ef`, si une régression du correctif apparaît. Aucun rollback n’a été nécessaire au moment du contrôle.
+
+## Recette administrative après MFA en Production
+
+Session Super Admin après MFA observée sur mata-beauty.com/admin. Après rechargement du nouveau build, Équipe & accès affiche le parcours d’ajout d’un compte existant. Une recherche d’adresse fictive inexistante est refusée et n’ouvre aucun dialogue d’attribution. La matrice des permissions serveur se charge, avec sept rôles et aucun message d’erreur. Aucun rôle, compte ou dossier Production n’a été modifié par ces essais. La limite précédemment signalée sur la session MFA de production est donc levée pour ces contrôles.
+
+La bascule internationale reste une opération distincte, décrite dans INTERNATIONAL_PRODUCTION_CUTOVER_2026-10-31.md : onze migrations identifiées par leur SHA-256 et une publication de code coordonnée, avec des conditions de recette encore ouvertes. La mission initiale interdisait les modifications de Supabase Production ; aucune exception n’est présumée à partir de la seule validation MFA.
+
+Correction visuelle relevée pendant ce contrôle : la première colonne de la matrice pouvait couper les noms de rôles au milieu des mots. Une largeur minimale et une règle de retour à la ligne limitée à cette colonne sont ajoutées, sans modifier les permissions ou les autres tableaux.
