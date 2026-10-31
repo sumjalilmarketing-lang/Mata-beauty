@@ -15,7 +15,7 @@ Défaut reproduit après publication initiale : la recherche qualifiait Vaulx-en
 
 Tests : pays professionnel FR distinct du pays personnel SN, compatibilité avec colonne absente, refus des pays invalides ou des identifiants non demandés. La branche internationale dispose déjà du pays professionnel dans son schéma ; cette correction nationale n’exécute aucune migration.
 
-Publication Auth initiale b679209 : déploiement dpl_CYxKHW6B2FTqnsNR5kmdft63yTkX READY, mata-beauty.com assigné sans erreur. Accueil, catalogue et recherche inspectés ; contrôle initial error/fatal sans entrée. 
+Publication Auth initiale b679209 : déploiement dpl_CYxKHW6B2FTqnsNR5kmdft63yTkX READY, mata-beauty.com assigné sans erreur. Accueil, catalogue et recherche inspectés ; contrôle initial error/fatal sans entrée.
 
 ## Vérifications finales après publication
 
