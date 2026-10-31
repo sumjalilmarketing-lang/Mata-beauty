@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { formatAdminMoney, totalAdminMoneyByCurrency } from "../../lib/domain/admin-money";
+import { formatAdminMoney, formatRecordedMoney, totalAdminMoneyByCurrency } from "../../lib/domain/admin-money";
 
 describe("international administrative money", () => {
+  it("does not invent a currency or turn absent amounts into zero", () => {
+    expect(formatRecordedMoney(20, null)).toBe("Devise non renseignée");
+    expect(formatRecordedMoney(20, "invalid")).toBe("Devise non renseignée");
+    expect(formatRecordedMoney(null, "EUR")).toBe("Montant non renseigné");
+    expect(formatRecordedMoney("NaN", "USD")).toBe("Montant non renseigné");
+    expect(formatRecordedMoney("0", "EUR")).toContain("0,00");
+    expect(formatRecordedMoney("20", "USD ")).toContain("USD");
+  });
   it("preserves Paris and New York currencies and decimal amounts", () => {
     expect(formatAdminMoney(45.5, "EUR")).toContain("45,50");
     expect(formatAdminMoney(45.5, "EUR")).toContain("EUR");

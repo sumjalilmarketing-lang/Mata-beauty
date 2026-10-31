@@ -4,6 +4,14 @@ export function formatAdminMoney(amount: number, currency: string) {
 }
 
 /** Never add amounts belonging to different currencies without an FX conversion. */
+export function formatRecordedMoney(value: unknown, currency: unknown) {
+  if (value === null || value === undefined || value === "") return "Montant non renseigné";
+  const amount = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(amount)) return "Montant non renseigné";
+  if (typeof currency !== "string" || !/^[A-Z]{3}$/.test(currency.trim())) return "Devise non renseignée";
+  return formatAdminMoney(amount, currency);
+}
+
 export function totalAdminMoneyByCurrency(rows: ReadonlyArray<{ amount: number; currency: string }>) {
   const totals = new Map<string, number>();
   for (const row of rows) {

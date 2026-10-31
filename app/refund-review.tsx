@@ -2,9 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { formatRecordedMoney } from "@/lib/domain/admin-money";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 
-type Refund = { id: string; payment_id: string; amount: number; status: string; reason: string; created_at: string };
+type Refund = { id: string; payment_id: string; amount: number; status: string; reason: string; created_at: string; payments: { currency: string } | { currency: string }[] | null };
 
 export function RefundReview() {
   const [rows, setRows] = useState<Refund[]>([]);
@@ -17,7 +18,7 @@ export function RefundReview() {
     setLoading(true); setNotice("");
     try {
       const client = getSupabaseBrowserClient(); if (!client) throw new Error("Connexion indisponible");
-      const result = await client.from("refunds").select("id,payment_id,amount,status,reason,created_at").order("created_at", { ascending: false }).limit(100).abortSignal(AbortSignal.timeout(10000));
+      const result = await client.from("refunds").select("id,payment_id,amount,status,reason,created_at,payments(currency)").order("created_at", { ascending: false }).limit(100).abortSignal(AbortSignal.timeout(10000));
       if (result.error) throw result.error;
       setRows(result.data);
     } catch (error) { setRows([]); setNotice(publicErrorMessage(error, "Les demandes de remboursement sont indisponibles.")); }
@@ -41,7 +42,7 @@ export function RefundReview() {
     <button disabled={busy || loading} onClick={() => void load()}>Actualiser les remboursements</button>
     {notice && <p role="status">{notice}</p>}
     {loading ? <p>Chargement…</p> : rows.length ? rows.map(row => <article className="control-list-row" key={row.id}>
-      <div><strong>{new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 }).format(row.amount)}</strong><p>{row.reason}</p><small>{row.status} · {new Date(row.created_at).toLocaleString("fr-FR")}</small></div>
+      <div><strong>{formatRecordedMoney(row.amount, (Array.isArray(row.payments) ? row.payments[0] : row.payments)?.currency)}</strong><p>{row.reason}</p><small>{row.status} · {new Date(row.created_at).toLocaleString("fr-FR")}</small></div>
       {["requested", "approved"].includes(row.status) && <button disabled={busy} onClick={() => setSelected(row)}>Examiner la demande</button>}
     </article>) : !notice && <p>Aucune demande de remboursement.</p>}
     {selected && <form className="dashboard-form" onSubmit={event => void decide(event)}>
