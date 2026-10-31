@@ -1,4 +1,5 @@
 "use client";
+import { formatAdminMoney, totalAdminMoneyByCurrency } from "@/lib/domain/admin-money";
 import { PasswordField } from "@/app/password-field";
 
 import Image from "next/image";
@@ -95,6 +96,7 @@ type CatalogRow = {
   sort_order?: number;
   duration_minutes?: number;
   price_amount?: number;
+  currency?: string;
 };
 
 type FinanceRow = {
@@ -254,8 +256,8 @@ const metricDefinitions: Array<{ key: keyof Metrics; label: string; tone?: strin
   { key: "tickets_open", label: "Tickets ouverts" },
 ];
 
-function formatCurrency(value: number) {
-  return `${new Intl.NumberFormat("fr-FR").format(value)} FCFA`;
+function formatCurrency(value: number, currency = "XOF") {
+  return formatAdminMoney(value, currency);
 }
 
 function formatDate(value: string | null, timeZone = "Africa/Dakar") {
@@ -701,7 +703,7 @@ function BookingsModule({ context, calendar, notify }: { context: AdminContext; 
   }, []);
   if (calendar) return <div className="admin-calendar"><div className="calendar-toolbar"><strong>Prochaines réservations · heure locale de chaque établissement</strong></div><div className="calendar-grid">{["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((day) => <strong key={day}>{day}</strong>)}{rows.slice(0, 14).map((row) => <article key={row.id}><small>{new Date(row.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: bookingTimeZone(row) })}</small><span>{relationOne(row.provider_services)?.title || "Prestation"}</span><StatusBadge value={row.status} /></article>)}</div></div>;
   return <><div className="admin-filter-bar"><span>{rows.length} réservations autorisées</span></div><div className="admin-table-wrap" role="region" aria-label="Réservations" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Référence</th><th>Prestation</th><th>Prestataire</th><th>Date</th><th>Prix</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{rows.map((row) =>
-    <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code></td><td><strong>{relationOne(row.provider_services)?.title || "Prestation"}</strong><small>{relationOne(row.provider_services)?.duration_minutes || "—"} min · {row.location_mode}</small></td><td>{relationOne(row.provider_profiles)?.business_name || "—"}</td><td>{formatDate(row.starts_at, bookingTimeZone(row))}</td><td>{formatCurrency(row.total_amount)}</td><td><StatusBadge value={row.status} /></td><td><PermissionGuard permission="bookings.update" context={context}><button className="table-action danger" onClick={() => setConfirmation(row)}>Modifier</button></PermissionGuard></td></tr>,
+    <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code></td><td><strong>{relationOne(row.provider_services)?.title || "Prestation"}</strong><small>{relationOne(row.provider_services)?.duration_minutes || "—"} min · {row.location_mode}</small></td><td>{relationOne(row.provider_profiles)?.business_name || "—"}</td><td>{formatDate(row.starts_at, bookingTimeZone(row))}</td><td>{formatCurrency(row.total_amount, row.currency)}</td><td><StatusBadge value={row.status} /></td><td><PermissionGuard permission="bookings.update" context={context}><button className="table-action danger" onClick={() => setConfirmation(row)}>Modifier</button></PermissionGuard></td></tr>,
   )}</tbody></table></div>{confirmation && <ConfirmationModal title="Annuler administrativement cette réservation ?" description="Le statut sera modifié avec justification et les parties conserveront l’historique." dangerous onCancel={() => setConfirmation(null)} onConfirm={async (reason) => {
     const { error } = await getSupabaseBrowserClient()!.rpc("admin_update_booking_status", { target_booking_id: confirmation.id, next_status: "cancelled_by_provider", reason });
     notify(error ? publicErrorMessage(error, "La réservation n’a pas pu être mise à jour.") : "Réservation mise à jour et auditée.");
@@ -717,7 +719,7 @@ export function CatalogModule({ services, notify }: { services: boolean; notify:
   const [loadError, setLoadError] = useState("");
   const load = useCallback(() => {
     const request = services
-      ? getSupabaseBrowserClient()!.from("provider_services").select("id,title,is_active,duration_minutes,price_amount").order("created_at", { ascending: false }).limit(200)
+      ? getSupabaseBrowserClient()!.from("provider_services").select("id,title,is_active,duration_minutes,price_amount,currency").order("created_at", { ascending: false }).limit(200)
       : getSupabaseBrowserClient()!.from("categories").select("id,name,slug,description,icon,image_url,parent_id,is_active,sort_order").order("sort_order");
     void request.abortSignal(AbortSignal.timeout(10000)).then(({ data, error }) => {
       setLoadError(error ? publicErrorMessage(error, "Le catalogue est indisponible.") : "");
@@ -759,7 +761,7 @@ export function CatalogModule({ services, notify }: { services: boolean; notify:
   }
 
   if (loadError) return <section><p role="alert">{loadError}</p><button onClick={load}>Réessayer</button></section>;
-  if (services) return <><div className="admin-filter-bar"><span>{rows.length} prestations réelles · modification depuis l’espace prestataire</span></div><div className="admin-table-wrap" role="region" aria-label="Prestations" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Prestation</th><th>Durée</th><th>Prix</th><th>Statut</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.title}</strong></td><td>{row.duration_minutes} min</td><td>{formatCurrency(row.price_amount || 0)}</td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div></>;
+  if (services) return <><div className="admin-filter-bar"><span>{rows.length} prestations réelles · modification depuis l’espace prestataire</span></div><div className="admin-table-wrap" role="region" aria-label="Prestations" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Prestation</th><th>Durée</th><th>Prix</th><th>Statut</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.title}</strong></td><td>{row.duration_minutes} min</td><td>{formatCurrency(row.price_amount || 0, row.currency)}</td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div></>;
 
   const topLevel = rows.filter((row) => !row.parent_id && row.id !== editing?.id);
   return <>
@@ -785,7 +787,7 @@ function FinanceModule({ section }: { section: "payments" | "commissions" }) {
     if (section === "payments") void getSupabaseBrowserClient()!.from("payments").select("id,booking_id,payment_status,payment_method,amount,currency,is_test,created_at").order("created_at", { ascending: false }).limit(200).then(({ data }) => setPayments((data ?? []) as FinanceRow[]));
   }, [section]);
   if (section !== "payments") return <OperationalFinance section={section} />;
-  return <><div className="admin-filter-bar"><span>{payments.length} paiements · lecture sécurisée</span></div><div className="admin-table-wrap" role="region" aria-label="Paiements" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Référence</th><th>Réservation</th><th>Méthode</th><th>Montant</th><th>Date</th><th>Statut</th></tr></thead><tbody>{payments.map((row) => <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code>{row.is_test && <small>Mode test</small>}</td><td><code>{row.booking_id.slice(0, 8)}</code></td><td>{row.payment_method}</td><td><strong>{formatCurrency(row.amount)}</strong></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.payment_status} /></td></tr>)}</tbody></table></div></>;
+  return <><div className="admin-filter-bar"><span>{payments.length} paiements · lecture sécurisée</span></div><div className="admin-table-wrap" role="region" aria-label="Paiements" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Référence</th><th>Réservation</th><th>Méthode</th><th>Montant</th><th>Date</th><th>Statut</th></tr></thead><tbody>{payments.map((row) => <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code>{row.is_test && <small>Mode test</small>}</td><td><code>{row.booking_id.slice(0, 8)}</code></td><td>{row.payment_method}</td><td><strong>{formatCurrency(row.amount, row.currency)}</strong></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.payment_status} /></td></tr>)}</tbody></table></div></>;
 }
 
 function OperationalFinance({ section }: { section: "commissions" }) {
@@ -802,8 +804,8 @@ function OperationalFinance({ section }: { section: "commissions" }) {
       setEntries((entryResult.data ?? []) as CommissionEntryRow[]);
     });
   }, [section]);
-  const total = entries.reduce((sum, row) => sum + row.amount, 0);
-  return <><section className="admin-metric-grid"><article><span>Commissions enregistrées</span><strong>{entries.length}</strong><small>Écritures réelles</small></article><article><span>Total Mata Beauty</span><strong>{formatCurrency(total)}</strong><small>Registre Supabase</small></article><article><span>Règles actives</span><strong>{rules.filter((row) => row.is_active).length}</strong><small>Calcul serveur</small></article></section><div className="admin-table-wrap" role="region" aria-label="Règles de commission" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Règle</th><th>Taux</th><th>Validité</th><th>Statut</th></tr></thead><tbody>{rules.map((row) => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td>{formatDate(row.valid_from)}<small>{row.valid_until ? `jusqu’au ${formatDate(row.valid_until)}` : "Sans échéance"}</small></td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div><div className="admin-table-wrap commission-entries" role="region" aria-label="Écritures de commission" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Écriture</th><th>Paiement</th><th>Taux</th><th>Commission</th><th>Date</th></tr></thead><tbody>{entries.map((row) => <tr key={row.id}><td><code>{row.id.slice(0,8)}</code></td><td><code>{row.payment_id.slice(0,8)}</code></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td><strong>{formatCurrency(row.amount)}</strong></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div></>;
+  const totals = totalAdminMoneyByCurrency(entries);
+  return <><section className="admin-metric-grid"><article><span>Commissions enregistrées</span><strong>{entries.length}</strong><small>Écritures réelles</small></article><article><span>Total Mata Beauty</span><strong>{totals.map(total => formatCurrency(total.amount, total.currency)).join(" · ") || "—"}</strong><small>Registre Supabase</small></article><article><span>Règles actives</span><strong>{rules.filter((row) => row.is_active).length}</strong><small>Calcul serveur</small></article></section><div className="admin-table-wrap" role="region" aria-label="Règles de commission" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Règle</th><th>Taux</th><th>Validité</th><th>Statut</th></tr></thead><tbody>{rules.map((row) => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td>{formatDate(row.valid_from)}<small>{row.valid_until ? `jusqu’au ${formatDate(row.valid_until)}` : "Sans échéance"}</small></td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div><div className="admin-table-wrap commission-entries" role="region" aria-label="Écritures de commission" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Écriture</th><th>Paiement</th><th>Taux</th><th>Commission</th><th>Date</th></tr></thead><tbody>{entries.map((row) => <tr key={row.id}><td><code>{row.id.slice(0,8)}</code></td><td><code>{row.payment_id.slice(0,8)}</code></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td><strong>{formatCurrency(row.amount, row.currency)}</strong></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div></>;
 }
 
 function AuditModule({ context }: { context: AdminContext }) {
@@ -1013,7 +1015,7 @@ function SettingsModule({ context, maintenance, notify }: { context: AdminContex
 
 type OperationalRow = Record<string, unknown>;
 const operationalSources: Partial<Record<ModuleKey, { table: string; select: string; description: string; title: (row: OperationalRow) => string; detail: (row: OperationalRow) => string }>> = {
-  payouts: { table: "payouts", select: "id,provider_id,amount,currency,status,created_at", description: "Versements enregistrés, en lecture seule. Aucun transfert réel n’est activé en mode mock.", title: row => `${formatCurrency(Number(row.amount))} · ${String(row.status)}`, detail: row => `Professionnel ${String(row.provider_id).slice(0, 8)} · ${formatDate(String(row.created_at))}` },
+  payouts: { table: "payouts", select: "id,provider_id,amount,currency,status,created_at", description: "Versements enregistrés, en lecture seule. Aucun transfert réel n’est activé en mode mock.", title: row => `${formatCurrency(Number(row.amount), String(row.currency))} · ${String(row.status)}`, detail: row => `Professionnel ${String(row.provider_id).slice(0, 8)} · ${formatDate(String(row.created_at))}` },
   salons: { table: "businesses", select: "id,name,city,status,created_at", description: "Salons enregistrés et leur statut.", title: row => String(row.name), detail: row => `${row.city ?? ""} · ${row.status}` },
   reviews: { table: "reviews", select: "id,rating,comment,is_visible,created_at", description: "Avis liés aux réservations terminées. Le texte de l’auteur est conservé.", title: row => `${row.rating}/5 · ${row.comment ?? "Sans commentaire"}`, detail: row => row.is_visible ? "Visible" : "Masqué" },
   disputes: { table: "disputes", select: "id,reason,status,priority,created_at", description: "Registre des litiges enregistrés, en lecture seule.", title: row => String(row.reason), detail: row => `${row.status} · ${row.priority}` },
