@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const type = parameters.get("type");
   const hash = parameters.get("token_hash");
   const code = parameters.get("code");
-  const validType = type === "signup" || type === "invite" || type === "recovery";
+  const validType = type === "email" || type === "signup" || type === "invite" || type === "recovery";
   const failure = "/?connexion=requise&auth_error=email_link_invalid";
   if (parameters.has("error") || parameters.has("error_code")) return redirect(request, failure);
   if ((!hash || hash.length > 2048 || !validType) && (!code || code.length > 2048)) return redirect(request, failure);
