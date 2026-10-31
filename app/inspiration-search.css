@@ -29,7 +29,7 @@
 .inspiration-search-dialog form>footer{position:sticky;bottom:0;display:flex;gap:10px;margin:0 -22px;padding:14px 22px max(14px,env(safe-area-inset-bottom));border-top:1px solid #f2dfe8;background:rgba(255,250,252,.97)}
 .inspiration-search-dialog form>footer button{min-height:48px;border-radius:12px;font-weight:850}
 .inspiration-search-clear{padding:0 16px;border:1px solid #d8c2ce;background:#fff;color:#39232e}
-.inspiration-search-submit{flex:1;background:linear-gradient(135deg,#bf236b,#e64e91);color:#fff}
+.inspiration-search-submit{flex:1;background:linear-gradient(135deg,#86124f,#b52165);color:#fff}
 .social-feed-header:has(.inspiration-active-filters){height:auto;min-height:108px;max-height:128px}
 .social-feed{scroll-behavior:auto}
 .inspiration-search-dialog button:focus-visible{outline:3px solid #75204b;outline-offset:2px}
