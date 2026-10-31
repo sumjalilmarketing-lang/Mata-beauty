@@ -32,4 +32,8 @@ Le dossier fictif Studio Test Paris reste en brouillon avec 0/4 documents : son 
 
 ## Contrôle après publication
 
-Déploiement, affectation du domaine, pages publiques et logs à compléter après passage READY.
+Code publié : `2790d5887218a94342d82943c27c885c73768684`. Déploiement `dpl_G8jPY5FCX1whwUd7e17zBeBqXFDD` READY, cible production, domaine mata-beauty.com attribué sans erreur. Build distant : environ 22 secondes.
+
+Accueil et feed chargés dans Chrome. Recherche publique vérifiée : Vaulx en Velin apparaît sans pays erroné. Le contrôle administratif de production affiche la vérification MFA obligatoire. Les parcours administratifs après cette étape ne sont pas annoncés comme recettés en production. Aucun log error/fatal retourné dans la fenêtre initiale de 15 minutes examinée.
+
+Retour arrière disponible vers le déploiement précédent `dpl_AqAzfBc3F2aiyBBCYW4WWZ9C7Pb2`, code `73ec38c04e6dc98cdc189cd9fae5cac80e33d5ef`, si une régression du correctif apparaît. Aucun rollback n’a été nécessaire au moment du contrôle.
