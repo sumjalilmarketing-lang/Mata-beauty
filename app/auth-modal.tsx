@@ -232,7 +232,7 @@ export function AuthModal({
           </button>
           <div className="auth-divider"><span>ou avec votre e-mail</span></div>
         </>}
-        <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
+        <form onSubmit={(event) => void handleSubmit(submit, () => setFeedback(""))(event)} noValidate>
           {mode === "register" && (
             <label>
               Nom complet
