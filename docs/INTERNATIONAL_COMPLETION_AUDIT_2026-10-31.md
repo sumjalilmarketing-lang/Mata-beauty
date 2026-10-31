@@ -73,3 +73,7 @@ Les advisors Supabase signalent encore des points à examiner : protection des m
 **Le noyau serveur international progresse : les quatre anomalies reproduites sont corrigées dans le test et les parcours serveur ci-dessus passent. Le GO international public complet reste suspendu.** Il exige encore une session Auth réelle avec MFA pour le Super Admin de test, la soumission puis l’approbation normale du dossier fictif, les parcours navigateur des quatre espaces et un essai de concurrence entre transactions distinctes. Les migrations de Production et les intégrations de lancement doivent ensuite faire l’objet d’une publication contrôlée ; elles n’ont pas été exécutées dans cette mission.
 
 Ne pas présenter les fixtures SQL comme un professionnel réellement approuvé ou une recette navigateur réussie. Ne pas désactiver la MFA ni créer de point d’entrée privilégié pour franchir ce blocage.
+
+## Publication de la version de recette
+
+Source `e213826b2c2c25d7b1af5a1d3ec96c11b93042e8`, déploiement Preview `dpl_EFkCtiSxTQw165HVBu7b4Caqwir8` : READY, alias international attribué sans erreur. Build distant : environ 21 secondes. La page d’administration restreinte est accessible sur l’alias du test et demande une connexion ; aucune session authentifiée n’est supposée. La requête de logs error/fatal du déploiement sur les 15 minutes examinées ne retourne aucune entrée. Cette fenêtre initiale ne certifie pas les parcours non exécutés.
