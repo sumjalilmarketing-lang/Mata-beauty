@@ -38,7 +38,7 @@ Les sources se trouvent sur la branche codex/global-finalization-20261031. L’a
 
 ## Limites de la décision
 
-La production nationale publiée reste READY sur le code 2790d5887218a94342d82943c27c885c73768684. L’administration Super Admin/MFA, le chargement du nouveau module, le refus d’une recherche inexistante et la matrice des permissions ont été observés en Production. Aucun droit n’a été modifié par ces contrôles.
+La production nationale publiée reste READY sur le code 0681317b28e9ee18884c4abec2c7a3c61cc9a61a. L’administration Super Admin/MFA, le chargement du nouveau module, le refus d’une recherche inexistante et la matrice des permissions ont été observés en Production. Aucun droit n’a été modifié par ces contrôles.
 
 **Le GO international public complet n’est pas délivré.** Ce plan rend la prochaine opération identifiable ; il n’annonce ni l’application des migrations, ni la réussite de la recette navigateur encore ouverte, ni la validation d’un paiement international en ligne.
 
