@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Mata Beauty",
     short_name: "Mata Beauty",
-    description: "Réservez vos prestations beauté premium au Sénégal.",
+    description: "Découvrez les professionnels de beauté près de vous et réservez votre rendez-vous.",
     id: "/",
     start_url: "/",
     scope: "/",

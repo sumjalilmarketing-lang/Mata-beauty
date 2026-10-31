@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { assertIsolatedAcceptanceTargets } from "./isolated-acceptance-targets.mjs";
 let state = null;
 let createSupabaseClient = null;
 
@@ -35,6 +36,7 @@ async function createAccount(admin, url, anonKey, runId, role, professional = fa
 }
 
 export async function startFinalAcceptance({ url, anonKey, serviceKey, previewUrl, createClient }) {
+  assertIsolatedAcceptanceTargets({ url, previewUrl });
   assert.ok(url && anonKey && serviceKey && previewUrl, "Configuration distante incomplète");
   assert.equal(typeof createClient, "function", "Client Supabase requis");
   assert.equal(state, null, "Une recette est déjà active");

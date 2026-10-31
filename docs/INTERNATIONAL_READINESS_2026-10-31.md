@@ -64,3 +64,18 @@ Validation locale : 207 tests, lint et build (incluant TypeScript) PASS. Les tes
 Avis fournisseurs test après migration : 7 INFO RLS sans politique, 1 WARN extension publique, 16 WARN fonctions SECURITY DEFINER exécutables par anon, 112 par authenticated, 1 protection mots de passe compromis désactivée. Ces avertissements ne prouvent pas autant de vulnérabilités : les fonctions publiques incluent disponibilités, maintenance et événements sociaux. Leur revue exhaustive et les tests croisés de rôles restent requis. Ne pas supprimer globalement ces autorisations au risque de casser les parcours publics.
 
 Revue des gardes des espaces : pro/salon exigent statut approuvé ; staff exige des permissions de collaborateur ; les espaces internes utilisent get_admin_context et les rôles autorisés. La revue de code ne remplace pas les quatre sessions fictives distinctes. NO-GO production maintenu. Six migrations internationales/correctives sont maintenant à coordonner avant le déploiement du code, après recette et sauvegarde/retour arrière vérifiés.
+
+
+## Reprise ciblée internationale — 31 octobre, correctif DST
+
+Défaut reproduit sur la base isolée : à Paris le 28 mars 2027, une prestation de 60 minutes à 01:30 était acceptée par le calcul nominal avec fermeture à 03:00 ; son terme réel est 03:30. Le même décalage existe à New York au passage à l’heure d’été. Le calcul nominal retirait aussi certains créneaux valides pendant l’heure répétée d’automne.
+
+Migration `20261031062239_dst_safe_independent_slots.sql`, appliquée uniquement au test : la fonction privée calcule les instants réels puis compare la durée écoulée à la fermeture réelle. Elle conserve les deux occurrences des heures répétées. Aucune table, politique RLS, attribution de rôle ou donnée utilisateur modifiée. Nouvelle fonction SECURITY INVOKER, search_path vide, EXECUTE refusé à anon et authenticated.
+
+Vérification SQL distante, reproductible avec `supabase/tests/international_dst_slots.sql` : PASS pour cinq scénarios DST (Paris/New York, printemps/automne et fermeture inexistante), deux horaires invalides, horaires normaux Dakar/Paris/New York et refus d’accès public au helper. Aucun jeu de données ni claims Auth synthétiques utilisé. Ceci valide le calcul SQL ; ce n’est pas une recette authentifiée de réservation.
+
+Le script historique de recette ne lit plus `.env.local` et n’a plus de repli Production. Il exige exactement la base internationale isolée et son alias de branche Preview. Douze cas de régression vérifient les cibles autorisées/refusées. Ce script historique n’a pas été exécuté : ses créations de rôles privilégiés ne remplacent pas la procédure d’approbation normale avec MFA.
+
+L’accueil, le manifeste et les métadonnées ne présentent plus toutes les offres comme exclusivement sénégalaises. La langue publiée reste le français ; cette correction ne constitue pas une traduction complète anglaise ou espagnole.
+
+Validation locale : 222 tests dans 43 fichiers, TypeScript, lint (zéro erreur, huit avertissements existants) et build PASS. Dernier inventaire distant : zéro professionnel approuvé, zéro dossier pending_review, zéro réservation, un facteur MFA vérifié. Le blocage des sessions professionnelles et la soumission normale du dossier doivent encore être résolus avant de déclarer le GO.

@@ -1,21 +1,16 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createClient } from "@supabase/supabase-js";
 import { browserAccount, browserLoginLink, finishFinalAcceptance, startFinalAcceptance } from "./final-acceptance-harness.mjs";
 
-const previewUrl = process.env.MATA_PREVIEW_URL ?? "https://mata-beauty-3bn126hnu-africrm.vercel.app/";
+const previewUrl = process.env.MATA_PREVIEW_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 assert.ok(serviceKey, "SUPABASE_SERVICE_ROLE_KEY est requis");
 
-function localValue(name) {
-  const source = readFileSync(".env.local", "utf8");
-  const match = source.match(new RegExp(`^${name}=(.*)$`, "m"));
-  return match?.[1]?.trim().replace(/^['"]|['"]$/g, "");
-}
-
-const url = localValue("NEXT_PUBLIC_SUPABASE_URL") ?? "https://qjdwxdbvrxedyfolnpol.supabase.co";
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? localValue("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+// No .env.local fallback: this helper creates accounts and mutates records.
+// The harness validates both targets before constructing any Supabase client.
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 assert.ok(anonKey, "NEXT_PUBLIC_SUPABASE_ANON_KEY est requis");
 
 let report = null;
