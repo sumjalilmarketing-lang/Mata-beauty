@@ -77,3 +77,11 @@ Ne pas présenter les fixtures SQL comme un professionnel réellement approuvé 
 ## Publication de la version de recette
 
 Source `e213826b2c2c25d7b1af5a1d3ec96c11b93042e8`, déploiement Preview `dpl_EFkCtiSxTQw165HVBu7b4Caqwir8` : READY, alias international attribué sans erreur. Build distant : environ 21 secondes. La page d’administration restreinte est accessible sur l’alias du test et demande une connexion ; aucune session authentifiée n’est supposée. La requête de logs error/fatal du déploiement sur les 15 minutes examinées ne retourne aucune entrée. Cette fenêtre initiale ne certifie pas les parcours non exécutés.
+
+## Reprise de la recette dans Chrome et comptes existants
+
+Le parcours Super Admin avec MFA a maintenant été observé connecté dans Chrome sur la Preview de test. Le dossier fictif Studio Test Paris reste en brouillon avec zéro document sur quatre : la décision normale est indisponible. Cette connexion ne constitue donc pas une approbation du dossier.
+
+L’écran Équipe & accès ne proposait que l’invitation de nouveaux membres et la modification de membres internes. Il ne permettait pas de préparer une attribution pour un compte client existant. Un parcours de recherche exacte a été ajouté. Il exige la même session Super Admin/AAL2 validée par admin_list_team, ne renvoie que les champs minimaux d’un compte actif exactement correspondant, refuse le compte courant et les résultats ambigus, et n’utilise aucune clé de service ni envoi e-mail. Aucun rôle n’est présélectionné pour un nouveau membre. La confirmation appelle admin_assign_role, qui conserve ses propres contrôles, la MFA obligatoire et le journal d’audit.
+
+Validation de cette extension : 245 tests dans 46 fichiers, dont 10 nouveaux cas de refus, d’origine, de correspondance exacte, de minimisation des données et de maintien de la procédure d’attribution. Aucune attribution nouvelle n’est annoncée avant confirmation et vérification effective.
