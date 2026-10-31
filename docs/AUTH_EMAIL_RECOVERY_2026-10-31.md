@@ -25,3 +25,15 @@ Le retour serveur accepte `email` et `signup`, toujours après vérification du 
 ## Limite de la clôture
 
 Le correctif améliore le parcours d’authentification ; il ne recrée pas un mot de passe perdu et ne rend pas une adresse fictive joignable. La recette normale de Studio Test Paris, les quatre espaces avec comptes distincts, la concurrence réelle et le candidat Production international restent ouverts. Le GO international complet n’est pas délivré par ce correctif.
+
+## Publication et contrôle sur le site
+
+Code national final `67358b2d09d0d9feefdb6cd57e77f717b003143c`, déploiement Production `dpl_A8bjqtpzfUN83wvXe3V8ZbSjFjTS`, READY, mata-beauty.com attribué sans erreur. Build distant : environ 24 secondes. Le dernier ajout efface aussi un ancien message de succès quand une nouvelle soumission échoue à la validation du formulaire.
+
+Après rechargement de mata-beauty.com dans Chrome : le parcours de renvoi est présent, la saisie d’une adresse volontairement invalide affiche uniquement l’erreur de validation, et le parcours distinct « Mot de passe oublié » est accessible. Une réponse générique du parcours de renvoi a été observée ; elle ne prouve pas la réception d’un e-mail. Aucun test de délivrabilité n’est annoncé comme réussi.
+
+La session Super Admin Production accède après ce déploiement à « Rôles et permissions » et à la matrice serveur des sept rôles. Aucune attribution ni modification de compte effectuée. Aucun log error/fatal retourné dans la fenêtre initiale de quinze minutes examinée sur ce déploiement.
+
+Code international final `6feaa7bd7836c3b388e5942e658f9684585a7807`, Preview isolée `dpl_7JSQnvsRFw7W546P6mSjac2NJHdm` READY. Configuration de test conservée ; aucune promotion de cette Preview sur la Production. L’accès Super Admin au test est encore fonctionnel. La tentative depuis le formulaire du propriétaire fictif s’arrête sur « Saisissez votre mot de passe » : aucun mot de passe n’y est renseigné. Il n’a été ni lu, ni deviné, ni remplacé.
+
+Le second contrôle complet conserve 209 tests nationaux et 252 internationaux, lint sans erreur, TypeScript et builds PASS. Le build national a nécessité un cache généré neuf après une erreur locale ENOTEMPTY ; le build propre et le build distant passent. Les onze migrations internationales et leurs empreintes sont inchangées et ne sont pas appliquées en Production.
