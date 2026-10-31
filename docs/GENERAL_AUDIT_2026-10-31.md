@@ -81,3 +81,11 @@ Versions appliquées : Next.js/eslint-config-next 16.4.1, Sharp 0.35.5, Zod 4.6.
 Version nationale : correctif isolé 055796f88915e797233509a8c2540e205a6b5cfd basé sur e4919bb, sans migration internationale. 177 tests, 26 contrôles smoke de structure, TypeScript et build local PASS ; lint zéro erreur, huit avertissements existants de navigation. Déploiement Vercel dpl_C5Q6FTDYjLxs9ngHKVzfmQag5jSv lancé avec autorisation utilisateur, vérification du domaine en cours à cette étape du rapport.
 
 Version internationale : mêmes versions de dépendances ; 207 tests, TypeScript et build PASS ; lint mêmes huit avertissements. Les autres NO-GO restent applicables. Aucun paiement réel, aucun changement de données Production.
+
+## Publication nationale vérifiée
+
+Correctif de sécurité national publié : Vercel dpl_C5Q6FTDYjLxs9ngHKVzfmQag5jSv, commit 055796f88915e797233509a8c2540e205a6b5cfd, target production, READY ; domaine mata-beauty.com assigné sans aliasError. Build Vercel terminé en environ 78 secondes après démarrage effectif.
+
+Contrôle navigateur après publication : page publique, catalogue, feed avec vidéo en lecture et formulaire de recherche affichant les professionnels disponibles. Aucun achat ni réservation réelle effectué. Scan runtime ciblé sur ce déploiement, niveaux error/fatal, fenêtre initiale 15 minutes : aucune entrée retournée ; cette courte observation ne garantit pas l’absence future d’incident. Aucun contrôle de drains/monitoring continu effectué ici.
+
+Seules les dépendances de la version nationale ont été publiées. Aucune migration ou modification de données Supabase Production. L’international et les correctifs multidevises restent en test ; NO-GO international maintenu. Le libellé pays de certaines fiches étrangères reste incorrect dans la version nationale antérieure, notamment Vaulx en Velin affiché avec Sénégal ; ce défaut de localisation n’est pas corrigé par le patch de dépendances.
