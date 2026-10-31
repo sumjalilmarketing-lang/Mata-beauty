@@ -19,6 +19,7 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [documentBusy, setDocumentBusy] = useState(false);
+  const [documentsComplete, setDocumentsComplete] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -87,7 +88,7 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
     if (!error) await load();
   }
   async function submit() {
-    if (busy || documentBusy) return; const client = getSupabaseBrowserClient(); if (!client) return;
+    if (busy || documentBusy || !documentsComplete) return; const client = getSupabaseBrowserClient(); if (!client) return;
     setBusy(true); setNotice("");
     const { error } = await client.rpc("submit_provider_for_review");
     setBusy(false); setNotice(error ? publicErrorMessage(error, "Complétez les informations et les quatre documents avant l’envoi.") : "Dossier envoyé. Notre équipe va examiner votre candidature.");
@@ -135,7 +136,7 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
     <article className="panel professional-onboarding-hero"><span className="professional-kicker">MATA BEAUTY · ESPACE PROFESSIONNEL</span><h2>{application ? applicationStatusLabels[application.status] ?? "Votre candidature" : "Développez votre activité beauté"}</h2>
       <p>Informations professionnelles → quatre documents → envoi → examen par notre équipe.</p>
       <p>L’accès professionnel sera activé après approbation de votre dossier.</p>
-      <ol className="professional-progress" aria-label="Étapes de la candidature"><li className={candidate ? "complete" : "current"}>Compte</li><li className={candidate && candidate.onboarding_progress >= 75 ? "complete" : candidate ? "current" : ""}>Profil</li><li className={candidate && candidate.onboarding_progress >= 100 ? "complete" : ""}>Justificatifs</li><li className={application?.status === "verified" ? "complete" : ""}>Validation</li></ol>
+      <ol className="professional-progress" aria-label="Étapes de la candidature"><li className={candidate ? "complete" : "current"}>Compte</li><li className={candidate && candidate.onboarding_progress >= 75 ? "complete" : candidate ? "current" : ""}>Profil</li><li className={documentsComplete ? "complete" : ""}>Justificatifs</li><li className={application?.status === "verified" ? "complete" : ""}>Validation</li></ol>
       {application?.rejection_reason && <p role="status">{application.rejection_reason}</p>}
       {application?.status === "verified" && <Link href="/pro">Ouvrir mon espace professionnel</Link>}
       {notice && <p role="status">{notice}</p>}
@@ -169,8 +170,8 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
         <label>Devise des tarifs<select name="currency" defaultValue={candidate.currency ?? ""} required><option value="">Choisir une devise</option><option value="XOF">XOF · Franc CFA</option><option value="EUR">EUR · Euro</option><option value="USD">USD · Dollar US</option><option value="GBP">GBP · Livre sterling</option><option value="CAD">CAD · Dollar canadien</option></select><small>Changer la devise est refusé tant que des prestations enregistrées utilisent une autre devise.</small></label>
         <button className="primary-button" disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer la localisation"}</button>
       </form></article>}
-      <ProfessionalDocuments providerId={userId} readOnly={!editable} onBusyChange={setDocumentBusy} />
-      {editable && <article className="panel"><p>{documentBusy ? "Attendez la fin de l’envoi du document avant de transmettre le dossier." : "Vérifiez les informations et vos quatre documents avant de transmettre le dossier."}</p><button className="primary-button" disabled={busy || documentBusy || candidate.onboarding_progress < 100} onClick={() => void submit()}>{busy ? "Envoi…" : "Envoyer mon dossier"}</button></article>}
+      <ProfessionalDocuments providerId={userId} readOnly={!editable} onBusyChange={setDocumentBusy} onCompleteChange={setDocumentsComplete} />
+      {editable && <article className="panel"><p>{documentBusy ? "Attendez la fin de l’envoi du document avant de transmettre le dossier." : "Vérifiez les informations et vos quatre documents avant de transmettre le dossier."}</p><button className="primary-button" disabled={busy || documentBusy || !documentsComplete || candidate.onboarding_progress < 100} onClick={() => void submit()}>{busy ? "Envoi…" : "Envoyer mon dossier"}</button></article>}
     </>}
   </section>;
 }

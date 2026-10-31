@@ -3,10 +3,11 @@ import Image from "next/image";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { countReceivedProfessionalDocuments } from "@/lib/domain/onboarding";
 type Document = { id: string; kind: string; storage_path: string; status: string; rejection_reason: string | null; created_at: string };
 const kinds: Record<string, string> = { identity: "Pièce d’identité", business_registration: "Immatriculation", qualification: "Qualification", address_proof: "Justificatif d’adresse" };
 
-export function ProfessionalDocuments({ providerId, review = false, readOnly = false, onReady, onChange, onBusyChange }: { providerId: string; review?: boolean; readOnly?: boolean; onReady?: (ready: boolean) => void; onChange?: () => void; onBusyChange?: (busy: boolean) => void }) {
+export function ProfessionalDocuments({ providerId, review = false, readOnly = false, onReady, onChange, onBusyChange, onCompleteChange }: { providerId: string; review?: boolean; readOnly?: boolean; onReady?: (ready: boolean) => void; onChange?: () => void; onBusyChange?: (busy: boolean) => void; onCompleteChange?: (complete: boolean) => void }) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,13 +33,15 @@ export function ProfessionalDocuments({ providerId, review = false, readOnly = f
   }, [preview, refresh]);
   const load = useCallback(async () => {
     onReady?.(false);
+    onCompleteChange?.(false);
     const client = getSupabaseBrowserClient(); if (!client) { setLoading(false); setNotice("Les documents n’ont pas pu être chargés."); return; }
     const result = await client.from("provider_documents").select("id,kind,storage_path,status,rejection_reason,created_at").eq("provider_id", providerId).order("created_at", { ascending: false }).order("id", { ascending: false });
     if (result.error) setNotice("Les documents n’ont pas pu être chargés.");
     else setDocuments((result.data ?? []).filter((document, index, all) => all.findIndex(item => item.kind === document.kind) === index));
     setLoading(false);
     onReady?.(!result.error);
-  }, [providerId, onReady]);
+    onCompleteChange?.(!result.error && countReceivedProfessionalDocuments(result.data ?? []) === 4);
+  }, [providerId, onReady, onCompleteChange]);
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = event.currentTarget;
@@ -68,7 +71,7 @@ export function ProfessionalDocuments({ providerId, review = false, readOnly = f
     if (!result.error) { await load(); onChange?.(); }
   }
   return <article className="panel professional-documents-panel"><h2>Documents professionnels</h2><p>Les quatre documents sont obligatoires. Ils restent privés et servent à vérifier votre activité.</p>
-    {!loading && <p>{documents.filter(document => document.status !== "rejected").length}/4 documents reçus</p>}
+    {!loading && <p>{countReceivedProfessionalDocuments(documents)}/4 documents reçus</p>}
     {notice && <p role="status">{notice}</p>}{loading ? <p>Chargement…</p> : Object.entries(kinds).map(([kind, label]) => {
       const document = documents.find(item => item.kind === kind);
       return <div className="control-list-row document-row" key={kind}><div><strong>{label}</strong>{document && <small>Reçu le {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Dakar" }).format(new Date(document.created_at))}</small>}</div><span>{!document ? "Manquant" : document.status === "approved" ? "Validé" : document.status === "rejected" ? "À remplacer" : "Reçu · à vérifier"}</span>
