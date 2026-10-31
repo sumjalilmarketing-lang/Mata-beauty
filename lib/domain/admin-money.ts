@@ -20,3 +20,9 @@ export function totalAdminMoneyByCurrency(rows: ReadonlyArray<{ amount: number; 
   }
   return [...totals].sort(([left], [right]) => left.localeCompare(right)).map(([currency, amount]) => ({ currency, amount }));
 }
+
+export function formatCurrencyBreakdown(rows: ReadonlyArray<{ currency: string; amount: number }> | null | undefined) {
+  if (rows === undefined) return "Détail par devise indisponible";
+  if (rows === null) return "Accès financier restreint";
+  return rows.map(row => formatRecordedMoney(row.amount, row.currency)).join(" · ") || "Aucun montant enregistré";
+}

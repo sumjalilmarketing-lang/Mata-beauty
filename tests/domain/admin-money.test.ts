@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { formatAdminMoney, formatRecordedMoney, totalAdminMoneyByCurrency } from "../../lib/domain/admin-money";
+import { formatAdminMoney, formatCurrencyBreakdown, formatRecordedMoney, totalAdminMoneyByCurrency } from "../../lib/domain/admin-money";
 
 describe("international administrative money", () => {
+  it("distinguishes an unavailable migration, restricted financial scope and an empty ledger", () => {
+    expect(formatCurrencyBreakdown(undefined)).toBe("Détail par devise indisponible");
+    expect(formatCurrencyBreakdown(null)).toBe("Accès financier restreint");
+    expect(formatCurrencyBreakdown([])).toBe("Aucun montant enregistré");
+    const totals = formatCurrencyBreakdown([{currency: "EUR", amount: 25}, {currency: "USD", amount: 50}]);
+    expect(totals).toContain("EUR"); expect(totals).toContain("USD"); expect(totals).not.toContain("75");
+  });
   it("does not invent a currency or turn absent amounts into zero", () => {
     expect(formatRecordedMoney(20, null)).toBe("Devise non renseignée");
     expect(formatRecordedMoney(20, "invalid")).toBe("Devise non renseignée");

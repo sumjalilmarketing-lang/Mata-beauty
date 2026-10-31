@@ -1,5 +1,5 @@
 "use client";
-import { formatAdminMoney, totalAdminMoneyByCurrency } from "@/lib/domain/admin-money";
+import { formatAdminMoney, totalAdminMoneyByCurrency, formatCurrencyBreakdown } from "@/lib/domain/admin-money";
 import { PasswordField } from "@/app/password-field";
 
 import Image from "next/image";
@@ -24,7 +24,10 @@ type AdminContext = {
   requires_mfa: boolean;
 };
 
+type FinancialCurrency = { currency: string; gross_revenue: number; commissions: number; average_order: number | null };
+
 type Metrics = {
+  financial_by_currency?: FinancialCurrency[];
   users_total: number;
   users_today: number;
   users_week: number;
@@ -134,6 +137,7 @@ type SocialMetrics = {
   booking_clicks: number;
   bookings: number | null;
   gross_amount: number | null;
+  gross_by_currency?: Array<{ currency: string; amount: number }> | null;
 };
 
 type SocialPostRow = {
@@ -241,7 +245,7 @@ function landingModule(context: AdminContext): ModuleKey {
   return navigation.find((item) => canAccessModule(context, item.key, item.permission))?.key ?? "overview";
 }
 
-const metricDefinitions: Array<{ key: keyof Metrics; label: string; tone?: string; currency?: boolean }> = [
+const metricDefinitions: Array<{ key: keyof Omit<Metrics, "financial_by_currency">; label: string; tone?: string; currency?: boolean }> = [
   { key: "users_total", label: "Utilisateurs" },
   { key: "users_today", label: "Nouveaux aujourd’hui", tone: "positive" },
   { key: "providers_active", label: "Prestataires actifs" },
@@ -618,14 +622,14 @@ function Overview({ context, setModule }: { context: AdminContext; setModule: (m
   const cancellationRate = bookingTotal ? Math.round((metrics.bookings_cancelled / bookingTotal) * 100) : 0;
   return <>
     <section className="admin-metric-grid">{metricDefinitions.map((definition) =>
-      <article className={definition.tone ?? ""} key={definition.key}><small>{definition.label}</small><strong>{definition.currency ? formatCurrency(metrics[definition.key]) : metrics[definition.key]}</strong><span>↗ Données Supabase</span></article>,
+      <article className={definition.tone ?? ""} key={definition.key}><small>{definition.label}</small><strong>{definition.currency ? formatCurrencyBreakdown(metrics.financial_by_currency?.map(row => ({ currency: row.currency, amount: definition.key === "commissions" ? row.commissions : row.gross_revenue }))) : metrics[definition.key]}</strong><span>↗ Données Supabase</span></article>,
     )}</section>
     <section className="admin-dashboard-grid">
       <article className="admin-panel admin-chart-panel"><div className="admin-panel-heading"><div><p>Activité réelle</p><h2>Réservations enregistrées</h2></div></div>
         <dl className="admin-kpi-list"><div><dt>Cette semaine</dt><dd>{metrics.bookings_week}</dd></div><div><dt>Confirmées</dt><dd>{metrics.bookings_confirmed}</dd></div><div><dt>Annulées</dt><dd>{metrics.bookings_cancelled}</dd></div></dl>
       </article>
       <article className="admin-panel"><div className="admin-panel-heading"><div><p>Qualité opérationnelle</p><h2>Indicateurs clés</h2></div></div>
-        <dl className="admin-kpi-list"><div><dt>Taux d’annulation</dt><dd>{cancellationRate}%</dd></div><div><dt>Panier moyen</dt><dd>{formatCurrency(metrics.average_order)}</dd></div><div><dt>Nouveaux comptes semaine</dt><dd>{metrics.users_week}</dd></div></dl>
+        <dl className="admin-kpi-list"><div><dt>Taux d’annulation</dt><dd>{cancellationRate}%</dd></div><div><dt>Panier moyen</dt><dd>{formatCurrencyBreakdown(metrics.financial_by_currency?.filter(row => row.average_order !== null).map(row => ({ currency: row.currency, amount: row.average_order! })))}</dd></div><div><dt>Nouveaux comptes semaine</dt><dd>{metrics.users_week}</dd></div></dl>
       </article>
       <article className="admin-panel urgent-panel"><div className="admin-panel-heading"><div><p>À traiter</p><h2>Alertes opérationnelles</h2></div></div>
         <PermissionGuard permission="documents.review" context={context}><button onClick={() => setModule("verification")}><span>Validations prestataires</span><strong>{metrics.providers_pending}</strong></button></PermissionGuard>
@@ -858,7 +862,7 @@ function SocialContentModule({ context, notify }: { context: AdminContext; notif
       {[
         ["Publications aujourd’hui", metrics.posts_today], ["Publiées", metrics.published], ["À contrôler", metrics.pending],
         ["Signalées", metrics.reported], ["Vues", metrics.views], ["Réservations générées", metrics.bookings],
-        ["Clics Réserver", metrics.booking_clicks], ["CA généré", metrics.gross_amount === null ? null : formatCurrency(metrics.gross_amount)],
+        ["Clics Réserver", metrics.booking_clicks], ["CA généré", metrics.gross_by_currency === null || metrics.gross_amount === null ? null : formatCurrencyBreakdown(metrics.gross_by_currency)],
       ].filter(([, value]) => value !== null).map(([labelValue, value]) => <article key={String(labelValue)}><span>{labelValue}</span><strong>{typeof value === "number" ? value.toLocaleString("fr-FR") : value}</strong><small>Données Supabase</small></article>)}
     </section>}
     <div className="admin-filter-bar">
