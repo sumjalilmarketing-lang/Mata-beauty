@@ -36,7 +36,9 @@ export async function GET(request: Request) {
       return redirect(request, "/?auth_error=profile_creation_failed");
     }
     if (type === "recovery" || type === "invite") {
-      const internal = type === "invite" ? await serviceSupabase().from("internal_invitations").select("id").eq("user_id", data.user.id).eq("status", "pending").maybeSingle() : null;
+      // Ordinary account invitations need only the verified user session.
+      // Internal role activation remains a separate server-authorized action.
+      const internal = type === "invite" && process.env.SUPABASE_SERVICE_ROLE_KEY ? await serviceSupabase().from("internal_invitations").select("id").eq("user_id", data.user.id).eq("status", "pending").maybeSingle() : null;
       return redirect(request, `/auth/update-password?mode=${type}${internal?.data ? "&team=1" : ""}`);
     }
     try { await sendWelcomeEmail(data.user.id); }
