@@ -42,7 +42,7 @@ Retour arrière disponible vers le déploiement précédent `dpl_AqAzfBc3F2aiyBB
 
 Session Super Admin après MFA observée sur mata-beauty.com/admin. Après rechargement du nouveau build, Équipe & accès affiche le parcours d’ajout d’un compte existant. Une recherche d’adresse fictive inexistante est refusée et n’ouvre aucun dialogue d’attribution. La matrice des permissions serveur se charge, avec sept rôles et aucun message d’erreur. Aucun rôle, compte ou dossier Production n’a été modifié par ces essais. La limite précédemment signalée sur la session MFA de production est donc levée pour ces contrôles.
 
-La bascule internationale reste une opération distincte, décrite dans INTERNATIONAL_PRODUCTION_CUTOVER_2026-10-31.md : onze migrations identifiées par leur SHA-256 et une publication de code coordonnée, avec des conditions de recette encore ouvertes. La mission initiale interdisait les modifications de Supabase Production ; aucune exception n’est présumée à partir de la seule validation MFA.
+La bascule internationale reste une opération distincte, décrite dans INTERNATIONAL_PRODUCTION_CUTOVER_2026-10-31.md : onze migrations identifiées par leur SHA-256 et une publication de code coordonnée, avec des conditions de recette encore ouvertes. L’autorisation explicite des onze migrations a ensuite été reçue, sous réserve de terminer cette recette ; aucune migration Production n’est encore exécutée.
 
 Correction visuelle relevée pendant ce contrôle : la première colonne de la matrice pouvait couper les noms de rôles au milieu des mots. Une largeur minimale et une règle de retour à la ligne limitée à cette colonne sont ajoutées, sans modifier les permissions ou les autres tableaux.
 
