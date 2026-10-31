@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { authErrorMessage } from "@/lib/auth/errors";
+import { requestEmailSignIn } from "@/lib/auth/email-sign-in";
 import { meetsPasswordPolicy, passwordPolicyMessage } from "@/lib/auth/password-policy";
 import { ensureAuthenticatedProfile, type AuthenticatedProfile } from "@/lib/auth/profile";
 import { safeOAuthDestination } from "@/lib/auth/redirect";
@@ -28,7 +29,7 @@ const authSchema = z.object({
 });
 
 type AuthValues = z.infer<typeof authSchema>;
-type AuthMode = "login" | "register" | "reset" | "confirm";
+type AuthMode = "login" | "register" | "reset" | "confirm" | "email-link";
 export type { AuthenticatedProfile } from "@/lib/auth/profile";
 
 export function AuthModal({
@@ -74,6 +75,11 @@ export function AuthModal({
     }
     submitting.current = true;
     try {
+      if (mode === "email-link") {
+        await requestEmailSignIn(supabase.auth, values.email, window.location.origin);
+        setFeedback("Si un compte correspond à cette adresse, un lien de connexion vous sera envoyé. Ouvrez le lien le plus récent dans ce navigateur. La vérification MFA reste nécessaire pour les accès internes.");
+        return;
+      }
       if (mode === "confirm") {
         const { error } = await supabase.auth.resend({
           type: "signup",
@@ -211,7 +217,7 @@ export function AuthModal({
     }
   }
 
-  const title = mode === "login" ? "Se connecter" : mode === "register" ? "Créer votre compte Client" : mode === "confirm" ? "Confirmer votre adresse e-mail" : "Mot de passe oublié";
+  const title = mode === "email-link" ? "Recevoir un lien de connexion" : mode === "login" ? "Se connecter" : mode === "register" ? "Créer votre compte Client" : mode === "confirm" ? "Confirmer votre adresse e-mail" : "Mot de passe oublié";
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -220,7 +226,7 @@ export function AuthModal({
         <div className="auth-brand"><span>M</span><div><strong>MATA</strong><small>BEAUTY</small></div></div>
         <p className="eyebrow">Compte sécurisé</p>
         <h2 id="auth-title">{title}</h2>
-        <p className="auth-lead">{mode === "login" ? "Retrouvez vos rendez-vous, favoris et recommandations personnalisées." : mode === "register" ? "Rejoignez l’expérience beauté premium pensée pour vous." : mode === "confirm" ? "Recevez un nouveau lien pour terminer votre inscription." : "Nous vous aidons à retrouver rapidement votre espace."}</p>
+        <p className="auth-lead">{mode === "login" ? "Retrouvez vos rendez-vous, favoris et recommandations personnalisées." : mode === "register" ? "Rejoignez l’expérience beauté premium pensée pour vous." : mode === "confirm" ? "Recevez un nouveau lien pour terminer votre inscription." : mode === "email-link" ? "Connectez-vous avec un lien envoyé à votre adresse e-mail." : "Nous vous aidons à retrouver rapidement votre espace."}</p>
         {!configuration.configured && (
           <div className="configuration-warning" role="alert">
             La connexion sécurisée est momentanément indisponible. Réessayez ultérieurement.
@@ -276,6 +282,7 @@ export function AuthModal({
           {mode !== "login" && <button onClick={() => { setFeedback(""); setMode("login"); }}>Déjà inscrit ? Se connecter</button>}
           {mode === "login" && <button onClick={() => { setFeedback(""); setMode("register"); }}>Créer un compte</button>}
           {mode === "login" && <button onClick={() => { setFeedback(""); setMode("reset"); }}>Mot de passe oublié</button>}
+          {mode === "login" && <button disabled={isSubmitting || googleLoading} onClick={() => { setFeedback(""); setMode("email-link"); }}>Recevoir un lien de connexion</button>}
           {mode !== "confirm" && mode !== "register" && <button onClick={() => { setFeedback(""); setMode("confirm"); }}>Renvoyer la confirmation</button>}
         </div>
       </section>
