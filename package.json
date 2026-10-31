@@ -27,14 +27,14 @@
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "^2.111.0",
     "drizzle-orm": "0.45.2",
-    "next": "16.2.11",
+    "next": "16.4.1",
     "postcss": "8.5.23",
     "qrcode": "^1.5.4",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "react-hook-form": "^7.82.0",
-    "sharp": "0.35.0",
-    "zod": "^4.4.3"
+    "sharp": "0.35.5",
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
@@ -49,7 +49,7 @@
     "axe-core": "4.10.3",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.4.1",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
