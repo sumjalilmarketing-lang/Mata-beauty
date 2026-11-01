@@ -1,0 +1,1113 @@
+"use client";
+import { formatAdminMoney, totalAdminMoneyByCurrency, formatCurrencyBreakdown } from "@/lib/domain/admin-money";
+import { PasswordField } from "@/app/password-field";
+
+import Image from "next/image";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { configureSupabaseBrowserClient, getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
+import { publicErrorMessage } from "@/lib/ui/public-error";
+import { ProviderReview } from "./provider-review";
+import { SalonReview } from "./salon-review";
+import { OnboardingQueue } from "./onboarding-queue";
+import { ManagedAccounts } from "./managed-accounts";
+import { NotificationCenter, NotificationBadge } from "./notification-center";
+import { LaunchAdmin } from "./launch-admin";
+import { SupportInbox } from "./support-inbox";
+import { ModerationInbox } from "./moderation-inbox";
+import { InternalTeam } from "./internal-team";
+import { CommentModeration } from "./comment-moderation";
+import { isPlatformSettingKey, parsePlatformSetting, validatePlatformSetting, type PlatformSettingKey, type PlatformSettingValue, type PlatformSettingsMap } from "@/lib/domain/admin-platform-settings";
+
+type AdminContext = {
+  is_super_admin: boolean;
+  roles: string[];
+  permissions: string[];
+  requires_mfa: boolean;
+};
+
+type FinancialCurrency = { currency: string; gross_revenue: number; commissions: number; average_order: number | null };
+
+type Metrics = {
+  financial_by_currency?: FinancialCurrency[];
+  users_total: number;
+  users_today: number;
+  users_week: number;
+  clients_active: number;
+  providers_active: number;
+  providers_pending: number;
+  salons_active: number;
+  bookings_today: number;
+  bookings_week: number;
+  bookings_confirmed: number;
+  bookings_cancelled: number;
+  gross_revenue: number;
+  commissions: number;
+  payments_pending: number;
+  payouts_pending: number;
+  disputes_open: number;
+  reports_open: number;
+  tickets_open: number;
+  average_order: number;
+};
+
+type UserRow = {
+  user_id: string;
+  email: string;
+  display_name: string | null;
+  phone: string | null;
+  account_role: string;
+  is_suspended: boolean;
+  city: string | null;
+  created_at: string;
+  last_sign_in_at: string | null;
+  bookings_count: number;
+  reports_count: number;
+  verification_status: string;
+};
+
+type ProviderRow = {
+  profile_id: string;
+  business_name: string;
+  city: string;
+  status: string;
+  average_rating: number | string;
+  review_count: number;
+  created_at: string;
+};
+
+type BookingRow = {
+  id: string;
+  starts_at: string;
+  status: string;
+  total_amount: number;
+  currency: string;
+  location_mode: string;
+  provider_profiles: { business_name: string; timezone: string | null; country_code: string | null } | Array<{ business_name: string; timezone: string | null; country_code: string | null }> | null;
+  businesses: { timezone: string | null; country_code: string | null } | Array<{ timezone: string | null; country_code: string | null }> | null;
+  provider_services: { title: string; duration_minutes: number } | Array<{ title: string; duration_minutes: number }> | null;
+};
+
+type CatalogRow = {
+  id: string;
+  name?: string;
+  title?: string;
+  slug?: string;
+  description?: string | null;
+  icon?: string | null;
+  image_url?: string | null;
+  parent_id?: string | null;
+  is_active: boolean;
+  sort_order?: number;
+  duration_minutes?: number;
+  price_amount?: number;
+  currency?: string;
+};
+
+type FinanceRow = {
+  id: string;
+  booking_id: string;
+  payment_status: string;
+  payment_method: string;
+  amount: number;
+  currency: string;
+  is_test: boolean;
+  created_at: string;
+};
+
+type CommissionRuleRow = { id: string; name: string; rate: number | string; is_active: boolean; valid_from: string; valid_until: string | null };
+type CommissionEntryRow = { id: string; payment_id: string; rate: number | string; amount: number; currency: string; created_at: string };
+
+type AuditRow = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  after_data: Record<string, unknown> | null;
+  created_at: string;
+};
+
+type SocialMetrics = {
+  posts_today: number;
+  published: number;
+  pending: number;
+  reported: number;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  booking_clicks: number;
+  bookings: number | null;
+  gross_amount: number | null;
+  gross_by_currency?: Array<{ currency: string; amount: number }> | null;
+};
+
+type SocialPostRow = {
+  id: string;
+  author_id: string;
+  caption: string;
+  status: string;
+  post_type: string;
+  thumbnail_url: string | null;
+  is_sponsored: boolean;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  share_count: number;
+  published_at: string | null;
+  created_at: string;
+  provider_profiles: { business_name: string; city: string } | Array<{ business_name: string; city: string }> | null;
+};
+
+type SearchResult = { entity_type: string; entity_id: string; title: string; subtitle: string };
+
+async function withTimeout<T>(operation: PromiseLike<T>, timeoutMs = 8000): Promise<T> {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("Le service met trop de temps à répondre.")), timeoutMs);
+  });
+  try {
+    return await Promise.race([Promise.resolve(operation), timeout]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+}
+
+const navigation = [
+  { key: "overview", label: "Vue d’ensemble", icon: "⌂", permission: "users.read" },
+  { key: "launch", label: "Lancement", icon: "↗", permission: "users.read" },
+  { key: "cohort", label: "Cohorte lancement", icon: "★", permission: "providers.read" },
+  { key: "users", label: "Utilisateurs", icon: "◎", permission: "users.read" },
+  { key: "providers", label: "Prestataires", icon: "✦", permission: "providers.read" },
+  { key: "salons", label: "Salons", icon: "⌑", permission: "providers.read" },
+  { key: "verification", label: "Validations professionnelles", icon: "✓", permission: "documents.review" },
+  { key: "bookings", label: "Réservations", icon: "▣", permission: "bookings.read" },
+  { key: "calendar", label: "Calendrier", icon: "□", permission: "bookings.read" },
+  { key: "categories", label: "Catégories", icon: "◇", permission: "categories.manage" },
+  { key: "services", label: "Prestations", icon: "≡", permission: "categories.manage" },
+  { key: "payments", label: "Paiements", icon: "¤", permission: "payments.read" },
+  { key: "commissions", label: "Commissions", icon: "%", permission: "commissions.manage" },
+  { key: "payouts", label: "Reversements", icon: "↗", permission: "payouts.manage" },
+  { key: "reviews", label: "Avis", icon: "★", permission: "reviews.moderate" },
+  { key: "comments", label: "Commentaires", icon: "✉", permission: "reviews.moderate" },
+  { key: "reports", label: "Signalements", icon: "!", permission: "reports.manage" },
+  { key: "disputes", label: "Litiges", icon: "⚖", permission: "reports.manage" },
+  { key: "promotions", label: "Promotions", icon: "◈", permission: "content.manage" },
+  { key: "notifications", label: "Notifications", icon: "◌", permission: "notifications.send" },
+  { key: "support", label: "Support", icon: "?", permission: "support.manage" },
+  { key: "content", label: "Contenu social", icon: "▶", permission: "content.manage" },
+  { key: "administrators", label: "Équipe & accès", icon: "♜", permission: "roles.manage" },
+  { key: "roles", label: "Rôles et permissions", icon: "⌘", permission: "roles.manage" },
+  { key: "statistics", label: "Statistiques", icon: "↗", permission: "users.read" },
+  { key: "audit", label: "Journaux d’audit", icon: "≣", permission: "audit.read" },
+  { key: "security", label: "Sécurité", icon: "⌾", permission: "roles.manage" },
+  { key: "settings", label: "Paramètres", icon: "⚙", permission: "settings.read" },
+  { key: "maintenance", label: "Maintenance", icon: "△", permission: "settings.update" },
+  { key: "platform-health", label: "Santé plateforme", icon: "●", permission: "settings.read" },
+] as const;
+type ModuleKey = typeof navigation[number]["key"];
+
+const adminNavigationGroups: ReadonlyArray<{ key: string; label: string; icon: string; moduleKeys: readonly ModuleKey[] }> = [
+  { key: "pilotage", label: "Pilotage", icon: "◉", moduleKeys: ["overview", "launch", "cohort", "statistics"] },
+  { key: "users-access", label: "Utilisateurs & accès", icon: "♙", moduleKeys: ["users", "providers", "salons", "verification", "administrators", "roles"] },
+  { key: "activity-services", label: "Activité & prestations", icon: "▣", moduleKeys: ["categories", "services", "bookings", "calendar"] },
+  { key: "finance", label: "Finances", icon: "¤", moduleKeys: ["payments", "commissions", "payouts"] },
+  { key: "communication-quality", label: "Communication & qualité", icon: "✉", moduleKeys: ["notifications", "reviews", "comments", "reports", "disputes", "support", "content", "promotions"] },
+  { key: "configuration-security", label: "Configuration & sécurité", icon: "⚙", moduleKeys: ["settings", "security", "audit", "maintenance", "platform-health"] },
+];
+
+function groupForModule(key: ModuleKey) {
+  return adminNavigationGroups.find((group) => group.moduleKeys.includes(key))?.key ?? adminNavigationGroups[0].key;
+}
+
+const adminRoleLabels: Record<string, string> = {
+  super_admin: "Super administrateur",
+  admin: "Administrateur",
+  support: "Agent support",
+  verification_agent: "Agent onboarding",
+  finance: "Responsable finance",
+  moderator: "Modérateur",
+  content_manager: "Responsable contenu",
+};
+
+function canAccessModule(context: AdminContext, key: ModuleKey, permission: string) {
+  if (context.is_super_admin) return true;
+  if (["launch", "cohort", "platform-health"].includes(key)) return false;
+  if ((key === "overview" || key === "statistics") && !context.roles.includes("admin")) return false;
+  return context.permissions.includes(permission);
+}
+
+function landingModule(context: AdminContext): ModuleKey {
+  if (context.is_super_admin || context.roles.includes("admin")) return "overview";
+  if (context.roles.includes("support")) return "support";
+  if (context.roles.includes("verification_agent")) return "verification";
+  if (context.roles.includes("finance")) return "payments";
+  if (context.roles.includes("moderator")) return "reports";
+  if (context.roles.includes("content_manager")) return "content";
+  return navigation.find((item) => canAccessModule(context, item.key, item.permission))?.key ?? "overview";
+}
+
+const metricDefinitions: Array<{ key: keyof Omit<Metrics, "financial_by_currency">; label: string; tone?: string; currency?: boolean }> = [
+  { key: "users_total", label: "Utilisateurs" },
+  { key: "users_today", label: "Nouveaux aujourd’hui", tone: "positive" },
+  { key: "providers_active", label: "Prestataires actifs" },
+  { key: "providers_pending", label: "Validations urgentes", tone: "warning" },
+  { key: "salons_active", label: "Salons actifs" },
+  { key: "bookings_today", label: "Réservations du jour" },
+  { key: "bookings_week", label: "Réservations semaine" },
+  { key: "gross_revenue", label: "Chiffre d’affaires", currency: true },
+  { key: "commissions", label: "Commissions Mata", currency: true },
+  { key: "payments_pending", label: "Paiements en attente", tone: "warning" },
+  { key: "disputes_open", label: "Litiges ouverts", tone: "danger" },
+  { key: "tickets_open", label: "Tickets ouverts" },
+];
+
+function formatCurrency(value: number, currency = "XOF") {
+  return formatAdminMoney(value, currency);
+}
+
+function formatDate(value: string | null, timeZone = "Africa/Dakar") {
+  return value ? new Date(value).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone }) : "Jamais";
+}
+
+function bookingTimeZone(row: BookingRow) {
+  const business = relationOne(row.businesses);
+  const provider = relationOne(row.provider_profiles);
+  return business?.timezone ?? provider?.timezone ?? ((business?.country_code ?? provider?.country_code) === "SN" ? "Africa/Dakar" : "UTC");
+}
+
+function relationOne<T>(value: T | T[] | null): T | null {
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function StatusBadge({ value }: { value: string }) {
+  const normalized = value.toLowerCase();
+  const tone = ["approved", "confirmed", "paid", "published", "active", "resolved"].some((item) => normalized.includes(item))
+    ? "success"
+    : ["rejected", "suspended", "failed", "cancelled", "urgent"].some((item) => normalized.includes(item))
+      ? "danger"
+      : ["pending", "draft", "open", "review"].some((item) => normalized.includes(item))
+        ? "warning"
+        : "neutral";
+  return <span className={`admin-status ${tone}`}>{value.replaceAll("_", " ")}</span>;
+}
+
+function PermissionGuard({ permission, context, children }: { permission: string; context: AdminContext; children: React.ReactNode }) {
+  return context.is_super_admin || context.permissions.includes(permission) ? children : null;
+}
+
+function EmptyState({ title, description }: { title: string; description: string }) {
+  return <div className="admin-empty"><span>✦</span><h3>{title}</h3><p>{description}</p></div>;
+}
+
+function LoadingSkeleton() {
+  return <div className="admin-loading" aria-label="Chargement"><i /><i /><i /><i /></div>;
+}
+
+function ConfirmationModal({
+  title, description, dangerous = false, onCancel, onConfirm,
+}: {
+  title: string;
+  description: string;
+  dangerous?: boolean;
+  onCancel: () => void;
+  onConfirm: (reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  return <div className="admin-modal-backdrop">
+    <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="confirmation-title">
+      <p className="admin-kicker">Action sensible</p>
+      <h2 id="confirmation-title">{title}</h2>
+      <p>{description}</p>
+      <label>Motif obligatoire<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={2} /></label>
+      <div className="admin-modal-actions">
+        <button className="secondary" onClick={onCancel}>Annuler</button>
+        <button className={dangerous ? "danger" : "primary"} disabled={busy || reason.trim().length < 2} onClick={() => {
+          setBusy(true);
+          void onConfirm(reason).finally(() => setBusy(false));
+        }}>{busy ? "Traitement…" : "Confirmer"}</button>
+      </div>
+    </section>
+  </div>;
+}
+
+export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "overview" }: { supabaseUrl: string; supabaseAnonKey: string; initialModule?: ModuleKey }) {
+  configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
+  const [context, setContext] = useState<AdminContext | null>(null);
+  const [sessionState, setSessionState] = useState<"loading" | "anonymous" | "unauthorized" | "mfa" | "ready">("loading");
+  const [activeModule, setActiveModule] = useState<ModuleKey>(initialModule);
+  const [moduleRefresh, setModuleRefresh] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileNav, setMobileNav] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState(() => groupForModule(initialModule));
+  const [globalQuery, setGlobalQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [notice, setNotice] = useState("");
+
+  const resolveSession = useCallback(async () => {
+    try {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) {
+        setSessionState("anonymous");
+        return;
+      }
+      const { data: session } = await withTimeout(supabase.auth.getSession());
+      if (!session.session?.user) {
+        setContext(null);
+        setSessionState("anonymous");
+        return;
+      }
+      const mfa = await withTimeout(supabase.rpc("admin_mfa_required"));
+      if (mfa.error) throw mfa.error;
+      if (mfa.data === true) {
+        setContext(null);
+        setSessionState("mfa");
+        return;
+      }
+      const { data, error } = await withTimeout(supabase.rpc("get_admin_context"));
+      const next = data as AdminContext | null;
+      if (error || !next || (!next.is_super_admin && !next.permissions.length)) {
+        setContext(null);
+        setSessionState("unauthorized");
+        return;
+      }
+      setContext(next);
+      let preferredModule = initialModule;
+      if (initialModule === "overview") {
+        try {
+          const storedModule = window.localStorage.getItem("mata-admin-last-module");
+          const storedItem = navigation.find((item) => item.key === storedModule);
+          if (storedItem && canAccessModule(next, storedItem.key, storedItem.permission)) preferredModule = storedItem.key;
+        } catch {
+          // Navigation persistence is optional; the current route remains usable if storage is unavailable.
+        }
+      }
+      const nextModule = canAccessModule(next, preferredModule, navigation.find((item) => item.key === preferredModule)?.permission ?? "")
+        ? preferredModule
+        : landingModule(next);
+      setActiveModule(nextModule);
+      let preferredGroup = groupForModule(nextModule);
+      try {
+        const storedGroup = window.localStorage.getItem("mata-admin-open-group");
+        if (adminNavigationGroups.some((group) => group.key === storedGroup && group.moduleKeys.some((key) => {
+          const item = navigation.find((entry) => entry.key === key);
+          return item && canAccessModule(next, item.key, item.permission);
+        }))) preferredGroup = storedGroup ?? preferredGroup;
+      } catch {
+        // Navigation persistence is optional; the current route remains usable if storage is unavailable.
+      }
+      setExpandedGroup(preferredGroup);
+      await supabase.rpc("record_admin_session", { client_user_agent: window.navigator.userAgent });
+      setSessionState("ready");
+    } catch {
+      setContext(null);
+      setSessionState("anonymous");
+      setNotice("Connexion au service momentanément indisponible. Réessayez.");
+    }
+  }, [initialModule]);
+
+  useEffect(() => {
+    void Promise.resolve().then(resolveSession);
+  }, [resolveSession]);
+
+  useEffect(() => {
+    if (!mobileNav) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileNav(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileNav]);
+
+  useEffect(() => {
+    if (!context || globalQuery.trim().length < 2) {
+      void Promise.resolve().then(() => setSearchResults([]));
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+      const { data } = await supabase.rpc("admin_global_search", { search_term: globalQuery.trim() });
+      setSearchResults((data ?? []) as SearchResult[]);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [context, globalQuery]);
+
+  async function signOut() {
+    const supabase = getSupabaseBrowserClient();
+    await supabase?.rpc("close_admin_session");
+    await supabase?.auth.signOut();
+    setContext(null);
+    setSessionState("anonymous");
+  }
+
+  function navigateToModule(moduleKey: ModuleKey) {
+    const item = navigation.find((entry) => entry.key === moduleKey);
+    if (!item || (context && !canAccessModule(context, item.key, item.permission))) return;
+    setActiveModule(moduleKey);
+    setExpandedGroup(groupForModule(moduleKey));
+    setMobileNav(false);
+    try {
+      window.localStorage.setItem("mata-admin-last-module", moduleKey);
+      window.localStorage.setItem("mata-admin-open-group", groupForModule(moduleKey));
+    } catch {
+      // Navigation persistence is optional.
+    }
+  }
+
+  if (sessionState === "loading") return <main className="admin-auth-shell"><LoadingSkeleton /></main>;
+  if (sessionState === "anonymous") return <AdminLogin onAuthenticated={resolveSession} configured={getSupabaseConfiguration().configured} />;
+  if (sessionState === "mfa") return <AdminMfa onVerified={resolveSession} onSignOut={signOut} />;
+  if (sessionState === "unauthorized") return <AccessDenied onSignOut={signOut} />;
+  if (!context) return null;
+
+  const visibleNavigation = navigation.filter((item) => canAccessModule(context, item.key, item.permission));
+  const effectiveModule = visibleNavigation.some((item) => item.key === activeModule) ? activeModule : landingModule(context);
+  const current = navigation.find((item) => item.key === effectiveModule) ?? visibleNavigation[0];
+  const visibleGroups = adminNavigationGroups.map((group) => ({
+    ...group,
+    items: visibleNavigation.filter((item) => group.moduleKeys.includes(item.key)),
+  })).filter((group) => group.items.length > 0);
+  const currentGroup = visibleGroups.find((group) => group.moduleKeys.includes(effectiveModule));
+  const roleLabel = context.is_super_admin ? adminRoleLabels.super_admin : context.roles.map((role) => adminRoleLabels[role] ?? role).join(", ");
+  const roleInitials = context.is_super_admin ? "SA" : context.roles.includes("verification_agent") ? "ON" : context.roles[0]?.slice(0, 2).toUpperCase() ?? "AD";
+
+  return <main className={`super-admin-shell ${collapsed ? "collapsed" : ""}`}>
+    {mobileNav && <button className="admin-mobile-scrim" aria-label="Fermer la navigation" onClick={() => setMobileNav(false)} />}
+    <aside id="admin-sidebar" className={`admin-sidebar ${mobileNav ? "mobile-open" : ""}`}>
+      <button className="admin-brand" onClick={() => navigateToModule(landingModule(context))}><Image src="/brand/mata-app-icon.webp" alt="" width={42} height={42} unoptimized /><strong>MATA<small>CONTROL CENTER</small></strong></button>
+      <div className="admin-role-card"><i>{roleInitials}</i><span><strong>{roleLabel}</strong><small>Accès sécurisé</small></span></div>
+      <nav aria-label="Navigation Super Admin">{visibleGroups.map((group) => {
+        const isOpen = expandedGroup === group.key;
+        const containsCurrent = group.moduleKeys.includes(effectiveModule);
+        return <section className="admin-nav-group" key={group.key}>
+          <button
+            type="button"
+            className={`admin-nav-group-trigger ${containsCurrent ? "group-active" : ""}`}
+            aria-label={group.label}
+            aria-expanded={isOpen}
+            aria-controls={`admin-nav-group-${group.key}`}
+            title={group.label}
+            onClick={() => {
+              setCollapsed(false);
+              setExpandedGroup(isOpen ? "" : group.key);
+              try { window.localStorage.setItem("mata-admin-open-group", isOpen ? "" : group.key); } catch { /* Storage is optional. */ }
+            }}
+          ><i aria-hidden="true">{group.icon}</i><span>{group.label}</span><b aria-hidden="true" className="admin-nav-chevron">⌄</b></button>
+          <div id={`admin-nav-group-${group.key}`} className={`admin-nav-group-content ${isOpen ? "is-open" : ""}`} aria-hidden={!isOpen} inert={!isOpen}>
+            <div className="admin-nav-group-links">{group.items.map((item) =>
+              <button
+                key={item.key}
+                type="button"
+                className={effectiveModule === item.key ? "active" : ""}
+                aria-label={item.label}
+                aria-current={effectiveModule === item.key ? "page" : undefined}
+                onClick={() => navigateToModule(item.key)}
+                title={item.label}
+              ><i aria-hidden="true">{item.icon}</i><span>{item.label}</span></button>,
+            )}</div>
+          </div>
+        </section>;
+      })}</nav>
+      <button className="admin-signout" onClick={() => void signOut()}><i>↪</i><span>Se déconnecter</span></button>
+    </aside>
+    <section className="admin-workspace">
+      <header className="admin-topbar">
+        <button className="admin-menu-button" aria-label={mobileNav ? "Fermer le menu" : "Ouvrir le menu"} aria-expanded={mobileNav} aria-controls="admin-sidebar" onClick={() => setMobileNav((value) => !value)}>☰</button>
+        <button className="admin-collapse" aria-label="Replier la navigation" onClick={() => setCollapsed((value) => !value)}>◀</button>
+        <div className="admin-global-search">
+          <span>⌕</span>
+          <input value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} placeholder="Rechercher un utilisateur, une réservation, un paiement…" />
+          {searchResults.length > 0 && <div className="admin-search-results">{searchResults.map((result) =>
+            <button key={`${result.entity_type}-${result.entity_id}`} onClick={() => {
+              const target: ModuleKey = result.entity_type === "user" ? "users" : result.entity_type === "provider" ? "providers" : result.entity_type === "booking" ? "bookings" : result.entity_type === "payment" ? "payments" : result.entity_type === "ticket" ? "support" : "promotions";
+              navigateToModule(target);
+              setSearchResults([]);
+              setGlobalQuery("");
+            }}><StatusBadge value={result.entity_type} /><span><strong>{result.title}</strong><small>{result.subtitle}</small></span></button>,
+          )}</div>}
+        </div>
+        <div className="admin-top-actions"><span className="secure-indicator">● Sécurisé</span>{visibleNavigation.some(item => item.key === "notifications") && <button aria-label="Notifications" onClick={() => navigateToModule("notifications")}>◌<NotificationBadge /></button>}<button aria-label="Ouvrir le journal d’audit" onClick={() => navigateToModule("audit")}>≣</button></div>
+      </header>
+      <div className="admin-page">
+        {notice && <div className="admin-toast" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
+        <div className="admin-page-heading"><div><p className="admin-breadcrumb"><span>Mata Beauty</span><span aria-hidden="true">/</span><span>Super Admin</span><span aria-hidden="true">/</span><span>{currentGroup?.label ?? "Administration"}</span></p><h1>{current.label}</h1></div><div className="admin-page-actions"><button className="primary" onClick={() => setModuleRefresh((value) => value + 1)}>Actualiser</button></div></div>
+        <AdminModule key={`${effectiveModule}:${moduleRefresh}`} module={effectiveModule} context={context} setModule={setActiveModule} notify={setNotice} />
+      </div>
+    </section>
+  </main>;
+}
+
+function AdminLogin({ onAuthenticated, configured }: { onAuthenticated: () => Promise<void>; configured: boolean }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true);
+    setFeedback("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setFeedback("Connexion refusée. Vérifiez vos identifiants administrateur.");
+      setBusy(false);
+      return;
+    }
+    await onAuthenticated();
+    setBusy(false);
+  }
+
+  return <main className="admin-auth-shell">
+    <section className="admin-login-card">
+      <div className="admin-login-brand"><Image src="/brand/mata-app-icon.webp" alt="" width={52} height={52} unoptimized /><div><strong>MATA BEAUTY</strong><small>SUPER ADMINISTRATION</small></div></div>
+      <p className="admin-kicker">Accès restreint</p>
+      <h1>Centre de contrôle</h1>
+      <p>Authentification réservée aux équipes autorisées. Chaque connexion et action sensible est journalisée.</p>
+      {!configured && <div className="admin-auth-error">Configuration sécurisée indisponible.</div>}
+      <form onSubmit={submit}>
+        <label>Adresse administrateur<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
+        <label>Mot de passe<PasswordField autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required /></label>
+        {feedback && <p className="admin-auth-error" role="alert">{feedback}</p>}
+        <button className="primary" disabled={!configured || busy}>{busy ? "Vérification…" : "Accéder à l’administration"}</button>
+      </form>
+      <small className="admin-security-note">⌾ Protection RLS · permissions granulaires · MFA compatible</small>
+    </section>
+  </main>;
+}
+
+function AccessDenied({ onSignOut }: { onSignOut: () => Promise<void> }) {
+  return <main className="admin-auth-shell"><section className="admin-login-card denied">
+    <span className="denied-icon">×</span><p className="admin-kicker">Accès refusé</p><h1>Compte non autorisé</h1>
+    <p>Votre compte ne dispose d’aucun rôle administratif actif. Aucun contenu sensible n’a été chargé.</p>
+    <button className="primary" onClick={() => void onSignOut()}>Revenir à la connexion</button>
+  </section></main>;
+}
+
+function AdminModule({
+  module, context, setModule, notify,
+}: {
+  module: ModuleKey;
+  context: AdminContext;
+  setModule: (module: ModuleKey) => void;
+  notify: (message: string) => void;
+}) {
+  if (module === "overview" || module === "statistics") return <Overview context={context} setModule={setModule} />;
+  if (module === "launch" || module === "cohort" || module === "platform-health") return <LaunchAdmin mode={module} />;
+  if (module === "reports") return <ModerationInbox />;
+  if (module === "comments") return <CommentModeration />;
+  if (module === "support") return <SupportInbox />;
+  if (module === "users") return context.is_super_admin ? <ManagedAccounts /> : <UsersModule context={context} notify={notify} />;
+  if (module === "notifications") return <NotificationCenter />;
+  if (module === "salons") return <SalonReview canApprove={context.is_super_admin || (context.permissions.includes("providers.verify") && context.permissions.includes("documents.review"))} />;
+  if (module === "verification") return <OnboardingQueue moduleKey="dashboard" />;
+  if (module === "providers") return <ProvidersModule context={context} verificationOnly={false} notify={notify} />;
+  if (module === "bookings" || module === "calendar") return <BookingsModule context={context} calendar={module === "calendar"} notify={notify} />;
+  if (module === "categories" || module === "services") return <CatalogModule services={module === "services"} notify={notify} />;
+  if (module === "payments" || module === "commissions") return <FinanceModule section={module} />;
+  if (module === "content") return <SocialContentModule context={context} notify={notify} />;
+  if (module === "audit") return <AuditModule context={context} />;
+  if (module === "administrators" || module === "roles") return <InternalTeam matrixOnly={module === "roles"} />;
+  if (module === "settings" || module === "maintenance") return <SettingsModule context={context} maintenance={module === "maintenance"} notify={notify} />;
+  return <OperationalModule module={module} context={context} />;
+}
+
+function Overview({ context, setModule }: { context: AdminContext; setModule: (module: ModuleKey) => void }) {
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  useEffect(() => {
+    void getSupabaseBrowserClient()?.rpc("get_admin_dashboard").then(({ data }) => setMetrics(data as Metrics | null));
+  }, []);
+  if (!metrics) return <LoadingSkeleton />;
+  const bookingTotal = metrics.bookings_confirmed + metrics.bookings_cancelled;
+  const cancellationRate = bookingTotal ? Math.round((metrics.bookings_cancelled / bookingTotal) * 100) : 0;
+  return <>
+    <section className="admin-metric-grid">{metricDefinitions.map((definition) =>
+      <article className={definition.tone ?? ""} key={definition.key}><small>{definition.label}</small><strong>{definition.currency ? formatCurrencyBreakdown(metrics.financial_by_currency?.map(row => ({ currency: row.currency, amount: definition.key === "commissions" ? row.commissions : row.gross_revenue }))) : metrics[definition.key]}</strong><span>↗ Données Supabase</span></article>,
+    )}</section>
+    <section className="admin-dashboard-grid">
+      <article className="admin-panel admin-chart-panel"><div className="admin-panel-heading"><div><p>Activité réelle</p><h2>Réservations enregistrées</h2></div></div>
+        <dl className="admin-kpi-list"><div><dt>Cette semaine</dt><dd>{metrics.bookings_week}</dd></div><div><dt>Confirmées</dt><dd>{metrics.bookings_confirmed}</dd></div><div><dt>Annulées</dt><dd>{metrics.bookings_cancelled}</dd></div></dl>
+      </article>
+      <article className="admin-panel"><div className="admin-panel-heading"><div><p>Qualité opérationnelle</p><h2>Indicateurs clés</h2></div></div>
+        <dl className="admin-kpi-list"><div><dt>Taux d’annulation</dt><dd>{cancellationRate}%</dd></div><div><dt>Panier moyen</dt><dd>{formatCurrencyBreakdown(metrics.financial_by_currency?.filter(row => row.average_order !== null).map(row => ({ currency: row.currency, amount: row.average_order! })))}</dd></div><div><dt>Nouveaux comptes semaine</dt><dd>{metrics.users_week}</dd></div></dl>
+      </article>
+      <article className="admin-panel urgent-panel"><div className="admin-panel-heading"><div><p>À traiter</p><h2>Alertes opérationnelles</h2></div></div>
+        <PermissionGuard permission="documents.review" context={context}><button onClick={() => setModule("verification")}><span>Validations prestataires</span><strong>{metrics.providers_pending}</strong></button></PermissionGuard>
+        <PermissionGuard permission="reports.manage" context={context}><button onClick={() => setModule("reports")}><span>Signalements ouverts</span><strong>{metrics.reports_open}</strong></button></PermissionGuard>
+        <PermissionGuard permission="reports.manage" context={context}><button onClick={() => setModule("disputes")}><span>Litiges ouverts</span><strong>{metrics.disputes_open}</strong></button></PermissionGuard>
+        <PermissionGuard permission="support.manage" context={context}><button onClick={() => setModule("support")}><span>Tickets support</span><strong>{metrics.tickets_open}</strong></button></PermissionGuard>
+      </article>
+    </section>
+    <PermissionGuard permission="settings.update" context={context}><div className="admin-security-banner"><span>⌾</span><div><strong>Contrôles sensibles actifs</strong><p>Les suspensions, validations, changements de rôle, réservations et paramètres exigent une justification et créent un journal d’audit.</p></div></div></PermissionGuard>
+  </>;
+}
+
+function UsersModule({ context, notify }: { context: AdminContext; notify: (message: string) => void }) {
+  const [rows, setRows] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [confirmation, setConfirmation] = useState<UserRow | null>(null);
+
+  const load = useCallback(async () => {
+    const { data } = await getSupabaseBrowserClient()!.rpc("admin_list_users", { search_term: query || null });
+    setRows((data ?? []) as UserRow[]);
+    setLoading(false);
+  }, [query]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+  const visible = useMemo(() => rows.filter((row) => roleFilter === "all" || row.account_role === roleFilter), [roleFilter, rows]);
+
+  return <>
+    <div className="admin-filter-bar"><div className="admin-inline-search">⌕<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom, e-mail ou téléphone" /></div><label>Rôle<select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}><option value="all">Tous les rôles</option><option value="client">Clients</option><option value="provider">Prestataires</option><option value="admin">Administrateurs</option></select></label><span>{visible.length} comptes</span></div>
+    {loading ? <LoadingSkeleton /> : <div className="admin-table-wrap" role="region" aria-label="Utilisateurs" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Utilisateur</th><th>Rôle</th><th>Ville</th><th>Inscription</th><th>Activité</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{visible.map((row) =>
+      <tr key={row.user_id}><td><strong>{row.display_name || "Sans nom"}</strong><small>{row.email}<br />{row.phone || "Téléphone non renseigné"}</small></td><td><StatusBadge value={row.account_role} /></td><td>{row.city || "—"}</td><td>{formatDate(row.created_at)}<small>Dernière connexion : {formatDate(row.last_sign_in_at)}</small></td><td>{row.bookings_count} réservation(s)<small>{row.reports_count} signalement(s)</small></td><td><StatusBadge value={row.is_suspended ? "suspended" : "active"} /></td><td><PermissionGuard permission="users.suspend" context={context}><button className={row.is_suspended ? "table-action positive" : "table-action danger"} onClick={() => setConfirmation(row)}>{row.is_suspended ? "Réactiver" : "Suspendre"}</button></PermissionGuard></td></tr>,
+    )}</tbody></table></div>}
+    {confirmation && <ConfirmationModal title={confirmation.is_suspended ? "Réactiver ce compte ?" : "Suspendre ce compte ?"} description={`${confirmation.display_name || confirmation.email} sera ${confirmation.is_suspended ? "de nouveau autorisé" : "immédiatement bloqué"}.`} dangerous={!confirmation.is_suspended} onCancel={() => setConfirmation(null)} onConfirm={async (reason) => {
+      const { error } = await getSupabaseBrowserClient()!.rpc("admin_set_user_suspension", { target_user_id: confirmation.user_id, suspended: !confirmation.is_suspended, reason });
+      if (error) notify(publicErrorMessage(error, "Le compte n’a pas pu être mis à jour.")); else notify("Compte mis à jour et action journalisée.");
+      setConfirmation(null);
+      await load();
+    }} />}
+  </>;
+}
+
+function ProvidersModule({ context, verificationOnly, notify }: { context: AdminContext; verificationOnly: boolean; notify: (message: string) => void }) {
+  const [opened, setOpened] = useState<string | null>(null);
+  const [rows, setRows] = useState<ProviderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [confirmation, setConfirmation] = useState<{ row: ProviderRow; status: "approved" | "rejected" | "suspended" } | null>(null);
+  const load = useCallback(async () => {
+    let request = getSupabaseBrowserClient()!.from("provider_profiles").select("profile_id,business_name,city,status,average_rating,review_count,created_at").order("created_at", { ascending: false }).limit(200);
+    if (verificationOnly) request = request.eq("status", "pending_review");
+    const { data } = await request;
+    setRows((data ?? []) as ProviderRow[]);
+    setLoading(false);
+  }, [verificationOnly]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+  if (loading) return <LoadingSkeleton />;
+  return <><div className="admin-filter-bar"><span>{rows.length} prestataires autorisés</span></div>
+    {rows.length ? <div className="admin-table-wrap" role="region" aria-label="Professionnels" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Prestataire</th><th>Ville</th><th>Note</th><th>Inscription</th><th>Statut</th><th>Décision</th></tr></thead><tbody>{rows.map((row) =>
+      <tr key={row.profile_id}><td><strong>{row.business_name}</strong></td><td>{row.city}</td><td>★ {Number(row.average_rating).toFixed(1)}<small>{row.review_count} avis</small></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.status} /></td><td><button className="table-action" onClick={() => setOpened(row.profile_id)}>Examiner le dossier</button>{row.status === "approved" && <PermissionGuard permission="providers.suspend" context={context}><button className="table-action danger" onClick={() => setConfirmation({ row, status: "suspended" })}>Suspendre le compte</button></PermissionGuard>}{row.status === "suspended" && <PermissionGuard permission="providers.suspend" context={context}><PermissionGuard permission="providers.verify" context={context}><button className="table-action positive" onClick={() => setConfirmation({ row, status: "approved" })}>Réactiver le professionnel</button></PermissionGuard></PermissionGuard>}</td></tr>,
+    )}</tbody></table></div> : <EmptyState title="File de vérification à jour" description="Aucun prestataire ne correspond aux filtres sélectionnés." />}
+    {opened && <article className="admin-panel dossier-container"><button className="table-action" onClick={() => setOpened(null)}>Fermer le dossier</button><ProviderReview key={opened} providerId={opened} /><p>Les candidatures en attente sont traitées dans « Validations professionnelles ».</p></article>}
+    {confirmation && <ConfirmationModal title={`${confirmation.status === "approved" ? "Approuver" : confirmation.status === "rejected" ? "Rejeter" : "Suspendre"} ${confirmation.row.business_name} ?`} description="La décision sera appliquée immédiatement et enregistrée dans le journal d’audit." dangerous={confirmation.status !== "approved"} onCancel={() => setConfirmation(null)} onConfirm={async (reason) => {
+      const { error } = await getSupabaseBrowserClient()!.rpc("admin_set_provider_status", { target_provider_id: confirmation.row.profile_id, next_status: confirmation.status, reason });
+      notify(error ? publicErrorMessage(error, "La décision n’a pas pu être appliquée.") : "Décision appliquée et journalisée.");
+      setConfirmation(null);
+      await load();
+    }} />}
+  </>;
+}
+
+function BookingsModule({ context, calendar, notify }: { context: AdminContext; calendar: boolean; notify: (message: string) => void }) {
+  const [rows, setRows] = useState<BookingRow[]>([]);
+  const [confirmation, setConfirmation] = useState<BookingRow | null>(null);
+  useEffect(() => {
+    void getSupabaseBrowserClient()!.from("bookings").select("id,starts_at,status,total_amount,currency,location_mode,businesses(timezone,country_code),provider_profiles(business_name,timezone,country_code),provider_services(title,duration_minutes)").order("starts_at", { ascending: false }).limit(200).then(({ data }) => setRows((data ?? []) as unknown as BookingRow[]));
+  }, []);
+  if (calendar) return <div className="admin-calendar"><div className="calendar-toolbar"><strong>Prochaines réservations · heure locale de chaque établissement</strong></div><div className="calendar-grid">{["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((day) => <strong key={day}>{day}</strong>)}{rows.slice(0, 14).map((row) => <article key={row.id}><small>{new Date(row.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: bookingTimeZone(row) })}</small><span>{relationOne(row.provider_services)?.title || "Prestation"}</span><StatusBadge value={row.status} /></article>)}</div></div>;
+  return <><div className="admin-filter-bar"><span>{rows.length} réservations autorisées</span></div><div className="admin-table-wrap" role="region" aria-label="Réservations" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Référence</th><th>Prestation</th><th>Prestataire</th><th>Date</th><th>Prix</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{rows.map((row) =>
+    <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code></td><td><strong>{relationOne(row.provider_services)?.title || "Prestation"}</strong><small>{relationOne(row.provider_services)?.duration_minutes || "—"} min · {row.location_mode}</small></td><td>{relationOne(row.provider_profiles)?.business_name || "—"}</td><td>{formatDate(row.starts_at, bookingTimeZone(row))}</td><td>{formatCurrency(row.total_amount, row.currency)}</td><td><StatusBadge value={row.status} /></td><td><PermissionGuard permission="bookings.update" context={context}><button className="table-action danger" onClick={() => setConfirmation(row)}>Modifier</button></PermissionGuard></td></tr>,
+  )}</tbody></table></div>{confirmation && <ConfirmationModal title="Annuler administrativement cette réservation ?" description="Le statut sera modifié avec justification et les parties conserveront l’historique." dangerous onCancel={() => setConfirmation(null)} onConfirm={async (reason) => {
+    const { error } = await getSupabaseBrowserClient()!.rpc("admin_update_booking_status", { target_booking_id: confirmation.id, next_status: "cancelled_by_provider", reason });
+    notify(error ? publicErrorMessage(error, "La réservation n’a pas pu être mise à jour.") : "Réservation mise à jour et auditée.");
+    setRows((current) => current.map((row) => row.id === confirmation.id ? { ...row, status: "cancelled_by_provider" } : row));
+    setConfirmation(null);
+  }} />}</>;
+}
+
+export function CatalogModule({ services, notify }: { services: boolean; notify: (message: string) => void }) {
+  const [rows, setRows] = useState<CatalogRow[]>([]);
+  const [editing, setEditing] = useState<CatalogRow | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const load = useCallback(() => {
+    const request = services
+      ? getSupabaseBrowserClient()!.from("provider_services").select("id,title,is_active,duration_minutes,price_amount,currency").order("created_at", { ascending: false }).limit(200)
+      : getSupabaseBrowserClient()!.from("categories").select("id,name,slug,description,icon,image_url,parent_id,is_active,sort_order").order("sort_order");
+    void request.abortSignal(AbortSignal.timeout(10000)).then(({ data, error }) => {
+      setLoadError(error ? publicErrorMessage(error, "Le catalogue est indisponible.") : "");
+      setRows((data ?? []) as CatalogRow[]);
+    });
+  }, [services]);
+  useEffect(() => { load(); }, [load]);
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true);
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    const name = String(values.get("name") ?? "").trim();
+    const slug = String(values.get("slug") ?? "").trim().toLowerCase();
+    const { error } = await getSupabaseBrowserClient()!.rpc("admin_manage_category", {
+      target_action: editing ? "update" : "create", target_category_id: editing?.id ?? null,
+      target_name: name, target_slug: slug, target_description: String(values.get("description") ?? ""),
+      target_icon: String(values.get("icon") ?? ""), target_image_url: String(values.get("imageUrl") ?? ""),
+      target_parent_id: String(values.get("parentId") ?? "") || null,
+      target_sort_order: Number(values.get("sortOrder") ?? 0), target_is_active: values.get("active") === "on",
+    });
+    setBusy(false);
+    if (error) { notify(publicErrorMessage(error, "La catégorie n’a pas pu être enregistrée.")); return; }
+    notify(editing ? "Catégorie modifiée et journalisée." : "Catégorie créée et disponible dans l’application.");
+    form.reset(); setEditing(null); load();
+  }
+
+  async function action(row: CatalogRow, kind: "set_active" | "delete") {
+    if (kind === "delete" && !window.confirm(`Supprimer « ${row.name} » ? Cette action sera refusée si des dépendances existent.`)) return;
+    setBusy(true);
+    const { error } = await getSupabaseBrowserClient()!.rpc("admin_manage_category", {
+      target_action: kind, target_category_id: row.id, target_name: null, target_slug: null,
+      target_description: null, target_icon: null, target_image_url: null, target_parent_id: null,
+      target_sort_order: row.sort_order ?? 0, target_is_active: kind === "set_active" ? !row.is_active : row.is_active,
+    });
+    setBusy(false);
+    notify(error ? publicErrorMessage(error, "L’action n’a pas pu être appliquée.") : kind === "delete" ? "Catégorie supprimée et action auditée." : "Visibilité mise à jour.");
+    if (!error) { setEditing(null); load(); }
+  }
+
+  if (loadError) return <section><p role="alert">{loadError}</p><button onClick={load}>Réessayer</button></section>;
+  if (services) return <><div className="admin-filter-bar"><span>{rows.length} prestations réelles · modification depuis l’espace prestataire</span></div><div className="admin-table-wrap" role="region" aria-label="Prestations" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Prestation</th><th>Durée</th><th>Prix</th><th>Statut</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.title}</strong></td><td>{row.duration_minutes} min</td><td>{formatCurrency(row.price_amount || 0, row.currency)}</td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div></>;
+
+  const topLevel = rows.filter((row) => !row.parent_id && row.id !== editing?.id);
+  return <>
+    <form className="admin-catalog-form" onSubmit={save} key={editing?.id ?? "new"}>
+      <header><div><p>Catalogue dynamique</p><h2>{editing ? "Modifier la catégorie" : "Créer une catégorie"}</h2></div>{editing && <button type="button" className="table-action" onClick={() => setEditing(null)}>Annuler</button>}</header>
+      <label>Nom<input name="name" required minLength={2} maxLength={80} defaultValue={editing?.name ?? ""} /></label>
+      <label>Slug<input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" defaultValue={editing?.slug ?? ""} /></label>
+      <label>Icône<input name="icon" maxLength={80} defaultValue={editing?.icon ?? ""} /></label>
+      <label>Ordre<input name="sortOrder" type="number" min={0} max={10000} defaultValue={editing?.sort_order ?? rows.length} /></label>
+      <label>Catégorie parente<select name="parentId" defaultValue={editing?.parent_id ?? ""}><option value="">Aucune</option>{topLevel.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+      <label>URL de l’image<input name="imageUrl" type="url" defaultValue={editing?.image_url ?? ""} /></label>
+      <label className="wide">Description<textarea name="description" maxLength={1000} defaultValue={editing?.description ?? ""} /></label>
+      <label className="catalog-checkbox"><input name="active" type="checkbox" defaultChecked={editing?.is_active ?? true} /> Visible dans l’application</label>
+      <button className="primary" disabled={busy}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : "Créer"}</button>
+    </form>
+    <div className="admin-table-wrap" role="region" aria-label="Liste des catégories" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Catégorie</th><th>Slug</th><th>Parent</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.icon} {row.name}</strong><small>{row.description || "Sans description"}</small></td><td>{row.slug}</td><td>{rows.find((parent) => parent.id === row.parent_id)?.name ?? "—"}</td><td>{row.sort_order}</td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td><td><button className="table-action" onClick={() => setEditing(row)}>Modifier</button><button className="table-action" disabled={busy} onClick={() => void action(row, "set_active")}>{row.is_active ? "Masquer" : "Réactiver"}</button><button className="table-action danger" disabled={busy} onClick={() => void action(row, "delete")}>Supprimer</button></td></tr>)}</tbody></table></div>
+  </>;
+}
+
+function FinanceModule({ section }: { section: "payments" | "commissions" }) {
+  const [payments, setPayments] = useState<FinanceRow[]>([]);
+  useEffect(() => {
+    if (section === "payments") void getSupabaseBrowserClient()!.from("payments").select("id,booking_id,payment_status,payment_method,amount,currency,is_test,created_at").order("created_at", { ascending: false }).limit(200).then(({ data }) => setPayments((data ?? []) as FinanceRow[]));
+  }, [section]);
+  if (section !== "payments") return <OperationalFinance section={section} />;
+  return <><div className="admin-filter-bar"><span>{payments.length} paiements · lecture sécurisée</span></div><div className="admin-table-wrap" role="region" aria-label="Paiements" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Référence</th><th>Réservation</th><th>Méthode</th><th>Montant</th><th>Date</th><th>Statut</th></tr></thead><tbody>{payments.map((row) => <tr key={row.id}><td><code>{row.id.slice(0, 8)}</code>{row.is_test && <small>Mode test</small>}</td><td><code>{row.booking_id.slice(0, 8)}</code></td><td>{row.payment_method}</td><td><strong>{formatCurrency(row.amount, row.currency)}</strong></td><td>{formatDate(row.created_at)}</td><td><StatusBadge value={row.payment_status} /></td></tr>)}</tbody></table></div></>;
+}
+
+function OperationalFinance({ section }: { section: "commissions" }) {
+  const [rules, setRules] = useState<CommissionRuleRow[]>([]);
+  const [entries, setEntries] = useState<CommissionEntryRow[]>([]);
+  useEffect(() => {
+    if (section !== "commissions") return;
+    const client = getSupabaseBrowserClient()!;
+    void Promise.all([
+      client.from("commission_rules").select("id,name,rate,is_active,valid_from,valid_until").order("valid_from", { ascending: false }),
+      client.from("platform_commissions").select("id,payment_id,rate,amount,currency,created_at").order("created_at", { ascending: false }).limit(200),
+    ]).then(([ruleResult, entryResult]) => {
+      setRules((ruleResult.data ?? []) as CommissionRuleRow[]);
+      setEntries((entryResult.data ?? []) as CommissionEntryRow[]);
+    });
+  }, [section]);
+  const totals = totalAdminMoneyByCurrency(entries);
+  return <><section className="admin-metric-grid"><article><span>Commissions enregistrées</span><strong>{entries.length}</strong><small>Écritures réelles</small></article><article><span>Total Mata Beauty</span><strong>{totals.map(total => formatCurrency(total.amount, total.currency)).join(" · ") || "—"}</strong><small>Registre Supabase</small></article><article><span>Règles actives</span><strong>{rules.filter((row) => row.is_active).length}</strong><small>Calcul serveur</small></article></section><div className="admin-table-wrap" role="region" aria-label="Règles de commission" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Règle</th><th>Taux</th><th>Validité</th><th>Statut</th></tr></thead><tbody>{rules.map((row) => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td>{formatDate(row.valid_from)}<small>{row.valid_until ? `jusqu’au ${formatDate(row.valid_until)}` : "Sans échéance"}</small></td><td><StatusBadge value={row.is_active ? "active" : "inactive"} /></td></tr>)}</tbody></table></div><div className="admin-table-wrap commission-entries" role="region" aria-label="Écritures de commission" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Écriture</th><th>Paiement</th><th>Taux</th><th>Commission</th><th>Date</th></tr></thead><tbody>{entries.map((row) => <tr key={row.id}><td><code>{row.id.slice(0,8)}</code></td><td><code>{row.payment_id.slice(0,8)}</code></td><td>{Number(row.rate).toLocaleString("fr-FR")} %</td><td><strong>{formatCurrency(row.amount, row.currency)}</strong></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div></>;
+}
+
+function AuditModule({ context }: { context: AdminContext }) {
+  const [rows, setRows] = useState<AuditRow[]>([]);
+  useEffect(() => {
+    if (context.is_super_admin || context.permissions.includes("audit.read")) void getSupabaseBrowserClient()!.from("audit_logs").select("id,action,entity_type,entity_id,after_data,created_at").order("created_at", { ascending: false }).limit(250).then(({ data }) => setRows((data ?? []) as AuditRow[]));
+  }, [context]);
+  return <><div className="admin-filter-bar"><span>Journal non modifiable · {rows.length} événements récents</span></div><div className="audit-timeline">{rows.map((row) => <article key={row.id}><i /><div><strong>{row.action}</strong><small>{row.entity_type} · {row.entity_id?.slice(0, 8) || "global"}</small><p>{typeof row.after_data?.justification === "string" ? row.after_data.justification : "Action système"}</p></div><time>{formatDate(row.created_at)}</time></article>)}</div></>;
+}
+
+function SocialContentModule({ context, notify }: { context: AdminContext; notify: (message: string) => void }) {
+  const [rows, setRows] = useState<SocialPostRow[]>([]);
+  const [metrics, setMetrics] = useState<SocialMetrics | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [launchSelected, setLaunchSelected] = useState<Set<string>>(new Set());
+  const [confirmation, setConfirmation] = useState<{ row: SocialPostRow; action: "approve" | "hide" | "remove" | "restore" | "warn" | "feature" } | null>(null);
+
+  const load = useCallback(async () => {
+    const supabase = getSupabaseBrowserClient()!;
+    const [{ data: postData }, { data: metricData }, selection] = await Promise.all([
+      supabase.from("posts").select("id,author_id,caption,status,post_type,thumbnail_url,is_sponsored,view_count,like_count,comment_count,share_count,published_at,created_at,provider_profiles!posts_author_id_fkey(business_name,city)").order("created_at", { ascending: false }).limit(250),
+      supabase.rpc("get_social_admin_dashboard"),
+      supabase.from("launch_feed_selection").select("post_id").eq("is_active", true),
+    ]);
+    setRows((postData ?? []) as unknown as SocialPostRow[]);
+    setMetrics((metricData ?? null) as SocialMetrics | null);
+    setLaunchSelected(new Set((selection.data ?? []).map((item) => item.post_id)));
+    setLoading(false);
+  }, []);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+
+  const visible = useMemo(() => rows.filter((row) =>
+    (statusFilter === "all" || row.status === statusFilter) && (typeFilter === "all" || row.post_type === typeFilter),
+  ), [rows, statusFilter, typeFilter]);
+
+  async function toggleLaunchSelection(row: SocialPostRow) {
+    const supabase=getSupabaseBrowserClient()!;
+    const user=await supabase.auth.getUser();
+    const selected=launchSelected.has(row.id);
+    const result=selected ? await supabase.from("launch_feed_selection").delete().eq("post_id",row.id) : await supabase.from("launch_feed_selection").upsert({post_id:row.id,label:"Sélection lancement",content_origin:"provider",sort_order:launchSelected.size,is_active:true,selected_by:user.data.user?.id});
+    notify(result.error?publicErrorMessage(result.error,"La sélection lancement nécessite la migration Phase 2."):selected?"Contenu retiré de la sélection lancement.":"Contenu ajouté à la sélection lancement.");
+    if(!result.error)await load();
+  }
+
+  if (loading) return <LoadingSkeleton />;
+  return <>
+    {metrics && <section className="admin-metric-grid">
+      {[
+        ["Publications aujourd’hui", metrics.posts_today], ["Publiées", metrics.published], ["À contrôler", metrics.pending],
+        ["Signalées", metrics.reported], ["Vues", metrics.views], ["Réservations générées", metrics.bookings],
+        ["Clics Réserver", metrics.booking_clicks], ["CA généré", metrics.gross_by_currency === null || metrics.gross_amount === null ? null : formatCurrencyBreakdown(metrics.gross_by_currency)],
+      ].filter(([, value]) => value !== null).map(([labelValue, value]) => <article key={String(labelValue)}><span>{labelValue}</span><strong>{typeof value === "number" ? value.toLocaleString("fr-FR") : value}</strong><small>Données Supabase</small></article>)}
+    </section>}
+    <div className="admin-filter-bar">
+      <select aria-label="Filtrer par statut" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tous les statuts</option><option value="published">Publiées</option><option value="draft">Brouillons</option><option value="scheduled">Programmées</option><option value="hidden">Masquées</option><option value="deleted">Retirées</option></select>
+      <select aria-label="Filtrer par format" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Tous les formats</option><option value="video">Vidéos</option><option value="photo">Photos</option><option value="before_after">Avant / Après</option><option value="promotion">Promotions</option><option value="availability">Disponibilités</option></select>
+      <span>{visible.length} publication(s)</span>
+    </div>
+    {visible.length ? <div className="admin-table-wrap" role="region" aria-label="Publications" tabIndex={0}><table className="admin-data-table"><thead><tr><th>Publication</th><th>Créateur</th><th>Format</th><th>Performance</th><th>Statut</th><th>Modération</th></tr></thead><tbody>{visible.map((row) => {
+      const provider = relationOne(row.provider_profiles);
+      return <tr key={row.id}><td>{row.thumbnail_url ? <Image src={row.thumbnail_url} alt="" width={54} height={72} unoptimized /> : <strong>▶</strong>}<small>{row.caption.slice(0, 90) || "Sans légende"}<br />{formatDate(row.published_at ?? row.created_at)}</small></td><td><strong>{provider?.business_name ?? "Créateur"}</strong><small>{provider?.city ?? "Ville non renseignée"}</small></td><td><StatusBadge value={row.post_type} />{row.is_sponsored && <small> Sponsorisé</small>}</td><td>{Number(row.view_count).toLocaleString("fr-FR")} vues<small>{row.like_count} likes · {row.comment_count} commentaires · {row.share_count} partages</small></td><td><StatusBadge value={row.status} /></td><td>
+        <PermissionGuard permission="content.manage" context={context}>
+          {row.status !== "published" && row.status !== "deleted" && <button className="table-action positive" onClick={() => setConfirmation({ row, action: "approve" })}>Approuver</button>}
+          {row.status === "published" && <><button className="table-action" onClick={() => setConfirmation({ row, action: "feature" })}>Mettre en avant</button><button className="table-action danger" onClick={() => setConfirmation({ row, action: "hide" })}>Masquer</button></>}
+          {row.status === "published" && <button className="table-action positive" onClick={() => void toggleLaunchSelection(row)}>{launchSelected.has(row.id)?"✓ Sélection lancement":"Ajouter au lancement"}</button>}
+          {row.status !== "deleted" && <button className="table-action danger" onClick={() => setConfirmation({ row, action: "remove" })}>Retirer</button>}
+          {row.status === "deleted" && <button className="table-action positive" onClick={() => setConfirmation({ row, action: "restore" })}>Restaurer</button>}
+          <button className="table-action" onClick={() => setConfirmation({ row, action: "warn" })}>Avertir</button>
+        </PermissionGuard>
+      </td></tr>;
+    })}</tbody></table></div> : <EmptyState title="Aucune publication" description="Aucun contenu ne correspond aux filtres sélectionnés." />}
+    {confirmation && <ConfirmationModal
+      title={`${confirmation.action === "feature" ? "Mettre en avant" : confirmation.action === "approve" ? "Approuver" : confirmation.action === "hide" ? "Masquer" : confirmation.action === "remove" ? "Retirer" : confirmation.action === "restore" ? "Restaurer" : "Avertir"} cette publication ?`}
+      description="La décision sera appliquée côté serveur, transmise au créateur et inscrite dans le journal d’audit."
+      dangerous={confirmation.action === "hide" || confirmation.action === "remove"}
+      onCancel={() => setConfirmation(null)}
+      onConfirm={async (reason) => {
+        const supabase = getSupabaseBrowserClient()!;
+        const result = confirmation.action === "feature"
+          ? await supabase.rpc("admin_feature_social_post", { target_post_id: confirmation.row.id, target_feature_type: "recommended", target_starts_at: new Date().toISOString(), target_ends_at: new Date(Date.now() + 7 * 86400000).toISOString(), target_position: null, target_audience: { type: "all" }, target_geographic_zone: null, reason })
+          : await supabase.rpc("admin_moderate_social_post", { target_post_id: confirmation.row.id, decision: confirmation.action, reason });
+        notify(result.error ? publicErrorMessage(result.error, "La décision de modération n’a pas pu être appliquée.") : confirmation.action === "feature" ? "Publication mise en avant pendant 7 jours." : "Décision appliquée et auditée.");
+        setConfirmation(null);
+        if (!result.error) await load();
+      }}
+    />}
+  </>;
+}
+
+function SettingsModule({ context, maintenance, notify }: { context: AdminContext; maintenance: boolean; notify: (message: string) => void }) {
+  const [enabled, setEnabled] = useState(false);
+  const [message, setMessage] = useState("Mata Beauty revient très vite.");
+  const [confirmation, setConfirmation] = useState(false);
+  const [settings, setSettings] = useState<{ key: string; description: string | null; value: unknown }[]>([]);
+  const [drafts, setDrafts] = useState<Partial<PlatformSettingsMap>>({});
+  const [settingToSave, setSettingToSave] = useState<PlatformSettingKey | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [revision, setRevision] = useState(0);
+  const canUpdate = context.is_super_admin || context.permissions.includes("settings.update");
+  useEffect(() => {
+    const controller = new AbortController();
+    queueMicrotask(() => { setLoading(true); setError(""); });
+    const client = getSupabaseBrowserClient();
+    if (!client) {
+      queueMicrotask(() => { if (!controller.signal.aborted) { setLoading(false); setError("La connexion sécurisée aux paramètres est indisponible."); } });
+      return () => controller.abort();
+    }
+    let query = client.from("app_settings").select("key,description,value");
+    query = maintenance ? query.eq("key", "maintenance") : query.eq("is_sensitive", false);
+    void query.order("key").abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).then(({ data, error: failure }) => {
+      if (controller.signal.aborted) return;
+      setLoading(false);
+      if (failure) { setSettings([]); setError(publicErrorMessage(failure, "Les paramètres sont indisponibles.")); return; }
+      setSettings(data ?? []);
+      const nextDrafts: Partial<PlatformSettingsMap> = {};
+      for (const row of data ?? []) {
+        if (!isPlatformSettingKey(row.key)) continue;
+        if (row.key === "application") {
+          const parsed = parsePlatformSetting("application", row.value);
+          if (parsed) nextDrafts.application = parsed;
+        } else if (row.key === "booking") {
+          const parsed = parsePlatformSetting("booking", row.value);
+          if (parsed) nextDrafts.booking = parsed;
+        } else {
+          const parsed = parsePlatformSetting("support", row.value);
+          if (parsed) nextDrafts.support = parsed;
+        }
+      }
+      setDrafts(nextDrafts);
+      const value = data?.find(row => row.key === "maintenance")?.value as { enabled?: boolean; message?: string } | undefined;
+      setEnabled(Boolean(value?.enabled));
+      if (value?.message) setMessage(value.message);
+    });
+    return () => controller.abort();
+  }, [revision, maintenance]);
+
+  function updateDraft<K extends PlatformSettingKey, F extends keyof PlatformSettingsMap[K]>(key: K, field: F, value: PlatformSettingsMap[K][F]) {
+    setDrafts(previous => {
+      const current = previous[key];
+      if (!current) return previous;
+      return { ...previous, [key]: { ...current, [field]: value } } as Partial<PlatformSettingsMap>;
+    });
+  }
+
+  async function saveSetting(key: PlatformSettingKey, reason: string) {
+    const value = drafts[key] as PlatformSettingValue | undefined;
+    if (!value) { notify("Le réglage n’a pas pu être chargé ; actualisez la page avant de modifier."); return; }
+    const invalid = validatePlatformSetting(key, value);
+    if (invalid) { notify(invalid); setSettingToSave(null); return; }
+    const client = getSupabaseBrowserClient();
+    if (!client || !canUpdate) { notify("Votre rôle ne permet pas de modifier les paramètres globaux."); setSettingToSave(null); return; }
+    try {
+      const { error: saveError } = await client.rpc("admin_update_setting", { setting_key: key, setting_value: value, reason: reason.trim() });
+      if (saveError) {
+        notify(publicErrorMessage(saveError, "Le réglage n’a pas pu être enregistré."));
+        setSettingToSave(null);
+        return;
+      }
+      setSettingToSave(null);
+      notify("Paramètre enregistré et inscrit au journal d’audit.");
+      setRevision(current => current + 1);
+    } catch (saveFailure) {
+      notify(publicErrorMessage(saveFailure, "Le réglage n’a pas pu être enregistré."));
+      setSettingToSave(null);
+    }
+  }
+
+  const settingTitles: Record<PlatformSettingKey, string> = { application: "Identité et région", booking: "Règles de réservation", support: "Coordonnées support" };
+  if (loading) return <p role="status">Chargement des paramètres…</p>;
+  if (error) return <section><p role="alert">{error}</p><button onClick={() => setRevision(value => value + 1)}>Réessayer</button></section>;
+  if (!maintenance) return <section className="admin-settings">
+    <header className="admin-settings-header"><div><p className="admin-kicker">Configuration de la plateforme</p><h2>Paramètres généraux</h2><p>Les valeurs proviennent de <code>app_settings</code>. Les enregistrements sont contrôlés côté base et journalisés.</p></div><button className="secondary" disabled={loading} onClick={() => setRevision(value => value + 1)}>Actualiser</button></header>
+    {!canUpdate && <p className="admin-settings-readonly" role="status">Lecture seule : votre rôle ne possède pas la permission <code>settings.update</code>.</p>}
+    <div className="admin-settings-note"><strong>Prise en compte fonctionnelle</strong><span>Cette interface enregistre uniquement les champs déjà présents dans le backend. Les règles métier qui ne lisent pas encore ces valeurs restent inchangées ; l’enregistrement ne modifie pas à lui seul les réservations, la devise des transactions ou les libellés affichés ailleurs.</span></div>
+    <div className="admin-settings-grid">
+      {drafts.application && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Plateforme</p><h3>Identité et région</h3></div><span className="admin-setting-key">application</span></div><div className="admin-settings-fields">
+        <label htmlFor="platform-name">Nom de la plateforme<input id="platform-name" value={drafts.application.name} maxLength={80} disabled={!canUpdate} onChange={event => updateDraft("application", "name", event.target.value)} /></label>
+        <label htmlFor="platform-locale">Langue<select id="platform-locale" value={drafts.application.locale} disabled={!canUpdate} onChange={event => updateDraft("application", "locale", event.target.value)}><option value="fr-SN">Français (Sénégal)</option><option value="en-SN">Anglais (Sénégal)</option></select></label>
+        <label htmlFor="platform-country">Pays<select id="platform-country" value={drafts.application.country} disabled={!canUpdate} onChange={event => updateDraft("application", "country", event.target.value)}><option value="SN">Sénégal</option></select></label>
+        <label htmlFor="platform-currency">Devise<select id="platform-currency" value={drafts.application.currency} disabled={!canUpdate} onChange={event => updateDraft("application", "currency", event.target.value)}><option value="XOF">XOF · Franc CFA</option></select></label>
+        <label htmlFor="platform-timezone">Fuseau horaire<select id="platform-timezone" value={drafts.application.timezone} disabled={!canUpdate} onChange={event => updateDraft("application", "timezone", event.target.value)}><option value="Africa/Dakar">Africa/Dakar</option></select></label>
+      </div><p className="admin-setting-help">Valeurs sauvegardées dans la configuration existante. Les écrans et services métier concernés ne seront affectés que lorsqu’ils consomment ce réglage.</p><PermissionGuard permission="settings.update" context={context}><div className="admin-setting-actions"><button className="primary" onClick={() => setSettingToSave("application")}>Enregistrer l’identité</button></div></PermissionGuard></article>}
+      {drafts.booking && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Rendez-vous</p><h3>Règles de réservation</h3></div><span className="admin-setting-key">booking</span></div><div className="admin-settings-fields">
+        <label htmlFor="booking-minimum-notice">Préavis minimum <span>(minutes)</span><input id="booking-minimum-notice" type="number" min={0} max={43200} step={1} value={drafts.booking.minimum_notice_minutes} disabled readOnly /></label>
+        <label htmlFor="booking-cancellation-window">Délai d’annulation <span>(heures)</span><input id="booking-cancellation-window" type="number" min={0} max={8760} step={1} value={drafts.booking.cancellation_window_hours} disabled readOnly /></label>
+      </div><p className="admin-settings-readonly" role="status">Lecture seule : ces valeurs ne sont pas encore appliquées par les contrôles serveur de réservation.</p></article>}
+      {drafts.support && <article className="admin-panel admin-setting-card"><div className="admin-setting-heading"><div><p className="admin-kicker">Contact</p><h3>Coordonnées support</h3></div><span className="admin-setting-key">support</span></div><div className="admin-settings-fields">
+        <label htmlFor="support-email">Adresse e-mail<input id="support-email" type="email" autoComplete="email" required value={drafts.support.email} disabled={!canUpdate} onChange={event => updateDraft("support", "email", event.target.value)} /></label>
+        <label htmlFor="support-phone">Téléphone<input id="support-phone" type="tel" autoComplete="tel" maxLength={40} value={drafts.support.phone} disabled={!canUpdate} onChange={event => updateDraft("support", "phone", event.target.value)} /></label>
+      </div><p className="admin-setting-help">Les coordonnées enregistrées ici n’affectent que les surfaces reliées à cette configuration.</p><PermissionGuard permission="settings.update" context={context}><div className="admin-setting-actions"><button className="primary" onClick={() => setSettingToSave("support")}>Enregistrer les coordonnées</button></div></PermissionGuard></article>}
+      {!drafts.application && !drafts.booking && !drafts.support && <EmptyState title="Aucun réglage structuré disponible" description="Aucune des clés générales prises en charge par cette interface n’est présente." />}
+    </div>
+    {settings.some(setting => !isPlatformSettingKey(setting.key)) && <p className="admin-settings-readonly">Les autres réglages sont volontairement exclus de cette page structurée.</p>}
+    {settingToSave && <ConfirmationModal title={`Enregistrer « ${settingTitles[settingToSave]} » ?`} description="L’enregistrement utilise la procédure d’administration existante. La base vérifiera settings.update et inscrira le motif au journal d’audit." onCancel={() => setSettingToSave(null)} onConfirm={reason => saveSetting(settingToSave, reason)} />}
+  </section>;
+  return <><section className={`maintenance-control ${enabled ? "enabled" : ""}`}><span>△</span><div><p>Contrôle global</p><h2>Mode maintenance {enabled ? "actif" : "inactif"}</h2><p>Bloque temporairement les espaces clients et prestataires tout en laissant l’administration accessible.</p></div><button className={enabled ? "danger" : "primary"} onClick={() => setConfirmation(true)}>{enabled ? "Désactiver" : "Activer"}</button></section><article className="admin-panel maintenance-form"><label>Message public<textarea value={message} onChange={(event) => setMessage(event.target.value)} /></label><p>Administrateurs autorisés ; clients et prestataires bloqués pendant la maintenance.</p></article>{confirmation && <ConfirmationModal title={`${enabled ? "Désactiver" : "Activer"} le mode maintenance ?`} description="L’impact sur les utilisateurs est immédiat. Cette action sera journalisée." dangerous={!enabled} onCancel={() => setConfirmation(false)} onConfirm={async (reason) => {
+    const next = { enabled: !enabled, message, allow_admins: true, allow_clients: false, allow_providers: false };
+    const { error } = await getSupabaseBrowserClient()!.rpc("admin_update_setting", { setting_key: "maintenance", setting_value: next, reason });
+    notify(error ? publicErrorMessage(error, "Le mode maintenance n’a pas pu être modifié.") : `Mode maintenance ${!enabled ? "activé" : "désactivé"}.`);
+    if (!error) setEnabled(!enabled);
+    setConfirmation(false);
+  }} />}</>;
+}
+
+type OperationalRow = Record<string, unknown>;
+const operationalSources: Partial<Record<ModuleKey, { table: string; select: string; description: string; title: (row: OperationalRow) => string; detail: (row: OperationalRow) => string }>> = {
+  payouts: { table: "payouts", select: "id,provider_id,amount,currency,status,created_at", description: "Versements enregistrés, en lecture seule. Aucun transfert réel n’est activé en mode mock.", title: row => `${formatCurrency(Number(row.amount), String(row.currency))} · ${String(row.status)}`, detail: row => `Professionnel ${String(row.provider_id).slice(0, 8)} · ${formatDate(String(row.created_at))}` },
+  salons: { table: "businesses", select: "id,name,city,status,created_at", description: "Salons enregistrés et leur statut.", title: row => String(row.name), detail: row => `${row.city ?? ""} · ${row.status}` },
+  reviews: { table: "reviews", select: "id,rating,comment,is_visible,created_at", description: "Avis liés aux réservations terminées. Le texte de l’auteur est conservé.", title: row => `${row.rating}/5 · ${row.comment ?? "Sans commentaire"}`, detail: row => row.is_visible ? "Visible" : "Masqué" },
+  disputes: { table: "disputes", select: "id,reason,status,priority,created_at", description: "Registre des litiges enregistrés, en lecture seule.", title: row => String(row.reason), detail: row => `${row.status} · ${row.priority}` },
+  promotions: { table: "promotions", select: "id,title,status,is_active,created_at", description: "Promotions enregistrées, en lecture seule. Les brouillons se préparent dans Lancement.", title: row => String(row.title), detail: row => `${row.status} · ${row.is_active ? "Active" : "Inactive"}` },
+  security: { table: "admin_sessions", select: "id,user_id,mfa_verified,revoked_at,signed_in_at,last_seen_at", description: "Sessions administratives enregistrées. Les révocations se gèrent dans Équipe & accès.", title: row => `Compte ${String(row.user_id).slice(0, 8)}`, detail: row => `${row.revoked_at ? "Révoquée" : "Enregistrée"} · MFA ${row.mfa_verified ? "vérifié" : "non vérifié"}` },
+};
+
+function OperationalModule({ module, context }: { module: ModuleKey; context: AdminContext }) {
+  const source = operationalSources[module];
+  const [rows, setRows] = useState<OperationalRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    setLoading(true); setNotice("");
+    try {
+      const client = getSupabaseBrowserClient(); if (!client || !source) throw new Error("Source indisponible");
+      const result = await client.from(source.table).select(source.select).order(module === "security" ? "signed_in_at" : "created_at", { ascending: false }).limit(100).abortSignal(AbortSignal.timeout(10000));
+      if (result.error) throw result.error;
+      setRows((result.data ?? []) as unknown as OperationalRow[]);
+    } catch (error) { setRows([]); setNotice(publicErrorMessage(error, "Les données sont indisponibles.")); }
+    finally { setLoading(false); }
+  }, [source, module]);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  async function moderate(row: OperationalRow) {
+    if (busy || !window.confirm(`${row.is_visible ? "Masquer" : "Restaurer"} cet avis ?`)) return;
+    setBusy(true);
+    try {
+      const result = await getSupabaseBrowserClient()!.from("reviews").update({ is_visible: !row.is_visible }).eq("id", String(row.id)).eq("is_visible", Boolean(row.is_visible)).select("id").abortSignal(AbortSignal.timeout(10000));
+      if (result.error) throw result.error;
+      if (result.data.length !== 1) throw new Error("L’avis ou vos droits ont changé. Actualisez la liste.");
+      await load(); setNotice("Visibilité de l’avis mise à jour.");
+    } catch (error) { setNotice(publicErrorMessage(error, "La visibilité de l’avis n’a pas été modifiée.")); }
+    finally { setBusy(false); }
+  }
+  return <section className="admin-panel"><h2>{navigation.find(item => item.key === module)?.label}</h2><p>{source?.description}</p><button disabled={loading || busy} onClick={() => void load()}>Actualiser le registre</button>{notice && <p role="status">{notice}</p>}{loading ? <p>Chargement…</p> : rows.length ? rows.map(row => <article className="control-list-row" key={String(row.id)}><div><strong>{source?.title(row)}</strong><p>{source?.detail(row)}</p></div>{module === "reviews" && (context.is_super_admin || context.permissions.includes("reviews.moderate")) && <button disabled={busy} onClick={() => void moderate(row)}>{row.is_visible ? "Masquer l’avis" : "Restaurer l’avis"}</button>}</article>) : !notice && <p>Aucun élément dans le périmètre autorisé.</p>}</section>;
+}
+function AdminMfa({ onVerified, onSignOut }: { onVerified: () => Promise<void>; onSignOut: () => Promise<void> }) {
+  const [factorId, setFactorId] = useState("");
+  const [qrCode, setQrCode] = useState("");
+  const [code, setCode] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function prepare() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true); setFeedback("");
+    try {
+      const factors = await supabase.auth.mfa.listFactors();
+      if (factors.error) throw factors.error;
+      const existing = factors.data.totp.find(factor => factor.status === "verified");
+      if (existing) { setFactorId(existing.id); return; }
+      // Remove only incomplete enrollments before restarting this setup.
+      for (const factor of factors.data.all.filter(factor => factor.factor_type === "totp" && factor.status === "unverified")) {
+        const removed = await supabase.auth.mfa.unenroll({ factorId: factor.id });
+        if (removed.error) throw removed.error;
+      }
+      const enrolled = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "MATA Beauty administration" });
+      if (enrolled.error) throw enrolled.error;
+      setFactorId(enrolled.data.id); setQrCode(enrolled.data.totp.qr_code);
+    } catch { setFeedback("Impossible de préparer la vérification. Réessayez."); }
+    finally { setBusy(false); }
+  }
+  async function verify(event: FormEvent) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !factorId) return;
+    setBusy(true); setFeedback("");
+    try {
+      const result = await supabase.auth.mfa.challengeAndVerify({ factorId, code });
+      if (result.error) { setFeedback("Code invalide ou expiré. Saisissez le code actuel."); return; }
+      setQrCode(""); setCode("");
+      await onVerified();
+    } catch { setFeedback("Vérification indisponible. Réessayez."); }
+    finally { setBusy(false); }
+  }
+  return <main className="admin-auth-shell"><section className="admin-login-card">
+    <h1>Vérification en deux étapes</h1>
+    <p>Votre rôle exige un second facteur avant tout accès administratif.</p>
+    {!factorId ? <button className="primary" disabled={busy} onClick={() => void prepare()}>{busy ? "Préparation…" : "Préparer la vérification"}</button> : <form onSubmit={event => void verify(event)}>
+      {qrCode && <><p>Scannez ce code avec votre application d’authentification, puis saisissez le code à six chiffres.</p><Image src={qrCode} alt="Code QR de configuration du second facteur" width={220} height={220} unoptimized /></>}
+      <label>Code d’authentification<input value={code} onChange={event => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required /></label>
+      <button className="primary" disabled={busy || code.length !== 6}>{busy ? "Vérification…" : "Vérifier le code"}</button>
+    </form>}
+    {feedback && <p role="alert">{feedback}</p>}
+    <button className="secondary" disabled={busy} onClick={() => void onSignOut()}>Se déconnecter</button>
+  </section></main>;
+}
+

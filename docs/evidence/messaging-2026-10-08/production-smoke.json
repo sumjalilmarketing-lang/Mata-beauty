@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-10-08T16:21:57.701Z",
+  "domain": "https://mata-beauty.com",
+  "checks": [
+    {
+      "engine": "chromium",
+      "homepage": 200,
+      "loginOpens": true,
+      "noHorizontalOverflow": true,
+      "privateContextWithoutSession": 401,
+      "messagingStylesPresent": true
+    },
+    {
+      "engine": "webkit",
+      "homepage": 200,
+      "loginOpens": true,
+      "noHorizontalOverflow": true,
+      "privateContextWithoutSession": 401,
+      "messagingStylesPresent": true
+    }
+  ]
+}

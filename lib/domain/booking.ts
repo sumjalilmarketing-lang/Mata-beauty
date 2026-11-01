@@ -34,18 +34,20 @@ export function assertBookingTransition(from: BookingStatus, to: BookingStatus) 
   }
 }
 
-export function calculateBookingQuote(serviceAmount: number, travelFee = 0) {
+export type BookingCurrency = "XOF" | "EUR" | "USD" | "GBP" | "CAD";
+
+export function calculateBookingQuote(serviceAmount: number, travelFee = 0, currency: BookingCurrency = "XOF") {
   if (!Number.isInteger(serviceAmount) || serviceAmount < 0) {
-    throw new Error("Le prix de la prestation doit être un entier positif en FCFA.");
+    throw new Error("Le prix de la prestation doit être un entier positif dans sa devise de facturation.");
   }
   if (!Number.isInteger(travelFee) || travelFee < 0) {
-    throw new Error("Les frais de déplacement doivent être un entier positif en FCFA.");
+    throw new Error("Les frais de déplacement doivent être un entier positif dans leur devise de facturation.");
   }
   return {
     serviceAmount,
     travelFee,
     totalAmount: serviceAmount + travelFee,
-    currency: "XOF" as const,
+    currency,
   };
 }
 

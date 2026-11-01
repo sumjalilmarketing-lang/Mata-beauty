@@ -1,0 +1,58 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+export type ApplicationRole = "client" | "provider" | "admin";
+
+export type AuthenticatedProfile = {
+  userId: string;
+  role: ApplicationRole;
+  roles: ApplicationRole[];
+  profileIncomplete: boolean;
+};
+
+type ProfileRow = {
+  role: ApplicationRole;
+  is_suspended: boolean;
+  account_status: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+};
+
+export async function loadAuthenticatedProfile(supabase: SupabaseClient, userId: string, signal?: AbortSignal): Promise<AuthenticatedProfile> {
+  const profileQuery = supabase.rpc("get_my_private_profile");
+  const rolesQuery = supabase.from("account_roles").select("role").eq("profile_id", userId);
+  const providerQuery = supabase.from("provider_profiles").select("status").eq("profile_id", userId);
+  const [{ data: profile, error: profileError }, { data: accountRoles, error: rolesError }, provider] = await Promise.all([
+    signal ? profileQuery.abortSignal(signal) : profileQuery,
+    signal ? rolesQuery.abortSignal(signal) : rolesQuery,
+    (signal ? providerQuery.abortSignal(signal) : providerQuery).maybeSingle(),
+  ]);
+  if (profileError || !profile) throw profileError ?? new Error("Profil introuvable.");
+  const row = profile as ProfileRow;
+  if (row.is_suspended) throw new Error("Ce compte est suspendu. Contactez l’assistance Mata Beauty.");
+  if (["disabled", "deleted", "suspended"].includes(row.account_status)) throw new Error("Ce compte est suspendu. Contactez l’assistance Mata Beauty.");
+
+  const roles = new Set<ApplicationRole>();
+  for (const item of accountRoles ?? []) {
+    if (item.role === "customer") roles.add("client");
+    if (item.role === "professional" && provider.data?.status === "approved") roles.add("provider");
+  }
+  if (row.role === "admin") roles.add("admin");
+  if (!roles.size) roles.add(row.role === "provider" && provider.data?.status === "approved" ? "provider" : "client");
+  const orderedRoles = [...roles];
+  const primaryRole = row.role === "admin" ? "admin" : row.role === "provider" && roles.has("provider") ? "provider" : "client";
+  if (rolesError) throw rolesError;
+  if (provider.error) throw provider.error;
+  return {
+    userId,
+    role: primaryRole,
+    roles: orderedRoles,
+    profileIncomplete: !row.first_name || !row.last_name || !row.phone,
+  };
+}
+
+export async function ensureAuthenticatedProfile(supabase: SupabaseClient, userId: string) {
+  const { error } = await supabase.rpc("ensure_authenticated_profile");
+  if (error) throw error;
+  return loadAuthenticatedProfile(supabase, userId);
+}

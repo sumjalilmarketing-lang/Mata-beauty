@@ -4,15 +4,20 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Mata Beauty",
     short_name: "Mata Beauty",
-    description: "Réservez vos prestations beauté premium au Sénégal.",
+    description: "Découvrez les professionnels de beauté près de vous et réservez votre rendez-vous.",
+    id: "/",
     start_url: "/",
+    scope: "/",
     display: "standalone",
-    background_color: "#f8f3eb",
-    theme_color: "#240a19",
+    background_color: "#fff9f6",
+    theme_color: "#5b0b45",
     lang: "fr",
-    orientation: "portrait-primary",
+    orientation: "any",
+    categories: ["beauty", "lifestyle"],
     icons: [
-      { src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+      { src: "/brand/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/brand/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/brand/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

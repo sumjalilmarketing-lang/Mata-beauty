@@ -1,7 +1,51 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  ...(process.env.MATA_E2E_NEXT_DIST_DIR ? { distDir: process.env.MATA_E2E_NEXT_DIST_DIR } : {}),
+  ...(process.env.MATA_E2E_TSCONFIG ? { typescript: { tsconfigPath: process.env.MATA_E2E_TSCONFIG } } : {}),
+  poweredByHeader: false,
+  allowedDevOrigins: ["localhost", "127.0.0.1"],
+  turbopack: { root: process.cwd() },
+  env: {
+    NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? "local",
+  },
+  async redirects() {
+    return [
+      { source: "/posts/:id", destination: "/video/:id", permanent: false },
+      { source: "/client/:path*", destination: "/app/:path*", permanent: false },
+      { source: "/provider/:path*", destination: "/pro/:path*", permanent: false },
+      { source: "/super-admin/:path*", destination: "/admin/:path*", permanent: false },
+      { source: "/forgot-password", destination: "/?auth=reset", permanent: false },
+      { source: "/update-password", destination: "/auth/update-password", permanent: false },
+    ];
+  },
+  async headers() {
+    const developmentEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+    const upgradeInsecureRequests = process.env.NODE_ENV === "production" && !process.env.MATA_E2E_NEXT_DIST_DIR
+      ? "; upgrade-insecure-requests"
+      : "";
+    const configuredSupabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin : null;
+    const documentFrameSource = configuredSupabaseOrigin ? `${configuredSupabaseOrigin}/storage/v1/object/sign/provider-documents/` : "'none'";
+    const mapFrameSource = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY ? " https://www.google.com" : "";
+    const supabaseConnectSource = configuredSupabaseOrigin ? ` ${configuredSupabaseOrigin}` : "";
+    const noIndexHeaders = ["/app/:path*", "/admin/:path*", "/auth/:path*", "/finance/:path*", "/moderation/:path*", "/onboarding/:path*", "/operations/:path*", "/pro/:path*", "/salon/:path*", "/staff/:path*", "/support-agent/:path*"].map(source => ({
+      source,
+      headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
+    }));
+    return [{
+      source: "/:path*",
+      headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), payment=()" },
+        { key: "Content-Security-Policy", value: `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; frame-src ${documentFrameSource}${mapFrameSource}; object-src 'none'; form-action 'self' https://app.paydunya.com; img-src 'self' data: blob: https:; media-src 'self' blob: https://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'${developmentEval}; connect-src 'self'${supabaseConnectSource} https://*.supabase.co wss://*.supabase.co https://app.paydunya.com${upgradeInsecureRequests}` },
+      ],
+    }, {
+      source: "/images/categories/:path*",
+      headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+    }, ...noIndexHeaders];
+  },
 };
 
 export default nextConfig;

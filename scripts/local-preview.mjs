@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 const root = process.cwd();
 const clientRoot = resolve(root, "dist", "client");
 const vinextCli = resolve(root, "node_modules", "vinext", "dist", "cli.js");
-const upstreamPort = 3001;
+const upstreamPort = Number(process.env.UPSTREAM_PORT ?? 3001);
 const publicPort = Number(process.env.PORT ?? 3000);
 const mimeTypes = new Map([
   [".css", "text/css"],
@@ -25,7 +25,12 @@ const child = spawn(process.execPath, [vinextCli, "start"], {
 
 const server = createServer((incoming, outgoing) => {
   const pathname = new URL(incoming.url ?? "/", `http://${incoming.headers.host ?? "localhost"}`).pathname;
-  if (pathname.startsWith("/assets/") || ["/og.png", "/favicon.svg"].includes(pathname)) {
+  if (
+    pathname.startsWith("/assets/") ||
+    pathname.startsWith("/images/") ||
+    pathname.startsWith("/brand/") ||
+    ["/og.png", "/favicon.svg", "/sw.js"].includes(pathname)
+  ) {
     const candidate = resolve(clientRoot, normalize(pathname).replace(/^[/\\]+/, ""));
     if (candidate.startsWith(clientRoot) && existsSync(candidate) && statSync(candidate).isFile()) {
       outgoing.writeHead(200, {

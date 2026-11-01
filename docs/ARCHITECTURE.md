@@ -25,6 +25,27 @@ Le schéma PostgreSQL, les contraintes et les politiques RLS sont versionnés da
 - les paiements sont uniquement simulés tant que
   `PAYMENT_PROVIDER_MODE=mock`.
 
+## Paiements et comptabilité
+
+PayTech est l'adaptateur cible pour le Sénégal (Orange Money, Wave, cartes),
+mais aucune transaction réelle n'est activée sans compte marchand sandbox,
+secrets de test et validation des notifications IPN. Les routes serveur
+recalculent les montants depuis la réservation ; la redirection de retour ne
+confirme jamais un paiement. Seul un webhook signé et idempotent peut faire
+évoluer son statut.
+
+Le registre `wallet_ledger` est append-only. `held` désigne une retenue
+comptable interne jusqu'à la réalisation du service et ne constitue pas un
+séquestre juridique. Les soldes sont dérivés du registre, jamais modifiés dans
+un profil. Les références externes, événements et clés d'idempotence sont
+uniques afin d'empêcher doublons et rejeux.
+
+Le mode `mock` crée uniquement un paiement `pending` sans URL de débit. Pour
+ouvrir la sandbox, il faudra valider le contrat PayTech, renseigner les secrets
+uniquement côté Vercel/Supabase, enregistrer l'URL HTTPS du webhook et tester
+succès, échec, rejeu, incohérence de montant et remboursement avant toute
+activation de production.
+
 ## Extension internationale
 
 Les montants stockent une devise ISO, les zones sont normalisées et les profils

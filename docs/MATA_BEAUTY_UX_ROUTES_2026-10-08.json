@@ -1,0 +1,1914 @@
+[
+  {
+    "role": "super_admin",
+    "path": "/onboarding",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/onboarding/new",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/onboarding/in-progress",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/onboarding/requests",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/onboarding/approved",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/onboarding/rejected",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/onboarding/documents",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/onboarding/history",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/onboarding/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/support-agent",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/support-agent/tickets",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/support-agent/unassigned",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/support-agent/mine",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/support-agent/priority",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/support-agent/escalations",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/support-agent/users",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/support-agent/bookings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/support-agent/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/moderation",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/moderation/reports",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/moderation/videos",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/moderation/comments",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/moderation/profiles",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/moderation/history",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/moderation/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/transactions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/pending",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/failed",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/refunds",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/disputes",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/commissions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/wallets",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/payouts",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/reconciliation",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/anomalies",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/finance/audit",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/users",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/providers",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/salons",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/bookings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/categories",
+    "referenceVersion": "250ac13",
+    "states": 13,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true,
+    "retestVersion": "fcc2f05",
+    "retestStates": 13,
+    "retestAxeFailures": 0,
+    "retestOverflowFailures": 0
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/promotions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/support",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/onboarding",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/moderation",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/content",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/audit",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/operations/settings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/alerts",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/activity",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/health",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/clients",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/providers",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/salons",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/staff",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/agents",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/roles",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 5,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true,
+    "retestVersion": "fcc2f05",
+    "retestStates": 12,
+    "retestAxeFailures": 0,
+    "retestOverflowFailures": 0
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/permissions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 5,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true,
+    "retestVersion": "fcc2f05",
+    "retestStates": 12,
+    "retestAxeFailures": 0,
+    "retestOverflowFailures": 0
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/sessions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/suspended",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/services",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 6,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true,
+    "retestVersion": "fcc2f05",
+    "retestStates": 12,
+    "retestAxeFailures": 0,
+    "retestOverflowFailures": 0
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/categories",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/bookings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/promotions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/videos",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/comments",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/social-reports",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/tickets",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/escalations",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/disputes",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/transactions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 6,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true,
+    "retestVersion": "fcc2f05",
+    "retestStates": 12,
+    "retestAxeFailures": 0,
+    "retestOverflowFailures": 0
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/commissions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 6,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true,
+    "retestVersion": "fcc2f05",
+    "retestStates": 12,
+    "retestAxeFailures": 0,
+    "retestOverflowFailures": 0
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/refunds",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/payouts",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/financial-reports",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/kyc",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/validations",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/campaigns",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/platform-settings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/system-logs",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/audit",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/security",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/deletion-requests",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/admin/administrators",
+    "referenceVersion": "250ac13",
+    "states": 15,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true,
+    "retestVersion": "fcc2f05",
+    "retestStates": 15,
+    "retestAxeFailures": 0,
+    "retestOverflowFailures": 0
+  },
+  {
+    "role": "admin",
+    "path": "/support-agent",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/support-agent/tickets",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/support-agent/unassigned",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/support-agent/mine",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/support-agent/priority",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/support-agent/escalations",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/support-agent/users",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/support-agent/bookings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/support-agent/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/moderation",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/moderation/reports",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/moderation/videos",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/moderation/comments",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/moderation/profiles",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/moderation/history",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/moderation/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/users",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/providers",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/salons",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/bookings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/categories",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/promotions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/support",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/onboarding",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/moderation",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/content",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/audit",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "admin",
+    "path": "/operations/settings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "content_manager",
+    "path": "/operations",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "content_manager",
+    "path": "/operations/providers",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "content_manager",
+    "path": "/operations/salons",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "content_manager",
+    "path": "/operations/categories",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "content_manager",
+    "path": "/operations/promotions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "content_manager",
+    "path": "/operations/content",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "content_manager",
+    "path": "/operations/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "content_manager",
+    "path": "/operations/settings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance/transactions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance/pending",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance/failed",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance/refunds",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance/commissions",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance/wallets",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance/payouts",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance/reconciliation",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance/anomalies",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "finance",
+    "path": "/finance/audit",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "moderator",
+    "path": "/moderation",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "moderator",
+    "path": "/moderation/reports",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "moderator",
+    "path": "/moderation/videos",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "moderator",
+    "path": "/moderation/comments",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "moderator",
+    "path": "/moderation/profiles",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "moderator",
+    "path": "/moderation/history",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "moderator",
+    "path": "/moderation/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "support",
+    "path": "/support-agent",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "support",
+    "path": "/support-agent/tickets",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "support",
+    "path": "/support-agent/unassigned",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "support",
+    "path": "/support-agent/mine",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "support",
+    "path": "/support-agent/priority",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "support",
+    "path": "/support-agent/escalations",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "support",
+    "path": "/support-agent/users",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "support",
+    "path": "/support-agent/bookings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "support",
+    "path": "/support-agent/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "verification_agent",
+    "path": "/onboarding",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "verification_agent",
+    "path": "/onboarding/new",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "verification_agent",
+    "path": "/onboarding/in-progress",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "verification_agent",
+    "path": "/onboarding/requests",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "verification_agent",
+    "path": "/onboarding/approved",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "verification_agent",
+    "path": "/onboarding/rejected",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "verification_agent",
+    "path": "/onboarding/documents",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "verification_agent",
+    "path": "/onboarding/history",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "verification_agent",
+    "path": "/onboarding/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 6,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true,
+    "retestVersion": "fcc2f05",
+    "retestStates": 12,
+    "retestAxeFailures": 0,
+    "retestOverflowFailures": 0
+  },
+  {
+    "role": "client",
+    "path": "/",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/discover",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/app/bookings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/app/messages",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/app/payments",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/app/inspirations",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/app/favorites",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/app/reviews",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/app/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 6,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true,
+    "retestVersion": "fcc2f05",
+    "retestStates": 12,
+    "retestAxeFailures": 0,
+    "retestOverflowFailures": 0
+  },
+  {
+    "role": "client",
+    "path": "/app/support",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/app/profile",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/app/settings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "client",
+    "path": "/app/application",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/agenda",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/bookings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/messages",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/services",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/videos",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/portfolio",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/clients",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/reviews",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/revenue",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/statistics",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/notifications",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 6,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true,
+    "retestVersion": "fcc2f05",
+    "retestStates": 12,
+    "retestAxeFailures": 0,
+    "retestOverflowFailures": 0
+  },
+  {
+    "role": "professional",
+    "path": "/pro/support",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/public-profile",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/pro/settings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/agenda",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/bookings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/team",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/services",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/resources",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/clients",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/videos",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/portfolio",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/messages",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/revenue",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/payouts",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/statistics",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/reviews",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/support",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/profile",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  },
+  {
+    "role": "professional",
+    "path": "/salon/settings",
+    "referenceVersion": "250ac13",
+    "states": 12,
+    "axeFailures": 0,
+    "pageOverflowFailures": 0,
+    "axeIncomplete": true
+  }
+]

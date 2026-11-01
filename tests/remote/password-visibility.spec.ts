@@ -1,0 +1,41 @@
+import { randomUUID } from "node:crypto";
+import { expect, test } from "@playwright/test";
+
+for (const width of [390, 1366]) test(`mots de passe indépendants, saisie et focus préservés — ${width}`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  const base = process.env.REMOTE_APP_URL, bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (base && bypass) await page.route(`${new URL(base).origin}/**`, route => route.continue({ headers: { ...route.request().headers(), "x-vercel-protection-bypass": bypass } }));
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Navigation de l’application" }).getByRole("button", { name: /^(Profil|Se connecter à MATA Beauty)$/ }).click();
+  await page.getByRole("button", { name: "Créer un compte", exact: true }).click();
+  const fields = page.locator(".password-field");
+  await expect(fields).toHaveCount(2);
+  const first = fields.nth(0).locator("input"), second = fields.nth(1).locator("input");
+  const value = `QA-${randomUUID()}!`;
+  await first.fill(value); await second.fill(value);
+  await expect(first).toHaveAttribute("type", "password");
+  await expect(second).toHaveAttribute("type", "password");
+  await first.focus(); await first.evaluate((input: HTMLInputElement) => input.setSelectionRange(3, 7));
+  await fields.nth(0).getByRole("button", { name: "Afficher le mot de passe", exact: true }).click();
+  await expect(first).toHaveAttribute("type", "text");
+  await expect(second).toHaveAttribute("type", "password");
+  expect(await first.evaluate((input: HTMLInputElement) => document.activeElement === input && input.selectionStart === 3 && input.selectionEnd === 7)).toBe(true);
+  expect(await first.inputValue() === value).toBe(true);
+  await fields.nth(0).getByRole("button", { name: "Masquer le mot de passe", exact: true }).click();
+  await expect(first).toHaveAttribute("type", "password");
+  expect(await first.inputValue() === value).toBe(true);
+  const toggle = fields.nth(1).getByRole("button");
+  await toggle.focus(); await toggle.press("Enter");
+  await expect(second).toHaveAttribute("type", "text");
+  await expect(toggle).toBeFocused();
+  await toggle.press("Space"); await expect(second).toHaveAttribute("type", "password");
+  expect(await second.inputValue() === value).toBe(true);
+  await expect(page.getByText("Les mots de passe correspondent.", { exact: true })).toBeVisible();
+  await second.fill("Different-example-123!");
+  await expect(page.getByText("Les mots de passe ne correspondent pas.", { exact: true })).toBeVisible();
+  // Submit invalid confirmation without sending a registration request.
+  await page.getByRole("button", { name: "Créer le compte", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  expect(await first.inputValue() === value).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
