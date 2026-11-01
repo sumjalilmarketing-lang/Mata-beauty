@@ -1,4 +1,6 @@
 "use client";
+import { applicationText } from "@/lib/domain/application-copy";
+import { useApplicationLocale } from "./use-application-locale";
 import { PasswordField, PasswordRequirements } from "@/app/password-field";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,6 +47,10 @@ export function AuthModal({
   onClose: () => void;
   onAuthenticated: (profile: AuthenticatedProfile) => void;
 }) {
+  const browserLocale = useApplicationLocale();
+  const [selectedLocale, setSelectedLocale] = useState("");
+  const locale = selectedLocale || browserLocale;
+  const t = (text: string) => applicationText(text, locale);
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [feedback, setFeedback] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -53,6 +59,7 @@ export function AuthModal({
   const configuration = getSupabaseConfiguration();
   const {
     register,
+    setValue,
     control,
     handleSubmit,
     reset,
@@ -101,24 +108,24 @@ export function AuthModal({
 
       if (mode === "register") {
         if (!values.displayName?.trim()) {
-          setFeedback("Saisissez votre nom complet.");
+          setFeedback(t("Saisissez votre nom complet."));
           return;
         }
         if (!values.password || !meetsPasswordPolicy(values.password)) {
-          setFeedback(passwordPolicyMessage);
+          setFeedback(t(passwordPolicyMessage));
           return;
         }
         if (!values.acceptLegal) {
-          setFeedback("Vous devez accepter les conditions et la politique de confidentialité.");
+          setFeedback(t("Vous devez accepter les conditions et la politique de confidentialité."));
           return;
         }
         if (values.password !== values.confirmation) {
-          setFeedback("Les mots de passe ne correspondent pas.");
+          setFeedback(t("Les mots de passe ne correspondent pas."));
           return;
         }
-        if (!values.countryCode) { setFeedback("Choisissez votre pays de résidence."); return; }
+        if (!values.countryCode) { setFeedback(t("Choisissez votre pays de résidence.")); return; }
         if (values.phone && !/^\+[1-9]\d{7,14}$/.test(values.phone)) {
-          setFeedback("Utilisez le format téléphonique international E.164, par exemple +221771234567.");
+          setFeedback(t("Utilisez le format téléphonique international E.164, par exemple +221771234567."));
           return;
         }
         const { data, error } = await supabase.auth.signUp({
@@ -133,7 +140,7 @@ export function AuthModal({
               region: values.region?.trim() || null,
               city: values.city?.trim() || null,
               phone_e164: values.phone || null,
-              locale: `${values.language ?? "fr"}-${values.countryCode}`,
+              locale: `${selectedLocale || browserLocale.slice(0,2)}-${values.countryCode}`,
               legal_accepted: true,
             },
           },
@@ -147,7 +154,7 @@ export function AuthModal({
         }
       } else {
         if (!values.password) {
-          setFeedback("Saisissez votre mot de passe.");
+          setFeedback(t("Saisissez votre mot de passe."));
           return;
         }
         const { error } = await supabase.auth.signInWithPassword({
@@ -217,50 +224,46 @@ export function AuthModal({
     }
   }
 
-  const title = mode === "email-link" ? "Recevoir un lien de connexion" : mode === "login" ? "Se connecter" : mode === "register" ? "Créer votre compte Client" : mode === "confirm" ? "Confirmer votre adresse e-mail" : "Mot de passe oublié";
+  const title = mode === "email-link" ? t("Recevoir un lien de connexion") : mode === "login" ? t("Se connecter") : mode === "register" ? t("Créer votre compte Client") : mode === "confirm" ? t("Confirmer votre adresse e-mail") : t("Mot de passe oublié");
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <button className="modal-close" onClick={onClose} aria-label="Fermer">×</button>
+      <section lang={locale} className="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <button className="modal-close" onClick={onClose} aria-label={t("Fermer")}>×</button>
         <div className="auth-brand"><span>M</span><div><strong>MATA</strong><small>BEAUTY</small></div></div>
-        <p className="eyebrow">Compte sécurisé</p>
+        <p className="eyebrow">{t("Compte sécurisé")}</p>
+        <label>{t("Langue préférée")}<select aria-label={t("Langue préférée")} value={locale.slice(0,2)} onChange={event => { const language = event.target.value; if(language === "fr" || language === "en" || language === "es") { setSelectedLocale(language); setValue("language", language); } }}>{SUPPORTED_LANGUAGES.map(language => <option key={language.code} value={language.code}>{language.label}</option>)}</select></label>
         <h2 id="auth-title">{title}</h2>
-        <p className="auth-lead">{mode === "login" ? "Retrouvez vos rendez-vous, favoris et recommandations personnalisées." : mode === "register" ? "Rejoignez l’expérience beauté premium pensée pour vous." : mode === "confirm" ? "Recevez un nouveau lien pour terminer votre inscription." : mode === "email-link" ? "Connectez-vous avec un lien envoyé à votre adresse e-mail." : "Nous vous aidons à retrouver rapidement votre espace."}</p>
+        <p className="auth-lead">{mode === "login" ? t("Retrouvez vos rendez-vous, favoris et recommandations personnalisées.") : mode === "register" ? t("Rejoignez l’expérience beauté premium pensée pour vous.") : mode === "confirm" ? t("Recevez un nouveau lien pour terminer votre inscription.") : mode === "email-link" ? t("Connectez-vous avec un lien envoyé à votre adresse e-mail.") : t("Nous vous aidons à retrouver rapidement votre espace.")}</p>
         {!configuration.configured && (
           <div className="configuration-warning" role="alert">
-            La connexion sécurisée est momentanément indisponible. Réessayez ultérieurement.
-          </div>
+            {t("La connexion sécurisée est momentanément indisponible. Réessayez ultérieurement.")}</div>
         )}
         {(mode === "login" || mode === "register") && <>
           <button className="google-auth-button" type="button" onClick={() => void continueWithGoogle()} disabled={googleLoading || isSubmitting || !configuration.configured}>
-            <span aria-hidden="true">G</span>{googleLoading ? "Ouverture de Google…" : "Continuer avec Google"}
+            <span aria-hidden="true">G</span>{googleLoading ? t("Ouverture de Google…") : t("Continuer avec Google")}
           </button>
-          <div className="auth-divider"><span>ou avec votre e-mail</span></div>
+          <div className="auth-divider"><span>{t("ou avec votre e-mail")}</span></div>
         </>}
         <form onSubmit={(event) => void handleSubmit(submit, () => setFeedback(""))(event)} noValidate>
           {mode === "register" && (
             <label>
-              Nom complet
-              <input autoComplete="name" {...register("displayName")} />
+              {t("Nom complet")}<input autoComplete="name" {...register("displayName")} />
             </label>
           )}
           {mode === "register" && <>
-            <label>Pays de résidence<select required aria-label="Pays de résidence" {...register("countryCode")}><option value="">Choisir un pays</option>{SUPPORTED_COUNTRIES.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select></label>
-            <label>Région ou État<input autoComplete="address-level1" maxLength={120} {...register("region")} /></label>
-            <label>Ville<input autoComplete="address-level2" maxLength={120} {...register("city")} /></label>
-            <label>Téléphone international<input type="tel" autoComplete="tel" placeholder="+221771234567" inputMode="tel" {...register("phone")} /></label>
-            <label>Langue préférée<select {...register("language")}>{SUPPORTED_LANGUAGES.map(language => <option key={language.code} value={language.code}>{language.label}</option>)}</select></label>
+            <label>{t("Pays de résidence")}<select required aria-label={t("Pays de résidence")} {...register("countryCode")}><option value="">{t("Choisir un pays")}</option>{SUPPORTED_COUNTRIES.map(country => <option key={country.code} value={country.code}>{new Intl.DisplayNames([locale], { type: "region" }).of(country.code) ?? country.name}</option>)}</select></label>
+            <label>{t("Région ou État")}<input autoComplete="address-level1" maxLength={120} {...register("region")} /></label>
+            <label>{t("Ville")}<input autoComplete="address-level2" maxLength={120} {...register("city")} /></label>
+            <label>{t("Téléphone international")}<input type="tel" autoComplete="tel" placeholder="+221771234567" inputMode="tel" {...register("phone")} /></label>
           </>}
           <label>
-            Adresse e-mail
-            <input type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} {...register("email")} />
-            {errors.email && <small className="field-error">{errors.email.message}</small>}
+            {t("Adresse e-mail")}<input type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} {...register("email")} />
+            {errors.email && <small className="field-error">{t(errors.email.message ?? "")}</small>}
           </label>
           {(mode === "login" || mode === "register") && (
             <label>
-              Mot de passe
-              <PasswordField
+              {t("Mot de passe")}<PasswordField locale={locale}
                 autoComplete={mode === "register" ? "new-password" : "current-password"}
                 aria-invalid={Boolean(errors.password)}
                 {...register("password")}
@@ -269,21 +272,21 @@ export function AuthModal({
             </label>
           )}
           {mode === "register" && <>
-            <label>Confirmer le mot de passe<PasswordField autoComplete="new-password" {...register("confirmation")} /></label>
-            <PasswordRequirements password={passwordValue} confirmation={confirmationValue} />
-            <label className="legal-consent"><input type="checkbox" aria-label="Accepter les conditions générales et la politique de confidentialité" {...register("acceptLegal")} /> <span>J’accepte les <Link href="/legal/conditions-generales" target="_blank" rel="noopener noreferrer">conditions générales</Link> et la <Link href="/legal/confidentialite" target="_blank" rel="noopener noreferrer">politique de confidentialité</Link> de Mata Beauty.</span></label>
+            <label>{t("Confirmer le mot de passe")}<PasswordField locale={locale} autoComplete="new-password" {...register("confirmation")} /></label>
+            <PasswordRequirements locale={locale} password={passwordValue} confirmation={confirmationValue} />
+            <label className="legal-consent"><input type="checkbox" aria-label={t("Accepter les conditions générales et la politique de confidentialité")} {...register("acceptLegal")} /> <span>{t("J’accepte les")}{" "}<Link href="/legal/conditions-generales" target="_blank" rel="noopener noreferrer">{t("conditions générales")}</Link> {t("et la")}{" "}<Link href="/legal/confidentialite" target="_blank" rel="noopener noreferrer">{t("politique de confidentialité")}</Link> {t("de Mata Beauty.")}</span></label>
           </>}
-          {feedback && <p className="auth-feedback" role="status">{feedback}</p>}
+          {feedback && <p className="auth-feedback" role="status">{t(feedback)}</p>}
           <button className="primary-button full" type="submit" disabled={isSubmitting || googleLoading || !configuration.configured}>
-            {isSubmitting ? "Veuillez patienter…" : mode === "login" ? "Se connecter" : mode === "register" ? "Créer le compte" : mode === "confirm" ? "Renvoyer la confirmation" : "Envoyer le lien"}
+            {isSubmitting ? t("Veuillez patienter…") : mode === "login" ? t("Se connecter") : mode === "register" ? t("Créer le compte") : mode === "confirm" ? t("Renvoyer la confirmation") : t("Envoyer le lien")}
           </button>
         </form>
         <div className="auth-links">
-          {mode !== "login" && <button onClick={() => { setFeedback(""); setMode("login"); }}>Déjà inscrit ? Se connecter</button>}
-          {mode === "login" && <button onClick={() => { setFeedback(""); setMode("register"); }}>Créer un compte</button>}
-          {mode === "login" && <button onClick={() => { setFeedback(""); setMode("reset"); }}>Mot de passe oublié</button>}
-          {mode === "login" && <button disabled={isSubmitting || googleLoading} onClick={() => { setFeedback(""); setMode("email-link"); }}>Recevoir un lien de connexion</button>}
-          {mode !== "confirm" && mode !== "register" && <button onClick={() => { setFeedback(""); setMode("confirm"); }}>Renvoyer la confirmation</button>}
+          {mode !== "login" && <button onClick={() => { setFeedback(""); setMode("login"); }}>{t("Déjà inscrit ? Se connecter")}</button>}
+          {mode === "login" && <button onClick={() => { setFeedback(""); setMode("register"); }}>{t("Créer un compte")}</button>}
+          {mode === "login" && <button onClick={() => { setFeedback(""); setMode("reset"); }}>{t("Mot de passe oublié")}</button>}
+          {mode === "login" && <button disabled={isSubmitting || googleLoading} onClick={() => { setFeedback(""); setMode("email-link"); }}>{t("Recevoir un lien de connexion")}</button>}
+          {mode !== "confirm" && mode !== "register" && <button onClick={() => { setFeedback(""); setMode("confirm"); }}>{t("Renvoyer la confirmation")}</button>}
         </div>
       </section>
     </div>

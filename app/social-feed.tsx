@@ -10,7 +10,7 @@ import type { AuthenticatedProfile } from "./auth-modal";
 import { LocationPicker } from "./location-picker";
 import { distanceKm, matchesSearch, type Coordinates } from "@/lib/domain/location";
 import { feedPrice, publicProfessionalName } from "@/lib/domain/feed-presentation";
-import { feedText } from "@/lib/domain/feed-copy";
+import { applicationText } from "@/lib/domain/application-copy";
 import { applicationLocale } from "@/lib/domain/booking-copy";
 import { fetchPublicPostVideoMedia } from "@/lib/domain/public-post-video-media";
 import "./inspiration-search.css";
@@ -120,7 +120,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const onLocationChange = location.onChange;
   const [posts, setPosts] = useState<FeedPost[]>(collection?.posts ?? []);
   const [locale, setLocale] = useState("fr-SN");
-  const t = useCallback((text: string) => feedText(text, locale), [locale]);
+  const t = useCallback((text: string) => applicationText(text, locale), [locale]);
   useEffect(() => {
     let active = true;
     void Promise.resolve().then(async () => {
@@ -282,7 +282,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     else setState("loading");
     const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE).abortSignal(signal);
     if (signal.aborted || generation !== loadGeneration.current) return;
-    if (error) { if (!cached.length) setState("error"); else setFeedback("Réseau lent · inspirations enregistrées affichées."); return; }
+    if (error) { if (!cached.length) setState("error"); else setFeedback(t("Réseau lent · inspirations enregistrées affichées.")); return; }
     const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
     if (signal.aborted || generation !== loadGeneration.current) return;
     const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
@@ -311,7 +311,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       setFavoriteProviders(new Set((favorites ?? []).map((item) => item.provider_id)));
       setBookingInterests(new Set((bookings ?? []).flatMap((item) => { const service=item.provider_services as { title?: string } | null; return (service?.title ?? "").toLocaleLowerCase("fr").split(/\s+/).filter((word) => word.length>=4); })));
     }
-  }, [authenticated, collection]);
+  }, [authenticated, collection, t]);
 
   const loadMore = useCallback(async () => {
     if (collection) { collection.onLoadMore(); return; }
@@ -534,12 +534,12 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const { data, error } = await supabase.rpc(kind === "like" ? "toggle_post_like" : "toggle_post_save", { target_post_id: post.id });
-    if (error || !data) { setFeedback("Cette action n’a pas pu être enregistrée."); return; }
+    if (error || !data) { setFeedback(t("Cette action n’a pas pu être enregistrée.")); return; }
     const result = data as { active: boolean; count: number };
     const setter = kind === "like" ? setLiked : setSaved;
     setter((current) => { const next = new Set(current); if (result.active) next.add(post.id); else next.delete(post.id); return next; });
     setPosts((current) => current.map((item) => item.id === post.id ? { ...item, [kind === "like" ? "likeCount" : "saveCount"]: result.count } : item));
-    setFeedback(kind === "like" ? (result.active ? "Vidéo aimée." : "J’aime retiré.") : (result.active ? "Ajoutée à Mes inspirations." : "Retirée de Mes inspirations."));
+    setFeedback(kind === "like" ? (result.active ? t("Vidéo aimée.") : t("J’aime retiré.")) : (result.active ? t("Ajoutée à Mes inspirations.") : t("Retirée de Mes inspirations.")));
   }
 
   async function follow(post: FeedPost) {
@@ -547,7 +547,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const { data, error } = await supabase.rpc("toggle_follow_provider_from_post", { target_provider_id: post.authorId, target_source_post_id: post.id });
-    if (error) { setFeedback("L’abonnement n’a pas pu être modifié."); return; }
+    if (error) { setFeedback(t("L’abonnement n’a pas pu être modifié.")); return; }
     setFollowed((current) => { const next = new Set(current); if (data) next.add(post.authorId); else next.delete(post.authorId); return next; });
     setFeedback(data ? `${t("Vous suivez")} ${post.businessName}.` : `${t("Vous ne suivez plus")} ${post.businessName}.`);
   }
@@ -557,13 +557,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     try {
       if (navigator.share) await navigator.share({ title: `${post.businessName} sur Mata Beauty`, text: post.caption, url });
       else await navigator.clipboard.writeText(url);
-    } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setFeedback("Le partage n’a pas pu être effectué."); return; }
+    } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setFeedback(t("Le partage n’a pas pu être effectué.")); return; }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const sessionHash = await getSessionHash();
     const { data } = await supabase.rpc("record_post_share", { target_post_id: post.id, target_session_hash: sessionHash });
     if (typeof data === "number") setPosts((current) => current.map((item) => item.id === post.id ? { ...item, shareCount: data } : item));
-    setFeedback("Partage enregistré.");
+    setFeedback(t("Partage enregistré."));
   }
 
   async function report(post: FeedPost) {
@@ -572,7 +572,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const { error } = await supabase.rpc("report_social_post", { target_post_id: post.id, target_reason: "contenu_inapproprie", target_details: null });
-    setFeedback(error ? "Le signalement n’a pas pu être envoyé." : "Signalement transmis à la modération.");
+    setFeedback(error ? t("Le signalement n’a pas pu être envoyé.") : t("Signalement transmis à la modération."));
   }
 
   async function openComments(post: FeedPost) {
@@ -594,7 +594,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     commentPending.current = true; setCommentBusy(true);
     try {
       const { error } = await supabase.from("post_comments").insert({ post_id: commentsPost.id, author_id: authenticated.userId, parent_id: replyTo?.id ?? null, body: commentText.trim() });
-      if (error) { setFeedback("Commentaire non publié. Patientez avant de réessayer."); return; }
+      if (error) { setFeedback(t("Commentaire non publié. Patientez avant de réessayer.")); return; }
       setCommentText(""); setReplyTo(null); await openComments(commentsPost);
     } finally { commentPending.current = false; setCommentBusy(false); }
   }
@@ -604,7 +604,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const { error } = await supabase.from("post_comments").delete().eq("id", comment.id);
-    if (error) setFeedback("Le commentaire n’a pas pu être supprimé.");
+    if (error) setFeedback(t("Le commentaire n’a pas pu être supprimé."));
     else await openComments(commentsPost);
   }
 
@@ -613,7 +613,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const supabase = getSupabaseBrowserClient();
     if (supabase) {
       const { error } = await supabase.rpc("report_post_comment", { target_comment_id: comment.id, target_reason: "contenu_inapproprie" });
-      setFeedback(error ? "Le signalement n’a pas pu être envoyé." : "Signalement transmis à la modération.");
+      setFeedback(error ? t("Le signalement n’a pas pu être envoyé.") : t("Signalement transmis à la modération."));
     }
   }
 
@@ -711,19 +711,19 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   };
 
   const activePost = visiblePosts[activeIndex];
-  const header = <header className="social-feed-header"><div className="feed-title-row">{collection ? <button type="button" aria-label="Retour aux vidéos du profil" onClick={() => { collection.onBack(); onDiscover?.(); }}>‹</button> : <><strong>MATA</strong><span>INSPIRATION</span></>}<div className="feed-header-actions">{!collection && <><button className="feed-mode-toggle" aria-label={t(feedMode === "immersive" ? "Afficher le mode Premium" : "Afficher le mode immersif")} aria-pressed={feedMode === "premium"} title={t(feedMode === "immersive" ? "Afficher le mode Premium" : "Afficher le mode immersif")} onClick={() => changeFeedMode(feedMode === "immersive" ? "premium" : "immersive")}>{t(feedMode === "immersive" ? "Premium" : "Immersif")}</button><button disabled={authPending} aria-label={t("Publier une vidéo")} onClick={onPublish}>＋</button><button aria-label={t("Rechercher")} onClick={openSearch}>⌕</button></>}</div></div>{!collection && activeSearch && <div className="inspiration-active-filters" aria-label="Filtres actifs"><span>{[categoryLabel, countryLabel, selectedProvider?.name, location.area, location.position ? `Autour de moi · ${radiusKm} km` : "", searchQuery].filter(Boolean).join(" · ")}</span><button type="button" onClick={clearSearch}>Effacer les filtres</button></div>}</header>;
+  const header = <header className="social-feed-header"><div className="feed-title-row">{collection ? <button type="button" aria-label="Retour aux vidéos du profil" onClick={() => { collection.onBack(); onDiscover?.(); }}>‹</button> : <><strong>MATA</strong><span>INSPIRATION</span></>}<div className="feed-header-actions">{!collection && <><button className="feed-mode-toggle" aria-label={t(feedMode === "immersive" ? t("Afficher le mode Premium") : t("Afficher le mode immersif"))} aria-pressed={feedMode === "premium"} title={t(feedMode === "immersive" ? t("Afficher le mode Premium") : t("Afficher le mode immersif"))} onClick={() => changeFeedMode(feedMode === "immersive" ? "premium" : "immersive")}>{t(feedMode === "immersive" ? t("Premium") : t("Immersif"))}</button><button disabled={authPending} aria-label={t("Publier une vidéo")} onClick={onPublish}>＋</button><button aria-label={t("Rechercher")} onClick={openSearch}>⌕</button></>}</div></div>{!collection && activeSearch && <div className="inspiration-active-filters" aria-label="Filtres actifs"><span>{[categoryLabel, countryLabel, selectedProvider?.name, location.area, location.position ? `Autour de moi · ${radiusKm} km` : "", searchQuery].filter(Boolean).join(" · ")}</span><button type="button" onClick={clearSearch}>Effacer les filtres</button></div>}</header>;
 
   const searchDialog = searchOpen && !collection ? <div className="inspiration-search-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) { setSearchOpen(false); writeSearchUrl(activeSearch); } }}>
     <section className="inspiration-search-dialog" role="dialog" aria-modal="true" aria-labelledby="inspiration-search-title">
-      <header><div><span>INSPIRATION</span><h2 id="inspiration-search-title">Que souhaitez-vous découvrir ?</h2></div><button type="button" aria-label="Fermer la recherche" onClick={() => { setSearchOpen(false); writeSearchUrl(activeSearch); }}>×</button></header>
+      <header><div><span>INSPIRATION</span><h2 id="inspiration-search-title">{t("Que souhaitez-vous découvrir ?")}</h2></div><button type="button" aria-label={t("Fermer la recherche")} onClick={() => { setSearchOpen(false); writeSearchUrl(activeSearch); }}>×</button></header>
       <form onSubmit={(event) => { event.preventDefault(); applySearch(); }}>
-        <label className="inspiration-search-field">Professionnel, salon ou prestation<input autoFocus maxLength={120} value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setSelectedProviderId(""); }} placeholder="Ex. Aïssatou Beauty, tresses…" /></label>
-        <label className="inspiration-search-field">Prestation<select value={selectedCategoryId.startsWith("__") ? "" : selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedProviderId(""); }}><option value="">Toutes les prestations</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="inspiration-search-field">Pays<select aria-label="Pays" value={selectedCountryCode} onChange={(event) => { setSelectedCountryCode(event.target.value); setSelectedProviderId(""); }}><option value="">Tous les pays avec des professionnels publiés</option>{countryOptions.map((code) => <option key={code} value={code}>{new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code}</option>)}</select></label>
-        {categories.length === 0 && <p className="inspiration-search-note">Les catégories publiées seront disponibles dès que le catalogue aura chargé.</p>}
+        <label className="inspiration-search-field">{t("Professionnel, salon ou prestation")}<input autoFocus maxLength={120} value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setSelectedProviderId(""); }} placeholder={t("Ex. Aïssatou Beauty, tresses…")} /></label>
+        <label className="inspiration-search-field">{t("Prestation")}<select value={selectedCategoryId.startsWith("__") ? "" : selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Toutes les prestations")}</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="inspiration-search-field">{t("Pays")}<select aria-label={t("Pays")} value={selectedCountryCode} onChange={(event) => { setSelectedCountryCode(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Tous les pays avec des professionnels publiés")}</option>{countryOptions.map((code) => <option key={code} value={code}>{new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code}</option>)}</select></label>
+        {categories.length === 0 && <p className="inspiration-search-note">{t("Les catégories publiées seront disponibles dès que le catalogue aura chargé.")}</p>}
         <LocationPicker area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} radiusKm={radiusKm} onRadiusChange={setRadiusKm} />
-        {providerOptions.length > 0 && <div className="inspiration-provider-suggestions"><strong>Professionnels correspondants</strong>{providerOptions.map((provider) => <button type="button" key={provider.profileId} aria-pressed={selectedProviderId === provider.profileId} onClick={() => openProfessionalFromSearch(provider.profileId)}><span><b>{provider.name}</b><small>{provider.specialty} · {provider.area}</small></span><i>Profil ›</i></button>)}</div>}
-        <footer><button type="button" className="inspiration-search-clear" onClick={clearSearch}>Effacer</button><button type="submit" className="inspiration-search-submit">Afficher les vidéos</button></footer>
+        {providerOptions.length > 0 && <div className="inspiration-provider-suggestions"><strong>{t("Professionnels correspondants")}</strong>{providerOptions.map((provider) => <button type="button" key={provider.profileId} aria-pressed={selectedProviderId === provider.profileId} onClick={() => openProfessionalFromSearch(provider.profileId)}><span><b>{provider.name}</b><small>{provider.specialty} · {provider.area}</small></span><i>{t("Profil ›")}</i></button>)}</div>}
+        <footer><button type="button" className="inspiration-search-clear" onClick={clearSearch}>{t("Effacer")}</button><button type="submit" className="inspiration-search-submit">{t("Afficher les vidéos")}</button></footer>
       </form>
     </section>
   </div> : null;
@@ -732,7 +732,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   if (state !== "ready") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="social-feed-empty"><span>▶</span><h1>{state === "error" ? t("Le feed est indisponible") : t("Les premières inspirations arrivent bientôt.")}</h1><p>{state === "error" ? t("Réessayez dans quelques instants.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={state === "error" ? () => void load() : openSearch}>{state === "error" ? t("Réessayer") : t("Rechercher une prestation")}</button></div></section>;
 
   return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="social-feed" aria-label={t("Vidéos beauté")} onScroll={(event) => { const node=event.currentTarget; const cardHeight=cards.current[0]?.getBoundingClientRect().height ?? node.clientHeight; const index=Math.round(node.scrollTop/Math.max(1,cardHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>
-    {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{activeSearch ? "Aucune vidéo pour ces filtres" : t("Les premières inspirations arrivent bientôt.")}</h1><p>{activeSearch ? "Aucun contenu publié ne correspond à cette prestation, ce professionnel ou cette zone." : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={activeSearch ? clearSearch : openSearch}>{activeSearch ? "Voir toutes les vidéos" : "Rechercher une prestation"}</button></div>}
+    {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{activeSearch ? t("Aucune vidéo pour ces filtres") : t("Les premières inspirations arrivent bientôt.")}</h1><p>{activeSearch ? t("Aucun contenu publié ne correspond à cette prestation, ce professionnel ou cette zone.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={activeSearch ? clearSearch : openSearch}>{activeSearch ? t("Voir toutes les vidéos") : t("Rechercher une prestation")}</button></div>}
     {visiblePosts.map((post, index) => <article className="social-video-card" data-post-id={post.id} data-video-state={post.postType === "video" ? videoErrors.has(post.id) ? "error" : index === activeIndex && (videoLoading.has(post.id) || videoRefreshing.has(post.id)) ? "loading" : videoReady.has(post.id) ? "ready" : "waiting" : undefined} key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`${t("Publication de")} ${post.businessName}`}>
       {post.postType === "video" ? (
         videoErrors.has(post.id) ? (
@@ -740,7 +740,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
             <span aria-hidden="true">◇</span>
             <p>{t("Cette vidéo ne peut pas être lue.")}</p>
             <button disabled={videoRefreshing.has(post.id)} onClick={() => void retryVideo(post)}>
-              {t(videoRefreshing.has(post.id) ? "Rechargement…" : "Réessayer")}
+              {t(videoRefreshing.has(post.id) ? "Rechargement…" : t("Réessayer"))}
             </button>
           </div>
         ) : !post.videoUrl ? (
@@ -748,7 +748,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
             {post.thumbnailUrl ? <Image className="video-poster-placeholder" src={post.thumbnailUrl} alt="" width={720} height={1280} unoptimized /> : <span aria-hidden="true">◇</span>}
             <p role="status">{t(videoRefreshing.has(post.id) ? "Chargement de la vidéo…" : "Vidéo en attente de chargement")}</p>
             <button disabled={videoRefreshing.has(post.id)} onClick={() => void retryVideo(post)}>
-              {t(videoRefreshing.has(post.id) ? "Chargement…" : "Réessayer")}
+              {t(videoRefreshing.has(post.id) ? t("Chargement…") : t("Réessayer"))}
             </button>
           </div>
         ) : index !== activeIndex && index !== activeIndex + 1 ? (
@@ -804,24 +804,24 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
             onError={() => handleVideoError(post)}
           />
         )
-      ) : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt="Avant" width={540} height={760} unoptimized /><figcaption>{t("Avant")}</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt="Après" width={540} height={760} unoptimized /><figcaption>{t("Après")}</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
+      ) : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt={t("Avant")} width={540} height={760} unoptimized /><figcaption>{t("Avant")}</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt={t("Après")} width={540} height={760} unoptimized /><figcaption>{t("Après")}</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
       {index === activeIndex && videoLoading.has(post.id) && !videoErrors.has(post.id) && <span className="video-loading" role="status">{t("Chargement…")}</span>}
       <div className="video-shade" />
       <div className="video-progress" role="progressbar" aria-label={t("Progression de la vidéo")} aria-valuenow={Math.round((progress[post.id] ?? 0)*100)}><i style={{ transform: `scaleX(${progress[post.id] ?? 0})` }} /></div>
-      {post.postType === "video" && !videoErrors.has(post.id) && <><button className="play-toggle" aria-label={t(pausedPosts.has(post.id) ? "Lire la vidéo" : "Mettre la vidéo en pause")} onClick={() => { const next = new Set(pausedPosts); const video = videos.current[index]; if (next.has(post.id)) { next.delete(post.id); void video?.play().catch(() => undefined); } else { next.add(post.id); video?.pause(); } setPausedPosts(next); }}>{pausedPosts.has(post.id) && index===activeIndex ? "▶" : ""}</button><button className="sound-toggle" aria-label={t(muted ? "Activer le son" : "Couper le son")} onClick={() => setMuted((value) => !value)}>{muted ? "♩×" : "♩"}</button></>}
+      {post.postType === "video" && !videoErrors.has(post.id) && <><button className="play-toggle" aria-label={t(pausedPosts.has(post.id) ? t("Lire la vidéo") : t("Mettre la vidéo en pause"))} onClick={() => { const next = new Set(pausedPosts); const video = videos.current[index]; if (next.has(post.id)) { next.delete(post.id); void video?.play().catch(() => undefined); } else { next.add(post.id); video?.pause(); } setPausedPosts(next); }}>{pausedPosts.has(post.id) && index===activeIndex ? "▶" : ""}</button><button className="sound-toggle" aria-label={t(muted ? t("Activer le son") : t("Couper le son"))} onClick={() => setMuted((value) => !value)}>{muted ? "♩×" : "♩"}</button></>}
       <aside className="social-actions" aria-label={t("Interactions de la publication")}>
         <button className="creator-orb" aria-label={`${t("Profil de")} ${post.businessName}`} onClick={() => void openProvider(post)}>{post.avatarUrl ? <Image src={post.avatarUrl} alt="" width={50} height={50} unoptimized /> : post.businessName.slice(0,2).toUpperCase()}</button>
         <button disabled={authPending} aria-pressed={liked.has(post.id)} className={liked.has(post.id) ? "active" : ""} aria-label={t("J’aime")} onClick={() => void toggle("like",post)}>♥</button>
         <button disabled={authPending} aria-label={t("Commentaires")} onClick={() => void openComments(post)}>◌</button>
         <button disabled={authPending} aria-label={t("Partager")} onClick={() => void share(post)}>↗</button>
         <details className="feed-options"><summary aria-label={t("Plus d’options")}>•••</summary><div>
-          <button disabled={authPending} aria-pressed={followed.has(post.authorId)} onClick={() => void follow(post)}>{t(followed.has(post.authorId) ? "Se désabonner" : "Suivre")}</button>
-          <button disabled={authPending} aria-pressed={saved.has(post.id)} onClick={() => void toggle("save",post)}>{t(saved.has(post.id) ? "Retirer des inspirations" : "Enregistrer")}</button>
+          <button disabled={authPending} aria-pressed={followed.has(post.authorId)} onClick={() => void follow(post)}>{t(followed.has(post.authorId) ? t("Se désabonner") : t("Suivre"))}</button>
+          <button disabled={authPending} aria-pressed={saved.has(post.id)} onClick={() => void toggle("save",post)}>{t(saved.has(post.id) ? t("Retirer des inspirations") : t("Enregistrer"))}</button>
           <button disabled={authPending} onClick={() => void report(post)}>{t("Signaler")}</button>
         </div></details>
       </aside>
       <div className="social-caption">
-        <button className="creator-name" onClick={() => void openProvider(post)}>{post.businessName === "Professionnel beauté" ? t(post.businessName) : post.businessName}</button>
+        <button className="creator-name" onClick={() => void openProvider(post)}>{post.businessName === t("Professionnel beauté") ? t(post.businessName) : post.businessName}</button>
         {post.city && <span className="feed-public-location">{post.city}</span>}
         {post.serviceId && post.serviceTitle && post.priceAmount !== null && post.durationMinutes !== null && <div className="linked-service">
           <button className="service-profile-link" onClick={() => void book(post)}><strong>{post.serviceTitle}</strong>{feedPrice(post.priceAmount, post.currency, locale) && <span>{feedPrice(post.priceAmount, post.currency, locale)}</span>}</button>
@@ -836,7 +836,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       </aside>
     </article>)}
   </div>{activePost?.isSponsored && <span className="sponsored-label">{t("Contenu sponsorisé")}</span>}
-  {commentsPost && <div className="comments-backdrop" onMouseDown={(event) => event.target===event.currentTarget && setCommentsPost(null)}><section ref={commentsDialog} className="comments-sheet" onKeyDown={event => { if (event.key === "Escape") { commentRequest.current++; setCommentsPost(null); } if (event.key === "Tab") { const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled)")); const first = items[0], last = items.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } } }} role="dialog" aria-modal="true" aria-label={t("Commentaires")}><header><strong>{t("Commentaires")}</strong><button aria-label={t("Fermer")} onClick={() => setCommentsPost(null)}>×</button></header><div>{commentsState === "loading" ? <p role="status">{t("Chargement des commentaires…")}</p> : commentsState === "error" ? <p role="alert">{t("Commentaires indisponibles.")} <button onClick={() => void openComments(commentsPost)}>{t("Réessayer")}</button></p> : comments.length ? comments.map((comment) => <article className={comment.parent_id ? "comment-reply" : ""} key={comment.id}><span>{comment.profiles?.display_name?.slice(0,1) ?? "M"}</span><p><strong>{comment.profiles?.display_name ?? t("Membre Mata")}</strong>{comment.body}<small><button onClick={() => setReplyTo(comment)}>{t("Répondre")}</button>{authenticated?.userId===comment.author_id ? <button onClick={() => void deleteComment(comment)}>{t("Supprimer")}</button> : <button onClick={() => void reportComment(comment)}>{t("Signaler")}</button>}</small></p></article>) : <p className="no-comments">{t("Soyez la première à commenter.")}</p>}</div><footer>{replyTo && <span className="reply-indicator">{t("Réponse à")} {replyTo.profiles?.display_name ?? t("un membre")} <button onClick={() => setReplyTo(null)}>×</button></span>}<input aria-label={t("Ajouter un commentaire")} value={commentText} maxLength={1000} onChange={(event) => setCommentText(event.target.value)} placeholder={t(replyTo ? "Écrire une réponse…" : "Ajouter un commentaire…")} /><button disabled={authPending || commentBusy || !commentText.trim()} onClick={() => void addComment()}>{t("Publier")}</button></footer></section></div>}
+  {commentsPost && <div className="comments-backdrop" onMouseDown={(event) => event.target===event.currentTarget && setCommentsPost(null)}><section ref={commentsDialog} className="comments-sheet" onKeyDown={event => { if (event.key === "Escape") { commentRequest.current++; setCommentsPost(null); } if (event.key === "Tab") { const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled)")); const first = items[0], last = items.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } } }} role="dialog" aria-modal="true" aria-label={t("Commentaires")}><header><strong>{t("Commentaires")}</strong><button aria-label={t("Fermer")} onClick={() => setCommentsPost(null)}>×</button></header><div>{commentsState === "loading" ? <p role="status">{t("Chargement des commentaires…")}</p> : commentsState === "error" ? <p role="alert">{t("Commentaires indisponibles.")} <button onClick={() => void openComments(commentsPost)}>{t("Réessayer")}</button></p> : comments.length ? comments.map((comment) => <article className={comment.parent_id ? "comment-reply" : ""} key={comment.id}><span>{comment.profiles?.display_name?.slice(0,1) ?? "M"}</span><p><strong>{comment.profiles?.display_name ?? t("Membre Mata")}</strong>{comment.body}<small><button onClick={() => setReplyTo(comment)}>{t("Répondre")}</button>{authenticated?.userId===comment.author_id ? <button onClick={() => void deleteComment(comment)}>{t("Supprimer")}</button> : <button onClick={() => void reportComment(comment)}>{t("Signaler")}</button>}</small></p></article>) : <p className="no-comments">{t("Soyez la première à commenter.")}</p>}</div><footer>{replyTo && <span className="reply-indicator">{t("Réponse à")} {replyTo.profiles?.display_name ?? t("un membre")} <button onClick={() => setReplyTo(null)}>×</button></span>}<input aria-label={t("Ajouter un commentaire")} value={commentText} maxLength={1000} onChange={(event) => setCommentText(event.target.value)} placeholder={t(replyTo ? t("Écrire une réponse…") : t("Ajouter un commentaire…"))} /><button disabled={authPending || commentBusy || !commentText.trim()} onClick={() => void addComment()}>{t("Publier")}</button></footer></section></div>}
   {feedback && <p className="feed-feedback" role="status">{t(feedback)}</p>}
   <button disabled={authPending} className="feed-publish-fab" aria-label={t("Ouvrir le Studio créateur")} onClick={onPublish}>＋</button>
   </section>;
