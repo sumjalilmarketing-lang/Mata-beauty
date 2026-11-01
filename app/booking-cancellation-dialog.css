@@ -1,0 +1,10 @@
+.booking-cancellation-dialog{width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;border:1px solid #8b6679;border-radius:18px;background:#fffafc;color:#30212a;box-shadow:0 20px 70px #0005}
+.booking-cancellation-dialog::backdrop{background:#160b18b8}
+.booking-cancellation-dialog h2{margin:0 0 14px;color:#30212a;font-size:24px}
+.booking-cancellation-dialog p{color:#51404b;line-height:1.6}
+.booking-cancellation-dialog [role=alert]{color:#8b2026}
+.booking-cancellation-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}
+.booking-cancellation-actions button{flex:1;min-width:180px;min-height:48px;padding:12px;border:1px solid #8b6679;border-radius:10px;background:#fff;color:#30212a;font-weight:700}
+.booking-cancellation-actions .booking-cancellation-confirm{background:#86124f;color:#fff}
+.booking-cancellation-actions button:focus-visible{outline:3px solid #74114f;outline-offset:3px}
+.booking-cancellation-actions button:disabled{cursor:wait}
