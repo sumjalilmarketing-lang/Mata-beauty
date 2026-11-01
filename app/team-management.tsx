@@ -1,6 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import { workspaceText } from "@/lib/domain/workspace-copy";
+import { useApplicationLocale } from "./use-application-locale";
+import { formatServiceMoney } from "@/lib/domain/service-money";
 import { ActionConfirmationDialog } from "./booking-cancellation-dialog";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -68,6 +71,8 @@ export function ProviderTeamAgenda({ userId }: { userId: string }) {
 type StaffAppointment = { id: string; starts_at: string; ends_at: string; status: string; service_title: string; client_name: string; time_zone: string };
 type StaffService = { id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; currency: string; is_active: boolean };
 export function StaffServices() {
+  const locale = useApplicationLocale();
+  const t = (text: string) => workspaceText(text, locale);
   const [services, setServices] = useState<StaffService[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -79,15 +84,17 @@ export function StaffServices() {
     }).catch(() => { if (active) { setServices([]); setLoading(false); } });
     return () => { active = false; };
   }, []);
-  return <section className="workspace-content"><h2>Prestations autorisées</h2>{loading ? <p role="status">Chargement…</p> : services.length ? <div className="workspace-list">{services.map((service) => <article key={service.id}><strong>{service.title}</strong><small>{service.duration_minutes} min · {formatStaffPrice(service.price_amount, service.currency)} · {service.is_active ? "Active" : "Inactive"}</small>{service.description && <p>{service.description}</p>}</article>)}</div> : <p>Aucune prestation du salon ne vous est attribuée.</p>}</section>;
+  return <section className="workspace-content"><h2>{t("Prestations autorisées")}</h2>{loading ? <p role="status">{t("Chargement…")}</p> : services.length ? <div className="workspace-list">{services.map((service) => <article key={service.id}><strong>{service.title}</strong><small>{service.duration_minutes} min · {formatStaffPrice(service.price_amount, service.currency, locale)} · {t(service.is_active ? "Active" : "Inactive")}</small>{service.description && <p>{service.description}</p>}</article>)}</div> : <p>{t("Aucune prestation du salon ne vous est attribuée.")}</p>}</section>;
 }
 
-function formatStaffPrice(amount: number, currency: string) {
-  try { return new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount); }
-  catch { return `${amount.toLocaleString("fr-FR")} ${currency}`; }
+function formatStaffPrice(amount: number, currency: string, locale = "fr-FR") {
+  try { return formatServiceMoney(amount, currency, locale); }
+  catch { return `${amount.toLocaleString(locale)} ${currency}`; }
 }
 
 export function StaffAgenda({ canManage }: { canManage: boolean }) {
+  const locale = useApplicationLocale();
+  const t = (text: string) => workspaceText(text, locale);
   const [rows, setRows] = useState<StaffAppointment[]>([]);
   const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA").format(new Date()));
   const [loading, setLoading] = useState(true), [busyId, setBusyId] = useState<string | null>(null), [feedback, setFeedback] = useState("");
@@ -107,13 +114,13 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
     else { setFeedback("Rendez-vous mis à jour."); await load(); }
     setBusyId(null);
   }
-  return <section className="workspace-content"><div className="workspace-intro"><div><span>Espace collaborateur</span><h2>Mes rendez-vous</h2><p>Seuls les rendez-vous attribués à votre compte sont affichés.</p></div></div>
-    {feedback && <p role="status">{feedback}</p>}<article className="workspace-panel salon-panel"><label>Semaine à partir du<input type="date" value={date} onChange={event => setDate(event.target.value)} /></label><p>Les heures sont affichées selon le fuseau de chaque salon.</p>
-      {loading && <p role="status">Chargement des rendez-vous…</p>}{!loading && rows.length === 0 && <p>Aucun rendez-vous attribué pour cette période.</p>}
-      <div className="salon-list">{rows.map(row => <div key={row.id}><div><strong>{row.service_title}</strong><small>{row.client_name} · {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: row.time_zone }).format(new Date(row.starts_at))} · {statusNames[row.status] ?? row.status}</small></div>
-        {canManage && row.status === "pending" && <><button disabled={busyId === row.id} onClick={() => void transition(row, "confirmed")}>Confirmer</button><button disabled={busyId === row.id} onClick={() => void transition(row, "declined")}>Refuser</button></>}
-        {canManage && row.status === "confirmed" && <button disabled={busyId === row.id} onClick={() => void transition(row, "in_progress")}>Démarrer</button>}
-        {canManage && row.status === "in_progress" && <button disabled={busyId === row.id} onClick={() => void transition(row, "completed")}>Terminer</button>}
+  return <section className="workspace-content"><div className="workspace-intro"><div><span>{t("Espace collaborateur")}</span><h2>{t("Mes rendez-vous")}</h2><p>{t("Seuls les rendez-vous attribués à votre compte sont affichés.")}</p></div></div>
+    {feedback && <p role="status">{t(feedback)}</p>}<article className="workspace-panel salon-panel"><label>{t("Semaine à partir du")}<input type="date" value={date} onChange={event => setDate(event.target.value)} /></label><p>{t("Les heures sont affichées selon le fuseau de chaque salon.")}</p>
+      {loading && <p role="status">{t("Chargement des rendez-vous…")}</p>}{!loading && rows.length === 0 && <p>{t("Aucun rendez-vous attribué pour cette période.")}</p>}
+      <div className="salon-list">{rows.map(row => <div key={row.id}><div><strong>{row.service_title}</strong><small>{row.client_name} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: row.time_zone }).format(new Date(row.starts_at))} · {t(statusNames[row.status] ?? row.status)}</small></div>
+        {canManage && row.status === "pending" && <><button disabled={busyId === row.id} onClick={() => void transition(row, "confirmed")}>{t("Confirmer")}</button><button disabled={busyId === row.id} onClick={() => void transition(row, "declined")}>{t("Refuser")}</button></>}
+        {canManage && row.status === "confirmed" && <button disabled={busyId === row.id} onClick={() => void transition(row, "in_progress")}>{t("Démarrer")}</button>}
+        {canManage && row.status === "in_progress" && <button disabled={busyId === row.id} onClick={() => void transition(row, "completed")}>{t("Terminer")}</button>}
       </div>)}</div>
     </article></section>;
 }
