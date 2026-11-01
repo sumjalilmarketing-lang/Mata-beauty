@@ -643,8 +643,18 @@ body{background:#080810;color:#fff8fc}
 }
 .mini-search { color:#675661; }
 
-/* Feedback remains readable inside the dark booking modal. */
-.micro-feedback,.micro-feedback strong,.micro-feedback small{color:#541331}
+/* Post-booking feedback follows the dark confirmation surface in every state. */
+.premium-booking-success .micro-feedback{padding:18px;border:1px solid #8f7487;background:#281624;color:#fff8ed;text-align:left}
+.premium-booking-success .micro-feedback strong{color:#fff8ed;font-size:16px;line-height:1.5}
+.premium-booking-success .micro-feedback small{margin-top:8px;color:#efca79;font-size:14px;line-height:1.5}
+.premium-booking-success .micro-feedback>div{display:flex;flex-wrap:wrap;gap:12px}
+.premium-booking-success .micro-feedback button{flex:1;min-width:100px;min-height:48px;padding:12px 18px;border:1px solid #bbaeb8;border-radius:10px;background:#3d2436;color:#fff8ed;font-size:16px;font-weight:700;line-height:1.4}
+.premium-booking-success .micro-feedback button:hover{background:#513248;border-color:#efca79}
+.premium-booking-success .micro-feedback button:active{background:#613e56}
+.premium-booking-success .micro-feedback button:focus-visible{outline:3px solid #efca79;outline-offset:3px}
+.premium-booking-success dt{font-size:12px;line-height:1.5}
+.premium-booking-success dd{color:#fff8ed;font-size:14px;line-height:1.5}
+.premium-booking-success>a:focus-visible,.premium-booking-success>button:focus-visible{outline:3px solid #efca79;outline-offset:3px}
 
 /* Keep selected dates readable on the pink surface, including small mobile labels. */
 .quick-date-strip button.active small,.quick-date-strip button.active span{color:#2a180a}
