@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { publicErrorMessage } from "../../lib/ui/public-error";
 
 describe("publicErrorMessage", () => {
+  it("distinguishes missing invitation transport from a failed delivery", () => {
+    expect(publicErrorMessage({ code: "MATA_TEAM_email_unavailable" })).toContain("n’est pas configuré");
+    expect(publicErrorMessage({ code: "MATA_TEAM_delivery_failed" })).toContain("invitation a été annulée");
+  });
+  it("does not expose arbitrary API messages or prototype properties", () => {
+    expect(publicErrorMessage({ code: "MATA_TEAM_unknown", message: "private key or SQL details" }, "Échec sûr.")).toBe("Échec sûr.");
+    expect(publicErrorMessage({ code: "toString" }, "Échec sûr.")).toBe("Échec sûr.");
+  });
   it("explains a contact-details restriction without exposing the backend marker", () => {
     const result = publicErrorMessage({ code: "P0001", message: "MATA_ANTI_CIRCUMVENTION:contact_details" });
     expect(result).toContain("Les coordonnées personnelles ne peuvent pas être partagées ici.");

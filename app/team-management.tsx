@@ -40,7 +40,12 @@ async function requestTeamApi<T>(businessId: string, method: "GET" | "POST", bod
     ...(body ? { body: JSON.stringify(body) } : {}), cache: "no-store",
   });
   const result: unknown = await response.json();
-  if (!response.ok) throw new Error(response.status === 503 ? "Le service d’invitation n’est pas disponible. Vérifiez la configuration e-mail." : "Action refusée ou informations invalides.");
+  if (!response.ok) {
+    const error = result && typeof result === "object" && "error" in result ? result.error : null;
+    const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "unknown";
+    // Only a fixed local message map can expose API failures; never render raw server details.
+    throw { code: `MATA_TEAM_${code}` };
+  }
   return result as T;
 }
 
