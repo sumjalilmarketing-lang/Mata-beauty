@@ -645,3 +645,7 @@ body{background:#080810;color:#fff8fc}
 
 /* Feedback remains readable inside the dark booking modal. */
 .micro-feedback,.micro-feedback strong,.micro-feedback small{color:#541331}
+
+/* Keep selected dates readable on the pink surface, including small mobile labels. */
+.quick-date-strip button.active small,.quick-date-strip button.active span{color:#2a180a}
+.quick-date-strip small,.quick-date-strip span{font-size:11px}
