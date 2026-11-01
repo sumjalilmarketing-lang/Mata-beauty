@@ -181,7 +181,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     const client = getSupabaseBrowserClient(); if (!client) return () => { active = false; };
     void client.from("provider_services").select("id,provider_id,title,duration_minutes,price_amount,currency,business_id").eq("id", parsed.data).eq("is_active", true).is("archived_at", null).maybeSingle().then(({ data, error }) => {
       if (!active) return;
-      const provider = catalog.find(item => item.profileId === data?.provider_id);
+      const provider = catalog.find(item => item.profileId === data?.provider_id && item.serviceId === data?.id);
       if (error || !data || !provider) {
         if (!restoredSelection) setNotice("Cette prestation n’est pas disponible à la réservation.");
         return;
