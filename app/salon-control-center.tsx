@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { formatServiceMoney } from "@/lib/domain/service-money";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkspaceModule } from "@/lib/navigation/spaces";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -139,5 +140,5 @@ function SalonHero({ title, description }: { title: string; description: string 
 function nullable(values: FormData, key: string) { const value = String(values.get(key) ?? "").trim(); return value || null; }
 function numberOrNull(values: FormData, key: string) { const value = String(values.get(key) ?? "").trim(); return value ? Number(value) : null; }
 function slugify(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "salon"; }
-function money(value: number, currency = "XOF") { return new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: 0 }).format(value); }
+function money(value: number, currency = "XOF") { return formatServiceMoney(value, currency); }
 function date(value: string, timeZone = "Africa/Dakar") { return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(value)); }

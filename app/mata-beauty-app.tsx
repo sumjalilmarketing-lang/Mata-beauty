@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { formatServiceMoney } from "@/lib/domain/service-money";
 import { bookingText } from "@/lib/domain/booking-copy";
 import { useApplicationLocale } from "./use-application-locale";
 import { type ReactNode, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -117,7 +118,7 @@ function readBookingDraft() {
   catch { return null; }
 }
 
-const formatPrice = (value: number, currency = "XOF", locale = "fr-FR") => new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+const formatPrice = (value: number, currency = "XOF", locale = "fr-FR") => formatServiceMoney(value, currency, locale);
 const today = new Date().toISOString().slice(0, 10);
 
 export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "feed", initialServiceId }: { supabaseUrl: string; supabaseAnonKey: string; initialScreen?: "feed" | "home" | "results"; initialServiceId?: string }) {

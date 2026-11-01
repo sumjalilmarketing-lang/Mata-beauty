@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { formatServiceMoney } from "@/lib/domain/service-money";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -297,7 +298,7 @@ function formatCount(value: number | null) {
 }
 function formatMoney(amount: number, currency: string | null) {
   if (!currency) return amount.toLocaleString("fr-FR") + " · devise à confirmer";
-  try { return new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount); }
+  try { return formatServiceMoney(amount, currency); }
   catch { return amount.toLocaleString("fr-FR") + " " + currency; }
 }
 
