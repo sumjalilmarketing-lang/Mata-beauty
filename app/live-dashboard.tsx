@@ -17,6 +17,7 @@ import { ReferralCard } from "./referral-card";
 import { NotificationCenter } from "./notification-center";
 import { BookingReview } from "./booking-review";
 import { ClientBookingGroups } from "./client-booking-groups";
+import { BookingCancellationDialog } from "./booking-cancellation-dialog";
 import type { ClientBookingItem } from "@/lib/domain/client-bookings";
 
 type Role = "client" | "provider" | "admin";
@@ -127,6 +128,7 @@ export function LiveDashboard({
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
   const [messageBooking, setMessageBooking] = useState<{ id: string; serviceTitle: string } | null>(null);
+  const [pendingCancellation, setPendingCancellation] = useState<ClientBookingItem | null>(null);
 
   const clientBookingPageSize = 50;
 
@@ -392,18 +394,19 @@ export function LiveDashboard({
   async function cancelClientBooking(booking: ClientBookingItem) {
     if (!canTransitionBooking(booking.status, "cancelled_by_client")) {
       setFeedback("Cette réservation ne peut plus être annulée depuis votre espace.");
-      return;
+      return false;
     }
-    if (!window.confirm(`Annuler le rendez-vous « ${booking.serviceName} » chez ${booking.providerName} ?`)) return;
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    const { error: updateError } = await supabase.from("bookings").update({ status: "cancelled_by_client" }).eq("id", booking.id).eq("client_id", userId);
-    if (updateError) {
+    if (!supabase) return false;
+    const { data: updated, error: updateError } = await supabase.from("bookings").update({ status: "cancelled_by_client" }).eq("id", booking.id).eq("client_id", userId).in("status", ["pending", "confirmed"]).select("id").maybeSingle();
+    if (updateError || !updated) {
       setFeedback(publicErrorMessage(updateError, "La réservation n’a pas pu être annulée."));
-      return;
+      return false;
     }
     setFeedback("Votre rendez-vous a été annulé.");
+    setPendingCancellation(null);
     await load();
+    return true;
   }
 
   async function saveProviderProfile(event: FormEvent<HTMLFormElement>) {
@@ -524,6 +527,7 @@ export function LiveDashboard({
         </nav>
         <button className="back-link" onClick={() => void onSignOut()}>Se déconnecter</button>
       </aside>}
+      {pendingCancellation && <BookingCancellationDialog serviceName={pendingCancellation.serviceName} providerName={pendingCancellation.providerName} onDismiss={() => setPendingCancellation(null)} onConfirm={() => cancelClientBooking(pendingCancellation)} />}
       <section className="dashboard-main">
         {show("dashboard") && <><div className="dashboard-top">
           <div><p className="eyebrow">Votre activité</p><h1>{displayName ? `Bonjour, ${displayName}` : "Mon activité"}</h1><p>Retrouvez vos rendez-vous et vos prochaines étapes.</p></div>
@@ -609,7 +613,7 @@ export function LiveDashboard({
         {role === "client" && moduleKey === "bookings" && (
           <article className="panel" id="live-bookings">
             <div className="panel-heading"><div><h2>Mes réservations</h2><p>Une carte par salon ou professionnel, avec l’historique complet de vos rendez-vous.</p></div><button onClick={() => void load()}>Actualiser</button></div>
-            {loading ? <div className="compact-empty" role="status">Chargement de vos réservations…</div> : <ClientBookingGroups items={[...activeClientBookingItems, ...clientBookingItems]} clientId={userId} stats={clientBookingStats} hasMore={bookingsHaveMore} loadingMore={loadingMoreBookings} onLoadMore={() => void loadMoreClientBookings()} onCancel={(booking) => void cancelClientBooking(booking)} onMessage={(booking) => { setMessageBooking({ id: booking.id, serviceTitle: booking.serviceName }); window.setTimeout(() => document.getElementById("booking-conversation")?.scrollIntoView({ behavior: "smooth" }), 0); }} />}
+            {loading ? <div className="compact-empty" role="status">Chargement de vos réservations…</div> : <ClientBookingGroups items={[...activeClientBookingItems, ...clientBookingItems]} clientId={userId} stats={clientBookingStats} hasMore={bookingsHaveMore} loadingMore={loadingMoreBookings} onLoadMore={() => void loadMoreClientBookings()} onCancel={setPendingCancellation} onMessage={(booking) => { setMessageBooking({ id: booking.id, serviceTitle: booking.serviceName }); window.setTimeout(() => document.getElementById("booking-conversation")?.scrollIntoView({ behavior: "smooth" }), 0); }} />}
             {bookingsHaveMore && <button className="client-booking-load-more" type="button" onClick={() => void loadMoreClientBookings()} disabled={loadingMoreBookings}>{loadingMoreBookings ? "Chargement…" : "Charger les rendez-vous plus anciens"}</button>}
           </article>
         )}
