@@ -10,6 +10,7 @@
 .inspiration-search-dialog>header button{width:40px;height:40px;flex:none;border:1px solid #e8d5df;border-radius:50%;background:#fff;color:#35202a;font-size:24px}
 .inspiration-search-dialog form{display:grid;min-height:0;flex:1;gap:16px;overflow:auto;padding:18px 22px 0;overscroll-behavior:contain}
 .inspiration-search-field{display:grid;gap:7px;color:#49323e;font-size:13px;font-weight:750}
+.inspiration-search-dialog input::placeholder{color:#62505a;opacity:1}
 .inspiration-search-field input,.inspiration-search-field select,.inspiration-search-dialog .location-picker input,.inspiration-search-dialog .location-picker select{width:100%;min-height:48px;padding:0 13px;border:1px solid #d8c2ce;border-radius:12px;background:#fff;color:#24131d;font-family:inherit;font-size:16px;font-weight:500;line-height:1.3;outline:none}
 .inspiration-search-field input:focus,.inspiration-search-field select:focus,.inspiration-search-dialog .location-picker input:focus,.inspiration-search-dialog .location-picker select:focus{border-color:#b52569;box-shadow:0 0 0 3px rgba(181,37,105,.16)}
 .inspiration-search-dialog .location-picker{display:grid;gap:12px;padding:14px;border:1px solid #ead9e1;border-radius:16px;background:#fff}
@@ -29,7 +30,7 @@
 .inspiration-search-dialog form>footer{position:sticky;bottom:0;display:flex;gap:10px;margin:0 -22px;padding:14px 22px max(14px,env(safe-area-inset-bottom));border-top:1px solid #f2dfe8;background:rgba(255,250,252,.97)}
 .inspiration-search-dialog form>footer button{min-height:48px;border-radius:12px;font-weight:850}
 .inspiration-search-clear{padding:0 16px;border:1px solid #d8c2ce;background:#fff;color:#39232e}
-.inspiration-search-submit{flex:1;background:linear-gradient(135deg,#bf236b,#e64e91);color:#fff}
+.inspiration-search-submit{flex:1;background:linear-gradient(135deg,#86124f,#b52165);color:#fff}
 .social-feed-header:has(.inspiration-active-filters){height:auto;min-height:108px;max-height:128px}
 .social-feed{scroll-behavior:auto}
 .inspiration-search-dialog button:focus-visible{outline:3px solid #75204b;outline-offset:2px}

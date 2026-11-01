@@ -1,4 +1,5 @@
 import "server-only";
+import { publicProfileClient } from "@/lib/profiles/public-profile-client";
 
 import { serviceSupabase } from "@/lib/payments/server";
 import { resolveSocialProfileVideoMedia } from "@/lib/profiles/social-profile-video-media";
@@ -125,12 +126,12 @@ function publicHandle(candidate: string | null | undefined, displayName: string)
 
 async function signMedia(bucket: string, path: string | null | undefined) {
   if (!path) return null;
-  const { data, error } = await serviceSupabase().storage.from(bucket).createSignedUrl(path, 3600);
+  const { data, error } = await publicProfileClient().storage.from(bucket).createSignedUrl(path, 3600);
   return error ? null : safeHttpUrl(data.signedUrl);
 }
 
 async function publicPosts(providerId: string, author: SocialProfileLink): Promise<SocialProfilePost[]> {
-  const { data, error } = await serviceSupabase().from("social_feed")
+  const { data, error } = await publicProfileClient().from("social_feed")
     .select("id,author_id,caption,video_url,thumbnail_url,view_count,published_at,business_name,slug,post_type,provider_service_id,media_items")
     .eq("author_id", providerId).eq("post_type", "video").order("published_at", { ascending: false }).limit(60);
   if (error) throw error;
@@ -160,7 +161,7 @@ async function publicPosts(providerId: string, author: SocialProfileLink): Promi
 
 async function savedPostsForIds(ids: string[]): Promise<SocialProfilePost[]> {
   const posts = await Promise.all(ids.slice(0, 24).map(async id => {
-    const { data: row } = await serviceSupabase().from("social_feed")
+    const { data: row } = await publicProfileClient().from("social_feed")
       .select("id,author_id,caption,video_url,thumbnail_url,view_count,published_at,business_name,slug,post_type,provider_service_id,media_items")
       .eq("id", id).maybeSingle();
     if (!row) return null;
@@ -178,14 +179,14 @@ async function savedPostsForIds(ids: string[]): Promise<SocialProfilePost[]> {
 }
 
 async function publicPostCount(providerId: string) {
-  const { count, error } = await serviceSupabase().from("social_feed")
+  const { count, error } = await publicProfileClient().from("social_feed")
     .select("id", { count: "exact", head: true }).eq("author_id", providerId).eq("post_type", "video");
   if (error) throw error;
   return count ?? 0;
 }
 
 async function specialtiesFor(providerId: string): Promise<string[]> {
-  const client = serviceSupabase();
+  const client = publicProfileClient();
   const links = await client.from("provider_categories").select("category_id").eq("provider_id", providerId).limit(30);
   const ids = ((links.data ?? []) as { category_id: string }[]).map(row => row.category_id);
   if (!ids.length) return [];
@@ -194,7 +195,7 @@ async function specialtiesFor(providerId: string): Promise<string[]> {
 }
 
 async function followerCounts(providerId: string, viewerId: string | null) {
-  const client = serviceSupabase();
+  const client = publicProfileClient();
   const [{ count: followers }, { count: following }] = await Promise.all([
     client.from("follows").select("follower_id", { count: "exact", head: true }).eq("followed_provider_id", providerId),
     client.from("follows").select("followed_provider_id", { count: "exact", head: true }).eq("follower_id", providerId),
@@ -204,7 +205,7 @@ async function followerCounts(providerId: string, viewerId: string | null) {
 }
 
 async function serviceRows(providerId: string, businessId?: string) {
-  let query = serviceSupabase().from("provider_services")
+  let query = publicProfileClient().from("provider_services")
     .select("id,title,description,duration_minutes,price_amount,currency")
     .eq("provider_id", providerId).eq("is_active", true).is("archived_at", null).order("title").limit(80);
   if (businessId) query = query.eq("business_id", businessId);
@@ -221,16 +222,16 @@ async function serviceRows(providerId: string, businessId?: string) {
 }
 
 async function reviewsFor(providerId: string) {
-  const { data } = await serviceSupabase().from("reviews")
+  const { data } = await publicProfileClient().from("reviews")
     .select("id,rating,comment,provider_reply,created_at").eq("provider_id", providerId)
     .eq("is_visible", true).order("created_at", { ascending: false }).limit(12);
   return ((data ?? []) as ReviewRow[]).map(row => ({ id: row.id, rating: row.rating, comment: row.comment, providerReply: row.provider_reply, createdAt: row.created_at }));
 }
 
 async function loadProfessional(lookup: string, viewerId: string | null): Promise<PublicSocialProfileData | null> {
-  const client = serviceSupabase();
+  const client = publicProfileClient();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookup);
-  let query = client.from("provider_profiles").select("profile_id,business_name,slug,bio,city,area,base_address,latitude,longitude,cover_url,average_rating,review_count,verified_at")
+  let query = client.from("provider_profiles").select("profile_id,business_name,slug,bio,city,base_address,latitude,longitude,cover_url,average_rating,review_count,verified_at")
     .eq("status", "approved");
   query = isUuid ? query.eq("profile_id", lookup) : query.eq("slug", lookup.toLowerCase());
   const { data, error } = await query.maybeSingle();
@@ -250,7 +251,7 @@ async function loadProfessional(lookup: string, viewerId: string | null): Promis
   return {
     kind: "professional", id: provider.profile_id, slug: provider.slug, name: provider.business_name,
     handle: publicHandle(identity.data?.username, provider.business_name),
-    bio: provider.bio, city: provider.city, area: provider.area, address: provider.base_address,
+    bio: provider.bio, city: provider.city, area: null, address: provider.base_address,
     latitude: provider.latitude, longitude: provider.longitude,
     avatarUrl: safeHttpUrl(identity.data?.avatar_url), coverUrl: safeHttpUrl(provider.cover_url),
     verified: Boolean(provider.verified_at), specialties,
@@ -264,7 +265,7 @@ async function loadProfessional(lookup: string, viewerId: string | null): Promis
 }
 
 async function loadSalon(lookup: string, viewerId: string | null): Promise<PublicSocialProfileData | null> {
-  const client = serviceSupabase();
+  const client = publicProfileClient();
   const { data, error } = await client.from("businesses").select("id,owner_id,slug,name,description,city,area,address,latitude,longitude,cover_url,logo_url")
     .eq("slug", lookup.toLowerCase()).eq("status", "approved").eq("is_active", true).is("archived_at", null).maybeSingle();
   if (error || !data) return null;

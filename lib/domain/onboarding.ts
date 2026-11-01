@@ -18,3 +18,14 @@ export function calculateProfessionalOnboardingProgress(input: ProfessionalOnboa
 export function canSubmitProfessionalOnboarding(input: ProfessionalOnboardingInput) {
   return calculateProfessionalOnboardingProgress(input) === 100;
 }
+
+// The query supplies newest documents first. An older accepted version cannot
+// make a newer rejected replacement count as received.
+export function countReceivedProfessionalDocuments(documents: readonly { kind: string; status: string }[]) {
+  const latest = new Map<string, string>();
+  for (const document of documents) {
+    if (!latest.has(document.kind)) latest.set(document.kind, document.status);
+  }
+  return ["identity", "business_registration", "qualification", "address_proof"]
+    .filter(kind => latest.get(kind) === "pending" || latest.get(kind) === "approved").length;
+}

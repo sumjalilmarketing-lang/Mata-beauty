@@ -3,12 +3,16 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { applicationOrigin, serviceSupabase } from "@/lib/payments/server";
 
 const input = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("lookup"), email: z.email().max(254) }),
   z.object({ action: z.literal("invite"), email: z.email().max(254), firstName: z.string().trim().min(1).max(100), lastName: z.string().trim().min(1).max(100), role: z.string().min(1).max(50) }),
   z.object({ action: z.literal("resend"), invitationId: z.uuid() }),
   z.object({ action: z.literal("role"), userId: z.uuid(), role: z.string().min(1).max(50), reason: z.string().trim().min(2).max(1000) }),
   z.object({ action: z.enum(["suspend", "reactivate", "revoke"]), userId: z.uuid(), reason: z.string().trim().min(2).max(1000) }),
 ]);
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+const accountRows = z.array(z.object({
+  user_id: z.uuid(), email: z.email(), display_name: z.string().nullable(), is_suspended: z.boolean(),
+}));
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
 
 async function manager(request: Request) {
@@ -18,7 +22,7 @@ async function manager(request: Request) {
   // This RPC independently enforces roles.manage, Super Admin and AAL2 in SQL.
   const members = await client.rpc("admin_list_team");
   if (members.error) return null;
-  return { client, members: members.data };
+  return { client, members: members.data, userId: data.user.id };
 }
 
 export async function GET(request: Request) {
@@ -41,6 +45,20 @@ export async function POST(request: Request) {
   const parsed = input.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return reply({ error: "Vérifiez les informations saisies." }, 400);
   const values = parsed.data;
+  if (values.action === "lookup") {
+    // The team-manager gate above independently requires Super Admin + AAL2.
+    // Search results remain server-side; expose only an exact, active match.
+    const result = await auth.client.rpc("admin_list_users", { search_term: values.email });
+    if (result.error) return reply({ error: "Recherche de compte indisponible." }, 503);
+    const rows = accountRows.safeParse(result.data);
+    if (!rows.success) return reply({ error: "Recherche de compte indisponible." }, 503);
+    const matches = rows.data.filter(row => row.email.toLowerCase() === values.email.toLowerCase());
+    const candidate = matches.length === 1 ? matches[0] : null;
+    if (!candidate || candidate.is_suspended || candidate.user_id === auth.userId) {
+      return reply({ error: "Aucun autre compte actif ne correspond exactement à cette adresse." }, 404);
+    }
+    return reply({ candidate: { userId: candidate.user_id, email: candidate.email, displayName: candidate.display_name ?? candidate.email } });
+  }
   if (values.action === "role") {
     const result = await auth.client.rpc("admin_assign_role", { target_user_id: values.userId, target_role_key: values.role, reason: values.reason });
     return result.error ? reply({ error: "Changement de rôle refusé." }, 403) : reply({ ok: true });

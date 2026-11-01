@@ -17,6 +17,12 @@ export function authErrorMessage(error: unknown) {
   if (code === "email_not_confirmed" || message.includes("email not confirmed")) {
     return "Votre adresse e-mail doit être confirmée avant la connexion.";
   }
+  if (code === "email_address_not_authorized" || code === "email_address_invalid") {
+    return "L’envoi à cette adresse e-mail n’est pas disponible. Vérifiez votre adresse ou contactez l’assistance Mata Beauty.";
+  }
+  if (code === "unexpected_failure" && message.includes("sending")) {
+    return "L’e-mail n’a pas pu être envoyé. Réessayez plus tard ou contactez l’assistance Mata Beauty.";
+  }
   if (code === "invalid_credentials" || message.includes("invalid login credentials")) {
     return "E-mail ou mot de passe incorrect.";
   }

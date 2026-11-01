@@ -95,6 +95,7 @@
   --ui-border: #8b6679;
   --ui-focus: #74114f;
   --ws-gold: #805711;
+  --ws-pink: #a7195b;
   color: #30212a;
   color-scheme: light;
 }
@@ -156,3 +157,10 @@
 }
 .workspace-pro .notification-row,.workspace-salon .notification-row{color:#30212a;border-color:#eadde5;background:#fff}.workspace-pro .notification-row small,.workspace-salon .notification-row small{color:#806e78}
 .messaging-unread-count{display:inline-flex;min-width:20px;height:20px;align-items:center;justify-content:center;padding:0 6px;border-radius:999px;background:#a7195b;color:#fff;font-size:11px;font-weight:800;line-height:1}
+
+/* AA contrast for text on light workspace surfaces and white button labels. */
+.workspace-layout:is(.workspace-pro,.workspace-salon) .workspace-nav-group a>span { color: #62505a; }
+.workspace-layout .workspace-account { background: linear-gradient(135deg,#86124f,#b52165); }
+.workspace-layout .workspace-quick-publish { background: linear-gradient(135deg,#86124f,#b52165); }
+
+.workspace-layout .launch-checklist .panel-heading>strong,.workspace-layout .professional-photo { color:#fff; background:linear-gradient(135deg,#86124f,#b52165); }
