@@ -648,4 +648,4 @@ body{background:#080810;color:#fff8fc}
 
 /* Keep selected dates readable on the pink surface, including small mobile labels. */
 .quick-date-strip button.active small,.quick-date-strip button.active span{color:#2a180a}
-.quick-date-strip small,.quick-date-strip span{font-size:11px}
+.quick-date-strip button small,.quick-date-strip label small,.quick-date-strip button span{font-size:11px}
