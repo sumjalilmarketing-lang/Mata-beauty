@@ -1,4 +1,4 @@
-const english: Record<string, string> = {
+const english = {
   "Le feed est indisponible": "The feed is unavailable", "Les premières inspirations arrivent bientôt.": "The first inspirations are coming soon.",
   "Réessayez dans quelques instants.": "Please try again shortly.", "Explorez les prestations et les professionnels près de vous.": "Explore services and professionals nearby.",
   "Découvrir les professionnels": "Discover professionals", "Explorer le feed": "Explore the feed", "Aucun créateur proche pour le moment": "No creators nearby yet",
@@ -29,5 +29,41 @@ const english: Record<string, string> = {
   "Le commentaire n’a pas pu être supprimé.": "The comment could not be deleted.", "Cette action n’a pas pu être enregistrée.": "This action could not be saved.",
   "Ajoutée à Mes inspirations.": "Saved to your inspirations.", "Retirée de Mes inspirations.": "Removed from your inspirations.",
   "J’aime enregistré.": "Liked.", "Vidéo aimée.": "Liked.", "J’aime retiré.": "Like removed.",
+} satisfies Record<string, string>;
+const spanish: Record<keyof typeof english, string> = {
+  "Le feed est indisponible": "El feed no está disponible", "Les premières inspirations arrivent bientôt.": "Las primeras inspiraciones llegarán pronto.",
+  "Réessayez dans quelques instants.": "Vuelve a intentarlo en unos instantes.", "Explorez les prestations et les professionnels près de vous.": "Explora servicios y profesionales cerca de ti.",
+  "Découvrir les professionnels": "Descubrir profesionales", "Explorer le feed": "Explorar el feed", "Aucun créateur proche pour le moment": "Todavía no hay creadores cerca",
+  "Les tendances arrivent": "Las tendencias llegarán pronto", "Aucune inspiration": "No hay inspiraciones", "Élargissez votre recherche ou revenez bientôt : les disponibilités locales sont actualisées en continu.": "Amplía la búsqueda o vuelve pronto: la disponibilidad local se actualiza continuamente.",
+  "Essayez une autre catégorie pour découvrir des prestations disponibles.": "Prueba otra categoría para encontrar servicios disponibles.",
+  "Filtres du feed": "Filtros del feed", "Chargement du feed": "Cargando el feed", "Vidéos beauté": "Vídeos de belleza", "Progression de la vidéo": "Progreso del vídeo", "Interactions de la publication": "Interacciones de la publicación",
+  "Afficher le mode Premium": "Cambiar al modo Premium", "Afficher le mode immersif": "Cambiar al modo inmersivo", "Premium": "Premium", "Immersif": "Inmersivo",
+  "Informations de réservation": "Información de la reserva", "Professionnel": "Profesional", "Profil vérifié": "Perfil verificado", "Prestation": "Servicio", "Tarif non renseigné": "Precio no indicado", "min": "min",
+  "Aucune prestation associée à cette publication.": "Esta publicación no tiene un servicio asociado.", "Disponibilités": "Disponibilidad", "Disponibilités momentanément indisponibles.": "La disponibilidad no se puede consultar en este momento.", "Aucun créneau disponible dans les 14 prochains jours.": "No hay horas disponibles en los próximos 14 días.", "Vérification des disponibilités…": "Consultando la disponibilidad…", "Prochain créneau": "Próxima hora disponible",
+  "Publication de": "Publicación de", "Profil de": "Perfil de", "Ouvrir le Studio créateur": "Abrir el estudio de creación", "un membre": "un miembro",
+  "Près de vous · 25 km": "Cerca de ti · 25 km", "Choisir ma zone": "Elegir mi zona", "Modifier": "Modificar", "Voir les résultats": "Ver resultados",
+  "Vous suivez": "Ahora sigues a", "Vous ne suivez plus": "Ya no sigues a", "L’abonnement n’a pas pu être modifié.": "No se ha podido actualizar el seguimiento.",
+  "Signaler cette vidéo pour contenu inapproprié ?": "¿Denunciar este vídeo por contenido inapropiado?",
+  "Réseau lent · inspirations enregistrées affichées.": "Conexión lenta · se muestran las inspiraciones guardadas.",
+  "Pour toi": "Para ti", "Près de moi": "Cerca de mí", "Tendances": "Tendencias", "Rechercher": "Buscar",
+  "Publier une vidéo": "Publicar un vídeo", "Profil": "Perfil", "J’aime": "Me gusta", "Commentaires": "Comentarios", "Partager": "Compartir",
+  "Plus d’options": "Más opciones", "Suivre": "Seguir", "Se désabonner": "Dejar de seguir", "Enregistrer": "Guardar",
+  "Retirer des inspirations": "Quitar de mis inspiraciones", "Signaler": "Denunciar", "Voir les disponibilités": "Ver disponibilidad", "Réserver": "Reservar",
+  "Professionnel beauté": "Profesional de belleza", "Fermer": "Cerrar", "Publier": "Publicar", "Supprimer": "Eliminar", "Répondre": "Responder",
+  "Ajouter un commentaire": "Añadir un comentario", "Ajouter un commentaire…": "Añadir un comentario…", "Écrire une réponse…": "Escribir una respuesta…",
+  "Chargement des commentaires…": "Cargando comentarios…", "Commentaires indisponibles.": "Los comentarios no están disponibles.", "Réessayer": "Volver a intentar",
+  "Soyez la première à commenter.": "Sé la primera persona en comentar.", "Membre Mata": "Miembro de Mata", "Réponse à": "Respuesta a",
+  "Chargement…": "Cargando…", "Lire la vidéo": "Reproducir el vídeo", "Mettre la vidéo en pause": "Pausar el vídeo", "Activer le son": "Activar el sonido", "Couper le son": "Silenciar",
+  "Cette vidéo ne peut pas être lue.": "No se puede reproducir este vídeo.", "Avant": "Antes", "Après": "Después", "Contenu sponsorisé": "Contenido patrocinado",
+  "Partage enregistré.": "Contenido compartido.", "Lien copié.": "Enlace copiado.", "Le partage n’a pas pu être effectué.": "No se ha podido compartir. Vuelve a intentarlo.",
+  "Signalement transmis à la modération.": "Denuncia enviada al equipo de moderación.", "Le signalement n’a pas pu être envoyé.": "No se ha podido enviar la denuncia.",
+  "Commentaire non publié. Patientez avant de réessayer.": "Comentario no publicado. Espera antes de volver a intentarlo.",
+  "Le commentaire n’a pas pu être supprimé.": "No se ha podido eliminar el comentario.", "Cette action n’a pas pu être enregistrée.": "No se ha podido guardar esta acción.",
+  "Ajoutée à Mes inspirations.": "Añadida a Mis inspiraciones.", "Retirée de Mes inspirations.": "Eliminada de Mis inspiraciones.",
+  "J’aime enregistré.": "Me gusta guardado.", "Vidéo aimée.": "Te gusta este vídeo.", "J’aime retiré.": "Me gusta retirado.",
 };
-export function feedText(text: string, locale: string) { return locale.toLowerCase().startsWith("en") ? english[text] ?? text : text; }
+export function feedText(text: string, locale: string) {
+  const language = locale.toLowerCase().split(/[-_]/)[0];
+  const dictionary: Record<string, string> | undefined = language === "en" ? english : language === "es" ? spanish : undefined;
+  return dictionary?.[text] ?? text;
+}

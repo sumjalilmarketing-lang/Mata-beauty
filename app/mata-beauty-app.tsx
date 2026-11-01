@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import { bookingText } from "@/lib/domain/booking-copy";
+import { useApplicationLocale } from "./use-application-locale";
 import { type ReactNode, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { AuthModal, type AuthenticatedProfile } from "./auth-modal";
@@ -115,7 +117,7 @@ function readBookingDraft() {
   catch { return null; }
 }
 
-const formatPrice = (value: number, currency = "XOF") => new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+const formatPrice = (value: number, currency = "XOF", locale = "fr-FR") => new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
 const today = new Date().toISOString().slice(0, 10);
 
 export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "feed", initialServiceId }: { supabaseUrl: string; supabaseAnonKey: string; initialScreen?: "feed" | "home" | "results"; initialServiceId?: string }) {
@@ -868,6 +870,8 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
 }
 
 function BookingModal({ selection, initialDate, initialRequest, authenticated, onClose, onSubmit }: { selection: BookingSelection; initialDate: string; initialRequest: BookingRequest | null; authenticated: boolean; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<BookingConfirmation | null> }) {
+  const locale = useApplicationLocale();
+  const t = (text: string) => bookingText(text, locale);
   const { provider, service } = selection;
   const [step, setStep] = useState(initialRequest?.slotStart ? 2 : 1);
   const [submitting, setSubmitting] = useState(false);
@@ -936,10 +940,10 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const uniqueSlots = [...new Map(slotSource.map(slot => [slot.slot_start, slot])).values()];
   const slots = uniqueSlots.map((slot) => ({
     instant: slot.slot_start,
-    label: new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone, timeZoneName: "short" }).format(new Date(slot.slot_start)),
+    label: new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone, timeZoneName: "short" }).format(new Date(slot.slot_start)),
   }));
 
-  const quickDates = useMemo(() => buildQuickDates(timeZone), [timeZone]);
+  const quickDates = useMemo(() => buildQuickDates(timeZone, locale), [timeZone, locale]);
   async function confirm() {
     setSubmitting(true);
     const result = await onSubmit(form);
@@ -960,51 +964,57 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const canConfirm = Boolean(form.time && form.slotStart) && (form.locationMode === "salon" || Boolean(form.address.trim()));
   return <div className="modal-backdrop premium-booking-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="modal premium-booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
-      <header className="booking-screen-header"><button aria-label="Fermer" onClick={onClose}>‹</button><div><h2 id="booking-title">Réserver</h2><p>{provider.name} · réservation rapide</p></div></header>
+      <header className="booking-screen-header"><button aria-label={t("Fermer")} onClick={onClose}>‹</button><div><h2 id="booking-title">{t("Réserver")}</h2><p>{provider.name} {" · "}{t("réservation rapide")}</p></div></header>
       {confirmation ? <BookingSuccess provider={provider} service={service} confirmation={confirmation} onClose={onClose} /> : <>
-        <div className="fast-booking-progress" aria-label={`Étape ${step} sur 2`}><span className={step >= 1 ? "active" : ""}>1 <small>Créneau</small></span><i /><span className={step >= 2 ? "active" : ""}>2 <small>Confirmation</small></span></div>
+        <div className="fast-booking-progress" aria-label={`${t("Étape")} ${step} ${t("sur")} 2`}><span className={step >= 1 ? "active" : ""}>1 <small>{t("Créneau")}</small></span><i /><span className={step >= 2 ? "active" : ""}>2 <small>{t("Confirmation")}</small></span></div>
         <div className="premium-booking-content">
-          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount, service.currency)}</b></div><h3>Quand êtes-vous disponible ?</h3><p>Heure locale de l’établissement · {timeZone}</p><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "", slotStart: undefined, collaboratorId: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>Autre</small><strong>＋</strong><input aria-label="Choisir une autre date" type="date" min={localToday} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "", slotStart: undefined, collaboratorId: "" })} /></label></div>{teamEnabled && !availabilityLoading && <fieldset className="booking-team-choice"><legend>Choisir mon professionnel</legend><label><input type="radio" name="employee-choice" checked={!form.collaboratorId} onChange={() => setForm({ ...form, collaboratorId: "", time: "", slotStart: undefined })} />Peu importe, attribuez-moi un professionnel disponible</label>{availablePeople.map(person => <label key={person.collaborator_id}><input type="radio" name="employee-choice" checked={form.collaboratorId === person.collaborator_id} onChange={() => setForm({ ...form, collaboratorId: person.collaborator_id, time: "", slotStart: undefined })} />{person.avatar_url && <Image unoptimized src={person.avatar_url} alt={person.display_name} width={48} height={48} />}<span><strong>{person.display_name}</strong><small>{person.title}</small><small>{person.specialties.join(" · ")}</small></span></label>)}</fieldset>}<div className="slot-section-title"><strong>Créneaux disponibles</strong><small>Mis à jour en direct</small></div>{availabilityLoading ? <div className="slot-loading">Recherche des meilleurs créneaux…</div> : availabilityError ? <div role="alert" className="no-slots">Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.<button onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>Réessayer</button></div> : slots.length ? <div className="premium-slot-grid">{slots.map((slot) => <button className={form.slotStart === slot.instant ? "active" : ""} key={slot.instant} onClick={() => { const instant = new Date(slot.instant); setForm({ ...form, time: new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone }).format(instant), slotStart: instant.toISOString() }); setStep(2); }}>{slot.label}</button>)}</div> : <div className="no-slots">Aucun créneau publié ce jour. Essayez une autre date.<button type="button" onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>Actualiser les disponibilités</button></div>}</>}
+          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount, service.currency, locale)}</b></div><h3>{t("Quand êtes-vous disponible ?")}</h3><p>{t("Heure locale de l’établissement")}{" · "}{timeZone}</p><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "", slotStart: undefined, collaboratorId: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>{t("Autre")}</small><strong>＋</strong><input aria-label={t("Choisir une autre date")} type="date" min={localToday} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "", slotStart: undefined, collaboratorId: "" })} /></label></div>{teamEnabled && !availabilityLoading && <fieldset className="booking-team-choice"><legend>{t("Choisir mon professionnel")}</legend><label><input type="radio" name="employee-choice" checked={!form.collaboratorId} onChange={() => setForm({ ...form, collaboratorId: "", time: "", slotStart: undefined })} />{t("Peu importe, attribuez-moi un professionnel disponible")}</label>{availablePeople.map(person => <label key={person.collaborator_id}><input type="radio" name="employee-choice" checked={form.collaboratorId === person.collaborator_id} onChange={() => setForm({ ...form, collaboratorId: person.collaborator_id, time: "", slotStart: undefined })} />{person.avatar_url && <Image unoptimized src={person.avatar_url} alt={person.display_name} width={48} height={48} />}<span><strong>{person.display_name}</strong><small>{person.title}</small><small>{person.specialties.join(" · ")}</small></span></label>)}</fieldset>}<div className="slot-section-title"><strong>{t("Créneaux disponibles")}</strong><small>{t("Mis à jour en direct")}</small></div>{availabilityLoading ? <div className="slot-loading">{t("Recherche des meilleurs créneaux…")}</div> : availabilityError ? <div role="alert" className="no-slots">{t("Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.")}<button onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Réessayer")}</button></div> : slots.length ? <div className="premium-slot-grid">{slots.map((slot) => <button className={form.slotStart === slot.instant ? "active" : ""} key={slot.instant} onClick={() => { const instant = new Date(slot.instant); setForm({ ...form, time: new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone }).format(instant), slotStart: instant.toISOString() }); setStep(2); }}>{slot.label}</button>)}</div> : <div className="no-slots">{t("Aucun créneau publié ce jour. Essayez une autre date.")}<button type="button" onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Actualiser les disponibilités")}</button></div>}</>}
           {step === 2 && <>
-            <h3>Vérifiez et confirmez</h3>
-            <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date)} à {form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name} · {timeZone}</small></div><b>{formatPrice(service.price_amount, service.currency)}</b></div>
-            {teamEnabled && <p>Professionnel : {availablePeople.find(person => person.collaborator_id === form.collaboratorId)?.display_name ?? "Affectation automatique à une personne qualifiée et disponible"}</p>}
-            <fieldset className="location-choice"><legend>Où ?</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>Chez le professionnel</strong><small>{provider.address ? `${provider.address} · ${provider.area}` : `${provider.area} · adresse à confirmer avec le professionnel`}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>À mon domicile</strong><small>Le professionnel se déplace</small></span></label>}</fieldset>
-            {form.locationMode === "client_address" && <label>Adresse<textarea autoFocus value={form.address} placeholder="Votre adresse complète" onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}
-            <fieldset className="location-choice"><legend>Paiement</legend>
-              <label><input type="radio" name="payment" checked={form.paymentMethod === "on_site"} onChange={() => setForm({ ...form, paymentMethod: "on_site" })} /><span><strong>Sur place</strong><small>Aucun débit aujourd’hui</small></span></label>
+            <h3>{t("Vérifiez et confirmez")}</h3>
+            <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date, locale)} {" "}{t("à")}{" "}{form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name} · {timeZone}</small></div><b>{formatPrice(service.price_amount, service.currency, locale)}</b></div>
+            {teamEnabled && <p>{t("Professionnel :")}{" "}{availablePeople.find(person => person.collaborator_id === form.collaboratorId)?.display_name ?? t("Affectation automatique à une personne qualifiée et disponible")}</p>}
+            <fieldset className="location-choice"><legend>{t("Où ?")}</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>{t("Chez le professionnel")}</strong><small>{provider.address ? `${provider.address} · ${provider.area}` : `${provider.area} · ${t("adresse à confirmer avec le professionnel")}`}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>{t("À mon domicile")}</strong><small>{t("Le professionnel se déplace")}</small></span></label>}</fieldset>
+            {form.locationMode === "client_address" && <label>{t("Adresse")}<textarea autoFocus value={form.address} placeholder={t("Votre adresse complète")} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}
+            <fieldset className="location-choice"><legend>{t("Paiement")}</legend>
+              <label><input type="radio" name="payment" checked={form.paymentMethod === "on_site"} onChange={() => setForm({ ...form, paymentMethod: "on_site" })} /><span><strong>{t("Sur place")}</strong><small>{t("Aucun débit aujourd’hui")}</small></span></label>
               {onlinePaymentAvailable ? <>
-                {paymentCapabilities.methods.includes("wave") && <label><input type="radio" name="payment" checked={form.paymentMethod === "wave"} onChange={() => setForm({ ...form, paymentMethod: "wave" })} /><span><strong>Wave · Paiement de démonstration</strong><small>PayDunya Sandbox · aucun argent réel</small></span></label>}
-                {paymentCapabilities.methods.includes("orange_money") && <label><input type="radio" name="payment" checked={form.paymentMethod === "orange_money"} onChange={() => setForm({ ...form, paymentMethod: "orange_money" })} /><span><strong>Orange Money · Paiement de démonstration</strong><small>PayDunya Sandbox · aucun argent réel</small></span></label>}
-                {paymentCapabilities.methods.includes("card") && <label><input type="radio" name="payment" checked={form.paymentMethod === "card"} onChange={() => setForm({ ...form, paymentMethod: "card" })} /><span><strong>Carte · Paiement de démonstration</strong><small>PayDunya Sandbox · aucune carte réelle</small></span></label>}
-              </> : <label><input type="radio" name="payment" disabled /><span><strong>Wave, Orange Money ou carte</strong><small>{paymentCapabilitiesLoading ? "Vérification…" : "Le paiement en ligne n’est pas encore disponible"}</small></span></label>}
+                {paymentCapabilities.methods.includes("wave") && <label><input type="radio" name="payment" checked={form.paymentMethod === "wave"} onChange={() => setForm({ ...form, paymentMethod: "wave" })} /><span><strong>{t("Wave · Paiement de démonstration")}</strong><small>{t("PayDunya Sandbox · aucun argent réel")}</small></span></label>}
+                {paymentCapabilities.methods.includes("orange_money") && <label><input type="radio" name="payment" checked={form.paymentMethod === "orange_money"} onChange={() => setForm({ ...form, paymentMethod: "orange_money" })} /><span><strong>{t("Orange Money · Paiement de démonstration")}</strong><small>{t("PayDunya Sandbox · aucun argent réel")}</small></span></label>}
+                {paymentCapabilities.methods.includes("card") && <label><input type="radio" name="payment" checked={form.paymentMethod === "card"} onChange={() => setForm({ ...form, paymentMethod: "card" })} /><span><strong>{t("Carte · Paiement de démonstration")}</strong><small>{t("PayDunya Sandbox · aucune carte réelle")}</small></span></label>}
+              </> : <label><input type="radio" name="payment" disabled /><span><strong>{t("Wave, Orange Money ou carte")}</strong><small>{paymentCapabilitiesLoading ? t("Vérification…") : t("Le paiement en ligne n’est pas encore disponible")}</small></span></label>}
             </fieldset>
-            <details className="booking-options"><summary>Politique d’annulation et note</summary><p>Votre demande reste en attente de confirmation du professionnel. Aucun montant ne sera débité en ligne.</p><label>Note<textarea maxLength={1000} value={form.note} placeholder="Précision utile pour le professionnel" onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></details>
-            <div className="payment-note">{form.paymentMethod === "on_site" ? "Paiement sur place · aucun débit aujourd’hui." : "Paiement de démonstration · aucun argent réel."}</div>
+            <details className="booking-options"><summary>{t("Politique d’annulation et note")}</summary><p>{t("Votre demande reste en attente de confirmation du professionnel. Aucun montant ne sera débité en ligne.")}</p><label>{t("Note")}<textarea maxLength={1000} value={form.note} placeholder={t("Précision utile pour le professionnel")} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></details>
+            <div className="payment-note">{form.paymentMethod === "on_site" ? t("Paiement sur place · aucun débit aujourd’hui.") : t("Paiement de démonstration · aucun argent réel.")}</div>
           </>}
         </div>
-        {step === 2 && <div className="premium-booking-nav"><button className="back-button" onClick={() => setStep(1)}>Modifier</button><button disabled={submitting || !canConfirm} onClick={() => void confirm()}>{submitting ? "Enregistrement…" : form.paymentMethod === "on_site" ? "Confirmer · " + formatPrice(service.price_amount, service.currency) : "Continuer vers la sandbox · " + formatPrice(service.price_amount, service.currency)}</button></div>}
+        {step === 2 && <div className="premium-booking-nav"><button className="back-button" onClick={() => setStep(1)}>{t("Modifier")}</button><button disabled={submitting || !canConfirm} onClick={() => void confirm()}>{submitting ? t("Enregistrement…") : form.paymentMethod === "on_site" ? t("Confirmer · ") + formatPrice(service.price_amount, service.currency, locale) : t("Continuer vers la sandbox · ") + formatPrice(service.price_amount, service.currency, locale)}</button></div>}
       </>}
     </section>
   </div>;
 }
 
 function BookingSuccess({ provider, service, confirmation, onClose }: { provider: Provider; service: ProviderService; confirmation: BookingConfirmation; onClose: () => void }) {
+  const locale = useApplicationLocale();
+  const t = (text: string) => bookingText(text, locale);
   const start = new Date(confirmation.startsAt);
   const end = new Date(start.getTime() + service.duration_minutes * 60000);
   const calendarDate = (value: Date) => value.toISOString().replace(/[-:]/g, "").replace(".000", "");
   const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${service.title} · ${provider.name}`)}&dates=${calendarDate(start)}/${calendarDate(end)}`;
-  return <div className="premium-booking-success"><span>✓</span><p>Demande enregistrée</p><h2>Votre rendez-vous est créé</h2><dl><div><dt>Professionnel</dt><dd>{provider.name}</dd></div><div><dt>Votre intervenant</dt><dd>{confirmation.collaboratorPhoto && <Image unoptimized src={confirmation.collaboratorPhoto} alt="" width={48} height={48} />}{confirmation.collaboratorName ?? (service.business_id || provider.businessId ? "Votre professionnel sera confirmé par le salon." : provider.name)}</dd></div><div><dt>Prestation</dt><dd>{service.title}</dd></div><div><dt>Date</dt><dd>{confirmation.date} à {confirmation.time}</dd></div><div><dt>Adresse</dt><dd>{confirmation.location}</dd></div><div><dt>Prix</dt><dd>{formatPrice(service.price_amount, service.currency)}</dd></div><div><dt>Paiement</dt><dd>À régler sur place · aucun débit en ligne</dd></div><div><dt>Statut</dt><dd>En attente de confirmation du professionnel</dd></div></dl><Link href="/app/messages">Message</Link><a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(confirmation.location)}`} target="_blank" rel="noreferrer">Itinéraire</a><BookingMicroFeedback bookingId={confirmation.id}/><a href={calendarUrl} target="_blank" rel="noreferrer">Ajouter au calendrier</a><button onClick={onClose}>Terminer</button></div>;
+  return <div className="premium-booking-success"><span>✓</span><p>{t("Demande enregistrée")}</p><h2>{t("Votre rendez-vous est créé")}</h2><dl><div><dt>{t("Professionnel")}</dt><dd>{provider.name}</dd></div><div><dt>{t("Votre intervenant")}</dt><dd>{confirmation.collaboratorPhoto && <Image unoptimized src={confirmation.collaboratorPhoto} alt="" width={48} height={48} />}{confirmation.collaboratorName ?? (service.business_id || provider.businessId ? t("Votre professionnel sera confirmé par le salon.") : provider.name)}</dd></div><div><dt>{t("Prestation")}</dt><dd>{service.title}</dd></div><div><dt>{t("Date")}</dt><dd>{formatBookingDate(localDateAt(start, providerTimeZone(provider)), locale)} {" "}{t("à")}{" "}{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone: providerTimeZone(provider), timeZoneName: "short" }).format(start)}</dd></div><div><dt>{t("Adresse")}</dt><dd>{confirmation.location}</dd></div><div><dt>{t("Prix")}</dt><dd>{formatPrice(service.price_amount, service.currency, locale)}</dd></div><div><dt>{t("Paiement")}</dt><dd>{t("À régler sur place · aucun débit en ligne")}</dd></div><div><dt>{t("Statut")}</dt><dd>{t("En attente de confirmation du professionnel")}</dd></div></dl><Link href="/app/messages">{t("Message")}</Link><a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(confirmation.location)}`} target="_blank" rel="noreferrer">{t("Itinéraire")}</a><BookingMicroFeedback bookingId={confirmation.id}/><a href={calendarUrl} target="_blank" rel="noreferrer">{t("Ajouter au calendrier")}</a><button onClick={onClose}>{t("Terminer")}</button></div>;
 }
 
 function BookingMicroFeedback({ bookingId }: { bookingId: string }) {
+  const locale = useApplicationLocale();
+  const t = (text: string) => bookingText(text, locale);
   const [sent, setSent] = useState(false);
   async function answer(response: "yes" | "no") { const client=getSupabaseBrowserClient(); if(!client)return; const user=await client.auth.getUser(); if(!user.data.user)return; const {error}=await client.from("micro_feedback").insert({profile_id:user.data.user.id,context:"booking",response,booking_id:bookingId}); if(!error)setSent(true); }
-  return <aside className="micro-feedback"><strong>Votre réservation a-t-elle été simple ?</strong>{sent ? <small>Merci pour votre retour.</small> : <div><button onClick={() => void answer("yes")}>👍 Oui</button><button onClick={() => void answer("no")}>👎 Non</button></div>}</aside>;
+  return <aside className="micro-feedback"><strong>{t("Votre réservation a-t-elle été simple ?")}</strong>{sent ? <small>{t("Merci pour votre retour.")}</small> : <div><button onClick={() => void answer("yes")}>{t("👍 Oui")}</button><button onClick={() => void answer("no")}>{t("👎 Non")}</button></div>}</aside>;
 }
 
 function BottomNav({ authenticated, active, onFeed, onAccount }: { authenticated: boolean; active: "inspiration"; onFeed: () => void; onAccount: (page: "bookings" | "messages" | "profile") => void }) {
-  return <nav className="premium-bottom-nav" aria-label="Navigation de l’application"><button className={`inspiration-nav ${active === "inspiration" ? "active" : ""}`} onClick={onFeed}><i>▶</i>Inspiration</button><button onClick={() => onAccount("bookings")}><i>□</i>Rendez-vous</button><button onClick={() => onAccount("messages")}><i>✉</i>Messages</button><button aria-label={authenticated ? "Profil" : "Se connecter à MATA Beauty"} onClick={() => onAccount("profile")}><i aria-hidden>○</i>{authenticated ? "Profil" : "Se connecter"}</button></nav>;
+  const locale = useApplicationLocale();
+  const t = (text: string) => bookingText(text, locale);
+  return <nav className="premium-bottom-nav" aria-label={t("Navigation de l’application")}><button className={`inspiration-nav ${active === "inspiration" ? "active" : ""}`} onClick={onFeed}><i>▶</i>Inspiration</button><button onClick={() => onAccount("bookings")}><i>□</i>{t("Rendez-vous")}</button><button onClick={() => onAccount("messages")}><i>✉</i>{t("Messages")}</button><button aria-label={authenticated ? t("Profil") : t("Se connecter à MATA Beauty")} onClick={() => onAccount("profile")}><i aria-hidden>○</i>{authenticated ? t("Profil") : t("Se connecter")}</button></nav>;
 }
 
 function formatDuration(minutes: number) {
@@ -1018,7 +1028,7 @@ function defaultService(provider: Provider): ProviderService {
   return { id: provider.serviceId, title: provider.specialty, duration_minutes: provider.durationMinutes, price_amount: provider.price, currency: provider.currency ?? "XOF", business_id: provider.businessId ?? null };
 }
 
-function buildQuickDates(timeZone = "Africa/Dakar") {
+function buildQuickDates(timeZone = "Africa/Dakar", locale = "fr-FR") {
   const base = localDateAt(new Date(), timeZone);
   return Array.from({ length: 6 }, (_, index) => {
     const dateValue = addCalendarDays(base, index);
@@ -1026,15 +1036,15 @@ function buildQuickDates(timeZone = "Africa/Dakar") {
     const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12));
     return {
       date: dateValue,
-      weekday: index === 0 ? "Aujourd’hui" : formatWallDate(dateValue).split(" ")[0].replace(".", ""),
-      day: date.getDate(),
-      month: date.toLocaleDateString("fr-FR", { month: "short" }).replace(".", ""),
+      weekday: index === 0 ? bookingText("Aujourd’hui", locale) : new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(date).replace(".", ""),
+      day: date.getUTCDate(),
+      month: date.toLocaleDateString(locale, { month: "short", timeZone: "UTC" }).replace(".", ""),
     };
   });
 }
 
-function formatBookingDate(dateValue: string) {
-  return formatWallDate(dateValue);
+function formatBookingDate(dateValue: string, locale = "fr-FR") {
+  return formatWallDate(dateValue, locale);
 }
 
 function parseDateParts(dateValue: string) {
