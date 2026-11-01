@@ -1,7 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isMalformedRequestPath } from "@/lib/domain/request-path";
 
 export async function proxy(request: NextRequest) {
+  if (isMalformedRequestPath(request.nextUrl.pathname)) {
+    return new NextResponse("Requête invalide.", { status: 400, headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff" } });
+  }
   let response = NextResponse.next({ request });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

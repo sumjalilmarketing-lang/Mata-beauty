@@ -11,6 +11,7 @@ import { LocationPicker } from "./location-picker";
 import { distanceKm, matchesSearch, type Coordinates } from "@/lib/domain/location";
 import { feedPrice, publicProfessionalName } from "@/lib/domain/feed-presentation";
 import { feedText } from "@/lib/domain/feed-copy";
+import { applicationLocale } from "@/lib/domain/booking-copy";
 import { fetchPublicPostVideoMedia } from "@/lib/domain/public-post-video-media";
 import "./inspiration-search.css";
 
@@ -122,9 +123,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const t = useCallback((text: string) => feedText(text, locale), [locale]);
   useEffect(() => {
     let active = true;
-    if (authenticated) void getSupabaseBrowserClient()?.from("profiles").select("locale").eq("id", authenticated.userId).maybeSingle().then(({ data }) => {
-      if (active && data?.locale) setLocale(data.locale);
-    });
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setLocale(applicationLocale(navigator.language));
+      if (!authenticated) return;
+      const result = await getSupabaseBrowserClient()?.from("profiles").select("locale").eq("id", authenticated.userId).maybeSingle();
+      if (active && result?.data?.locale) setLocale(applicationLocale(result.data.locale));
+    }).catch(() => undefined);
     return () => { active = false; };
   }, [authenticated]);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "error">(collection ? "ready" : "loading");
