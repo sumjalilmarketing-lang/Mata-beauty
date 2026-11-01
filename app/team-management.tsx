@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { ActionConfirmationDialog } from "./booking-cancellation-dialog";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
@@ -125,6 +126,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
   const [enabled, setEnabled] = useState(false), [timeZone, setTimeZone] = useState("Africa/Dakar"), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const inFlight = useRef(false);
   const savedMemberId = useRef<string | null>(null);
+  const [accessToRevoke, setAccessToRevoke] = useState<TeamAccess | null>(null);
   const [revision, setRevision] = useState(0);
   const load = useCallback(async () => {
     const client = api();
@@ -153,9 +155,9 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
   }, [businessId, ownerId, collaboratorAccessEnabled]);
   useEffect(() => { const timer = window.setTimeout(() => { void load().catch(error => { setMessage(publicErrorMessage(error, "Chargement de l’équipe impossible.")); setLoading(false); }); }, 0); return () => window.clearTimeout(timer); }, [load]);
   async function mutate(action: () => Promise<void>, success: string) {
-    if (inFlight.current) return; inFlight.current = true; setBusy(true); setMessage("");
-    try { await action(); await load(); setRevision(v => v + 1); setMessage(success); }
-    catch (error) { setMessage(publicErrorMessage(error, "La modification n’a pas pu être enregistrée.")); }
+    if (inFlight.current) return false; inFlight.current = true; setBusy(true); setMessage("");
+    try { await action(); await load(); setRevision(v => v + 1); setMessage(success); return true; }
+    catch (error) { setMessage(publicErrorMessage(error, "La modification n’a pas pu être enregistrée.")); return false; }
     finally { inFlight.current = false; setBusy(false); }
   }
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -213,10 +215,19 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
         <form className="salon-form" onSubmit={event => { event.preventDefault(); const values = new FormData(event.currentTarget); const permissions = normalizePermissions(values.getAll("permission").map(String)); const role = String(values.get("role") ?? account.internal_role); void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "update_access", businessId, collaboratorId: account.collaborator_id, role, permissions }); }, "Rôle et permissions mis à jour."); }}>
           <label>Rôle<select name="role" defaultValue={account.internal_role}><option value="member">Membre</option><option value="reception">Accueil</option><option value="manager">Responsable d’équipe</option></select></label>
           <fieldset className="wide"><legend>Permissions individuelles</legend>{permissionChoices.map(([key,label]) => <label className="check" key={key}><input type="checkbox" name="permission" value={key} defaultChecked={account.permissions.includes(key)} />{label}</label>)}</fieldset>
-        <button disabled={busy}>Enregistrer les permissions</button>{!account.revoked_at && <button type="button" className="danger" disabled={busy} onClick={() => { if (window.confirm(`Révoquer l’accès de ${account.display_name} ? Les fiches et rendez-vous restent conservés.`)) void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "revoke_access", businessId, collaboratorId: account.collaborator_id }); }, "Accès révoqué immédiatement. Les fiches et l’historique sont conservés."); }}>Révoquer l’accès</button>}
+        <button disabled={busy}>Enregistrer les permissions</button>{!account.revoked_at && <button type="button" className="danger" disabled={busy} onClick={() => setAccessToRevoke(account)}>Révoquer l’accès</button>}
         </form>
       </article>)}</div>{!staffAccess.length && <p>Aucun compte associé pour l’instant.</p>}
     </article>
+    {accessToRevoke && <ActionConfirmationDialog title={`Révoquer l’accès de ${accessToRevoke.display_name} ?`}
+      description="Ce compte ne pourra plus accéder à cet espace collaborateur. Les fiches et rendez-vous restent conservés."
+      dismissLabel="Conserver l’accès" confirmLabel="Confirmer la révocation" busyLabel="Révocation…"
+      failureMessage="La révocation n’a pas été confirmée. Actualisez la liste ou réessayez."
+      onDismiss={() => setAccessToRevoke(null)} onConfirm={async () => {
+        const success = await mutate(async () => { await requestTeamApi(businessId, "POST", { action: "revoke_access", businessId, collaboratorId: accessToRevoke.collaborator_id }); }, "Accès révoqué immédiatement. Les fiches et l’historique sont conservés.");
+        if (success) setAccessToRevoke(null);
+        return success;
+      }} />}
     <details className="workspace-panel salon-panel"><summary>Historique des accès ({audit.length})</summary><div className="salon-list">{audit.map(item => <div key={item.id}><div><strong>{item.event_type.replaceAll("_", " ")}</strong><small>{new Date(item.created_at).toLocaleString("fr-FR")} · {String(item.details.role ?? "")}</small></div></div>)}{!audit.length && <p>Aucune action enregistrée.</p>}</div></details></>}
     <div className="team-toolbar"><button disabled={busy} className="salon-primary" onClick={() => { savedMemberId.current = null; setSelected(null); setEditing(true); }}>Ajouter un employé</button>
       <button disabled={busy} onClick={() => void mutate(async () => { const result = await api().rpc("set_team_booking_enabled", { target_business_id: businessId, enabled: !enabled }); if (result.error) throw result.error; }, enabled ? "Réservation par équipe désactivée." : "Réservation par équipe activée.")}>{enabled ? "Désactiver la réservation par équipe" : "Activer la réservation par équipe"}</button></div>
