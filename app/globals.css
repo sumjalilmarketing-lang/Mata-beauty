@@ -642,3 +642,6 @@ body{background:#080810;color:#fff8fc}
   background:linear-gradient(135deg,#86124f,#b52165);
 }
 .mini-search { color:#675661; }
+
+/* Feedback remains readable inside the dark booking modal. */
+.micro-feedback,.micro-feedback strong,.micro-feedback small{color:#541331}
