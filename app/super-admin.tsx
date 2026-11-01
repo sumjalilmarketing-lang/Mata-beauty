@@ -7,6 +7,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { ProviderReview } from "./provider-review";
+import { SalonReview } from "./salon-review";
 import { OnboardingQueue } from "./onboarding-queue";
 import { ManagedAccounts } from "./managed-accounts";
 import { NotificationCenter, NotificationBadge } from "./notification-center";
@@ -600,6 +601,7 @@ function AdminModule({
   if (module === "support") return <SupportInbox />;
   if (module === "users") return context.is_super_admin ? <ManagedAccounts /> : <UsersModule context={context} notify={notify} />;
   if (module === "notifications") return <NotificationCenter />;
+  if (module === "salons") return <SalonReview canApprove={context.is_super_admin || (context.permissions.includes("providers.verify") && context.permissions.includes("documents.review"))} />;
   if (module === "verification") return <OnboardingQueue moduleKey="dashboard" />;
   if (module === "providers") return <ProvidersModule context={context} verificationOnly={false} notify={notify} />;
   if (module === "bookings" || module === "calendar") return <BookingsModule context={context} calendar={module === "calendar"} notify={notify} />;
