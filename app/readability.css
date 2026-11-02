@@ -1,6 +1,6 @@
 /* Surface tokens own both foreground and background: OS dark mode must never
    turn inherited text white while leaving a shared form surface white. */
-.privacy-choice { position: fixed; z-index: 60; left: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); max-width: calc(100vw - 24px); color: #fff8fc; font: 14px/1.5 "Segoe UI",Arial,sans-serif; }
+.privacy-choice { position: relative; width: fit-content; max-width: calc(100% - 24px); margin: 12px 12px calc(84px + env(safe-area-inset-bottom)); color: #fff8fc; font: 14px/1.5 "Segoe UI",Arial,sans-serif; }
 .privacy-choice > summary { width: fit-content; min-height: 44px; padding: 10px 12px; border: 1px solid #bca7b7; border-radius: 9px; background: #2d1226; cursor: pointer; }
 .privacy-choice > section { width: min(350px,calc(100vw - 24px)); max-height: 65dvh; overflow: auto; margin-top: 8px; padding: 16px; border: 1px solid #bca7b7; border-radius: 12px; color: #fff8fc; background: #2d1226; box-shadow: 0 6px 26px #0005; }
 .privacy-choice h2 { margin: 0; color: #fff8fc; font-size: 18px; line-height: 1.3; }
@@ -233,6 +233,15 @@
 .premium-booking-modal .fast-booking-progress > span:not(.active) { color: #c9bfce; }
 .premium-booking-modal .fast-booking-progress > span small { font-size: 12px; }
 .premium-booking-modal .booking-screen-header p { font-size: 12px; }
+.premium-booking-modal :is(.fast-service-summary,.booking-recap-card) { grid-template-columns: 52px minmax(0,1fr); }
+.premium-booking-modal :is(.fast-service-summary,.booking-recap-card) > div { min-width: 0; overflow-wrap: anywhere; }
+.premium-booking-modal :is(.fast-service-summary,.booking-recap-card) > b { grid-column: 2; font-size: 16px; }
+.premium-booking-modal :is(.fast-service-summary,.booking-recap-card) small { font-size: 13px; line-height: 1.5; }
+.premium-booking-modal .booking-recap-card .recap-photo { width: 52px; height: 52px; }
+.premium-booking-modal :is(.location-choice small,.location-choice legend,.booking-options summary,.booking-options label,.payment-note,.slot-section-title small) { font-size: 13px; line-height: 1.5; }
+.premium-booking-modal .slot-section-title { flex-wrap: wrap; gap: 8px; }
+.premium-booking-modal .premium-booking-content > label { font-size: 14px; }
+.premium-booking-modal :is(textarea,select) { min-width: 0; max-width: 100%; font-size: 16px; }
 .workspace-layout:is(.workspace-pro,.workspace-salon) .panel-heading > button { color: #74114f; }
 .application-decision { margin: 16px 0 24px; padding: 20px; border: 2px solid #b77a9c; border-radius: 14px; color: #30212d; background: #fff; }
 .application-decision h3 { margin: 0 0 10px; color: #541331 !important; font-size: 21px; }
@@ -419,6 +428,24 @@
 .messaging-empty-state > span { width: 62px; height: 62px; margin: 0 auto 15px; display: grid; place-items: center; border-radius: 50%; background: #fce6f0; color: #85124f; font-size: 28px; }
 .messaging-empty-state h3 { color: #291822; font-size: 21px; }
 .messaging-empty-state p { line-height: 1.6; }
+/* The messaging split view owns a light surface in every workspace. Its
+   foregrounds and bubbles must not inherit the surrounding dark dashboard. */
+.workspace-layout .messaging-workspace .conversation-panel {
+  --message-surface: #fffafd;
+  --message-received: #eee7ec;
+  --message-text: #291822;
+  --message-muted: #574651;
+  --message-border: #94798c;
+  --message-field: #ffffff;
+  color-scheme: light;
+}
+.workspace-layout .messaging-workspace .messaging-thread-area > .conversation-panel { color: #291822; background: #fffafd; }
+.workspace-layout .messaging-workspace .conversation-panel .panel-heading h2 { color: #291822; }
+.workspace-layout .messaging-workspace .conversation-panel .panel-heading small,
+.workspace-layout .messaging-workspace .conversation-panel .message-list .compact-empty { color: #574651; }
+.workspace-layout .messaging-workspace .conversation-panel .panel-heading :is(a,button) { color: #74114f; }
+.workspace-layout .messaging-workspace .conversation-appointments { color: #492b3d; }
+.workspace-layout .messaging-workspace .messaging-search input::placeholder { color: #62515e; opacity: 1; }
 @media (max-width: 767px) {
   .messaging-shell { display: block; min-height: 70dvh; overflow: hidden; }
   .messaging-sidebar { min-height: 70dvh; border-right: 0; }
