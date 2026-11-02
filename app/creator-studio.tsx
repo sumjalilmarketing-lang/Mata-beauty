@@ -84,6 +84,8 @@ export function CreatorStudio({ userId, providerApproved }: { userId: string; pr
     {firstPublicationFeedback && <aside className="panel studio-feedback"><strong>Le Studio était-il facile à utiliser ?</strong><div><button onClick={() => void answerStudioFeedback("yes")}>👍 Oui</button><button onClick={() => void answerStudioFeedback("no")}>👎 Non</button></div></aside>}
     {active === "create" && <VideoPublisher key={selectionVersion} initialFiles={initialFiles} userId={userId} providerApproved={providerApproved} initialContentType={createType} onPublished={async (postType) => {
       await load();
+      setInitialFiles([]);
+      setCreateType("video");
       setFirstPublicationFeedback(true);
       setActive(postType === "video" ? "videos" : postType === "before_after" ? "before_after" : "photos");
     }} />}
