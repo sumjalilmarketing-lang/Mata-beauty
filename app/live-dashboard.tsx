@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ServiceEditor, type EditableService } from "./service-editor";
 import { ActivityLocationSettings } from "./activity-location-settings";
 import { activityLocationReady, serviceDetailsError } from "@/lib/domain/service-creation";
 import Image from "next/image";
@@ -127,7 +128,7 @@ export function LiveDashboard({
   const [businessTimeZones, setBusinessTimeZones] = useState<Record<string, string | null>>({});
   const [clientProfile, setClientProfile] = useState<ClientAccountRow | null>(null);
   const [pendingProviders, setPendingProviders] = useState<PendingProviderRow[]>([]);
-  const [ownServices, setOwnServices] = useState<Array<{ id: string; title: string; price_amount: number; duration_minutes: number; currency: string }>>([]);
+  const [ownServices, setOwnServices] = useState<EditableService[]>([]);
   const [baseServices, setBaseServices] = useState<BaseServiceRow[]>([]);
   const [adminMetrics, setAdminMetrics] = useState({ users: 0, providersPending: 0, reportsOpen: 0 });
   const [loading, setLoading] = useState(true);
@@ -308,7 +309,7 @@ export function LiveDashboard({
               .eq("profile_id", userId)
               .maybeSingle(),
             supabase.from("services").select("id,name").eq("is_active", true).order("name"),
-            supabase.from("provider_services").select("id,title,price_amount,duration_minutes,currency").eq("provider_id", userId).eq("is_active", true).order("title"),
+            supabase.from("provider_services").select("id,service_id,title,description,price_amount,duration_minutes,currency,is_active,archived_at,updated_at").eq("provider_id", userId).is("business_id", null).is("archived_at", null).order("title"),
             businessIds.length ? supabase.from("businesses").select("id,timezone").in("id", businessIds) : Promise.resolve({ data: [], error: null }),
           ]);
           if (profileResult.error) throw profileResult.error;
@@ -586,7 +587,7 @@ export function LiveDashboard({
               <button className="primary-button" type="submit">Enregistrer le profil</button>
             </form>
             <ProfessionalDocuments providerId={userId} /></>}
-            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <div className="control-list-row" key={service.id}><strong>{service.title}</strong><span>{service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</span></div>)}<Link href="/pro/videos">Retour au Studio</Link>{providerProfile && <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
+            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <ServiceEditor key={service.id} service={service} catalog={baseServices} userId={userId} activityCurrency={providerProfile?.currency ?? null} onSaved={value => setOwnServices(current => current.map(item => item.id === value.id ? value : item))} onRemoved={id => { setOwnServices(current => current.filter(item => item.id !== id)); setFeedback("Prestation supprimée du catalogue. Les réservations existantes sont conservées."); }} />)}<Link href="/pro/videos">Retour au Studio</Link>{providerProfile && <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
               <h3 className="wide">Ajouter une prestation</h3>
               <label>Type<select name="serviceId" required defaultValue=""><option value="" disabled>Choisir</option>{baseServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
               <label>Nom de votre prestation<input name="title" required minLength={2} maxLength={120} placeholder="Ex. : Tresses personnalisées" /></label>
@@ -634,7 +635,7 @@ export function LiveDashboard({
                   <strong>{booking.provider_services?.title ?? "Prestation beauté"}</strong>
                   {booking.collaborator_name && <small>{booking.collaborator_avatar_url && <Image unoptimized src={booking.collaborator_avatar_url} alt="" width={36} height={36} />} Prestation assurée par {booking.collaborator_name}</small>}
                   {role === "client" && booking.status === "completed" && <BookingReview bookingId={booking.id} clientId={userId} providerId={booking.provider_id} performer={booking.collaborator_name} />}
-                  <small>{new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: role === "provider" ? timeZone : undefined }).format(new Date(booking.starts_at))}{role === "provider" && ` · ${timeZone}`} · {booking.provider_services?.duration_minutes ?? Math.round((new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60000)} min</small>
+                  <small>{new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: role === "provider" ? timeZone : undefined }).format(new Date(booking.starts_at))}{role === "provider" && ` · ${timeZone}`} · {Math.round((new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60000)} min</small>
                   <small>{booking.location_mode === "client_address" ? booking.appointment_address : "Chez le professionnel"} · {booking.total_amount.toLocaleString("fr-FR")} {booking.currency}</small>
                 </div>
                 <span className={booking.status === "confirmed" ? "status confirmed" : "status pending"}>{{ pending: "En attente", confirmed: "Confirmé", in_progress: "En cours", completed: "Terminé", declined: "Refusé", cancelled_by_client: "Annulé", cancelled_by_provider: "Annulé", no_show: "Absence", disputed: "Litige" }[booking.status] ?? "Rendez-vous"}</span>
