@@ -1,0 +1,12 @@
+.workspace-layout .service-editor.service-editor{display:block;width:100%;min-width:0;padding:1rem;margin-block:1rem;border:1px solid #b69aa9;border-radius:1rem;background:#fff;color:#30212a}
+.workspace-layout .service-editor.service-editor .service-editor-summary{display:flex;flex-wrap:wrap;gap:.5rem 1rem;justify-content:space-between;color:#30212a}
+.workspace-layout .service-editor.service-editor p,.workspace-layout .service-editor.service-editor span,.workspace-layout .service-editor.service-editor label{color:#493641}
+.workspace-layout .service-editor.service-editor .service-editor-warning{color:#752c10;background:#fff3e6;padding:.75rem;border-radius:.5rem}
+.workspace-layout .service-editor.service-editor form{display:grid;gap:1rem;margin-top:1rem}
+.workspace-layout .service-editor.service-editor label{display:grid;gap:.4rem;font-weight:600}
+.workspace-layout .service-editor.service-editor input,.workspace-layout .service-editor.service-editor select,.workspace-layout .service-editor.service-editor textarea{box-sizing:border-box;width:100%;min-width:0;min-height:48px;padding:.75rem;font:inherit;color:#30212a;background:#fff;border:1px solid #876878;border-radius:.6rem}
+.workspace-layout .service-editor.service-editor .service-editor-actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:.75rem}
+.workspace-layout .service-editor.service-editor button{min-height:48px;max-width:100%;padding:.65rem 1rem;font:inherit;font-weight:600;white-space:normal;color:#fff;background:#761448;border:1px solid #761448;border-radius:.6rem;cursor:pointer}
+.workspace-layout .service-editor.service-editor button.service-editor-danger{color:#9a2020;background:#fff;border-color:#9a2020}
+.workspace-layout .service-editor.service-editor button:disabled{opacity:.65;cursor:wait}
+.workspace-layout .service-editor.service-editor :is(button,input,select,textarea):focus-visible{outline:3px solid #a51c62;outline-offset:3px}
