@@ -1,9 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchPublicPostVideoMedia } from "@/lib/domain/public-post-video-media";
+import { fetchPublicPostVideoMedia, fetchPublicPostVideoResult, postUsesVideoMedia } from "@/lib/domain/public-post-video-media";
 
 const postId = "d0dde438-b0c5-463a-bcd7-99e606dca7ef";
 
 describe("fetchPublicPostVideoMedia", () => {
+  it("keeps private photos and carousels out of the video-only endpoint", () => {
+    expect(postUsesVideoMedia("photo", ["image", "image", "image"])).toBe(false);
+    expect(postUsesVideoMedia("before_after", ["before", "after"])).toBe(false);
+    expect(postUsesVideoMedia("video", ["video"])).toBe(true);
+    expect(postUsesVideoMedia(undefined, [])).toBe(true);
+  });
+
+  it("distinguishes a withdrawn publication from a recoverable outage", async () => {
+    const removed = vi.fn<typeof fetch>().mockResolvedValue(new Response("{}", { status: 404 }));
+    const outage = vi.fn<typeof fetch>().mockResolvedValue(new Response("{}", { status: 503 }));
+    const offline = vi.fn<typeof fetch>().mockRejectedValue(new Error("offline"));
+    await expect(fetchPublicPostVideoResult(postId, removed)).resolves.toEqual({ status: "not_found" });
+    await expect(fetchPublicPostVideoResult(postId, outage)).resolves.toEqual({ status: "unavailable" });
+    await expect(fetchPublicPostVideoResult(postId, offline)).resolves.toEqual({ status: "unavailable" });
+  });
   it("requests a fresh URL for the exact public post without browser storage access", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
       videoUrl: "https://storage.example.test/signed/video.mp4?token=fresh",
