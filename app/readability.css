@@ -445,6 +445,7 @@
 .workspace-layout .messaging-workspace .conversation-panel .message-list .compact-empty { color: #574651; }
 .workspace-layout .messaging-workspace .conversation-panel .panel-heading :is(a,button) { color: #74114f; }
 .workspace-layout .messaging-workspace .conversation-appointments { color: #492b3d; }
+.workspace-layout .messaging-workspace .messaging-sidebar .messaging-search input { min-height: 42px; padding: 0; border: 0; border-radius: 0; background: transparent; color: #291822; box-shadow: none; }
 .workspace-layout .messaging-workspace .messaging-search input::placeholder { color: #62515e; opacity: 1; }
 @media (max-width: 767px) {
   .messaging-shell { display: block; min-height: 70dvh; overflow: hidden; }
