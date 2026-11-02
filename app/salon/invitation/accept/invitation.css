@@ -1,0 +1,16 @@
+.team-invitation-page { min-height: 100dvh; display: grid; align-content: center; padding: max(24px,env(safe-area-inset-top)) 16px max(32px,env(safe-area-inset-bottom)); background: #fff7fb; color: #30212a; color-scheme: light; }
+.team-invitation-card { width: min(100%,620px); margin: auto; padding: clamp(22px,5vw,40px); border: 1px solid #927486; border-radius: 20px; background: #fff; color: #30212a; }
+.team-invitation-brand { display: flex; align-items: center; gap: 12px; color: #74114f; text-decoration: none; font: 700 26px Georgia,serif; }
+.team-invitation-brand img { border-radius: 12px; }
+.team-invitation-card h1 { margin: 18px 0; color: #30212a; font: 500 clamp(28px,6vw,38px)/1.2 Georgia,serif; }
+.team-invitation-card p { color: #30212a; font-size: 16px; line-height: 1.6; overflow-wrap: anywhere; }
+.team-invitation-card .team-invitation-kicker { margin-top: 28px; color: #94194f; font-weight: 700; }
+.team-invitation-card .team-invitation-note { color: #62505a; }
+.team-invitation-actions { display: grid; gap: 12px; margin-top: 24px; }
+.team-invitation-primary,.team-invitation-secondary { display: inline-block; min-height: 48px; padding: 14px 18px; border: 1px solid #74114f; border-radius: 10px; text-align: center; font: 700 16px/1.4 Arial,sans-serif; text-decoration: none; }
+.team-invitation-card .team-invitation-primary { background: #74114f; color: #fff; }
+.team-invitation-card .team-invitation-secondary { background: #fff; color: #74114f; }
+.team-invitation-account { min-height: 44px; margin-top: 16px; border: 0; color: #74114f; background: transparent; text-decoration: underline; font: inherit; }
+.team-invitation-card .team-invitation-error { padding: 12px; border: 1px solid #9c243c; border-radius: 8px; color: #9c243c; background: #fff4f6; }
+.team-invitation-card button:disabled { opacity: 1; background: #eee6ec; border-color: #927486; color: #62505a; cursor: wait; }
+.team-invitation-page :is(button,a):focus-visible { outline: 3px solid #74114f; outline-offset: 3px; }
