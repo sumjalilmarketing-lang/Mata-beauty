@@ -1,0 +1,8 @@
+.push-settings { margin: 20px 0; padding: 20px; border: 1px solid #a986a0; border-radius: 16px; background: #210f22; color: #fff4fc; }
+.push-settings h3 { color: #fff4fc; margin: 0 0 10px; }
+.push-settings p { color: #ead6e5; line-height: 1.55; }
+.push-settings label { display: flex; align-items: center; gap: 10px; min-height: 44px; color: #fff4fc; }
+.push-settings input { width: 20px; height: 20px; accent-color: #c51a77; }
+.push-settings button { min-height: 44px; margin: 8px 12px 0 0; padding: 10px 16px; border: 1px solid #f3b9d9; border-radius: 10px; background: #8d1759; color: #fff; font-weight: 700; }
+.push-settings button:disabled { background: #4c3a49; color: #ead6e5; cursor: not-allowed; }
+.push-settings button:focus-visible, .push-settings input:focus-visible { outline: 3px solid #ffd681; outline-offset: 3px; }
