@@ -1,6 +1,8 @@
 import { feedText } from "./feed-copy";
 
 const copy: Record<string, readonly [string, string]> = {
+  "Ce créneau vient d’être réservé. Choisissez une nouvelle disponibilité.": ["This time slot has just been booked. Choose a new available time.", "Esta hora acaba de reservarse. Elige otra disponibilidad."],
+  "La confirmation n’a pas pu être vérifiée. Consultez vos rendez-vous avant de réessayer.": ["Confirmation could not be verified. Check your appointments before trying again.", "No se ha podido verificar la confirmación. Consulta tus citas antes de volver a intentarlo."],
   "réservation rapide": ["quick booking", "reserva rápida"],
   "Étape": ["Step", "Paso"], "sur": ["of", "de"], "Créneau": ["Time slot", "Hora"], "Confirmation": ["Confirmation", "Confirmación"],
   "Quand êtes-vous disponible ?": ["When are you available?", "¿Cuándo tienes disponibilidad?"],

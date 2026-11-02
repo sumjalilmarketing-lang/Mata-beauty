@@ -1,11 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { analyticsChoice, subscribeAnalyticsChoice } from "./consent";
 
 type MetricName = "record_product_event" | "record_video_view" | "record_post_share" | "record_post_booking_click" | "record_social_profile_visit";
 type MetricResult = { ok: boolean; data: unknown };
 
 export async function analyticsSessionHash(key: string): Promise<string | null> {
   try {
-    if (typeof window === "undefined") return null;
+    if (typeof window === "undefined" || analyticsChoice() !== "accepted") return null;
     const storage = window.sessionStorage;
     let session = storage.getItem(key);
     if (!session) { session = crypto.randomUUID(); storage.setItem(key, session); }
@@ -26,14 +27,15 @@ export async function recordSessionMetric(
   const failed = { ok: false, data: null };
   if (parentSignal?.aborted) return failed;
   const hash = await analyticsSessionHash(sessionKey);
-  if (!hash || parentSignal?.aborted) return failed;
+  if (!hash || parentSignal?.aborted || analyticsChoice() !== "accepted") return failed;
   const controller = new AbortController();
   const abort = () => controller.abort();
+  const unsubscribe = subscribeAnalyticsChoice(() => { if (analyticsChoice() !== "accepted") abort(); });
   const timeout = setTimeout(abort, 5000);
   parentSignal?.addEventListener("abort", abort, { once: true });
   try {
     const { data, error } = await client.rpc(name, { ...parameters, target_session_hash: hash }).abortSignal(controller.signal);
-    return error ? failed : { ok: true, data };
+    return error || controller.signal.aborted ? failed : { ok: true, data };
   } catch { return failed; }
-  finally { clearTimeout(timeout); parentSignal?.removeEventListener("abort", abort); }
+  finally { clearTimeout(timeout); parentSignal?.removeEventListener("abort", abort); unsubscribe(); }
 }
