@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { formatServiceMoney } from "@/lib/domain/service-money";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
@@ -368,7 +369,7 @@ export function LiveDashboard({
     const confirmed = bookings.filter((booking) => booking.status === "confirmed").length;
     const completed = bookings.filter((booking) => booking.status === "completed");
     const revenue = Object.entries(completed.reduce<Record<string, number>>((sum, booking) => ({ ...sum, [booking.currency]: (sum[booking.currency] ?? 0) + booking.total_amount }), {}))
-      .map(([currency, amount]) => new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount)).join(" · ") || "—";
+      .map(([currency, amount]) => formatServiceMoney(amount, currency)).join(" · ") || "—";
     return role === "provider"
       ? [[String(bookings.length), "Réservations"], [String(confirmed), "Confirmées"], [revenue, "Revenus théoriques"]]
       : [[String(bookings.filter((booking) => new Date(booking.starts_at) >= new Date()).length), "À venir"], [String(completed.length), "Terminées"], [String(notifications.filter((item) => !item.read_at).length), "Notifications non lues"]];
@@ -582,7 +583,7 @@ export function LiveDashboard({
               <button className="primary-button" type="submit">Enregistrer le profil</button>
             </form>
             <ProfessionalDocuments providerId={userId} /></>}
-            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <div className="control-list-row" key={service.id}><strong>{service.title}</strong><span>{service.duration_minutes} min · {new Intl.NumberFormat("fr-FR", { style: "currency", currency: service.currency, maximumFractionDigits: 0 }).format(service.price_amount)}</span></div>)}<Link href="/pro/videos">Retour au Studio</Link>{!providerProfile?.currency && <p role="alert">Complétez d’abord le pays, le fuseau horaire et la devise de votre activité avant de publier des tarifs.</p>}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
+            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <div className="control-list-row" key={service.id}><strong>{service.title}</strong><span>{service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</span></div>)}<Link href="/pro/videos">Retour au Studio</Link>{!providerProfile?.currency && <p role="alert">Complétez d’abord le pays, le fuseau horaire et la devise de votre activité avant de publier des tarifs.</p>}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
               <h3 className="wide">Ajouter une prestation</h3>
               <label>Type<select name="serviceId" required defaultValue=""><option value="" disabled>Choisir</option>{baseServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
               <label>Nom affiché<input name="title" required minLength={2} /></label>

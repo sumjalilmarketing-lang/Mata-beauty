@@ -4,7 +4,7 @@ import { useApplicationLocale } from "./use-application-locale";
 import { PasswordField, PasswordRequirements } from "@/app/password-field";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -47,6 +47,14 @@ export function AuthModal({
   onClose: () => void;
   onAuthenticated: (profile: AuthenticatedProfile) => void;
 }) {
+  const dialog = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    dialog.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => {
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+    };
+  }, []);
   const browserLocale = useApplicationLocale();
   const [selectedLocale, setSelectedLocale] = useState("");
   const locale = selectedLocale || browserLocale;
@@ -228,7 +236,16 @@ export function AuthModal({
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section lang={locale} className="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <section ref={dialog} lang={locale} className="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" tabIndex={-1} onKeyDown={event => {
+        if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onClose(); return; }
+        if (event.key !== "Tab") return;
+        const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button:not(:disabled), a[href], input:not(:disabled):not([type=hidden]), select:not(:disabled), textarea:not(:disabled), [tabindex]"))
+          .filter(element => element.tabIndex >= 0 && element.getClientRects().length > 0);
+        const first = items[0], last = items.at(-1);
+        if (!first) { event.preventDefault(); event.currentTarget.focus(); }
+        else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }}>
         <button className="modal-close" onClick={onClose} aria-label={t("Fermer")}>×</button>
         <div className="auth-brand"><span>M</span><div><strong>MATA</strong><small>BEAUTY</small></div></div>
         <p className="eyebrow">{t("Compte sécurisé")}</p>
