@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { PhotoCropper } from "./photo-cropper";
+import { mediaSelectionError } from "@/lib/domain/media-composer";
+import { formatServiceMoney } from "@/lib/domain/service-money";
+import "./media-composer.css";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -8,7 +12,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { validatePublishedVideoDelivery, type PublishedVideoRecord } from "@/lib/domain/video-delivery";
 
-type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; services: { categories: { name: string } | null } | null };
+type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
 type PublishStatus = "draft" | "scheduled" | "published";
 type ContentType = "video" | "photo" | "before_after" | "promotion" | "availability";
 
@@ -97,29 +101,35 @@ async function inspectAndCreateThumbnail(file: File) {
   }
 }
 
-export function VideoPublisher({ userId, providerApproved, onPublished, initialContentType = "video" }: { userId: string; providerApproved: boolean; onPublished: (postType: ContentType) => Promise<void>; initialContentType?: ContentType }) {
+export function VideoPublisher({ userId, providerApproved, onPublished, initialContentType = "video", initialFiles = [] }: { userId: string; providerApproved: boolean; onPublished: (postType: ContentType) => Promise<void>; initialContentType?: ContentType; initialFiles?: File[] }) {
   const [services, setServices] = useState<ProviderService[]>([]);
   const [phase, setPhase] = useState<"idle" | "analysing" | "uploading" | "publishing">("idle");
   const [feedback, setFeedback] = useState("");
   const [contentType, setContentType] = useState<ContentType>(initialContentType);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>(initialFiles);
+  const [step, setStep] = useState<"media" | "details">("media");
+  const [cropping, setCropping] = useState<number | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<string[]>(() => initialFiles.map(file => URL.createObjectURL(file)));
   const mediaInput = useRef<HTMLInputElement>(null);
+  const publishPending = useRef(false);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount,services(categories(name))").eq("provider_id", userId).eq("is_active", true).order("title").then(({ data }) => setServices((data ?? []) as unknown as ProviderService[]));
+    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount,currency,services(categories(name))").eq("provider_id", userId).eq("is_active", true).is("archived_at", null).order("title").then(({ data }) => setServices((data ?? []) as unknown as ProviderService[]));
   }, [userId]);
 
   useEffect(() => () => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); }, [previewUrls]);
   async function publish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
-    if (!supabase || phase !== "idle") return;
+    if (!supabase || phase !== "idle" || step !== "details" || publishPending.current) return;
     const form = event.currentTarget;
     const values = new FormData(form);
     const selectedType = String(values.get("contentType") ?? "video") as ContentType;
-    const files = selectedType === "video" ? [values.get("video")].filter((item): item is File => item instanceof File && item.size > 0) : values.getAll("media").filter((item): item is File => item instanceof File && item.size > 0);
+    const files = selectedFiles;
+    const selectionError = mediaSelectionError(files);
+    if (selectionError) { setFeedback(selectionError); return; }
     const file = files[0];
     const status = String(values.get("status")) as PublishStatus;
     const serviceId = String(values.get("serviceId") ?? "");
@@ -137,6 +147,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
     if (status !== "draft" && !serviceId) { setFeedback("Associez une prestation avant de publier ou programmer."); return; }
     if (status === "scheduled" && !scheduledValue) { setFeedback("Choisissez une date de publication."); return; }
 
+    publishPending.current = true;
     let videoPath = "";
     let thumbnailPath = "";
     const mediaPaths: string[] = [];
@@ -202,13 +213,15 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
         }));
       }
       if (error) throw error;
-      window.sessionStorage.removeItem(FEED_CACHE_KEY);
+      persisted = true;
+      try { window.sessionStorage.removeItem(FEED_CACHE_KEY); } catch { /* The saved publication remains valid when session storage is unavailable. */ }
       window.dispatchEvent(new Event("mata:feed:invalidate"));
       form.reset();
       previewUrls.forEach((url) => URL.revokeObjectURL(url));
       setPreviewUrls([]);
+      setSelectedFiles([]); setStep("media");
       setContentType("video");
-      setFeedback(status === "published" ? "Votre vidéo a été publiée." : status === "scheduled" ? "Publication programmée." : "Brouillon enregistré.");
+      setFeedback(status === "published" ? "Votre publication a été publiée." : status === "scheduled" ? "Publication programmée." : "Brouillon enregistré.");
       await onPublished(selectedType);
     } catch (caught) {
       if (!persisted) {
@@ -217,37 +230,57 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
         if (mediaPaths.length) await supabase.storage.from("provider-social-media").remove(mediaPaths);
       }
       setFeedback(publicErrorMessage(caught, persisted ? "La vidéo est enregistrée, mais sa visibilité n’a pas pu être confirmée. Actualisez le Studio avant de réessayer." : "La publication a échoué. Vérifiez le fichier et réessayez."));
-    } finally { setPhase("idle"); }
+    } finally { publishPending.current = false; setPhase("idle"); }
   }
 
   const idleLabel = contentType === "video" ? "Publier la vidéo" : "Publier le contenu";
   const busyLabel = phase === "analysing" ? "Analyse de la vidéo…" : phase === "uploading" ? "Envoi sécurisé…" : phase === "publishing" ? "Publication…" : idleLabel;
   const progressValue = phase === "analysing" ? 20 : phase === "uploading" ? 60 : phase === "publishing" ? 90 : 0;
   return <article className="panel video-publisher-panel" id="video-publisher">
-    <div className="panel-heading"><div><h2>Montrez votre talent</h2><p>Choisissez un média, associez une prestation et publiez depuis votre téléphone.</p></div><span className="role-pill">Créateur</span></div>
+    <div className="panel-heading"><div><h2>Montrez votre talent</h2><p>Choisissez un média, associez une prestation et publiez depuis votre téléphone.</p></div><span className="role-pill">{step === "media" ? "1 · Aperçu" : "2 · Publication"}</span></div>
     <form className="dashboard-form video-publisher-form" onSubmit={(event) => void publish(event)}>
-      <label>Format<select name="contentType" value={contentType} onChange={(event) => setContentType(event.target.value as ContentType)}><option value="video">Vidéo</option><option value="photo">Photo / carrousel</option><option value="before_after">Avant / Après</option><option value="promotion">Promotion</option><option value="availability">Disponibilité immédiate</option></select></label>
-      <label>Titre<input name="title" maxLength={120} placeholder="Ex. Tresses Knotless" /></label>
-      {contentType === "video" ? <><label className="wide video-drop">Vidéo MP4, WebM ou MOV · 90 s maximum · 100 Mo<input ref={mediaInput} name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required onChange={(event) => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); setPreviewUrls(event.target.files?.[0] ? [URL.createObjectURL(event.target.files[0])] : []); }} /></label><label className="wide">Miniature personnalisée (facultatif)<input name="thumbnail" type="file" accept="image/jpeg,image/png,image/webp" /></label></> : <label className="wide video-drop">{contentType === "before_after" ? "Deux images : avant puis après" : "Images JPEG, PNG ou WebP · 10 maximum"}<input ref={mediaInput} name="media" type="file" accept="image/jpeg,image/png,image/webp" multiple={contentType !== "promotion" && contentType !== "availability"} required onChange={(event) => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); setPreviewUrls(Array.from(event.target.files ?? []).map((item) => URL.createObjectURL(item))); }} /></label>}
-      {previewUrls.length > 0 && <div className="wide publisher-preview">{contentType === "video" ? <video src={previewUrls[0]} controls muted playsInline aria-label="Aperçu de la vidéo" /> : previewUrls.map((url, index) => <Image key={url} src={url} alt={contentType === "before_after" ? index === 0 ? "Avant" : "Après" : `Aperçu ${index + 1}`} width={320} height={400} unoptimized />)}<span>Aperçu avant publication</span><button type="button" onClick={() => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); setPreviewUrls([]); if (mediaInput.current) mediaInput.current.value = ""; }}>Supprimer et recommencer</button></div>}
+      <input type="hidden" name="contentType" value={contentType} />
+      <div className="wide composer-media" hidden={step !== "media"}>
+        <input ref={mediaInput} aria-label="Choisir une photo ou une vidéo" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" multiple onChange={event => {
+          const files = Array.from(event.target.files ?? []); if (!files.length) return;
+          const error = mediaSelectionError(files); if (error) { setFeedback(error); event.target.value = ""; return; }
+          setSelectedFiles(files); setPreviewUrls(files.map(file => URL.createObjectURL(file))); setCropping(null); setFeedback("");
+          setContentType(files[0].type.startsWith("video/") ? "video" : ["before_after", "promotion", "availability"].includes(contentType) ? contentType : "photo");
+        }} />
+        {previewUrls.length === 0 ? <p>Choisissez une vidéo (90 secondes maximum) ou jusqu’à 10 photos.</p> : <div className="composer-previews">{previewUrls.map((url, index) => <div key={url}>{contentType === "video" ? <video src={url} controls playsInline aria-label="Aperçu de votre vidéo" /> : <><Image src={url} alt={`Photo ${index + 1}`} width={500} height={650} unoptimized /><button type="button" onClick={() => setCropping(index)}>Recadrer la photo {index + 1}</button></>}</div>)}</div>}
+        {cropping !== null && selectedFiles[cropping] && <PhotoCropper key={previewUrls[cropping]} file={selectedFiles[cropping]} onCancel={() => setCropping(null)} onApply={file => {
+          if (file.size > MAX_IMAGE_BYTES) { setFeedback("Le recadrage dépasse 12 Mo. Choisissez un cadrage plus petit."); setCropping(null); return; }
+          const files = selectedFiles.map((old, index) => index === cropping ? file : old);
+          setSelectedFiles(files); setPreviewUrls(files.map(item => URL.createObjectURL(item))); setCropping(null); setFeedback("");
+        }} />}
+        {selectedFiles.length > 0 && contentType !== "video" && <details><summary>Autres formats photo</summary><label>Format<select value={contentType} onChange={event => setContentType(event.target.value as ContentType)}><option value="photo">Photo / carrousel</option><option value="before_after">Avant / Après (2 photos)</option><option value="promotion">Promotion</option><option value="availability">Disponibilité immédiate</option></select></label></details>}
+        <div className="composer-actions"><button type="button" onClick={() => mediaInput.current?.click()}>{selectedFiles.length ? "Changer les médias" : "＋ Choisir une photo ou une vidéo"}</button><button className="primary-button" type="button" disabled={!selectedFiles.length || cropping !== null} onClick={() => setStep("details")}>Suivant</button></div>
+      </div>
+      <fieldset className="wide composer-details" hidden={step !== "details"} disabled={phase !== "idle"}>
+      <button type="button" disabled={phase !== "idle"} onClick={() => setStep("media")}>← Retour à l’aperçu</button>
+      <h3>Votre publication</h3>
+      <label>Titre<input name="title" maxLength={120} placeholder="Ajoutez un titre" /></label>
       <label className="wide">Légende<textarea name="caption" required maxLength={2200} rows={3} placeholder="Expliquez la technique, le résultat ou le conseil beauté…" /></label>
-      <label className="wide">Hashtags<input name="hashtags" maxLength={300} placeholder="#tresses #dakar #soins" /></label>
+      <details className="wide publisher-options"><summary>Localisation et hashtags</summary><label className="wide">Hashtags<input name="hashtags" maxLength={300} placeholder="#tresses #dakar #soins" /></label>
       <label>Localisation<input name="location" maxLength={160} placeholder="Dakar, Sénégal" /></label>
+      </details>
       {contentType === "availability" && <label>Créneau disponible<input name="availableAt" type="datetime-local" required /></label>}
       {contentType === "promotion" && <><label>Remise (%)<input name="discount" type="number" min="1" max="90" required /></label><label>Fin de l’offre<input name="promotionEndsAt" type="datetime-local" required /></label><label>Places disponibles<input name="promotionSlots" type="number" min="1" max="10000" required /></label></>}
       {services.length === 0 && <Link className="wide primary-button" href="/pro/services">Créer une prestation</Link>}
-      <label>Catégorie et prestation<select name="serviceId" defaultValue=""><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title} · {service.duration_minutes} min · {service.price_amount.toLocaleString("fr-FR")} F</option>)}</select></label>
+      <label>Catégorie et prestation<select name="serviceId" defaultValue=""><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title} · {service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</option>)}</select></label>
       <details className="wide publisher-options"><summary>Options de publication</summary>
       <label>Visibilité<select name="visibility" defaultValue="public"><option value="public">Tout le monde</option><option value="followers">Abonnés</option></select></label>
-      <label>Publication<select name="status" defaultValue={providerApproved ? "published" : "draft"}><option value="draft">Brouillon</option><option value="scheduled" disabled={!providerApproved}>Programmer</option><option value="published" disabled={!providerApproved}>Publier maintenant</option></select></label>
+      {contentType === "video" && <label>Couverture personnalisée<input name="thumbnail" type="file" accept="image/jpeg,image/png,image/webp" /></label>}<label>Publication<select name="status" defaultValue={providerApproved ? "published" : "draft"}><option value="draft">Brouillon</option><option value="scheduled" disabled={!providerApproved}>Programmer</option><option value="published" disabled={!providerApproved}>Publier maintenant</option></select></label>
       <label>Date programmée<input name="scheduledFor" type="datetime-local" /></label>
       <label className="wide legal-consent"><input name="allowComments" type="checkbox" defaultChecked /><span>Autoriser les commentaires.</span></label>
       </details>
-      <label className="wide legal-consent"><input name="consent" type="checkbox" /><span>Je confirme avoir l’autorisation des personnes reconnaissables dans cette vidéo.</span></label>
+      <label className="wide legal-consent"><input name="consent" type="checkbox" /><span>Je confirme avoir l’autorisation des personnes reconnaissables dans ce contenu.</span></label>
       {!providerApproved && <p className="wide publisher-notice">Votre profil doit être approuvé avant une publication publique. Le brouillon reste disponible.</p>}
-      {feedback && <p className="wide dashboard-feedback" role="status">{feedback}</p>}
+
       {phase !== "idle" && <label className="wide upload-progress">Progression de la publication<progress max="100" value={progressValue} /><span>{progressValue}% · {busyLabel}</span></label>}
       <button className="primary-button" type="submit" disabled={phase !== "idle"}>{busyLabel}</button>
+      </fieldset>
+      {feedback && <p className="wide dashboard-feedback" role="status">{feedback}</p>}
     </form>
   </article>;
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { mediaSelectionError } from "@/lib/domain/media-composer";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { SocialDashboard } from "./social-dashboard";
 import { VideoPublisher } from "./video-publisher";
@@ -22,6 +23,9 @@ const tabs: Array<{ key: StudioTab; label: string }> = [
 export function CreatorStudio({ userId, providerApproved }: { userId: string; providerApproved: boolean }) {
   const [active, setActive] = useState<StudioTab>("create");
   const [createType, setCreateType] = useState<"video" | "photo" | "before_after">("video");
+  const picker = useRef<HTMLInputElement>(null);
+  const [initialFiles, setInitialFiles] = useState<File[]>([]);
+  const [selectionVersion, setSelectionVersion] = useState(0);
   const [posts, setPosts] = useState<CreatorPost[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [feedback, setFeedback] = useState("");
@@ -73,12 +77,12 @@ export function CreatorStudio({ userId, providerApproved }: { userId: string; pr
   });
 
   return <section className="creator-studio">
-    <header className="studio-hero"><div><span>STUDIO MATA BEAUTY</span><h2>Montrez votre talent.</h2><p>Filmez, importez ou créez un avant/après puis reliez-le à une prestation réservable.</p></div><button onClick={() => setActive("create")}>＋ Publier</button></header>
-    <details className="studio-other-formats"><summary>Autres formats</summary><div className="studio-launch-actions"><button onClick={() => { setCreateType("video"); setActive("create"); }}><span>●</span><strong>Filmer</strong><small>Vidéo mobile</small></button><button onClick={() => { setCreateType("photo"); setActive("create"); }}><span>↑</span><strong>Importer</strong><small>Photo ou vidéo</small></button><button onClick={() => { setCreateType("before_after"); setActive("create"); }}><span>◇</span><strong>Avant / Après</strong><small>Deux images</small></button></div>
-    </details><nav className="studio-tabs" aria-label="Navigation Studio">{tabs.map((tab) => <button className={active === tab.key ? "active" : ""} key={tab.key} onClick={() => setActive(tab.key)}>{tab.label}</button>)}</nav>
+    <header className="studio-hero"><div><span>STUDIO MATA BEAUTY</span><h2>Photo ou vidéo ?</h2><p>Choisissez votre média, préparez votre publication et partagez votre talent.</p></div><button type="button" onClick={() => picker.current?.click()}>＋ Créer</button></header>
+    <input ref={picker} hidden aria-label="Importer une photo ou une vidéo" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" multiple onChange={event => { const files = Array.from(event.target.files ?? []); if (!files.length) return; const error = mediaSelectionError(files); if (error) { setFeedback(error); event.target.value = ""; return; } setInitialFiles(files); setCreateType(files[0].type.startsWith("video/") ? "video" : "photo"); setSelectionVersion(value => value + 1); setActive("create"); setFeedback(""); event.target.value = ""; }} />
+    <nav className="studio-tabs" aria-label="Navigation Studio">{tabs.map((tab) => <button className={active === tab.key ? "active" : ""} key={tab.key} onClick={() => setActive(tab.key)}>{tab.label}</button>)}</nav>
     {feedback && <p className="dashboard-feedback" role="status">{feedback}</p>}
     {firstPublicationFeedback && <aside className="panel studio-feedback"><strong>Le Studio était-il facile à utiliser ?</strong><div><button onClick={() => void answerStudioFeedback("yes")}>👍 Oui</button><button onClick={() => void answerStudioFeedback("no")}>👎 Non</button></div></aside>}
-    {active === "create" && <VideoPublisher key={createType} userId={userId} providerApproved={providerApproved} initialContentType={createType} onPublished={async (postType) => {
+    {active === "create" && <VideoPublisher key={selectionVersion} initialFiles={initialFiles} userId={userId} providerApproved={providerApproved} initialContentType={createType} onPublished={async (postType) => {
       await load();
       setFirstPublicationFeedback(true);
       setActive(postType === "video" ? "videos" : postType === "before_after" ? "before_after" : "photos");
