@@ -16,7 +16,7 @@ import { feedPrice, publicProfessionalName } from "@/lib/domain/feed-presentatio
 import { applicationText } from "@/lib/domain/application-copy";
 import { applicationLocale } from "@/lib/domain/booking-copy";
 import { createVideoRefreshQueue, reloadVideoSource } from "@/lib/domain/video-recovery";
-import { fetchPublicPostVideoMedia } from "@/lib/domain/public-post-video-media";
+import { fetchPublicPostVideoResult, postUsesVideoMedia } from "@/lib/domain/public-post-video-media";
 import "./inspiration-search.css";
 
 type FeedPost = {
@@ -78,11 +78,11 @@ async function usableSignedUrl(bucketId: string, storagePath: string) {
 
 async function resolvePrivateMedia(row: SocialFeedRow): Promise<SocialFeedRow | null> {
   const privateItems = (row.media_items ?? []).filter((item) => item.bucket_id === "provider-social-media");
-  const privateVideo = row.post_type === "video"
-    || privateItems.some((item) => item.media_type === "video")
-    || row.video_url.includes("/provider-social-media/");
+  const privateVideo = postUsesVideoMedia(row.post_type, privateItems.map((item) => item.media_type));
   if (privateVideo) {
-    const media = await fetchPublicPostVideoMedia(row.id);
+    const result = await fetchPublicPostVideoResult(row.id);
+    if (result.status === "not_found") return null;
+    const media = result.status === "ready" ? result.media : null;
     return media
       ? { ...row, video_url: media.videoUrl, thumbnail_url: media.thumbnailUrl }
       : { ...row, video_url: "", thumbnail_url: null, media_urls: [] };
@@ -127,6 +127,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const [availabilityChecked, setAvailabilityChecked] = useState<Set<string>>(new Set());
   const [availabilityFailed, setAvailabilityFailed] = useState<Set<string>>(new Set());
   const [activeIndex, setActiveIndex] = useState(0);
+  const [unavailablePosts, setUnavailablePosts] = useState<Set<string>>(new Set());
   const [muted, setMuted] = useState(true);
   const [pageVisible, setPageVisible] = useState(true);
   const [liked, setLiked] = useState<Set<string>>(new Set());
@@ -244,14 +245,39 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const activeSearch = Boolean(searchQuery.trim() || selectedCategoryId || selectedCountryCode || selectedProviderId || location.area.trim() || location.position);
   const visiblePosts = useMemo(() => {
     const matches = collection ? collection.posts : filterInspirationPosts(posts, location.providers, searchFilters);
-    return diversifyFeed(matches.map((post) => ({ ...post,
+    return diversifyFeed(matches.filter((post) => !unavailablePosts.has(post.id)).map((post) => ({ ...post,
       distance: location.position ? distanceKm(location.position, location.providers.find((item) => item.serviceId === post.serviceId && item.profileId === post.authorId)?.coordinates) : null,
       followed: followed.has(post.authorId) || favoriteProviders.has(post.authorId),
       specialtyAffinity: liked.has(post.id) || saved.has(post.id) || [...bookingInterests].some((term) => `${post.serviceTitle ?? ""} ${post.hashtags.join(" ")}`.toLocaleLowerCase("fr").includes(term)) ? 1 : 0,
       proximityScore: 0,
       availableSoon: Boolean((realAvailability[post.id] ?? post.availableAt) && new Date(realAvailability[post.id] ?? post.availableAt ?? 0).getTime() < FEED_RANKING_REFERENCE_TIME+72*3_600_000),
     }))).sort((a, b) => location.position ? (a.distance ?? Infinity) - (b.distance ?? Infinity) : 0);
-  }, [bookingInterests, collection, favoriteProviders, followed, liked, location, posts, realAvailability, saved, searchFilters]);
+  }, [bookingInterests, collection, favoriteProviders, followed, liked, location, posts, realAvailability, saved, searchFilters, unavailablePosts]);
+
+  const activePostId = visiblePosts[activeIndex]?.id;
+  useEffect(() => {
+    if (!activePostId || !pageVisible) return;
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const controller = new AbortController();
+    let pending = false;
+    const verify = async () => {
+      if (pending || controller.signal.aborted || document.visibilityState === "hidden") return;
+      pending = true;
+      try {
+        const { data, error } = await client.from("social_feed").select("id").eq("id", activePostId)
+          .abortSignal(controller.signal).maybeSingle();
+        if (!controller.signal.aborted && !error && !data) {
+          setUnavailablePosts((current) => new Set(current).add(activePostId));
+          setActiveIndex(0);
+        }
+      } catch { /* A network error does not prove that a publication was removed. */ }
+      finally { pending = false; }
+    };
+    void verify();
+    const timer = window.setInterval(() => { void verify(); }, 30_000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, [activePostId, pageVisible]);
 
   const load = useCallback(async () => {
     if (collection) return;
@@ -439,9 +465,15 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     if (signal.aborted) return false;
     setVideoRefreshing((current) => new Set(current).add(post.id));
     try {
-      const media = await fetchPublicPostVideoMedia(post.id);
+      const result = await fetchPublicPostVideoResult(post.id);
       if (signal.aborted) return false;
-      if (!media) throw new Error("video_media_unavailable");
+      if (result.status === "not_found") {
+        setUnavailablePosts((current) => new Set(current).add(post.id));
+        setActiveIndex(0);
+        return false;
+      }
+      if (result.status !== "ready") throw new Error("video_media_unavailable");
+      const media = result.media;
       setPosts((current) => {
         const next = current.map((item) => item.id === post.id ? { ...item, videoUrl: media.videoUrl, thumbnailUrl: media.thumbnailUrl } : item);
        
@@ -800,7 +832,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
             onError={() => handleVideoError(post)}
           />
         )
-      ) : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt={t("Avant")} width={540} height={760} unoptimized /><figcaption>{t("Avant")}</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt={t("Après")} width={540} height={760} unoptimized /><figcaption>{t("Après")}</figcaption></figure></div> : <Image className="social-photo-media" src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
+      ) : post.postType === "before_after" ? <div className="social-before-after"><figure><Image src={post.mediaUrls[0]} alt={t("Avant")} onError={() => { setUnavailablePosts((current) => new Set(current).add(post.id)); setActiveIndex(0); }} width={540} height={760} unoptimized /><figcaption>{t("Avant")}</figcaption></figure><figure><Image src={post.mediaUrls[1] ?? post.mediaUrls[0]} alt={t("Après")} onError={() => { setUnavailablePosts((current) => new Set(current).add(post.id)); setActiveIndex(0); }} width={540} height={760} unoptimized /><figcaption>{t("Après")}</figcaption></figure></div> : <Image className="social-photo-media" onError={() => { setUnavailablePosts((current) => new Set(current).add(post.id)); setActiveIndex(0); }} src={post.mediaUrls[0]} alt={post.title ?? post.caption} width={720} height={960} unoptimized />}
       {index === activeIndex && (videoLoading.has(post.id) || videoRefreshing.has(post.id)) && !videoErrors.has(post.id) && <span className="video-loading" role="status">{t("Chargement…")}</span>}
       <div className="video-shade" />
       <div className="video-progress" role="progressbar" aria-label={t("Progression de la vidéo")} aria-valuenow={Math.round((progress[post.id] ?? 0)*100)}><i style={{ transform: `scaleX(${progress[post.id] ?? 0})` }} /></div>
