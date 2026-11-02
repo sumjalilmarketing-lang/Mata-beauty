@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { PwaRegister } from "./pwa-register";
+import { PrivacyChoice } from "./privacy-choice";
 import "./globals.css";
 import "./readability.css";
 
@@ -25,5 +26,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#5b0b45", colorScheme: "light dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="fr"><body><PwaRegister />{children}</body></html>;
+  return <html lang="fr"><body><PwaRegister />{children}<PrivacyChoice /></body></html>;
 }

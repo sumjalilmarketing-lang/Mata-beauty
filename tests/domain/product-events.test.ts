@@ -3,16 +3,58 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { recordProductEvent } from "@/lib/analytics/product-events";
 import { analyticsSessionHash, recordSessionMetric } from "@/lib/analytics/session-metric";
 import { readBrowserStorage, writeBrowserStorage } from "@/lib/browser-storage";
+import { analyticsChoice, setAnalyticsChoice } from "@/lib/analytics/consent";
 
 beforeEach(() => {
   const values = new Map<string, string>();
-  vi.stubGlobal("window", { sessionStorage: { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) } });
+  const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) };
+  vi.stubGlobal("window", Object.assign(new EventTarget(), { sessionStorage: storage, localStorage: storage }));
+  setAnalyticsChoice("accepted");
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("optional product analytics", () => {
+  it("does not create a measurement identifier or send metrics without a choice", async () => {
+    window.localStorage.removeItem("mata-analytics-choice-v1");
+    const rpc = vi.fn();
+    await expect(recordProductEvent({ rpc } as unknown as SupabaseClient, "search")).resolves.toBe(false);
+    expect(window.sessionStorage.getItem("mata-analytics-session")).toBeNull();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("expires old consent and fails closed on malformed or future choices", () => {
+    for (const value of ["broken", JSON.stringify({ choice: "accepted", savedAt: Date.now() - 180 * 86400000 }), JSON.stringify({ choice: "accepted", savedAt: Date.now() + 60000 })]) {
+      window.localStorage.setItem("mata-analytics-choice-v1", value);
+      expect(analyticsChoice()).toBeNull();
+    }
+  });
+
+  it("withdraws consent, clears identifiers and aborts in-flight telemetry", async () => {
+    let started!: () => void;
+    const ready = new Promise<void>(resolve => { started = resolve; });
+    const rpc = vi.fn(() => ({ abortSignal: (signal: AbortSignal) => new Promise((_, reject) => {
+      signal.addEventListener("abort", () => reject(new Error("Withdrawn")), { once: true }); started();
+    }) }));
+    const pending = recordProductEvent({ rpc } as unknown as SupabaseClient, "search");
+    await ready;
+    setAnalyticsChoice("rejected");
+    await expect(pending).resolves.toBe(false);
+    expect(analyticsChoice()).toBe("rejected");
+    expect(window.sessionStorage.getItem("mata-analytics-session")).toBeNull();
+    expect(window.sessionStorage.getItem("mata-feed-session")).toBeNull();
+    rpc.mockClear();
+    await recordProductEvent({ rpc } as unknown as SupabaseClient, "search");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("disables measurement for this page if the choice cannot be saved", () => {
+    vi.stubGlobal("window", Object.assign(new EventTarget(), { localStorage: { getItem: () => JSON.stringify({ choice: "accepted", savedAt: Date.now() }), setItem: () => { throw new Error("Quota"); }, removeItem: () => { throw new Error("Denied"); } } }));
+    expect(setAnalyticsChoice("rejected")).toBe(false);
+    expect(analyticsChoice()).toBeNull();
+  });
   it("does not reject or send a metric when browser storage is forbidden", async () => {
-    vi.stubGlobal("window", { get sessionStorage() { throw new DOMException("Storage denied", "SecurityError"); } });
+    const localStorage = window.localStorage;
+    vi.stubGlobal("window", { localStorage, get sessionStorage() { throw new DOMException("Storage denied", "SecurityError"); } });
     const rpc = vi.fn();
     await expect(recordProductEvent({ rpc } as unknown as SupabaseClient, "booking_started")).resolves.toBe(false);
     expect(rpc).not.toHaveBeenCalled();
@@ -24,7 +66,8 @@ describe("optional product analytics", () => {
   });
 
   it("skips tracking when the session cannot be stored", async () => {
-    vi.stubGlobal("window", { sessionStorage: { getItem: () => null, setItem: () => { throw new DOMException("Full", "QuotaExceededError"); } } });
+    const localStorage = window.localStorage;
+    vi.stubGlobal("window", { localStorage, sessionStorage: { getItem: () => null, setItem: () => { throw new DOMException("Full", "QuotaExceededError"); } } });
     await expect(analyticsSessionHash("test")).resolves.toBeNull();
   });
 

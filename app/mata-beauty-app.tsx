@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { formatServiceMoney } from "@/lib/domain/service-money";
 import { bookingText } from "@/lib/domain/booking-copy";
+import { BookingSlotConflict, bookingSubmissionError } from "@/lib/domain/booking-submission";
 import { useApplicationLocale } from "./use-application-locale";
 import { type ReactNode, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
@@ -600,9 +601,10 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       currency: quote.currency,
       client_note: request.note.trim() || null,
       source_post_id: booking.sourcePostId ?? null,
-    }).select("id,starts_at,collaborator_name,collaborator_avatar_url").single();
+    }).select("id,starts_at,collaborator_name,collaborator_avatar_url").abortSignal(AbortSignal.timeout(20_000)).single();
+    if (error?.code === "23P01") throw new BookingSlotConflict();
     if (error || !created) {
-      setNotice(error?.code === "23P01" ? "Ce créneau vient d’être réservé." : "La réservation n’a pas pu être enregistrée.");
+      setNotice("La réservation n’a pas pu être enregistrée.");
       return null;
     }
     void recordProductEvent(supabase, "booking_completed", { booking_id: created.id, provider_id: provider.profileId, source: booking.sourcePostId ? "video" : "catalog" });
@@ -877,6 +879,8 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const { provider, service } = selection;
   const [step, setStep] = useState(initialRequest?.slotStart ? 2 : 1);
   const [submitting, setSubmitting] = useState(false);
+  const submissionPending = useRef(false);
+  const [submissionError, setSubmissionError] = useState("");
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
   const [slotRows, setSlotRows] = useState<AvailabilitySlot[]>([]);
   const [teamEnabled, setTeamEnabled] = useState(false);
@@ -946,23 +950,39 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   }));
 
   const quickDates = useMemo(() => buildQuickDates(timeZone, locale), [timeZone, locale]);
-  async function confirm() {
+  const confirm = useCallback(async () => {
+    if (submissionPending.current) return;
+    submissionPending.current = true;
     setSubmitting(true);
-    const result = await onSubmit(form);
-    setSubmitting(false);
-    if (result) setConfirmation(result);
-    else if (!authenticated) setWaitingForAuthentication(true);
-  }
-  useEffect(() => {
-    if (!authenticated || !waitingForAuthentication) return;
-    void Promise.resolve().then(async () => {
-      setWaitingForAuthentication(false);
-      setSubmitting(true);
+    setSubmissionError("");
+    try {
       const result = await onSubmit(form);
       if (result) setConfirmation(result);
+      else if (!authenticated) setWaitingForAuthentication(true);
+      else setSubmissionError("La confirmation n’a pas pu être vérifiée. Consultez vos rendez-vous avant de réessayer.");
+    } catch (error: unknown) {
+      if (bookingSubmissionError(error) === "conflict") {
+        setSubmissionError("Ce créneau vient d’être réservé. Choisissez une nouvelle disponibilité.");
+        setForm(current => ({ ...current, time: "", slotStart: undefined }));
+        setSlotRows([]);
+        setCollaborators([]);
+        setAvailabilityAttempt(attempt => attempt + 1);
+        setStep(1);
+      } else {
+        setSubmissionError("La confirmation n’a pas pu être vérifiée. Consultez vos rendez-vous avant de réessayer.");
+      }
+    } finally {
+      submissionPending.current = false;
       setSubmitting(false);
+    }
+  }, [authenticated, form, onSubmit, setForm]);
+  useEffect(() => {
+    if (!authenticated || !waitingForAuthentication) return;
+    void Promise.resolve().then(() => {
+      setWaitingForAuthentication(false);
+      void confirm();
     });
-  }, [authenticated, form, onSubmit, waitingForAuthentication]);
+  }, [authenticated, confirm, waitingForAuthentication]);
   const canConfirm = Boolean(form.time && form.slotStart) && (form.locationMode === "salon" || Boolean(form.address.trim()));
   return <div className="modal-backdrop premium-booking-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="modal premium-booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
@@ -970,6 +990,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
       {confirmation ? <BookingSuccess provider={provider} service={service} confirmation={confirmation} onClose={onClose} /> : <>
         <div className="fast-booking-progress" aria-label={`${t("Étape")} ${step} ${t("sur")} 2`}><span className={step >= 1 ? "active" : ""}>1 <small>{t("Créneau")}</small></span><i /><span className={step >= 2 ? "active" : ""}>2 <small>{t("Confirmation")}</small></span></div>
         <div className="premium-booking-content">
+          {submissionError && <p role="alert" className="booking-submit-error">{t(submissionError)}</p>}
           {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount, service.currency, locale)}</b></div><h3>{t("Quand êtes-vous disponible ?")}</h3><p>{t("Heure locale de l’établissement")}{" · "}{timeZone}</p><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "", slotStart: undefined, collaboratorId: "" })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>{t("Autre")}</small><strong>＋</strong><input aria-label={t("Choisir une autre date")} type="date" min={localToday} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "", slotStart: undefined, collaboratorId: "" })} /></label></div>{teamEnabled && !availabilityLoading && <fieldset className="booking-team-choice"><legend>{t("Choisir mon professionnel")}</legend><label><input type="radio" name="employee-choice" checked={!form.collaboratorId} onChange={() => setForm({ ...form, collaboratorId: "", time: "", slotStart: undefined })} />{t("Peu importe, attribuez-moi un professionnel disponible")}</label>{availablePeople.map(person => <label key={person.collaborator_id}><input type="radio" name="employee-choice" checked={form.collaboratorId === person.collaborator_id} onChange={() => setForm({ ...form, collaboratorId: person.collaborator_id, time: "", slotStart: undefined })} />{person.avatar_url && <Image unoptimized src={person.avatar_url} alt={person.display_name} width={48} height={48} />}<span><strong>{person.display_name}</strong><small>{person.title}</small><small>{person.specialties.join(" · ")}</small></span></label>)}</fieldset>}<div className="slot-section-title"><strong>{t("Créneaux disponibles")}</strong><small>{t("Mis à jour en direct")}</small></div>{availabilityLoading ? <div className="slot-loading">{t("Recherche des meilleurs créneaux…")}</div> : availabilityError ? <div role="alert" className="no-slots">{t("Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.")}<button onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Réessayer")}</button></div> : slots.length ? <div className="premium-slot-grid">{slots.map((slot) => <button className={form.slotStart === slot.instant ? "active" : ""} key={slot.instant} onClick={() => { const instant = new Date(slot.instant); setForm({ ...form, time: new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone }).format(instant), slotStart: instant.toISOString() }); setStep(2); }}>{slot.label}</button>)}</div> : <div className="no-slots">{t("Aucun créneau publié ce jour. Essayez une autre date.")}<button type="button" onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Actualiser les disponibilités")}</button></div>}</>}
           {step === 2 && <>
             <h3>{t("Vérifiez et confirmez")}</h3>
