@@ -1,5 +1,14 @@
 /* Surface tokens own both foreground and background: OS dark mode must never
    turn inherited text white while leaving a shared form surface white. */
+.privacy-choice { position: fixed; z-index: 60; left: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); max-width: calc(100vw - 24px); color: #fff8fc; font: 14px/1.5 "Segoe UI",Arial,sans-serif; }
+.privacy-choice > summary { width: fit-content; min-height: 44px; padding: 10px 12px; border: 1px solid #bca7b7; border-radius: 9px; background: #2d1226; cursor: pointer; }
+.privacy-choice > section { width: min(350px,calc(100vw - 24px)); max-height: 65dvh; overflow: auto; margin-top: 8px; padding: 16px; border: 1px solid #bca7b7; border-radius: 12px; color: #fff8fc; background: #2d1226; box-shadow: 0 6px 26px #0005; }
+.privacy-choice h2 { margin: 0; color: #fff8fc; font-size: 18px; line-height: 1.3; }
+.privacy-choice small { display: block; margin-top: 10px; color: #e2d1dc; }
+.privacy-choice section > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.privacy-choice button { flex: 1; min-height: 44px; padding: 8px; border: 1px solid #d5bdcd; border-radius: 8px; color: #fff8fc; background: #53183b; }
+.privacy-choice :is(summary,button):focus-visible { outline: 3px solid #ffd078; outline-offset: 3px; }
+.booking-submit-error { padding: 12px; border: 1px solid #ffb5c5; border-radius: 9px; color: #fff4f6; background: #521b30; }
 .super-admin-shell, .admin-auth-shell {
   --ui-surface: #fffefd;
   --ui-field: #ffffff;

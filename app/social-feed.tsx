@@ -6,6 +6,8 @@ import { diversifyFeed } from "@/lib/domain/social-feed";
 import type { CatalogCategory } from "@/lib/supabase/catalog";
 import { filterInspirationPosts, validSearchRadius, type InspirationSearchProvider } from "@/lib/domain/inspiration-search";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { recordSessionMetric } from "@/lib/analytics/session-metric";
+import { readBrowserStorage, writeBrowserStorage } from "@/lib/browser-storage";
 import type { AuthenticatedProfile } from "./auth-modal";
 import { LocationPicker } from "./location-picker";
 import { distanceKm, matchesSearch, type Coordinates } from "@/lib/domain/location";
@@ -265,13 +267,6 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     }))).sort((a, b) => location.position ? (a.distance ?? Infinity) - (b.distance ?? Infinity) : 0);
   }, [bookingInterests, collection, favoriteProviders, followed, liked, location, posts, realAvailability, saved, searchFilters]);
 
-  const getSessionHash = useCallback(async () => {
-    const session = window.sessionStorage.getItem("mata-feed-session") ?? crypto.randomUUID();
-    window.sessionStorage.setItem("mata-feed-session", session);
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(session));
-    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-  }, []);
-
   const load = useCallback(async () => {
     if (collection) return;
     const generation = ++loadGeneration.current;
@@ -408,7 +403,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   useEffect(() => {
     if (restoredPosition.current || state !== "ready" || !visiblePosts.length) return;
     restoredPosition.current = true;
-    const rememberedId = window.sessionStorage.getItem("mata-feed-active-post");
+    const rememberedId = readBrowserStorage("sessionStorage", "mata-feed-active-post");
     const rememberedIndex = visiblePosts.findIndex((post) => post.id === rememberedId);
     if (rememberedIndex < 0) return;
     window.requestAnimationFrame(() => {
@@ -431,17 +426,14 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     });
     const post = visiblePosts[activeIndex];
     if (!post || !pageVisible) return;
-    window.sessionStorage.setItem("mata-feed-active-post", post.id);
-    const timer = window.setTimeout(async () => {
+    writeBrowserStorage("sessionStorage", "mata-feed-active-post", post.id);
+    const timer = window.setTimeout(() => {
       const supabase = getSupabaseBrowserClient();
-      if (!supabase) return;
-      const sessionHash = await getSessionHash();
-      if (pageRequests.current.signal.aborted) return;
-      await supabase.rpc("record_video_view", { target_post_id: post.id, target_session_hash: sessionHash, target_watched_ms: 2000, target_completed: false }).abortSignal(pageRequests.current.signal);
+      if (supabase) void recordSessionMetric(supabase, "record_video_view", { target_post_id: post.id, target_watched_ms: 2000, target_completed: false }, "mata-feed-session", pageRequests.current.signal);
     }, 2000);
     if (activeIndex >= visiblePosts.length - 3) void loadMore();
     return () => window.clearTimeout(timer);
-  }, [activeIndex, getSessionHash, loadMore, pageVisible, pausedPosts, visiblePosts]);
+  }, [activeIndex, loadMore, pageVisible, pausedPosts, visiblePosts]);
 
   useEffect(() => {
     const post = visiblePosts[activeIndex];
@@ -574,10 +566,10 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setFeedback(t("Le partage n’a pas pu être effectué.")); return; }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const sessionHash = await getSessionHash();
-    const { data } = await supabase.rpc("record_post_share", { target_post_id: post.id, target_session_hash: sessionHash });
-    if (typeof data === "number") setPosts((current) => current.map((item) => item.id === post.id ? { ...item, shareCount: data } : item));
     setFeedback(t("Partage enregistré."));
+    void recordSessionMetric(supabase, "record_post_share", { target_post_id: post.id }, "mata-feed-session", pageRequests.current.signal).then(({ data }) => {
+      if (typeof data === "number" && !pageRequests.current.signal.aborted) setPosts((current) => current.map((item) => item.id === post.id ? { ...item, shareCount: data } : item));
+    });
   }
 
   async function report(post: FeedPost) {
@@ -631,11 +623,11 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     }
   }
 
-  async function book(post: FeedPost) {
+  function book(post: FeedPost) {
     if (!post.serviceId || !post.serviceTitle || post.durationMinutes === null || post.priceAmount === null) return;
-    const supabase = getSupabaseBrowserClient();
-    if (supabase) await supabase.rpc("record_post_booking_click", { target_post_id: post.id, target_session_hash: await getSessionHash() });
     onBook(post.authorId, { id: post.serviceId, title: post.serviceTitle, duration_minutes: post.durationMinutes, price_amount: post.priceAmount }, post.id);
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) void recordSessionMetric(supabase, "record_post_booking_click", { target_post_id: post.id }, "mata-feed-session", pageRequests.current.signal);
   }
 
   function handleVideoError(post: FeedPost) {
@@ -650,10 +642,10 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     });
   }
 
-  async function openProvider(post: FeedPost) {
-    const supabase = getSupabaseBrowserClient();
-    if (supabase) void supabase.rpc("record_social_profile_visit", { target_provider_id: post.authorId, target_post_id: post.id, target_session_hash: await getSessionHash() });
+  function openProvider(post: FeedPost) {
     onOpenProvider(post.authorId);
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) void recordSessionMetric(supabase, "record_social_profile_visit", { target_provider_id: post.authorId, target_post_id: post.id }, "mata-feed-session", pageRequests.current.signal);
   }
 
   const categoryLabel = categories.find((item) => item.id === selectedCategoryId)?.name ?? "";
@@ -805,15 +797,12 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
               setProgress((current) => ({ ...current, [post.id]: ratio }));
               if (ratio >= 0.95 && !completedViews.current.has(post.id)) {
                 completedViews.current.add(post.id);
-                void getSessionHash().then((hash) => {
-                  if (pageRequests.current.signal.aborted) return;
-                  return getSupabaseBrowserClient()?.rpc("record_video_view", {
-                    target_post_id: post.id,
-                    target_session_hash: hash,
-                    target_watched_ms: Math.round(video.currentTime * 1000),
-                    target_completed: true,
-                  }).abortSignal(pageRequests.current.signal);
-                });
+                const supabase = getSupabaseBrowserClient();
+                if (supabase) void recordSessionMetric(supabase, "record_video_view", {
+                  target_post_id: post.id,
+                  target_watched_ms: Math.round(video.currentTime * 1000),
+                  target_completed: true,
+                }, "mata-feed-session", pageRequests.current.signal);
               }
             }}
             onError={() => handleVideoError(post)}
