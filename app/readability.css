@@ -466,3 +466,16 @@
   :is(.conversation-panel, .support-thread) .message-list { padding: 10px; }
   .workspace-layout:has(.message-composer textarea:focus) .workspace-mobile-nav { display: none; }
 }
+
+/* Client privacy settings own both sides of their light-surface contrast.
+   Shared workspace dark cards must not leak into these preference labels. */
+.client-control-center #privacy-settings { background: #ffffff; color: #30212a; color-scheme: light; }
+.client-control-center #privacy-settings :is(h2,p) { color: #30212a; }
+.client-control-center #privacy-settings .privacy-grid > label { min-width: 0; min-height: 48px; padding: 12px; border: 1px solid #927486; background: #fff7fb; color: #30212a; }
+.client-control-center #privacy-settings .privacy-grid > label:not(.legal-consent) { display: grid; gap: 8px; }
+.client-control-center #privacy-settings .privacy-grid > label > span { min-width: 0; color: #30212a; overflow-wrap: anywhere; }
+.client-control-center #privacy-settings select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #927486; border-radius: 8px; background: #ffffff; color: #30212a; color-scheme: light; font: inherit; }
+.client-control-center #privacy-settings select option { background: #ffffff; color: #30212a; }
+.client-control-center #privacy-settings input[type="checkbox"] { flex: 0 0 22px; width: 22px !important; min-width: 22px; height: 22px; margin-top: 1px; accent-color: #74114f; color-scheme: light; }
+.client-control-center #privacy-settings .privacy-actions > a { color: #74114f; text-decoration: underline; text-underline-offset: 3px; }
+.client-control-center #privacy-settings :is(input,select,button,a):focus-visible { outline: 3px solid #74114f; outline-offset: 3px; }
