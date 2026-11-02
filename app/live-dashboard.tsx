@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { ActivityLocationSettings } from "./activity-location-settings";
+import { activityLocationReady, serviceDetailsError } from "@/lib/domain/service-creation";
 import Image from "next/image";
 import { formatServiceMoney } from "@/lib/domain/service-money";
 import { bookingTimeZone } from "@/lib/domain/booking-time-zone";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
@@ -57,6 +59,7 @@ type ProviderProfileRow = {
   bio: string | null;
   city: string;
   country_code: string | null;
+  region: string | null;
   timezone: string | null;
   currency: string | null;
   service_mode: "salon" | "mobile" | "both";
@@ -130,6 +133,8 @@ export function LiveDashboard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [savingService, setSavingService] = useState(false);
+  const servicePending = useRef(false);
   const [messageBooking, setMessageBooking] = useState<{ id: string; serviceTitle: string } | null>(null);
   const [pendingCancellation, setPendingCancellation] = useState<ClientBookingItem | null>(null);
 
@@ -299,7 +304,7 @@ export function LiveDashboard({
           const [profileResult, serviceResult, ownResult, businessResult] = await Promise.all([
             supabase
               .from("provider_profiles")
-              .select("profile_id,business_name,bio,city,country_code,timezone,currency,service_mode,status,activity_type,years_experience,base_address,languages,cancellation_policy,onboarding_progress")
+              .select("profile_id,business_name,bio,city,country_code,region,timezone,currency,service_mode,status,activity_type,years_experience,base_address,languages,cancellation_policy,onboarding_progress")
               .eq("profile_id", userId)
               .maybeSingle(),
             supabase.from("services").select("id,name").eq("is_active", true).order("name"),
@@ -475,29 +480,22 @@ export function LiveDashboard({
 
   async function addProviderService(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!providerProfile?.currency) { setFeedback("Enregistrez d’abord le pays, le fuseau horaire et la devise de facturation de votre profil."); return; }
+    if (servicePending.current) return;
+    if (!activityLocationReady(providerProfile)) { setFeedback("Enregistrez le pays, le fuseau horaire et la devise dans le bloc juste au-dessus du formulaire."); return; }
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
+    if (!supabase || !providerProfile?.currency) return;
     const form = event.currentTarget;
-    const formData = new FormData(form);
-    const serviceId = String(formData.get("serviceId") ?? "");
-    const title = String(formData.get("title") ?? "").trim();
-    const durationMinutes = Number(formData.get("durationMinutes"));
-    const priceAmount = Number(formData.get("priceAmount"));
-    const { error: insertError } = await supabase.from("provider_services").insert({
-      provider_id: userId,
-      service_id: serviceId,
-      title,
-      duration_minutes: durationMinutes,
-      price_amount: priceAmount,
-      currency: providerProfile.currency,
-    });
-    if (insertError) setFeedback(insertError.message);
-    else {
-      form.reset();
-      setFeedback("Prestation ajoutée.");
-      await load();
-    }
+    const values = new FormData(form);
+    const details = { serviceId: String(values.get("serviceId") ?? ""), title: String(values.get("title") ?? "").trim(), durationMinutes: Number(values.get("durationMinutes")), priceAmount: Number(values.get("priceAmount")) };
+    const invalid = serviceDetailsError(details);
+    if (invalid) { setFeedback(invalid); return; }
+    servicePending.current = true; setSavingService(true); setFeedback("");
+    try {
+      const { error } = await supabase.from("provider_services").insert({ provider_id: userId, service_id: details.serviceId, title: details.title, duration_minutes: details.durationMinutes, price_amount: details.priceAmount, currency: providerProfile.currency });
+      if (error) throw error;
+      form.reset(); setFeedback("Prestation ajoutée."); await load();
+    } catch (error) { setFeedback(publicErrorMessage(error, "La prestation n’a pas été créée. Vos champs sont conservés ; vérifiez les réglages et réessayez.")); }
+    finally { servicePending.current = false; setSavingService(false); }
   }
 
   async function moderateProvider(profileId: string, decision: "approved" | "rejected") {
@@ -545,7 +543,7 @@ export function LiveDashboard({
         {show("dashboard") && (loading ? (
           <div className="metric-grid" role="status" aria-label="Chargement"><article className="skeleton-card" /><article className="skeleton-card" /><article className="skeleton-card" /></div>
         ) : (
-          <div className="metric-grid">{metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
+          <><div className="metric-grid">{metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>{role === "provider" && <p className="dashboard-scope-note">Indicateurs calculés sur les 30 rendez-vous chargés. Les revenus théoriques ne sont pas un solde encaissé.</p>}</>
         ))}
         {role === "client" && show("profile") && <ClientControlCenter userId={userId} />}
         {role === "client" && !moduleKey && <ReferralCard type="client" />}
@@ -588,13 +586,13 @@ export function LiveDashboard({
               <button className="primary-button" type="submit">Enregistrer le profil</button>
             </form>
             <ProfessionalDocuments providerId={userId} /></>}
-            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <div className="control-list-row" key={service.id}><strong>{service.title}</strong><span>{service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</span></div>)}<Link href="/pro/videos">Retour au Studio</Link>{!providerProfile?.currency && <p role="alert">Complétez d’abord le pays, le fuseau horaire et la devise de votre activité avant de publier des tarifs.</p>}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
+            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <div className="control-list-row" key={service.id}><strong>{service.title}</strong><span>{service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</span></div>)}<Link href="/pro/videos">Retour au Studio</Link>{providerProfile && <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
               <h3 className="wide">Ajouter une prestation</h3>
               <label>Type<select name="serviceId" required defaultValue=""><option value="" disabled>Choisir</option>{baseServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
-              <label>Nom affiché<input name="title" required minLength={2} /></label>
-              <label>Durée (minutes)<input name="durationMinutes" type="number" required min={15} max={720} step={15} /></label>
-              <label>Prix ({providerProfile?.currency ?? "devise à définir"})<input name="priceAmount" type="number" required min={0} step={1} disabled={!providerProfile?.currency} /></label>
-              <button className="primary-button" type="submit" disabled={!providerProfile?.currency}>Ajouter la prestation</button>
+              <label>Nom de votre prestation<input name="title" required minLength={2} maxLength={120} placeholder="Ex. : Tresses personnalisées" /></label>
+              <label>Durée au choix (minutes)<input name="durationMinutes" type="number" inputMode="numeric" required min={15} max={720} step={1} aria-describedby="service-duration-help" /><small id="service-duration-help">De 15 à 720 minutes, à la minute près.</small></label>
+              <label>Prix ({providerProfile?.currency ?? "devise à définir"})<input name="priceAmount" type="number" required min={0} step={1} disabled={!activityLocationReady(providerProfile)} /></label>
+              <button className="primary-button" type="submit" disabled={!activityLocationReady(providerProfile) || savingService}>{savingService ? "Enregistrement…" : "Ajouter la prestation"}</button>{!activityLocationReady(providerProfile) && <p className="wide" role="status">Pour activer le prix et valider, enregistrez les réglages de votre activité juste au-dessus. Le nom et la durée restent dans ce formulaire.</p>}
             </form></>}
           </article>}
           </>
