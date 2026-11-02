@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { formatServiceMoney } from "@/lib/domain/service-money";
+import { bookingTimeZone } from "@/lib/domain/booking-time-zone";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
@@ -120,6 +121,7 @@ export function LiveDashboard({
   const [loadingMoreBookings, setLoadingMoreBookings] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [providerProfile, setProviderProfile] = useState<ProviderProfileRow | null>(null);
+  const [businessTimeZones, setBusinessTimeZones] = useState<Record<string, string | null>>({});
   const [clientProfile, setClientProfile] = useState<ClientAccountRow | null>(null);
   const [pendingProviders, setPendingProviders] = useState<PendingProviderRow[]>([]);
   const [ownServices, setOwnServices] = useState<Array<{ id: string; title: string; price_amount: number; duration_minutes: number; currency: string }>>([]);
@@ -293,7 +295,8 @@ export function LiveDashboard({
         }
 
         if (role === "provider") {
-          const [profileResult, serviceResult, ownResult] = await Promise.all([
+          const businessIds = [...new Set(mappedBookings.map((booking) => booking.provider_services?.business_id).filter((id): id is string => Boolean(id)))];
+          const [profileResult, serviceResult, ownResult, businessResult] = await Promise.all([
             supabase
               .from("provider_profiles")
               .select("profile_id,business_name,bio,city,country_code,timezone,currency,service_mode,status,activity_type,years_experience,base_address,languages,cancellation_policy,onboarding_progress")
@@ -301,9 +304,12 @@ export function LiveDashboard({
               .maybeSingle(),
             supabase.from("services").select("id,name").eq("is_active", true).order("name"),
             supabase.from("provider_services").select("id,title,price_amount,duration_minutes,currency").eq("provider_id", userId).eq("is_active", true).order("title"),
+            businessIds.length ? supabase.from("businesses").select("id,timezone").in("id", businessIds) : Promise.resolve({ data: [], error: null }),
           ]);
           if (profileResult.error) throw profileResult.error;
           if (serviceResult.error) throw serviceResult.error;
+          if (businessResult.error) throw businessResult.error;
+          setBusinessTimeZones(Object.fromEntries((businessResult.data ?? []).map((business: { id: string; timezone: string | null }) => [business.id, business.timezone])));
           setProviderProfile(profileResult.data as ProviderProfileRow | null);
           setBaseServices((serviceResult.data ?? []) as BaseServiceRow[]);
           if (ownResult.error) throw ownResult.error;
@@ -513,7 +519,6 @@ export function LiveDashboard({
 
   const show = (...keys: string[]) => !moduleKey || keys.includes(moduleKey);
   const DashboardContainer = moduleKey ? "section" : "main";
-  const dashboardTimeZone = providerProfile?.timezone ?? (providerProfile?.country_code === "SN" ? "Africa/Dakar" : "UTC");
 
   return (
     <DashboardContainer className={moduleKey ? "focused-dashboard" : "dashboard"}>
@@ -622,14 +627,16 @@ export function LiveDashboard({
           <article className="panel" id="live-bookings">
             <div className="panel-heading"><h2>Réservations</h2><button onClick={() => void load()}>Actualiser</button></div>
             {!loading && bookings.length === 0 && <div className="compact-empty">Aucun rendez-vous pour le moment.</div>}
-            {bookings.map((booking) => (
+            {bookings.map((booking) => {
+              const timeZone = bookingTimeZone(booking.provider_services?.business_id ? businessTimeZones[booking.provider_services.business_id] : null, providerProfile?.timezone, providerProfile?.country_code);
+              return (
               <div className="appointment live-appointment" key={booking.id} id={`booking-${booking.id}`}>
-                <span className="date-block">{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", ...(role === "provider" ? { timeZone: dashboardTimeZone } : {}) }).format(new Date(booking.starts_at))}</span>
+                <span className="date-block">{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", ...(role === "provider" ? { timeZone } : {}) }).format(new Date(booking.starts_at))}</span>
                 <div>
                   <strong>{booking.provider_services?.title ?? "Prestation beauté"}</strong>
                   {booking.collaborator_name && <small>{booking.collaborator_avatar_url && <Image unoptimized src={booking.collaborator_avatar_url} alt="" width={36} height={36} />} Prestation assurée par {booking.collaborator_name}</small>}
                   {role === "client" && booking.status === "completed" && <BookingReview bookingId={booking.id} clientId={userId} providerId={booking.provider_id} performer={booking.collaborator_name} />}
-                  <small>{new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: role === "provider" ? dashboardTimeZone : undefined }).format(new Date(booking.starts_at))} · {booking.provider_services?.duration_minutes ?? Math.round((new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60000)} min</small>
+                  <small>{new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: role === "provider" ? timeZone : undefined }).format(new Date(booking.starts_at))}{role === "provider" && ` · ${timeZone}`} · {booking.provider_services?.duration_minutes ?? Math.round((new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60000)} min</small>
                   <small>{booking.location_mode === "client_address" ? booking.appointment_address : "Chez le professionnel"} · {booking.total_amount.toLocaleString("fr-FR")} {booking.currency}</small>
                 </div>
                 <span className={booking.status === "confirmed" ? "status confirmed" : "status pending"}>{{ pending: "En attente", confirmed: "Confirmé", in_progress: "En cours", completed: "Terminé", declined: "Refusé", cancelled_by_client: "Annulé", cancelled_by_provider: "Annulé", no_show: "Absence", disputed: "Litige" }[booking.status] ?? "Rendez-vous"}</span>
@@ -647,7 +654,8 @@ export function LiveDashboard({
                   }}>Messages</button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </article>
         )}
         {role !== "admin" && messageBooking && (

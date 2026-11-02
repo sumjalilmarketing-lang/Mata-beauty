@@ -206,6 +206,25 @@
 .password-requirements p { margin: 8px 0; }
 .password-requirements ul { margin: 8px 0; padding-left: 20px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px 12px; }
 .password-requirements .password-match { font-weight: 600; }
+
+/* These standalone recovery/error cards stay light even when the feed's
+   global foreground is white. Keep the foreground and surface together. */
+:is(.auth-page,.system-page) > section {
+  color-scheme: light;
+  color: #271f23;
+  background: #ffffff;
+}
+:is(.auth-page,.system-page) h1 { color: #541331; font-size: 28px; line-height: 1.2; }
+.auth-page :is(.password-requirements,.auth-feedback) { color: #5b4d53; }
+.auth-page input { color: #271f23; background: #ffffff; border-color: #8b6679; }
+.auth-page .return-home { display: inline-flex; align-items: center; min-height: 44px; margin-top: 12px; }
+.auth-page :is(input,button,a):focus-visible { outline: 3px solid #74114f; outline-offset: 3px; }
+
+/* Future booking steps remain readable before they become active. */
+.premium-booking-modal .fast-booking-progress > span:not(.active) { color: #c9bfce; }
+.premium-booking-modal .fast-booking-progress > span small { font-size: 12px; }
+.premium-booking-modal .booking-screen-header p { font-size: 12px; }
+.workspace-layout:is(.workspace-pro,.workspace-salon) .panel-heading > button { color: #74114f; }
 .application-decision { margin: 16px 0 24px; padding: 20px; border: 2px solid #b77a9c; border-radius: 14px; color: #30212d; background: #fff; }
 .application-decision h3 { margin: 0 0 10px; color: #541331 !important; font-size: 21px; }
 .application-decision p, .application-decision label { color: #30212d !important; font-size: 15px; line-height: 1.5; }
