@@ -4,10 +4,11 @@ import { useApplicationLocale } from "./use-application-locale";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FormEvent, type ReactNode } from "react";
+import { FormEvent, useRef, useState, type ReactNode } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { workspaceHref, workspaceSpaces, simpleNavigation, navigationLabel, navigationParent, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import "./workspace.css";
+import "./workspace-more-menu.css";
 import { ProductHelp } from "./product-help";
 import { NotificationBadge } from "./notification-center";
 
@@ -31,7 +32,10 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
   const simpleKeys = space === "client" || space === "pro" ? simpleNavigation[space] : null;
   const mainModules = simpleKeys ? simpleKeys.flatMap((key) => modules.filter((item) => item.key === key)) : modules;
   const groups = simpleKeys ? ["Navigation"] : [...new Set(modules.map((item) => item.group))];
-  const mobileItems = simpleKeys ? mainModules : modules.filter((item) => item.primary).slice(0, 4);
+  const mobileItems = simpleKeys ? space === "pro" ? mainModules.slice(0, 4) : mainModules : modules.filter((item) => item.primary).slice(0, 4);
+  const moreItems = modules.filter(item => !mobileItems.some(primary => primary.key === item.key)).sort((a, b) => Number(b.key === "settings") - Number(a.key === "settings"));
+  const moreDialog = useRef<HTMLDialogElement>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const parent = navigationParent(space, moduleKey);
   const secondary = simpleKeys ? modules.filter((item) => item.key !== "dashboard" && !mainModules.includes(item) && navigationParent(space, item.key) === parent) : [];
   const notificationsModule = modules.find((item) => item.key === "notifications");
@@ -86,7 +90,12 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
     </main>
     <nav className="workspace-mobile-nav" aria-label={t("Navigation mobile")}>
       {mobileItems.map((item) => <Link className={item.key === parent ? "active" : ""} href={workspaceHref(space, item.key)} key={item.key}><span>{item.icon}</span><small>{t(navigationLabel(space, item))}</small></Link>)}
-      {!simpleKeys && <Link className={!mobileItems.some((item) => item.key === moduleKey) ? "active" : ""} href={`${definition.prefix}/menu`}><span>•••</span><small>{t("Plus")}</small></Link>}
+      {space !== "client" && moreItems.length > 0 && <button type="button" className={moreOpen || !mobileItems.some(item => item.key === parent) ? "active" : ""} aria-haspopup="dialog" aria-expanded={moreOpen} aria-controls="workspace-more-menu" onClick={() => { moreDialog.current?.showModal(); setMoreOpen(true); }}><span aria-hidden>•••</span><small>{t("Plus")}</small></button>}
     </nav>
+    <dialog ref={moreDialog} id="workspace-more-menu" className="workspace-more-menu" aria-labelledby="workspace-more-title" onClose={() => setMoreOpen(false)} onClick={event => { if (event.target === event.currentTarget) moreDialog.current?.close(); }}>
+      <div className="workspace-more-content"><header><div><h2 id="workspace-more-title">{t("Plus")}</h2><p>{t(definition.label)}</p></div><button type="button" autoFocus aria-label={t("Fermer le menu")} onClick={() => moreDialog.current?.close()}>✕</button></header>
+      <nav aria-label={t("Autres rubriques")}>{moreItems.map(item => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined} onClick={() => moreDialog.current?.close()}><span aria-hidden>{item.icon}</span><span>{t(navigationLabel(space, item))}</span><span aria-hidden>›</span></Link>)}</nav>
+      <button className="workspace-more-signout" type="button" onClick={() => { moreDialog.current?.close(); void signOut(); }}>{t("Se déconnecter")}</button></div>
+    </dialog>
   </div>;
 }
