@@ -486,3 +486,9 @@
 .workspace-layout:is(.workspace-pro,.workspace-salon) .dashboard-top p:not(.eyebrow) { color: #62505a; }
 .workspace-layout:is(.workspace-pro,.workspace-salon) .workspace-mobile-nav a { color: #62505a; }
 .workspace-layout:is(.workspace-pro,.workspace-salon) .workspace-mobile-nav a.active { color: #94194f; }
+
+/* Keep long professional navigation labels separate on narrow screens. */
+@media (max-width: 900px) {
+  .workspace-layout:is(.workspace-pro,.workspace-salon) .workspace-mobile-nav > a { flex: 1 0 90px; min-width: 90px; padding-inline: 6px; }
+  .workspace-layout:is(.workspace-pro,.workspace-salon) .workspace-mobile-nav small { max-width: 100%; font-size: 12px; line-height: 1.25; white-space: normal; text-align: center; }
+}
