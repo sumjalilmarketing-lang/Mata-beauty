@@ -18,6 +18,7 @@ import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/
 import { loadAuthenticatedProfile } from "@/lib/auth/profile";
 import { intendedRoleForDestination, safeOAuthDestination } from "@/lib/auth/redirect";
 import { recordProductEvent } from "@/lib/analytics/product-events";
+import { readBrowserStorage, removeBrowserStorage, writeBrowserStorage } from "@/lib/browser-storage";
 import { legalDocuments } from "@/lib/legal-documents";
 import Link from "next/link";
 import { ServiceImage } from "./service-image";
@@ -240,7 +241,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }, []);
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem("mata-theme");
+    const savedTheme = readBrowserStorage("localStorage", "mata-theme");
     const preferredTheme = "dark";
     void Promise.resolve().then(() => setTheme(savedTheme === "dark" || savedTheme === "light" ? savedTheme : preferredTheme));
     const splashTimer = window.setTimeout(() => setShowSplash(false), 1350);
@@ -317,7 +318,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   function toggleTheme() {
     setTheme((current) => {
       const next = current === "light" ? "dark" : "light";
-      window.localStorage.setItem("mata-theme", next);
+      writeBrowserStorage("localStorage", "mata-theme", next);
       return next;
     });
   }
@@ -421,7 +422,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       setBooking(null);
       setProfile(null);
       setView("home");
-      window.sessionStorage.removeItem(bookingDraftKey);
+      removeBrowserStorage("sessionStorage", bookingDraftKey);
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -497,7 +498,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   }
 
   function closeBooking() {
-    window.sessionStorage.removeItem(bookingDraftKey);
+    removeBrowserStorage("sessionStorage", bookingDraftKey);
     setRestoredBookingRequest(null);
     setBooking(null);
   }
@@ -605,7 +606,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       return null;
     }
     void recordProductEvent(supabase, "booking_completed", { booking_id: created.id, provider_id: provider.profileId, source: booking.sourcePostId ? "video" : "catalog" });
-    window.sessionStorage.removeItem(bookingDraftKey);
+    removeBrowserStorage("sessionStorage", bookingDraftKey);
     if (request.paymentMethod !== "on_site") {
       const { data: sessionData } = await supabase.auth.getSession();
       const paymentResponse = await fetch("/api/payments/create", {
@@ -736,7 +737,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
         <BottomNav authenticated={Boolean(authenticated)} active="inspiration" onFeed={() => setScreen("feed")} onAccount={openClientPage} />
       </div>
 
-      {showLaunchWelcome && <LaunchWelcome area={area} categories={categories} onArea={setArea} onCategory={(value) => { setCategory(value); }} onClose={() => { window.localStorage.setItem("mata-launch-welcome", "done"); setShowLaunchWelcome(false); }} />}
+      {showLaunchWelcome && <LaunchWelcome area={area} categories={categories} onArea={setArea} onCategory={(value) => { setCategory(value); }} onClose={() => { writeBrowserStorage("localStorage", "mata-launch-welcome", "done"); setShowLaunchWelcome(false); }} />}
 
       {booking && <BookingModal selection={booking} initialDate={date} initialRequest={restoredBookingRequest} authenticated={Boolean(authenticated?.roles.includes("client"))} onClose={closeBooking} onSubmit={confirmBooking} />}
       {authRequest && <AuthModal initialMode={authRequest.mode} intendedRole={authRequest.role === "provider" ? "provider" : "client"} returnTo={authRequest.returnTo} onClose={() => setAuthRequest(null)} onAuthenticated={handleAuthenticated} />}
@@ -892,7 +893,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const onlinePaymentAvailable = paymentCapabilities.onlineCheckoutEnabled && (service.currency ?? "XOF") === "XOF";
 
   useEffect(() => {
-    window.sessionStorage.setItem(bookingDraftKey, JSON.stringify({ selection, request: form }));
+    writeBrowserStorage("sessionStorage", bookingDraftKey, JSON.stringify({ selection, request: form }));
   }, [form, selection]);
 
   useEffect(() => {

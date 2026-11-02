@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { recordSessionMetric } from "./session-metric";
 
 export type ProductEventName =
   | "signup_started" | "signup_completed" | "provider_onboarding_started" | "provider_onboarding_completed"
@@ -17,18 +18,9 @@ export async function recordProductEvent(
   eventName: ProductEventName,
   properties: Record<string, unknown> = {},
 ) {
-  let sessionHash: string | null = null;
-  if (typeof window !== "undefined") {
-    const key = "mata-analytics-session";
-    let sessionId = window.sessionStorage.getItem(key);
-    if (!sessionId) { sessionId = crypto.randomUUID(); window.sessionStorage.setItem(key, sessionId); }
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(sessionId));
-    sessionHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-  }
-  const { error } = await client.rpc("record_product_event", {
+  const result = await recordSessionMetric(client, "record_product_event", {
     target_event_name: eventName,
     target_properties: safeProperties(properties),
-    target_session_hash: sessionHash,
-  });
-  return !error;
+  }, "mata-analytics-session");
+  return result.ok;
 }
