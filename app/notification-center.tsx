@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { PushSettings } from "./push-settings";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { notificationBadgeAfterRead, notificationDestination, type NotificationItem } from "@/lib/domain/notifications";
@@ -52,6 +53,7 @@ export function NotificationCenter({ userId }: { userId?: string }) {
   }
   const visible = items.filter(item => !unreadOnly || !item.read_at);
   return <section className="notification-center" aria-label="Centre de notifications"><header><div><h2>Mes notifications</h2><p>Vos rendez-vous, messages et informations de compte.</p></div><button disabled={busy || !items.some(item => !item.read_at)} onClick={() => void mark()}>Tout marquer comme lu</button></header>
+    <PushSettings />
     <label><input type="checkbox" checked={unreadOnly} onChange={event => setUnreadOnly(event.target.checked)} /> Non lues uniquement</label> <button onClick={() => void load()}>Actualiser</button>
     {error && <p role="alert">{error}</p>}{loading ? <p role="status">Chargement…</p> : !visible.length && <p>{unreadOnly ? "Vous avez lu toutes les notifications affichées." : "Aucune notification pour le moment. Les nouvelles informations apparaîtront ici."}</p>}
     {visible.map(item => <article className={`notification-card${item.read_at ? " read" : ""}`} key={item.id}><h3>{item.title}</h3>{!item.read_at && <strong>Non lue</strong>}<p>{item.body}</p><time dateTime={item.created_at}>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.created_at))}</time><div className="notification-actions">{notificationDestination(item) && <button disabled={busy} onClick={() => void mark(item, true)}>Ouvrir</button>}{!item.read_at && <button disabled={busy} onClick={() => void mark(item)}>Marquer comme lue</button>}</div></article>)}
