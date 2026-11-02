@@ -262,7 +262,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const controller = new AbortController();
     let pending = false;
     const verify = async () => {
-      if (pending || controller.signal.aborted) return;
+      if (pending || controller.signal.aborted || document.visibilityState === "hidden") return;
       pending = true;
       try {
         const { data, error } = await client.from("social_feed").select("id").eq("id", activePostId)
