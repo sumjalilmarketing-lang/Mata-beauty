@@ -19,6 +19,7 @@ export function safeOAuthDestination(value: string | null) {
 
 export function intendedRoleForDestination(destination: string | null): "client" | "provider" {
   const safe = safeOAuthDestination(destination);
+  if (safe.split(/[?#]/, 1)[0] === "/salon/invitation/accept") return "client";
   return safe.startsWith("/pro") || safe.startsWith("/provider") || safe.startsWith("/salon") ? "provider" : "client";
 }
 

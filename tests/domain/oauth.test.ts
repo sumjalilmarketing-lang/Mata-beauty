@@ -16,6 +16,8 @@ describe("Google OAuth security", () => {
   it("infers only a public application intent from the requested workspace", () => {
     expect(intendedRoleForDestination("/pro/studio")).toBe("provider");
     expect(intendedRoleForDestination("/salon/team")).toBe("provider");
+    expect(intendedRoleForDestination("/salon/invitation/accept")).toBe("client");
+    expect(intendedRoleForDestination("/salon/invitation/accept?auth=google")).toBe("client");
     expect(intendedRoleForDestination("/admin")).toBe("client");
   });
 

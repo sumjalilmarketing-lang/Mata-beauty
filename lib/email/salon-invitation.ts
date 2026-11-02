@@ -1,0 +1,12 @@
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
+}
+export function salonInvitationEmail(inviteUrl: string, businessName: string) {
+  const name = businessName.trim() || "une équipe";
+  const href = escapeHtml(inviteUrl);
+  return {
+    subject: "Vous êtes invité à rejoindre une équipe Mata Beauty",
+    text: `${name} vous invite à rejoindre son équipe sur Mata Beauty.\n\nOuvrir l’invitation : ${inviteUrl}\n\nSur la page Mata Beauty, connectez-vous avec l’adresse qui a reçu cet email, puis choisissez « Oui, rejoindre l’équipe » ou « Non, pas maintenant ». Vous n’avez rien à répondre par email.\n\nCe lien personnel expire dans 48 heures et ne peut être accepté qu’une fois. Si cette invitation ne vous concerne pas, ignorez ce message.`,
+    html: `<!doctype html><html lang="fr"><body style="margin:0;background:#fff7fb;color:#30212a;font-family:Arial,sans-serif"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:28px 16px"><table role="presentation" width="100%" style="max-width:560px;background:#fff;border:1px solid #927486;border-radius:16px" cellspacing="0" cellpadding="24"><tr><td><p style="font-size:24px;font-weight:bold;color:#74114f">Mata Beauty</p><h1 style="font-size:26px;color:#30212a">Vous êtes invité à rejoindre une équipe</h1><p style="line-height:1.6;color:#30212a"><strong>${escapeHtml(name)}</strong> vous invite à rejoindre son équipe.</p><p style="line-height:1.6;color:#30212a">Souhaitez-vous la rejoindre ? Ouvrez votre invitation pour choisir sur le site Mata Beauty.</p><p style="margin:28px 0"><a href="${href}" style="display:inline-block;padding:16px 22px;background:#74114f;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold">Ouvrir l’invitation</a></p><p style="line-height:1.6;color:#30212a">Vous verrez deux choix : <strong>Oui, rejoindre l’équipe</strong> ou <strong>Non, pas maintenant</strong>. Vous n’avez rien à écrire ni à répondre par email.</p><p style="line-height:1.6;color:#62505a">Connectez-vous avec l’adresse qui a reçu cet email. Ce lien est personnel, à usage unique et valable 48 heures. Si cette invitation ne vous concerne pas, vous pouvez ignorer ce message.</p><p style="font-size:13px;line-height:1.6;color:#62505a">Si le bouton ne fonctionne pas, ouvrez ce lien :<br><a href="${href}" style="color:#74114f;word-break:break-all">${href}</a></p></td></tr></table></td></tr></table></body></html>`,
+  };
+}

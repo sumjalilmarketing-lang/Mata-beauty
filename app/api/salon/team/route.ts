@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { authenticatedSupabase, applicationOrigin, hasTrustedOrigin, jsonError } from "@/lib/payments/server";
+import { salonInvitationEmail } from "@/lib/email/salon-invitation";
 
 const noStore = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
 const allowedPermissions = new Set(["bookings.read", "bookings.manage", "messages.read", "messages.reply", "services.read"]);
@@ -87,10 +88,12 @@ export async function POST(request: Request) {
   if (created.error || typeof created.data !== "string") return jsonError("L’invitation n’a pas pu être créée.", 409, "invitation_create_failed");
   const inviteUrl = new URL(`/salon/invitation/accept#token=${token}`, applicationOrigin(request)).toString();
   try {
+    const business = await auth.client.from("businesses").select("name").eq("id", action.businessId).maybeSingle();
+    const invitationEmail = salonInvitationEmail(inviteUrl, business.data?.name ?? "Une équipe");
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${emailKey}`, "Content-Type": "application/json", "Idempotency-Key": `salon-invite-${created.data}` },
-      body: JSON.stringify({ from: "MATA Beauty <bonjour@mata-beauty.com>", to: [action.email], subject: "Invitation à rejoindre une équipe MATA Beauty", text: `Vous avez reçu une invitation à rejoindre un salon sur MATA Beauty. Elle expire dans 48 heures.\n\nAccepter : ${inviteUrl}\n\nSi vous n’attendiez pas cette invitation, ignorez ce message.` }),
+      body: JSON.stringify({ from: "MATA Beauty <bonjour@mata-beauty.com>", to: [action.email], ...invitationEmail }),
       signal: AbortSignal.timeout(8_000),
     });
     const result: unknown = await response.json();

@@ -1,77 +1,99 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
+import { AuthModal } from "@/app/auth-modal";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-
-const tokenKey = "mata.salon.invitation.pending";
+import { readBrowserStorage, removeBrowserStorage, writeBrowserStorage } from "@/lib/browser-storage";
+import { pendingSalonInvitation, salonInvitationPath, salonInvitationTokenKey } from "@/lib/domain/salon-invitation";
+import "./invitation.css";
 
 export default function AcceptSalonInvitationPage() {
+  const router = useRouter();
   const enabled = process.env.NEXT_PUBLIC_SALON_COLLABORATOR_ACCESS_ENABLED === "true";
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [declined, setDeclined] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const inFlight = useRef(false);
 
   useEffect(() => {
-    if (!enabled) {
-      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-      queueMicrotask(() => setReady(true));
-      return;
-    }
+    let active = true;
     const fromLink = new URLSearchParams(window.location.hash.slice(1)).get("token");
-    const saved = fromLink || window.sessionStorage.getItem(tokenKey);
-    if (saved && /^[A-Za-z0-9_-]{40,60}$/.test(saved)) {
-      window.sessionStorage.setItem(tokenKey, saved);
-      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-      queueMicrotask(() => setToken(saved));
-    }
+    const candidate = enabled ? pendingSalonInvitation(fromLink, readBrowserStorage("sessionStorage", salonInvitationTokenKey)) : null;
+    if (candidate) writeBrowserStorage("sessionStorage", salonInvitationTokenKey, candidate);
+    else removeBrowserStorage("sessionStorage", salonInvitationTokenKey);
+    // The secret stays in memory/session storage, never in requests or server logs.
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    queueMicrotask(() => { if (active) setToken(candidate); });
     const client = getSupabaseBrowserClient();
-    if (client) void client.auth.getSession().then(({ data }) => {
-      setSignedIn(Boolean(data.session)); setReady(true);
-    }).catch(() => setReady(true));
-    else queueMicrotask(() => setReady(true));
+    const listener = client?.auth.onAuthStateChange((_event, session) => {
+      if (active) { setSignedIn(Boolean(session)); setEmail(session?.user.email ?? ""); }
+    });
+    if (enabled && client) void client.auth.getSession().then(({ data }) => {
+      if (active) { setSignedIn(Boolean(data.session)); setEmail(data.session?.user.email ?? ""); setReady(true); }
+    }).catch(() => { if (active) setReady(true); });
+    else queueMicrotask(() => { if (active) setReady(true); });
+    return () => { active = false; listener?.data.subscription.unsubscribe(); };
   }, [enabled]);
 
   async function accept() {
     const client = getSupabaseBrowserClient();
-    if (!client || !token || busy) return;
-    setBusy(true); setFeedback("");
+    if (!enabled || !client || !token || inFlight.current) return;
+    inFlight.current = true; setBusy(true); setFeedback("");
     try {
       const { data } = await client.auth.getSession();
-      if (!data.session) {
-        window.sessionStorage.setItem(tokenKey, token);
-        window.location.assign(`/?connexion=requise&returnTo=${encodeURIComponent("/salon/invitation/accept")}`);
-        return;
-      }
+      if (!data.session) { setAuthOpen(true); return; }
       const response = await fetch("/api/salon/invitations/accept", {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` },
         body: JSON.stringify({ token }),
       });
+      if (response.status === 401) { setSignedIn(false); setAuthOpen(true); return; }
       if (!response.ok) throw new Error("accept_failed");
-      window.sessionStorage.removeItem(tokenKey);
-      setToken(null);
-      window.location.assign("/staff");
+      removeBrowserStorage("sessionStorage", salonInvitationTokenKey);
+      setToken(null); setFeedback("Invitation acceptée. Ouverture de votre espace équipe…");
+      router.replace("/staff");
+      router.refresh();
     } catch {
-      setFeedback("L’invitation ne peut pas être acceptée. Vérifiez que le compte connecté utilise l’adresse invitée, puis demandez au salon de renvoyer un lien valide si besoin.");
-    } finally { setBusy(false); }
+      setFeedback("Impossible de confirmer cette invitation. Le compte connecté doit utiliser l’adresse qui a reçu l’email, et cette adresse doit être confirmée. Si le lien a expiré ou a déjà été utilisé, demandez une nouvelle invitation.");
+    } finally { inFlight.current = false; setBusy(false); }
+  }
+  function notNow() {
+    if (inFlight.current) return;
+    removeBrowserStorage("sessionStorage", salonInvitationTokenKey);
+    setToken(null); setDeclined(true); setFeedback("");
+  }
+  async function changeAccount() {
+    const client = getSupabaseBrowserClient(); if (!client || busy) return;
+    setBusy(true);
+    try { const { error } = await client.auth.signOut(); if (error) throw error; setSignedIn(false); setEmail(""); setAuthOpen(true); }
+    catch { setFeedback("La déconnexion n’a pas pu être confirmée. Réessayez."); }
+    finally { setBusy(false); }
   }
 
-  return <main className="workspace-content">
-    <section className="workspace-panel salon-panel salon-invitation-accept" aria-labelledby="salon-invitation-title">
-      <span className="salon-eyebrow">MATA Beauty · Espace équipe</span>
-      <h1 id="salon-invitation-title">Rejoindre un salon</h1>
-      {!enabled && <p role="status">Les invitations collaborateur ne sont pas encore activées.</p>}
-      {!ready && <p role="status">Vérification de votre invitation…</p>}
-      {ready && !token && <p role="alert">Ce lien d’invitation est manquant ou invalide.</p>}
-      {ready && token && <>
-        <p>Connectez-vous avec l’adresse e-mail qui a reçu l’invitation. Le lien est à usage unique et expire après 48 heures.</p>
-        {!signedIn && <p>Après connexion, revenez sur cette page pour confirmer votre arrivée dans l’équipe.</p>}
-        {feedback && <p role="alert">{feedback}</p>}
-        <button className="salon-primary" disabled={busy} onClick={() => void accept()}>{busy ? "Validation…" : signedIn ? "Accepter l’invitation" : "Se connecter et continuer"}</button>
-        {!signedIn && <p><Link href={`/?connexion=requise&returnTo=${encodeURIComponent("/salon/invitation/accept")}`}>Se connecter</Link></p>}
-      </>}
+  return <main className="team-invitation-page">
+    <section className="team-invitation-card" aria-labelledby="salon-invitation-title">
+      <Link className="team-invitation-brand" href="/" aria-label="Mata Beauty, accueil"><Image src="/brand/icon-192.png" alt="" width={56} height={56} /><span>Mata Beauty</span></Link>
+      <p className="team-invitation-kicker">Invitation à rejoindre une équipe</p>
+      <h1 id="salon-invitation-title">Souhaitez-vous rejoindre l’équipe ?</h1>
+      {!enabled ? <p role="status">Les invitations collaborateur sont temporairement indisponibles.</p> : !ready ? <p role="status">Chargement de votre invitation…</p> : declined ? <>
+        <p role="status">Vous n’avez pas rejoint l’équipe. Aucun accès n’a été ajouté à votre compte.</p>
+        <p>Vous pouvez fermer cette page. Si vous changez d’avis avant l’expiration du lien, rouvrez l’email d’invitation.</p><Link className="team-invitation-secondary" href="/">Retour à Mata Beauty</Link>
+      </> : token ? <>
+        <p>Une équipe vous invite sur Mata Beauty. Choisissez votre réponse ci-dessous : vous n’avez rien à écrire ni à répondre par email.</p>
+        <p>{signedIn ? <>Compte connecté : <strong>{email}</strong>. Vérifiez que c’est l’adresse qui a reçu l’invitation.</> : "Connectez-vous ou créez un compte avec l’adresse qui a reçu l’email, puis confirmez votre choix sur cette page."}</p>
+        <p className="team-invitation-note">Le lien est personnel, valable 48 heures et utilisable une seule fois. L’ouverture de cette page ne valide pas l’invitation.</p>
+        <div className="team-invitation-actions"><button className="team-invitation-primary" type="button" disabled={busy} onClick={() => void accept()}>{busy ? "Validation…" : "Oui, rejoindre l’équipe"}</button><button className="team-invitation-secondary" type="button" disabled={busy} onClick={notNow}>Non, pas maintenant</button></div>
+        {signedIn && <button className="team-invitation-account" type="button" disabled={busy} onClick={() => void changeAccount()}>Utiliser un autre compte</button>}
+      </> : <p role="status">{feedback || "Ce lien d’invitation est manquant ou invalide. Ouvrez le bouton de l’email reçu, ou demandez une nouvelle invitation."}</p>}
+      {token && feedback && <p className="team-invitation-error" role="alert">{feedback}</p>}
     </section>
+    {authOpen && <AuthModal intendedRole="client" returnTo={salonInvitationPath} onClose={() => setAuthOpen(false)} onAuthenticated={() => { setAuthOpen(false); setSignedIn(true); setFeedback("Vous êtes connecté. Touchez « Oui, rejoindre l’équipe » pour confirmer votre choix."); }} />}
   </main>;
 }
