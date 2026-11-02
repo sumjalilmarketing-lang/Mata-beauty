@@ -309,7 +309,7 @@ export function LiveDashboard({
               .eq("profile_id", userId)
               .maybeSingle(),
             supabase.from("services").select("id,name").eq("is_active", true).order("name"),
-            supabase.from("provider_services").select("id,service_id,title,description,price_amount,duration_minutes,currency,is_active,archived_at,updated_at").eq("provider_id", userId).is("business_id", null).is("archived_at", null).order("title"),
+            supabase.from("provider_services").select("id,business_id,service_id,title,description,price_amount,duration_minutes,currency,is_active,archived_at,updated_at").eq("provider_id", userId).is("archived_at", null).order("title"),
             businessIds.length ? supabase.from("businesses").select("id,timezone").in("id", businessIds) : Promise.resolve({ data: [], error: null }),
           ]);
           if (profileResult.error) throw profileResult.error;
@@ -587,7 +587,7 @@ export function LiveDashboard({
               <button className="primary-button" type="submit">Enregistrer le profil</button>
             </form>
             <ProfessionalDocuments providerId={userId} /></>}
-            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <ServiceEditor key={service.id} service={service} catalog={baseServices} userId={userId} activityCurrency={providerProfile?.currency ?? null} onSaved={value => setOwnServices(current => current.map(item => item.id === value.id ? value : item))} onRemoved={id => { setOwnServices(current => current.filter(item => item.id !== id)); setFeedback("Prestation supprimée du catalogue. Les réservations existantes sont conservées."); }} />)}<Link href="/pro/videos">Retour au Studio</Link>{providerProfile && <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
+            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <ServiceEditor key={service.id} service={service} catalog={baseServices} userId={userId} businessId={service.business_id ?? undefined} activityCurrency={service.business_id ? null : providerProfile?.currency ?? null} onSaved={value => setOwnServices(current => current.map(item => item.id === value.id ? value : item))} onRemoved={id => { setOwnServices(current => current.filter(item => item.id !== id)); setFeedback("Prestation supprimée du catalogue. Les réservations existantes sont conservées."); }} />)}<Link href="/pro/videos">Retour au Studio</Link>{providerProfile && <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
               <h3 className="wide">Ajouter une prestation</h3>
               <label>Type<select name="serviceId" required defaultValue=""><option value="" disabled>Choisir</option>{baseServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
               <label>Nom de votre prestation<input name="title" required minLength={2} maxLength={120} placeholder="Ex. : Tresses personnalisées" /></label>

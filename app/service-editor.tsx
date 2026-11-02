@@ -7,7 +7,7 @@ import { formatServiceMoney } from "@/lib/domain/service-money";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import "./service-editor.css";
 
-export type EditableService = { id: string; service_id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; currency: string; is_active: boolean; archived_at: string | null; updated_at: string };
+export type EditableService = { business_id?: string | null; id: string; service_id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; currency: string; is_active: boolean; archived_at: string | null; updated_at: string };
 export function ServiceEditor({ service, catalog, userId, businessId, activityCurrency, onSaved, onRemoved }: {
   service: EditableService; catalog: Array<{ id: string; name: string }>; userId: string; businessId?: string;
   activityCurrency: string | null; onSaved: (value: EditableService) => void; onRemoved: (id: string) => void;
@@ -33,7 +33,7 @@ export function ServiceEditor({ service, catalog, userId, businessId, activityCu
     try {
       let query = supabase.from("provider_services").update(payload).eq("id", service.id).eq("provider_id", userId).eq("updated_at", service.updated_at).is("archived_at", null);
       query = businessId ? query.eq("business_id", businessId) : query.is("business_id", null);
-      const { data, error } = await query.select("id,service_id,title,description,duration_minutes,price_amount,currency,is_active,archived_at,updated_at").maybeSingle();
+      const { data, error } = await query.select("id,business_id,service_id,title,description,duration_minutes,price_amount,currency,is_active,archived_at,updated_at").maybeSingle();
       if (error) throw error;
       if (!data) { setMessage("Cette prestation a changé ou n’est plus accessible. Actualisez la page avant de réessayer."); return; }
       if (details) { onSaved(data as EditableService); setEditing(false); setMessage("Prestation modifiée. Les dates, durées et montants des réservations existantes restent inchangés."); }
