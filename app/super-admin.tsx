@@ -10,6 +10,7 @@ import { ProviderReview } from "./provider-review";
 import { SalonReview } from "./salon-review";
 import { OnboardingQueue } from "./onboarding-queue";
 import { ManagedAccounts } from "./managed-accounts";
+import { operationalAccounts } from "@/lib/domain/operational-accounts";
 import { NotificationCenter, NotificationBadge } from "./notification-center";
 import { LaunchAdmin } from "./launch-admin";
 import { SupportInbox } from "./support-inbox";
@@ -652,8 +653,12 @@ function UsersModule({ context, notify }: { context: AdminContext; notify: (mess
   const [confirmation, setConfirmation] = useState<UserRow | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await getSupabaseBrowserClient()!.rpc("admin_list_users", { search_term: query || null });
-    setRows((data ?? []) as UserRow[]);
+    const client = getSupabaseBrowserClient()!;
+    const { data, error } = await client.rpc("admin_list_users", { search_term: query || null });
+    const accounts = (data ?? []) as UserRow[];
+    if (error || !accounts.length) { setRows([]); setLoading(false); return; }
+    const statuses = await client.from("profiles").select("id,account_status").in("id", accounts.map(account => account.user_id));
+    setRows(statuses.error ? [] : operationalAccounts(accounts, statuses.data ?? []));
     setLoading(false);
   }, [query]);
   useEffect(() => { void Promise.resolve().then(load); }, [load]);

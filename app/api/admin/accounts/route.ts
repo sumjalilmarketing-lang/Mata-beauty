@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { serviceSupabase } from "@/lib/payments/server";
+import { operationalAccounts } from "@/lib/domain/operational-accounts";
 
 const input = z.object({ action: z.enum(["preview", "suspend", "archive", "reactivate", "delete"]),
   accounts: z.array(z.object({ userId: z.uuid(), operationId: z.uuid() })).min(1).max(20),
@@ -20,7 +21,12 @@ export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get("search") ?? "";
   if (query.length > 200) return reply({ error: "Recherche trop longue." }, 400);
   const result = await client.rpc("admin_managed_accounts", { search_term: query || null });
-  return result.error ? reply({ error: "La liste des comptes est indisponible." }, 503) : reply({ accounts: result.data });
+  if (result.error) return reply({ error: "La liste des comptes est indisponible." }, 503);
+  const accounts = (Array.isArray(result.data) ? result.data : []) as Array<{ user_id: string }>;
+  if (!accounts.length) return reply({ accounts: [] });
+  const statuses = await client.from("profiles").select("id,account_status").in("id", accounts.map(account => account.user_id));
+  if (statuses.error) return reply({ error: "Le statut des comptes n’a pas pu être vérifié." }, 503);
+  return reply({ accounts: operationalAccounts(accounts, statuses.data ?? []) });
 }
 export async function POST(request: Request) {
   if (request.headers.get("origin") !== new URL(request.url).origin) return reply({ error: "Origine refusée." }, 403);
