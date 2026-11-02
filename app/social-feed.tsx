@@ -47,23 +47,9 @@ type CommentRow = { id: string; author_id: string; parent_id: string | null; bod
 const FEED_BATCH_SIZE = 8;
 const FEED_RANKING_REFERENCE_TIME = Date.now();
 const FEED_CACHE_KEY = "mata-social-feed-cache-v2";
-const FEED_CACHE_TTL_MS = 5 * 60 * 1000;
 const FEED_MODE_KEY = "mata-social-feed-mode";
+
 type FeedDisplayMode = "immersive" | "premium";
-
-function readFeedCache(): FeedPost[] {
-  try {
-    const parsed: unknown = JSON.parse(window.sessionStorage.getItem(FEED_CACHE_KEY) ?? "null");
-    if (!parsed || typeof parsed !== "object") return [];
-    const cache = parsed as { savedAt?: unknown; posts?: unknown };
-    if (typeof cache.savedAt !== "number" || Date.now() - cache.savedAt > FEED_CACHE_TTL_MS || !Array.isArray(cache.posts)) return [];
-    return cache.posts.filter((post): post is FeedPost => Boolean(post && typeof post === "object" && "id" in post && "videoUrl" in post));
-  } catch { return []; }
-}
-
-function writeFeedCache(posts: FeedPost[]) {
-  try { window.sessionStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), posts })); } catch { /* Cache non critique. */ }
-}
 
 function mapFeedPost(row: SocialFeedRow): FeedPost {
   return {
@@ -275,18 +261,20 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     if (signal.aborted) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) { setState("error"); return; }
-    const cached = readFeedCache();
-    if (cached.length) { setPosts(cached); setState("ready"); }
-    else setState("loading");
+    // Cached posts can have been withdrawn since the previous visit. Never
+    // render them before the public feed has confirmed their current status.
+    try { window.sessionStorage.removeItem(FEED_CACHE_KEY); } catch { /* Optional storage. */ }
+    setPosts([]);
+    setActiveIndex(0);
+    setState("loading");
     const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE).abortSignal(signal);
     if (signal.aborted || generation !== loadGeneration.current) return;
-    if (error) { if (!cached.length) setState("error"); else setFeedback(t("Réseau lent · inspirations enregistrées affichées.")); return; }
+    if (error) { setState("error"); return; }
     const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
     if (signal.aborted || generation !== loadGeneration.current) return;
     const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
     const ranked = diversifyFeed(mapped);
     setPosts(ranked);
-    writeFeedCache(ranked);
     setHasMore(mapped.length === FEED_BATCH_SIZE);
     const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
     feedCursor.current = last ? { publishedAt: last.published_at, id: last.id } : null;
@@ -309,7 +297,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       setFavoriteProviders(new Set((favorites ?? []).map((item) => item.provider_id)));
       setBookingInterests(new Set((bookings ?? []).flatMap((item) => { const service=item.provider_services as { title?: string } | null; return (service?.title ?? "").toLocaleLowerCase("fr").split(/\s+/).filter((word) => word.length>=4); })));
     }
-  }, [authenticated, collection, t]);
+  }, [authenticated, collection]);
 
   const loadMore = useCallback(async () => {
     if (collection) { collection.onLoadMore(); return; }
@@ -329,7 +317,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
       if (signal.aborted || generation !== loadGeneration.current) return;
       const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
-      setPosts((current) => { const next = diversifyFeed([...current, ...mapped.filter((item) => !current.some((existing) => existing.id === item.id))]); writeFeedCache(next); return next; });
+      setPosts((current) => { const next = diversifyFeed([...current, ...mapped.filter((item) => !current.some((existing) => existing.id === item.id))]); return next; });
       const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
       if (last) feedCursor.current = { publishedAt: last.published_at, id: last.id };
       setHasMore((data ?? []).length === FEED_BATCH_SIZE);
@@ -375,7 +363,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   }, []);
 
   useEffect(() => {
-    const invalidate = () => { window.sessionStorage.removeItem(FEED_CACHE_KEY); void load(); };
+    const invalidate = () => { void load(); };
     window.addEventListener("mata:feed:invalidate", invalidate);
     return () => window.removeEventListener("mata:feed:invalidate", invalidate);
   }, [load]);
@@ -413,10 +401,14 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   }, [state, visiblePosts]);
 
   useEffect(() => {
-    const visibilityChanged = () => setPageVisible(document.visibilityState !== "hidden");
+    const visibilityChanged = () => {
+      const visible = document.visibilityState !== "hidden";
+      setPageVisible(visible);
+      if (visible) void load();
+    };
     document.addEventListener("visibilitychange", visibilityChanged);
     return () => document.removeEventListener("visibilitychange", visibilityChanged);
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     videos.current.forEach((video, index) => {
@@ -452,7 +444,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       if (!media) throw new Error("video_media_unavailable");
       setPosts((current) => {
         const next = current.map((item) => item.id === post.id ? { ...item, videoUrl: media.videoUrl, thumbnailUrl: media.thumbnailUrl } : item);
-        writeFeedCache(next);
+       
         return next;
       });
       setVideoReady((current) => { const next = new Set(current); next.delete(post.id); return next; });
