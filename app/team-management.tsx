@@ -130,6 +130,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
   const [qualifications, setQualifications] = useState<Qualification[]>([]), [hours, setHours] = useState<Hours[]>([]), [absences, setAbsences] = useState<Absence[]>([]);
   const [selected, setSelected] = useState<Member | null>(null), [editing, setEditing] = useState(false);
   const [staffAccess, setStaffAccess] = useState<TeamAccess[]>([]), [invitations, setInvitations] = useState<TeamInvitation[]>([]), [audit, setAudit] = useState<TeamAudit[]>([]);
+  const [shareLink, setShareLink] = useState<{ businessId: string; invitationId: string; email: string; url: string } | null>(null);
   const [enabled, setEnabled] = useState(false), [timeZone, setTimeZone] = useState("Africa/Dakar"), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const inFlight = useRef(false);
   const savedMemberId = useRef<string | null>(null);
@@ -181,6 +182,27 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     } catch (error) { setMessage(publicErrorMessage(error, "Le suivi de livraison est indisponible.")); }
     finally { inFlight.current = false; setBusy(false); }
   }
+  async function invite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const linkOnly = submitter instanceof HTMLButtonElement && submitter.value === "link";
+    const email = String(values.get("email") ?? "").trim().toLowerCase();
+    await mutate(async () => {
+      const result = await requestTeamApi<{ invitationId: string; inviteUrl: string }>(businessId, "POST", {
+        action: linkOnly ? "invite_link" : "invite", businessId, email,
+        role: String(values.get("role") ?? "member"), permissions: normalizePermissions(values.getAll("permission").map(String)),
+      });
+      setShareLink({ businessId, invitationId: result.invitationId, email, url: result.inviteUrl });
+      form.reset();
+    }, linkOnly ? "Lien créé. Aucun email envoyé. Partagez le lien uniquement avec le destinataire indiqué." : "Email pris en charge ; réception non confirmée. Vous pouvez aussi transmettre le lien au destinataire.");
+  }
+  async function copyInvitationLink() {
+    if (!shareLink || shareLink.businessId !== businessId) return;
+    try { await navigator.clipboard.writeText(shareLink.url); setMessage("Lien copié. Partagez-le uniquement avec le destinataire indiqué."); }
+    catch { setMessage("La copie automatique est indisponible. Sélectionnez le lien ci-dessous pour le copier."); }
+  }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget);
     const file = form.get("photo");
@@ -220,18 +242,24 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     <header><h2>Mon équipe</h2><p>Les fiches d’équipe gèrent les prestations et les horaires. Les accès de compte sont séparés et limités aux permissions attribuées côté serveur. Les horaires suivent le fuseau du salon ({timeZone}).</p></header>
     {message && <p className="salon-feedback" role="status">{message}</p>}
     {!collaboratorAccessEnabled && <p className="salon-feedback" role="status">Les invitations, rôles de compte et permissions sont désactivés jusqu’à validation et application de la migration de sécurité.</p>}
-    {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><h3>Inviter un collaborateur</h3><p>Le lien est à usage unique, envoyé à l’adresse indiquée et expire après 48 heures.</p>
-      <form className="salon-form" onSubmit={event => { event.preventDefault(); const form = event.currentTarget; const values = new FormData(form); const permissions = normalizePermissions(values.getAll("permission").map(String)); void mutate(async () => {
-        await requestTeamApi(businessId, "POST", { action: "invite", businessId, email: String(values.get("email") ?? ""), role: String(values.get("role") ?? "member"), permissions }); form.reset();
-      }, "Invitation envoyée. Elle apparaîtra comme acceptée après validation par le collaborateur."); }}>
+    {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><h3>Inviter un collaborateur</h3><p>Envoyez un email ou créez un lien à transmettre directement au destinataire. Le lien expire après 48 heures et ne peut être accepté qu’une fois, avec un compte utilisant l’adresse invitée et confirmée.</p>
+      <form className="salon-form" onSubmit={event => void invite(event)}>
         <label>E-mail<input name="email" type="email" required maxLength={254} autoComplete="email" /></label>
         <label>Rôle<select name="role" defaultValue="member"><option value="member">Membre</option><option value="reception">Accueil</option><option value="manager">Responsable d’équipe</option></select></label>
         <fieldset className="wide"><legend>Permissions de cette invitation</legend>{permissionChoices.map(([key, label]) => <label className="check" key={key}><input type="checkbox" name="permission" value={key} defaultChecked={["bookings.read", "messages.read", "messages.reply"].includes(key)} />{label}</label>)}</fieldset>
-        <button className="salon-primary" disabled={busy}>Envoyer l’invitation</button>
+        <button className="salon-primary" type="submit" value="email" disabled={busy}>Envoyer l’invitation par email</button>
+        <button type="submit" value="link" disabled={busy}>Créer un lien à partager</button>
       </form>
+      <p>Si une invitation est déjà en attente pour cette adresse, révoquez-la avant d’en créer une nouvelle.</p>
+      {shareLink?.businessId === businessId && <div className="salon-form">
+        <p className="wide">Lien personnel pour <strong>{shareLink.email}</strong>. Copiez-le avant de quitter cette page. Si le destinataire ne peut pas confirmer cette adresse, utilisez une autre adresse qu’il possède et peut confirmer.</p>
+        <label className="wide">Lien d’invitation<input readOnly value={shareLink.url} onFocus={event => event.currentTarget.select()} autoComplete="off" spellCheck={false} /></label>
+        <button type="button" onClick={() => void copyInvitationLink()}>Copier le lien</button>
+        <button type="button" onClick={() => setShareLink(null)}>Masquer le lien</button>
+      </div>}
     </article>
     <article className="workspace-panel salon-panel"><h3>Invitations et accès</h3>
-      <div className="salon-list">{invitations.map(invite => <div key={invite.id}><div><strong>{invite.email}</strong><small>{invite.internal_role} · {invite.status === "pending" ? `Expire le ${new Date(invite.expires_at).toLocaleString("fr-FR")}` : invite.status === "accepted" ? `Acceptée le ${invite.accepted_at ? new Date(invite.accepted_at).toLocaleDateString("fr-FR") : "—"}` : invite.status}</small></div>{invite.status === "pending" && <button disabled={busy} onClick={() => void checkDelivery(invite.id)}>Vérifier la livraison</button>}{invite.status === "pending" && <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "revoke_invitation", businessId, invitationId: invite.id }); }, "Invitation révoquée.")}>Révoquer</button>}</div>)}{!invitations.length && <p>Aucune invitation pour le moment.</p>}</div>
+      <div className="salon-list">{invitations.map(invite => <div key={invite.id}><div><strong>{invite.email}</strong><small>{invite.internal_role} · {invite.status === "pending" ? `Expire le ${new Date(invite.expires_at).toLocaleString("fr-FR")}` : invite.status === "accepted" ? `Acceptée le ${invite.accepted_at ? new Date(invite.accepted_at).toLocaleDateString("fr-FR") : "—"}` : invite.status}</small></div>{invite.status === "pending" && <button disabled={busy} onClick={() => void checkDelivery(invite.id)}>Vérifier la livraison</button>}{invite.status === "pending" && <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "revoke_invitation", businessId, invitationId: invite.id }); if (shareLink?.invitationId === invite.id) setShareLink(null); }, "Invitation révoquée.")}>Révoquer</button>}</div>)}{!invitations.length && <p>Aucune invitation pour le moment.</p>}</div>
       <h4>Comptes associés</h4><div className="team-cards">{staffAccess.map(account => <article className="workspace-panel salon-panel" key={account.collaborator_id}><h5>{account.display_name}</h5><p>{account.email || "Adresse non disponible"} · {account.internal_role} · {account.revoked_at ? "Accès révoqué" : "Accès actif"}</p>
         <form className="salon-form" onSubmit={event => { event.preventDefault(); const values = new FormData(event.currentTarget); const permissions = normalizePermissions(values.getAll("permission").map(String)); const role = String(values.get("role") ?? account.internal_role); void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "update_access", businessId, collaboratorId: account.collaborator_id, role, permissions }); }, "Rôle et permissions mis à jour."); }}>
           <label>Rôle<select name="role" defaultValue={account.internal_role}><option value="member">Membre</option><option value="reception">Accueil</option><option value="manager">Responsable d’équipe</option></select></label>

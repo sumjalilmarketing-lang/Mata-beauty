@@ -7,7 +7,7 @@ const noStore = { "Cache-Control": "private, no-store", "X-Content-Type-Options"
 const allowedPermissions = new Set(["bookings.read", "bookings.manage", "messages.read", "messages.reply", "services.read"]);
 const roles = new Set(["manager", "reception", "member"]);
 type InvitationAction =
-  | { action: "invite"; businessId: string; email: string; role: string; permissions: string[] }
+  | { action: "invite" | "invite_link"; businessId: string; email: string; role: string; permissions: string[] }
   | { action: "revoke_invitation"; businessId: string; invitationId: string }
   | { action: "update_access"; businessId: string; collaboratorId: string; role: string; permissions: string[] }
   | { action: "revoke_access"; businessId: string; collaboratorId: string };
@@ -27,9 +27,9 @@ function parseAction(value: unknown): InvitationAction | null {
   if (!value || typeof value !== "object") return null;
   const action = value as Record<string, unknown>;
   if (!validId(action.businessId)) return null;
-  if (action.action === "invite" && typeof action.email === "string" && action.email.length <= 254
+  if ((action.action === "invite" || action.action === "invite_link") && typeof action.email === "string" && action.email.length <= 254
     && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(action.email) && validRole(action.role) && validPermissions(action.permissions)) {
-    return { action: "invite", businessId: action.businessId, email: action.email.trim().toLowerCase(), role: action.role, permissions: action.permissions };
+    return { action: action.action, businessId: action.businessId, email: action.email.trim().toLowerCase(), role: action.role, permissions: action.permissions };
   }
   if (action.action === "revoke_invitation" && validId(action.invitationId)) return { action: "revoke_invitation", businessId: action.businessId, invitationId: action.invitationId };
   if (action.action === "update_access" && validId(action.collaboratorId) && validRole(action.role) && validPermissions(action.permissions)) {
@@ -97,22 +97,29 @@ export async function POST(request: Request) {
   }
 
   const emailKey = process.env.RESEND_API_KEY;
-  if (!emailKey) return jsonError("Le service d’invitation par e-mail n’est pas configuré.", 503, "email_unavailable");
+  if (action.action === "invite" && !emailKey) return jsonError("Le service d’invitation par e-mail n’est pas configuré.", 503, "email_unavailable");
   // Check ownership before consulting any recipient-specific delivery state.
   const ownerCheck = await auth.client.rpc("owner_list_business_invitations", { target_business_id: action.businessId });
   if (ownerCheck.error) return jsonError("Accès au salon refusé.", 403, "invitation_owner_required");
-  try {
-    const suppression = await fetch(`https://api.resend.com/suppressions/${encodeURIComponent(action.email)}`, {
-      headers: { Authorization: `Bearer ${emailKey}` }, cache: "no-store", signal: AbortSignal.timeout(8000),
-    });
-    if (suppression.ok) return jsonError("Cette adresse a été bloquée après un rejet ou un signalement. Vérifiez la boîte avec son titulaire avant tout nouvel envoi.", 409, "recipient_suppressed");
-    if (suppression.status !== 404) return jsonError("La vérification du destinataire est indisponible. Aucun envoi effectué.", 503, "recipient_check_unavailable");
-  } catch { return jsonError("La vérification du destinataire est indisponible. Aucun envoi effectué.", 503, "recipient_check_unavailable"); }
+  if (action.action === "invite") {
+    try {
+      const suppression = await fetch(`https://api.resend.com/suppressions/${encodeURIComponent(action.email)}`, {
+        headers: { Authorization: `Bearer ${emailKey}` }, cache: "no-store", signal: AbortSignal.timeout(8000),
+      });
+      if (suppression.ok) return jsonError("Cette adresse a été bloquée après un rejet ou un signalement. Vérifiez la boîte avec son titulaire avant tout nouvel envoi.", 409, "recipient_suppressed");
+      if (suppression.status !== 404) return jsonError("La vérification du destinataire est indisponible. Aucun envoi effectué.", 503, "recipient_check_unavailable");
+    } catch { return jsonError("La vérification du destinataire est indisponible. Aucun envoi effectué.", 503, "recipient_check_unavailable"); }
+  }
   const token = randomBytes(32).toString("base64url");
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const created = await auth.client.rpc("create_business_invitation", { target_business_id: action.businessId, target_email: action.email, target_role: action.role, target_permissions: action.permissions, target_token_hash: tokenHash });
   if (created.error || typeof created.data !== "string") return jsonError("L’invitation n’a pas pu être créée.", 409, "invitation_create_failed");
   const inviteUrl = new URL(`/salon/invitation/accept#token=${token}`, applicationOrigin(request)).toString();
+  if (action.action === "invite_link") {
+    // Explicit owner-only sharing. No email, no fake delivery receipt, no role grant.
+    // Acceptance still requires the invited, confirmed email and consumes the token.
+    return Response.json({ ok: true, invitationId: created.data, deliveryState: "link_only", inviteUrl }, { status: 201, headers: noStore });
+  }
   let providerMessageId = "";
   try {
     const business = await auth.client.from("businesses").select("name").eq("id", action.businessId).maybeSingle();
@@ -136,5 +143,5 @@ export async function POST(request: Request) {
   const receipt = await auth.client.rpc("record_business_invitation_receipt", { target_invitation_id: created.data, target_message_id: providerMessageId });
   // Never revoke a valid, already-sent invitation for a telemetry failure.
   console.info(JSON.stringify({ event: "salon_invitation_provider_accepted", invitationId: created.data, providerMessageId, receiptSaved: !receipt.error }));
-  return Response.json({ ok: true, invitationId: created.data, deliveryState: "provider_accepted" }, { status: 201, headers: noStore });
+  return Response.json({ ok: true, invitationId: created.data, deliveryState: "provider_accepted", inviteUrl }, { status: 201, headers: noStore });
 }
