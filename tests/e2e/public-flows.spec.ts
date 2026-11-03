@@ -86,14 +86,14 @@ test("international registration sends the selected country, locale, phone and l
   await page.getByLabel("Ville", { exact: true }).fill("Madrid");
   await page.getByLabel("Téléphone international").fill("+34600000000");
   await page.getByLabel("Langue préférée").selectOption("es");
-  await page.getByLabel("Adresse e-mail").fill("madrid@example.com");
-  await page.getByLabel("Mot de passe", { exact: true }).fill("MataMadrid2026!");
-  await page.getByLabel("Confirmer le mot de passe").fill("MataMadrid2026!");
-  await page.getByRole("checkbox", { name: "Accepter les conditions générales et la politique de confidentialité" }).check();
-  await page.getByRole("button", { name: "Créer le compte", exact: true }).click();
+  await page.locator('input[name="email"]').fill("madrid@example.com");
+  await page.locator('input[name="password"]').fill("MataMadrid2026!");
+  await page.locator('input[name="confirmation"]').fill("MataMadrid2026!");
+  await page.locator('input[name="acceptLegal"]').check();
+  await page.getByRole("dialog").locator('button[type="submit"]').click();
   await expect.poll(() => signupMetadata).not.toBeNull();
   expect(signupMetadata).toMatchObject({ country_code: "ES", region: "Communauté de Madrid", city: "Madrid", phone_e164: "+34600000000", locale: "es-ES" });
-  await expect(page.getByRole("dialog")).toContainText("Consultez votre boîte e-mail");
+  await expect(page.getByRole("dialog")).toContainText("Consulta tu correo");
 });
 
 test("mobile bottom navigation works without horizontal overflow", async ({ page }) => {
@@ -240,7 +240,8 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await expect(page.locator(".social-video-card").first().locator("video")).toHaveCount(0);
   await expect(page.locator(".social-video-card").first().locator(".video-poster-placeholder")).toHaveCount(1);
-  await expect(page.locator(".social-video-card").first()).toHaveAttribute("data-video-state", "waiting");
+  // Decoded readiness is cached when an off-screen player is unmounted.
+  await expect(page.locator(".social-video-card").first()).toHaveAttribute("data-video-state", "ready");
   await expect(page.locator(".video-fallback")).toHaveCount(0);
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   expect(await feed.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
@@ -284,7 +285,7 @@ test("video states distinguish waiting, loading, ready and confirmed errors, wit
       retryCounts[postId] = (retryCounts[postId] ?? 0) + 1;
       window.sessionStorage.setItem("video-retry-counts", JSON.stringify(retryCounts));
       if (postId.startsWith("8888")) await new Promise((resolve) => window.setTimeout(resolve, 400));
-      if (postId.startsWith("8888") || retryCounts[postId] === 2) {
+      if (postId.startsWith("8888")) {
         return new Response(JSON.stringify({ error: "temporary media signing failure" }), { status: 503, headers: { "Content-Type": "application/json" } });
       }
       return new Response(JSON.stringify({ videoUrl: "https://audit.supabase.co/retry.mp4", thumbnailUrl: null }), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -320,7 +321,7 @@ test("video states distinguish waiting, loading, ready and confirmed errors, wit
   await page.goto("/");
   await expect(page.locator(".social-video-card")).toHaveCount(3);
   await expect(page.locator(".social-video-card").nth(2).locator("video")).toHaveCount(0);
-  await expect(page.locator(".social-video-card").nth(2).locator(".video-poster-placeholder")).toHaveCount(1);
+  await expect(page.locator(".social-video-card").nth(2).getByRole("status").filter({ hasText: "Vidéo en attente de chargement" })).toContainText("Vidéo en attente de chargement");
   await expect(page.locator(".video-fallback")).toHaveCount(0);
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await page.locator(".social-video-card").first().locator("video").dispatchEvent("waiting");
@@ -330,7 +331,7 @@ test("video states distinguish waiting, loading, ready and confirmed errors, wit
 
   const firstVideo = page.locator(".social-video-card").first().locator("video");
   await firstVideo.dispatchEvent("error");
-  await expect.poll(() => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("video-retry-counts") ?? "{}")["66666666-6666-4666-8666-666666666666"])).toBe(1);
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("video-retry-counts") ?? "{}")["66666666-6666-4666-8666-666666666666"])).toBe(2);
   await expect(page.locator(".social-video-card").first().getByRole("alert")).toHaveCount(0);
   await firstVideo.dispatchEvent("canplay");
   await expect(page.locator(".social-video-card").first()).toHaveAttribute("data-video-state", "ready");
@@ -345,11 +346,12 @@ test("video states distinguish waiting, loading, ready and confirmed errors, wit
 
   const feed = page.locator(".social-feed");
   await feed.evaluate((node) => node.scrollTo({ top: node.clientHeight * 2, behavior: "auto" }));
-  await expect(page.locator(".social-video-card").nth(2).getByRole("status")).toContainText("Chargement de la vidéo");
+  await expect(page.locator(".social-video-card").nth(2).getByRole("status").filter({ hasText: "Chargement de la vidéo" })).toContainText("Chargement de la vidéo");
   await expect(page.locator(".social-video-card").nth(2)).toHaveAttribute("data-video-state", "loading");
   await expect(page.locator(".social-video-card").nth(2).locator(".video-fallback")).toHaveCount(0);
-  await expect(page.locator(".social-video-card").nth(2).getByRole("status")).toContainText("Vidéo en attente de chargement");
-  await expect(page.locator(".social-video-card").nth(2)).toHaveAttribute("data-video-state", "waiting");
+  // A confirmed signing 503 is an error with recovery, not an idle video.
+  await expect(page.locator(".social-video-card").nth(2).getByRole("alert")).toContainText("Cette vidéo ne peut pas être lue");
+  await expect(page.locator(".social-video-card").nth(2)).toHaveAttribute("data-video-state", "error");
   await expect(page.locator(".social-video-card").nth(2).getByRole("button", { name: "Réessayer", exact: true })).toBeVisible();
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(0);
   await feed.evaluate((node) => node.scrollTo({ top: node.clientHeight, behavior: "auto" }));

@@ -241,7 +241,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
     await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByText(/10:00/).first()).toBeVisible();
+    await expect(page.getByRole("dialog").getByText(/10:00/).first()).toBeVisible();
     const durationMs = Date.now() - startedAt;
     expect(actions).toBe(7);
     expect(durationMs).toBeLessThan(30_000);
@@ -348,7 +348,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.reload();
     await expect(page.getByRole("dialog", { name: "Réserver" })).toBeVisible();
     await expect(page.getByRole("dialog", { name: "Réserver" }).getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByText(/10:00/).first()).toBeVisible();
+    await expect(page.getByRole("dialog").getByText(/10:00/).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000.*F\s*CFA/ })).toBeVisible();
   });
 

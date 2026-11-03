@@ -10,7 +10,11 @@ L'interface cesse d'envoyer une demande de suppression lorsque le motif est annu
 
 Validation : 419 tests unitaires dont 15 nouvelles régressions SQL, 26 contrôles structurels, TypeScript et compilation. Recette SQL hébergée des équipes réussie sur Test après migration, données synthétiques annulées. Les nouveaux tests PostgreSQL couvrent les six rôles, MFA, immutabilité, annulation double rôle, tiers, opérateur autorisé, serveur, propriétaire/public des anciens médias et refus de dérive de définition.
 
-La langue française des scénarios navigateur est explicite. Leurs médias simulés passent par le contrat d'URL HTTPS signé actuel, sans désactiver la CSP. Un lot intermédiaire de 44 parcours s'est arrêté après six échecs : 28 réussis, 10 non exécutés. La suite globale n'est donc pas déclarée entièrement verte. Les scénarios internationaux et de cycle vidéo nécessitent encore une recette complète ; les tests ne sont pas désactivés.
+La langue française des scénarios navigateur est explicite. Les sélecteurs de l’inscription restent stables après le passage à l’espagnol. Les récapitulatifs de réservation sont vérifiés dans leur fenêtre visible. Les médias simulés passent par le contrat d’URL HTTPS signé actuel, sans désactiver la CSP. Les scénarios vidéo comptent le chargement initial puis le renouvellement, distinguent le lecteur hors écran mis en cache d’une erreur de signature 503 et vérifient la récupération. Les tests ne sont pas désactivés.
+
+Recette finale navigateur : 72 scénarios Chromium, bureau et mobile 390 px, exécution finale sans échec (code de sortie 0 ; état Playwright `passed`, aucune entrée `failedTests`). Les médias et API sont simulés localement, pas une recette native ni une preuve de délivrabilité réelle.
+
+La page publique `/account-deletion`, reprise séparément de la PR #35, explique les étapes dans les paramètres client et professionnel, le traitement vérifié de la demande et la voie de contact en cas de perte d’accès. Elle ne déclenche aucune suppression et ne présente pas l’archivage d’un salon comme une suppression de compte.
 
 Restent distincts : rédaction/validation des CGU et de la confidentialité, réception réelle Outlook/Hotmail, blocage des utilisateurs, recette native/iOS et dossier des stores. Aucun succès sur ces points n'est revendiqué. Aucun email réel envoyé ni rôle attribué à une personne pour ces corrections.
 
