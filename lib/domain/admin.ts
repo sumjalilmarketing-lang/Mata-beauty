@@ -18,7 +18,7 @@ export const adminPermissionKeys = [
   "payments.read", "payments.refund", "commissions.manage", "payouts.manage",
   "reviews.moderate", "reports.manage", "categories.manage", "content.manage",
   "notifications.send", "settings.read", "settings.update", "roles.manage",
-  "audit.read", "support.manage", "documents.review",
+  "audit.read", "support.manage", "documents.review", "crm.manage",
 ] as const;
 
 export type AdminPermissionKey = typeof adminPermissionKeys[number];
@@ -34,7 +34,7 @@ export const defaultRolePermissions: Record<AdminRoleKey, readonly AdminPermissi
   support: ["users.read", "bookings.read", "bookings.update", "support.manage"],
   moderator: ["users.read", "providers.read", "bookings.read", "reviews.moderate", "reports.manage"],
   verification_agent: ["users.read", "providers.read", "providers.verify", "documents.review"],
-  commercial: ["providers.read", "providers.verify", "documents.review"],
+  commercial: ["providers.read", "providers.verify", "documents.review", "crm.manage"],
   finance: ["bookings.read", "payments.read", "payments.refund", "commissions.manage", "payouts.manage"],
   content_manager: ["providers.read", "categories.manage", "content.manage", "notifications.send", "settings.read"],
 };

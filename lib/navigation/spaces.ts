@@ -102,6 +102,14 @@ const onboardingModules = [
   module("notifications", "Notifications", "◌", "Compte", "Alertes liées aux dossiers.", { resource: "notifications" }),
 ] as const;
 
+const commercialModules = [
+  module("dashboard", "Vue commerciale", "⌂", "CRM", "Prospection, pipeline et relances de vos prospects.", { primary:true,permission:"crm.manage" }),
+  module("crm", "Prospects", "◎", "CRM", "Fiches contacts, suivi commercial et historique.", { primary:true,permission:"crm.manage" }),
+  module("follow-ups", "Relances", "◷", "CRM", "Prochaines actions arrivées à échéance.", { primary:true,permission:"crm.manage" }),
+  module("dossiers", "Validation des dossiers", "✓", "Dossiers", "Pièces, compléments et décisions professionnelles.", { primary:true,permission:"documents.review",resource:"providers" }),
+  ...onboardingModules.filter(item => item.key !== "dashboard").map(item => ({...item,primary:false})),
+] as const;
+
 const supportModules = [
   module("dashboard", "Dashboard", "⌂", "Assistance", "Files, urgences, SLA et tâches de l’agent.", { primary: true, permission: "support.manage" }),
   module("tickets", "Tickets", "▣", "Assistance", "Tous les tickets autorisés.", { primary: true, permission: "support.manage", resource: "reports" }),
@@ -202,7 +210,7 @@ export const workspaceSpaces: Record<WorkspaceSpaceKey, WorkspaceSpace> = {
   pro: { key: "pro", label: "Espace professionnel", prefix: "/pro", eyebrow: "Votre activité", modules: proModules },
   salon: { key: "salon", label: "Espace salon", prefix: "/salon", eyebrow: "Votre établissement", modules: salonModules },
   staff: { key: "staff", label: "Espace employé", prefix: "/staff", eyebrow: "Votre activité au salon", modules: staffModules },
-  commercial: { key: "commercial", label: "Espace commercial", prefix: "/commercial", eyebrow: "Dossiers et validation des professionnels", allowedAdminRoles: ["commercial", "super_admin"], modules: onboardingModules },
+  commercial: { key: "commercial", label: "Espace commercial", prefix: "/commercial", eyebrow: "Dossiers et validation des professionnels", allowedAdminRoles: ["commercial", "super_admin"], modules: commercialModules },
   onboarding: { key: "onboarding", label: "Onboarding", prefix: "/onboarding", eyebrow: "Validation professionnelle", allowedAdminRoles: ["verification_agent", "super_admin"], modules: onboardingModules },
   support: { key: "support", label: "Service client et réclamations", prefix: "/support-agent", eyebrow: "Relation client", allowedAdminRoles: ["support", "admin", "super_admin"], modules: supportModules },
   moderation: { key: "moderation", label: "Modération", prefix: "/moderation", eyebrow: "Confiance et sécurité", allowedAdminRoles: ["moderator", "admin", "super_admin"], modules: moderationModules },
