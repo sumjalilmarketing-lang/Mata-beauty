@@ -214,7 +214,7 @@ test("the social video layer is server-counted, attributable, storage-isolated, 
   assert.match(feed, /FEED_BATCH_SIZE = 8/);
   assert.match(feed, /index !== activeIndex && index !== activeIndex \+ 1/);
   assert.match(feed, /video-poster-placeholder/);
-  assert.match(feed, /preload=\{index === activeIndex \? "auto" : "metadata"\}/);
+  assert.match(feed, /preload=\{feedVideoPreload\(index === activeIndex, saveData\)\}/);
   assert.match(feed, /filterInspirationPosts/);
   assert.match(feed, /<button className="feed-book" disabled=\{authPending\} onClick=\{\(\) => void book\(post\)\}>\{t\("Réserver"\)\}<\/button>/);
   assert.match(feed, /onBook\(post\.authorId,.*post\.id\)/s);

@@ -13,6 +13,7 @@ export function SocialProfileVideoFrame({ videoUrl, thumbnailUrl }: {
   const [isNearViewport, setIsNearViewport] = useState(false);
   const [frameReady, setFrameReady] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
   useEffect(() => {
     const preview = previewRef.current;
@@ -31,10 +32,10 @@ export function SocialProfileVideoFrame({ videoUrl, thumbnailUrl }: {
   }, [isNearViewport]);
 
   useEffect(() => {
-    if (!isNearViewport || frameReady || videoFailed || !videoUrl) return;
+    if ((thumbnailUrl && !thumbnailFailed) || !isNearViewport || frameReady || videoFailed || !videoUrl) return;
     const timeout = window.setTimeout(() => setVideoFailed(true), 12000);
     return () => window.clearTimeout(timeout);
-  }, [frameReady, isNearViewport, videoFailed, videoUrl]);
+  }, [frameReady, isNearViewport, thumbnailFailed, thumbnailUrl, videoFailed, videoUrl]);
 
   function seekToPreviewFrame(video: HTMLVideoElement) {
     if (!Number.isFinite(video.duration) || video.duration <= 0) {
@@ -50,6 +51,7 @@ export function SocialProfileVideoFrame({ videoUrl, thumbnailUrl }: {
   }
 
   return <span ref={previewRef} className={styles.videoPreview} aria-hidden="true">
+    {thumbnailUrl && !thumbnailFailed ? <Image className={styles.videoCoverFallback} src={thumbnailUrl} alt="" fill sizes="(max-width: 760px) 33vw, 260px" unoptimized onError={() => setThumbnailFailed(true)} /> : <>
     {videoUrl && isNearViewport && !videoFailed && <video
       ref={videoRef}
       className={styles.videoFrame}
@@ -66,15 +68,8 @@ export function SocialProfileVideoFrame({ videoUrl, thumbnailUrl }: {
       style={{ opacity: frameReady ? 1 : 0 }}
     />}
     {!frameReady && !videoFailed && <span className={styles.videoFramePlaceholder} aria-hidden="true">Chargement de l’aperçu…</span>}
-    {(!videoUrl || videoFailed) && thumbnailUrl && <Image
-      className={styles.videoCoverFallback}
-      src={thumbnailUrl}
-      alt=""
-      fill
-      sizes="(max-width: 760px) 33vw, 260px"
-      unoptimized
-    />}
-    {(!videoUrl || videoFailed) && !thumbnailUrl && <span className={styles.videoFallback}>Aperçu<br/>indisponible</span>}
+    {(!videoUrl || videoFailed) && <span className={styles.videoFallback}>Aperçu<br/>indisponible</span>}
+    </>}
   </span>;
 }
 

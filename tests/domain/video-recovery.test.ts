@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createVideoRefreshQueue, reloadVideoSource } from "@/lib/domain/video-recovery";
+import { createVideoRefreshQueue, reloadVideoSource, playFeedVideo, feedVideoPreload } from "@/lib/domain/video-recovery";
 
 describe("stalled video recovery", () => {
   it("restarts fetching even when signing returns the exact same URL", () => {
@@ -37,3 +37,18 @@ describe("stalled video recovery", () => {
     await expect(queue.run("post-a", async () => true)).resolves.toBe(true);
   });
 });
+
+it('restores the watched position after renewing a signed URL',()=>{
+ const events=new EventTarget();const video={src:'https://media.example.test/old.mp4',currentTime:12,duration:90,addEventListener:events.addEventListener.bind(events),load:()=>{video.currentTime=0;}};
+ reloadVideoSource(video,'https://media.example.test/new.mp4');expect(video.currentTime).toBe(0);events.dispatchEvent(new Event('loadedmetadata'));expect(video.currentTime).toBe(12);
+});
+it('clamps recovery to the new duration',()=>{
+ const events=new EventTarget();const video={src:'old',currentTime:50,duration:20,addEventListener:events.addEventListener.bind(events),load:()=>{video.currentTime=0;}};
+ reloadVideoSource(video,'new');events.dispatchEvent(new Event('loadedmetadata'));expect(video.currentTime).toBeCloseTo(19.95);
+});
+it('retries blocked sound autoplay muted, without disguising decode failures',async()=>{
+ const muted=vi.fn();const video={muted:false,play:vi.fn().mockRejectedValueOnce(new DOMException('Gesture required','NotAllowedError')).mockResolvedValueOnce(undefined)};
+ await playFeedVideo(video,muted);expect(video.muted).toBe(true);expect(video.play).toHaveBeenCalledTimes(2);expect(muted).toHaveBeenCalledOnce();
+ const broken={muted:false,play:vi.fn().mockRejectedValue(new DOMException('Unsupported codec','NotSupportedError'))};await playFeedVideo(broken,muted);expect(broken.play).toHaveBeenCalledOnce();
+});
+it('warms the next video while respecting data saver',()=>{expect(feedVideoPreload(false,false)).toBe('auto');expect(feedVideoPreload(false,true)).toBe('metadata');expect(feedVideoPreload(true,true)).toBe('auto');});

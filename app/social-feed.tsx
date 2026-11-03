@@ -15,7 +15,7 @@ import { feedAvailabilityWindow } from "@/lib/domain/feed-availability";
 import { feedPrice, publicProfessionalName } from "@/lib/domain/feed-presentation";
 import { applicationText } from "@/lib/domain/application-copy";
 import { applicationLocale } from "@/lib/domain/booking-copy";
-import { createVideoRefreshQueue, reloadVideoSource } from "@/lib/domain/video-recovery";
+import { createVideoRefreshQueue, reloadVideoSource, playFeedVideo, feedVideoPreload } from "@/lib/domain/video-recovery";
 import { fetchPublicPostVideoResult, postUsesVideoMedia } from "@/lib/domain/public-post-video-media";
 import "./inspiration-search.css";
 
@@ -129,6 +129,15 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const [activeIndex, setActiveIndex] = useState(0);
   const [unavailablePosts, setUnavailablePosts] = useState<Set<string>>(new Set());
   const [muted, setMuted] = useState(true);
+  const [saveData, setSaveData] = useState(true);
+  useEffect(() => {
+    let active = true;
+    const connection = (navigator as Navigator & { connection?: EventTarget & { saveData?: boolean; effectiveType?: string } }).connection;
+    const update = () => { if (active) setSaveData(Boolean(connection?.saveData) || ["slow-2g", "2g"].includes(connection?.effectiveType ?? "")); };
+    queueMicrotask(update);
+    connection?.addEventListener("change", update);
+    return () => { active = false; connection?.removeEventListener("change", update); };
+  }, []);
   const [pageVisible, setPageVisible] = useState(true);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -169,6 +178,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const [realAvailability, setRealAvailability] = useState<Record<string, string | null>>({});
   const cards = useRef<Array<HTMLElement | null>>([]);
   const videos = useRef<Array<HTMLVideoElement | null>>([]);
+  const playbackPositions = useRef(new Map<string, number>());
   const availabilityRequests = useRef(new Set<string>());
   const restoredPosition = useRef(false);
   const completedViews = useRef(new Set<string>());
@@ -430,7 +440,8 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const visibilityChanged = () => {
       const visible = document.visibilityState !== "hidden";
       setPageVisible(visible);
-      if (visible) void load();
+      // Keep the current source and position when returning from another tab.
+      if (visible && !initialPageReady.current) void load();
     };
     document.addEventListener("visibilitychange", visibilityChanged);
     return () => document.removeEventListener("visibilitychange", visibilityChanged);
@@ -440,7 +451,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     videos.current.forEach((video, index) => {
       if (!video) return;
       const post = visiblePosts[index];
-      if (pageVisible && index === activeIndex && post && !pausedPosts.has(post.id)) void video.play().catch(() => undefined); else video.pause();
+      if (pageVisible && !searchOpen && index === activeIndex && post && !pausedPosts.has(post.id)) void playFeedVideo(video, () => setMuted(true)); else video.pause();
     });
     const post = visiblePosts[activeIndex];
     if (!post || !pageVisible) return;
@@ -451,13 +462,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     }, 2000);
     if (activeIndex >= visiblePosts.length - 3) void loadMore();
     return () => window.clearTimeout(timer);
-  }, [activeIndex, loadMore, pageVisible, pausedPosts, visiblePosts]);
+  }, [activeIndex, loadMore, pageVisible, pausedPosts, searchOpen, visiblePosts]);
 
   useEffect(() => {
     const post = visiblePosts[activeIndex];
     const video = videos.current[activeIndex];
     if (searchOpen) { videos.current.forEach((item) => item?.pause()); return; }
-    if (pageVisible && post && video && !videoLoading.has(post.id) && !pausedPosts.has(post.id)) void video.play().catch(() => undefined);
+    if (pageVisible && post && video && !videoLoading.has(post.id) && !pausedPosts.has(post.id)) void playFeedVideo(video, () => setMuted(true));
   }, [activeIndex, pageVisible, pausedPosts, searchOpen, videoLoading, visiblePosts]);
 
   const retryVideo = useCallback((post: FeedPost): Promise<boolean> => videoRefreshQueue.current.run(post.id, async () => {
@@ -497,6 +508,15 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       if (!signal.aborted) setVideoRefreshing((current) => { const next = new Set(current); next.delete(post.id); return next; });
     }
   }), []);
+
+  useEffect(() => {
+    const resume = () => {
+      const post = visiblePosts[activeIndex];
+      if (pageVisible && !searchOpen && post?.postType === "video" && !pausedPosts.has(post.id) && (videoErrors.has(post.id) || videoLoading.has(post.id))) void retryVideo(post);
+    };
+    window.addEventListener("online", resume);
+    return () => window.removeEventListener("online", resume);
+  }, [activeIndex, pageVisible, pausedPosts, retryVideo, searchOpen, videoErrors, videoLoading, visiblePosts]);
 
   useEffect(() => {
     const post = visiblePosts[activeIndex];
@@ -796,7 +816,17 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
             muted={muted}
             loop
             playsInline
-            preload={index === activeIndex ? "auto" : "metadata"}
+            preload={feedVideoPreload(index === activeIndex, saveData)}
+            onLoadedMetadata={(event) => {
+              const video = event.currentTarget;
+              const position = playbackPositions.current.get(post.id) ?? 0;
+              if (position > 0 && video.currentTime === 0) {
+                try { video.currentTime = Number.isFinite(video.duration) && video.duration > 0 ? Math.min(position, Math.max(0, video.duration - 0.05)) : position; } catch { /* Playback remains usable for non-seekable media. */ }
+              }
+            }}
+            onStalled={(event) => {
+              if (index === activeIndex && event.currentTarget.readyState < 3 && !pausedPosts.has(post.id)) setVideoLoading(current => current.has(post.id) ? current : new Set(current).add(post.id));
+            }}
             onLoadStart={() => {
               setVideoReady((current) => { const next = new Set(current); next.delete(post.id); return next; });
               setVideoLoading((current) => new Set(current).add(post.id));
@@ -817,8 +847,10 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
             }}
             onTimeUpdate={(event) => {
               const video = event.currentTarget;
+              if (index !== activeIndex) return;
+              playbackPositions.current.set(post.id, video.currentTime);
               const ratio = video.duration ? video.currentTime / video.duration : 0;
-              setProgress((current) => ({ ...current, [post.id]: ratio }));
+              setProgress((current) => Math.abs((current[post.id] ?? 0) - ratio) < 0.01 ? current : ({ ...current, [post.id]: ratio }));
               if (ratio >= 0.95 && !completedViews.current.has(post.id)) {
                 completedViews.current.add(post.id);
                 const supabase = getSupabaseBrowserClient();

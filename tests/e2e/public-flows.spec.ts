@@ -222,6 +222,12 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   const feed = page.locator(".social-feed");
   await expect(page.locator(".social-video-card")).toHaveCount(3, { timeout: 15_000 });
   expect(requestedBatches).toContain("8");
+  await expect(page.locator(".social-video-card").nth(1).locator("video")).toHaveAttribute("preload", "auto");
+  await page.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" }); document.dispatchEvent(new Event("visibilitychange")); });
+  await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(0);
+  await page.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" }); document.dispatchEvent(new Event("visibilitychange")); });
+  await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
+
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await expect(page.locator(".social-video-card").first().getByRole("button", { name: "Voir les disponibilités", exact: true }).first()).toBeVisible();
   const activeCard = page.locator(".social-video-card").filter({ has: page.locator('video[data-playing="true"]') }).first();
@@ -330,9 +336,12 @@ test("video states distinguish waiting, loading, ready and confirmed errors, wit
   await expect(page.locator(".social-video-card").first()).toHaveAttribute("data-video-state", "ready");
 
   const firstVideo = page.locator(".social-video-card").first().locator("video");
+  await firstVideo.evaluate((node: HTMLVideoElement) => { Object.defineProperty(node, "duration", { configurable: true, value: 90 }); node.currentTime = 12; node.dispatchEvent(new Event("timeupdate", { bubbles: true })); });
   await firstVideo.dispatchEvent("error");
   await expect.poll(() => page.evaluate(() => JSON.parse(window.sessionStorage.getItem("video-retry-counts") ?? "{}")["66666666-6666-4666-8666-666666666666"])).toBe(2);
   await expect(page.locator(".social-video-card").first().getByRole("alert")).toHaveCount(0);
+  await firstVideo.evaluate((node: HTMLVideoElement) => { node.currentTime = 0; node.dispatchEvent(new Event("loadedmetadata")); });
+  await expect.poll(() => firstVideo.evaluate((node: HTMLVideoElement) => node.currentTime)).toBe(12);
   await firstVideo.dispatchEvent("canplay");
   await expect(page.locator(".social-video-card").first()).toHaveAttribute("data-video-state", "ready");
   await firstVideo.dispatchEvent("error");
