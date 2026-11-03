@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { bookingVideo } from "./fixtures/booking-video";
 
 // Keep route fixtures deterministic across WebKit and Chromium; these tests
 // exercise application flows rather than the separately tested PWA worker.
@@ -8,6 +9,8 @@ const testSupabaseOrigin = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://
 const testAppOrigin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/public/social-posts/*/media", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ videoUrl: "https://audit.supabase.co/storage/v1/object/sign/provider-social-media/audit.mp4", thumbnailUrl: null }) }));
+  await page.route("https://audit.supabase.co/storage/**", route => route.fulfill({ status: 200, contentType: "video/mp4", body: bookingVideo, headers: { "Access-Control-Allow-Origin": testAppOrigin } }));
   await page.addInitScript(() => window.localStorage.setItem("mata-launch-welcome", "done"));
 });
 

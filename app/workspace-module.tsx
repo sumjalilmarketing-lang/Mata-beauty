@@ -83,7 +83,8 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const financeOverview = space === "finance" && module.key === "dashboard";
   const departmentCases = ["commercial","finance","support"].includes(space) && (module.key === "cases" || (module.key === "dashboard" && ((space === "finance" && !canReadFinance) || (space === "support" && !canManageSupport))));
   const teamConsole = module.key === "teams" && ["admin","commercial","finance","support"].includes(space);
-  const custom = departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
+  const accountSettings = space === "pro" && module.key === "settings";
+  const custom = accountSettings || departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
     : space === "admin" && module.key === "alerts" ? fraudAlerts
     : space === "admin" && module.key === "security" ? resources.sessions
@@ -151,6 +152,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
   if (space === "client" && module.key === "profile") return <ClientProfile userId={userId} />;
   if (space === "client" && module.key === "application") return <ProfessionalApplication userId={userId} />;
+  if (accountSettings) return <ClientControlCenter userId={userId} section="settings" />;
   if (space === "client" && ["settings", "payments", "reviews", "support"].includes(module.key)) return <ClientControlCenter userId={userId} section={module.key} />;
   const shortcuts = workspaceSpaces[space].modules.filter((item) => item.key !== module.key && allowedModuleKeys.includes(item.key)).slice(0, 4);
   return <section className="workspace-content">

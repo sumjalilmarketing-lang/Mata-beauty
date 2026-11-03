@@ -7,7 +7,7 @@ import { canAccessWorkspaceModule } from "@/lib/auth/workspace-access";
 
 export async function WorkspaceRoute({ space, moduleKey }: { space: WorkspaceSpaceKey; moduleKey: string }) {
   const collaboratorAccessEnabled = process.env.NEXT_PUBLIC_SALON_COLLABORATOR_ACCESS_ENABLED === "true";
-  const normalizedModule = space === "pro" && ["settings", "menu"].includes(moduleKey) ? "public-profile" : moduleKey === "menu" ? "dashboard" : moduleKey === "studio" ? "videos" : moduleKey;
+  const normalizedModule = moduleKey === "menu" ? "settings" : moduleKey === "studio" ? "videos" : moduleKey;
   const access = await requireWorkspace(space, normalizedModule);
   const salonWorkflows = new Set(["dashboard", "agenda", "bookings", "team", "services", "videos", "portfolio", "messages", "revenue", "statistics", "reviews", "profile", "settings"]);
   const allowedModuleKeys = workspaceSpaces[space].modules.filter((item) => (space !== "staff" || collaboratorAccessEnabled) && canAccessWorkspaceModule(access.identity, item.permission, item.staffPermission) && (space === "salon" ? salonWorkflows.has(item.key) : Boolean(item.resource) || ["teams","cases"].includes(item.key) || item.key === "dashboard" || (["commercial", "onboarding"].includes(space) && item.key === "documents") || (space === "commercial" && ["crm","follow-ups"].includes(item.key)) || (space === "client" && ["settings", "application"].includes(item.key)) || (space === "pro" && ["settings", "statistics", "portfolio"].includes(item.key)))).map((item) => item.key);

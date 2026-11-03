@@ -395,7 +395,7 @@ export function LiveDashboard({
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setFeedback("");
-    const { error: updateError } = await supabase.from("bookings").update({ status }).eq("id", booking.id);
+    const { data: updated, error: updateError } = await supabase.from("bookings").update({ status }).eq("id", booking.id).eq("status", booking.status).select("id").maybeSingle();
     if (updateError) {
       setFeedback(updateError.message);
       return;

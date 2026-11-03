@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { bookingVideo } from "./fixtures/booking-video";
 
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://audit.supabase.co";
 const appOrigin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -26,6 +27,8 @@ function json(route: Route, body: unknown, status = 200) {
 }
 
 async function mockSupabase(page: Page, state: AuditState) {
+  await page.route("**/api/public/social-posts/*/media", route => json(route, { videoUrl: "https://audit.supabase.co/storage/v1/object/sign/provider-social-media/audit.mp4", thumbnailUrl: null }));
+  await page.route("https://audit.supabase.co/storage/**", route => route.fulfill({ body: bookingVideo, contentType: "video/mp4", headers: { "Access-Control-Allow-Origin": appOrigin } }));
   const tomorrow = new Date();
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   const date = tomorrow.toISOString().slice(0, 10);
@@ -238,7 +241,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
     await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByText(/10:00/)).toBeVisible();
+    await expect(page.getByText(/10:00/).first()).toBeVisible();
     const durationMs = Date.now() - startedAt;
     expect(actions).toBe(7);
     expect(durationMs).toBeLessThan(30_000);
@@ -345,7 +348,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.reload();
     await expect(page.getByRole("dialog", { name: "Réserver" })).toBeVisible();
     await expect(page.getByRole("dialog", { name: "Réserver" }).getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByText(/10:00/)).toBeVisible();
+    await expect(page.getByText(/10:00/).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000.*F\s*CFA/ })).toBeVisible();
   });
 
