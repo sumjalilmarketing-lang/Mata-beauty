@@ -5,6 +5,7 @@ export const departmentLabels:Record<Department,string>={commercial:"Commercial"
 export const caseStatuses={open:"À traiter",in_progress:"En cours",waiting:"En attente",completed:"Terminé"}as const;
 const reason=z.string().trim().min(2).max(1000),teamId=z.uuid(),email=z.email().max(254).transform(v=>v.toLowerCase());
 export const departmentTeamInput=z.discriminatedUnion("action",[
+ z.object({action:z.literal("commercial-team"),name:z.string().trim().min(2).max(120),reason}).strict(),
  z.object({action:z.literal("team"),teamId:teamId.nullable(),version:z.number().int().positive().nullable(),department:z.enum(departments),name:z.string().trim().min(2).max(120),managerEmail:email,enabled:z.boolean(),reason}).strict(),
  z.object({action:z.literal("member"),teamId,email,reason}).strict(),
  z.object({action:z.literal("access"),teamId,userId:z.uuid(),change:z.enum(["suspend","reactivate","revoke"]),reason}).strict(),

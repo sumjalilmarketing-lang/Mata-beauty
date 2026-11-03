@@ -9,12 +9,12 @@ test('entrée par lien : le responsable commercial rejoint son CRM et ses équip
  await page.goto('/commercial/teams');
  await expect(page.getByRole('heading',{name:'Mes équipes · Commercial'})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Suivi des agents'})).toBeVisible();
- await expect(page.getByRole('button',{name:'Créer une équipe'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Créer une équipe'})).toHaveCount(1);
 });
 test('responsable : équipe, recrutement et invitation par lien conservé après actualisation',async({page,context})=>{
  await login(context,'commercial_manager');const data=departmentContext('commercial_manager');
  await page.route('**/api/department-teams',async route=>{if(route.request().method()==='GET')return route.fulfill({json:data});const body=route.request().postDataJSON();if(body.action==='member'){expect(body).not.toHaveProperty('role');data.members.push({...data.members[0],user_id:'aaaaaaaa-aaaa-4aaa-8aaa-000000000090',email:body.email,display_name:'Agent ajouté'});return route.fulfill({json:{ok:true}});}expect(body.action).toBe('invite');expect(body.channel).toBe('link');return route.fulfill({json:{ok:true,link:'http://127.0.0.1/auth/confirm?type=invite&token_hash=synthetic-ui-token'}});});
- await page.goto('/commercial/teams');await expect(page.getByRole('heading',{name:'Mes équipes · Commercial'})).toBeVisible();await expect(page.getByRole('button',{name:'Créer une équipe'})).toHaveCount(0);
+ await page.goto('/commercial/teams');await expect(page.getByRole('heading',{name:'Mes équipes · Commercial'})).toBeVisible();await expect(page.getByRole('button',{name:'Créer une équipe'})).toHaveCount(1);
  await page.getByLabel('Email du compte confirmé').fill('agent-added@example.test');await page.getByLabel('Motif de l’accès').fill('Recrutement recette');await page.getByRole('button',{name:'Ajouter l’agent',exact:true}).click();await expect(page.locator('strong').filter({hasText:/^Agent ajouté$/})).toBeVisible();
  await page.getByLabel('Prénom',{exact:true}).fill('Agent');await page.getByLabel('Nom',{exact:true}).fill('Recette');await page.getByLabel('Email',{exact:true}).fill('invite@example.test');await page.getByLabel('Transmission').selectOption('link');await page.getByRole('button',{name:'Préparer l’invitation',exact:true}).click();await expect(page.getByLabel('Lien personnel de l’invitation')).toHaveValue(/synthetic-ui-token/);await expect(page.getByRole('heading',{name:'Suivi des agents'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);

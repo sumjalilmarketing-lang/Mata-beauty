@@ -26,6 +26,7 @@ import { CommentModeration } from "./comment-moderation";
 import { CatalogModule } from "./super-admin";
 import { DepartmentTeamConsole } from "./department-team-console";
 import { DepartmentCases } from "./department-cases";
+import { CommercialField } from "./commercial-field";
 import { CommercialCrm } from "./commercial-crm";
 import { FinanceOverview } from "./finance-overview";
 import { RefundReview } from "./refund-review";
@@ -84,7 +85,8 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const departmentCases = ["commercial","finance","support"].includes(space) && (module.key === "cases" || (module.key === "dashboard" && ((space === "finance" && !canReadFinance) || (space === "support" && !canManageSupport))));
   const teamConsole = module.key === "teams" && ["admin","commercial","finance","support"].includes(space);
   const accountSettings = space === "pro" && module.key === "settings";
-  const custom = accountSettings || departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
+  const fieldView = space === "commercial" && ["field","reports","appointments"].includes(module.key);
+  const custom = fieldView || accountSettings || departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
     : space === "admin" && module.key === "alerts" ? fraudAlerts
     : space === "admin" && module.key === "security" ? resources.sessions
@@ -123,7 +125,8 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   }, [definition, paymentStatus, space, module.key, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
-  if (teamConsole) return <DepartmentTeamConsole department={space === "admin" ? undefined : space as "commercial"|"finance"|"support"} />;
+  if (fieldView) return <CommercialField view={module.key as "field"|"reports"|"appointments"} userId={userId} />;
+  if (teamConsole) return <DepartmentTeamConsole canCreateCommercialTeam={space === "commercial" && canManageCrmAssignments} department={space === "admin" ? undefined : space as "commercial"|"finance"|"support"} />;
   if (departmentCases) return <DepartmentCases department={space as "commercial"|"finance"|"support"} />;
   if (crmView) return <CommercialCrm key={module.key} userId={userId} canAssign={canManageCrmAssignments} isSuper={isSuperAdmin} dueOnly={module.key === "follow-ups"} />;
   if (financeOverview) return <FinanceOverview allowedModuleKeys={allowedModuleKeys} />;

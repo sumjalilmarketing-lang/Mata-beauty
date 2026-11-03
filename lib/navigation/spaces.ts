@@ -103,6 +103,9 @@ const onboardingModules = [
 ] as const;
 
 const commercialModules = [
+  module("field", "Pointages et visites", "◷", "Terrain", "Journées, visites et positions enregistrées.", {permission:"commercial.cases"}),
+  module("reports", "Rapports", "▣", "Terrain", "Comptes rendus transmis au responsable de votre équipe.", {permission:"commercial.cases"}),
+  module("appointments", "Rendez-vous", "◷", "Terrain", "Agenda commercial et comptes rendus.", {permission:"commercial.cases"}),
   module("teams", "Mes équipes", "◎", "Supervision", "Accès des agents, affectations et suivi des activités.", { permission:"teams.manage" }),
   module("cases", "Dossiers attribués", "▣", "Dossiers", "Vos dossiers et comptes rendus.", { permission:"commercial.cases" }),
   module("dashboard", "Vue commerciale", "⌂", "CRM", "Prospection, pipeline et relances de vos prospects.", { primary:true,permission:"crm.manage" }),
