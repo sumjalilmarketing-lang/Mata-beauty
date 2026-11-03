@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { serviceDepositQuote } from "@/lib/domain/service-deposit";
 import { formatServiceMoney } from "@/lib/domain/service-money";
 import { bookingText } from "@/lib/domain/booking-copy";
 import { BookingSlotConflict, bookingSubmissionError } from "@/lib/domain/booking-submission";
@@ -31,6 +32,7 @@ type Provider = {
   id: string;
   profileId: string;
   serviceId: string;
+  depositPercentage?: number;
   categoryId?: string;
   name: string;
   specialty: string;
@@ -76,7 +78,7 @@ type PaymentCapabilities = {
 };
 
 type BookingConfirmation = { id: string; startsAt: string; date: string; time: string; location: string; collaboratorName?: string | null; collaboratorPhoto?: string | null };
-type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; currency?: BookingCurrency; business_id?: string | null };
+type ProviderService = { deposit_percentage?: number; id: string; title: string; duration_minutes: number; price_amount: number; currency?: BookingCurrency; business_id?: string | null };
 type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[] };
 type BookingSelection = { provider: Provider; service: ProviderService; sourcePostId?: string };
 type AvailabilitySlot = { slot_start: string };
@@ -88,9 +90,9 @@ const bookingDraftSchema = z.object({
     provider: z.object({
       id: z.string().min(1), profileId: z.string().min(1), serviceId: z.string().min(1), name: z.string(), specialty: z.string(),
       category: z.string(), area: z.string(), address: z.string().optional(), coordinates: z.object({ latitude: z.number(), longitude: z.number() }).optional(), price: z.number().int().nonnegative(), rating: z.number(), reviews: z.number().int().nonnegative(),
-      initials: z.string(), verified: z.boolean(), homeService: z.boolean(), durationMinutes: z.number().int(), businessId: z.string().uuid().optional(), countryCode: z.string().length(2).optional(), timeZone: z.string().optional(), coverUrl: z.string().optional(),
+      initials: z.string(), verified: z.boolean(), homeService: z.boolean(), currency: z.enum(["XOF", "EUR", "USD", "GBP", "CAD"]).optional(), durationMinutes: z.number().int(), depositPercentage: z.number().int().min(0).max(60).optional(), businessId: z.string().uuid().optional(), countryCode: z.string().length(2).optional(), timeZone: z.string().optional(), coverUrl: z.string().optional(),
     }),
-    service: z.object({ id: z.string().min(1), title: z.string(), duration_minutes: z.number().int(), price_amount: z.number().int().nonnegative(), currency: z.enum(["XOF", "EUR", "USD", "GBP", "CAD"]).optional(), business_id: z.string().uuid().nullable().optional() }),
+    service: z.object({ deposit_percentage: z.number().int().min(0).max(60).optional(), id: z.string().min(1), title: z.string(), duration_minutes: z.number().int(), price_amount: z.number().int().nonnegative(), currency: z.enum(["XOF", "EUR", "USD", "GBP", "CAD"]).optional(), business_id: z.string().uuid().nullable().optional() }),
     sourcePostId: z.string().uuid().optional(),
   }),
   request: z.object({
@@ -184,7 +186,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     }
     if (catalogState !== "live") return () => { active = false; };
     const client = getSupabaseBrowserClient(); if (!client) return () => { active = false; };
-    void client.from("provider_services").select("id,provider_id,title,duration_minutes,price_amount,currency,business_id").eq("id", parsed.data).eq("is_active", true).is("archived_at", null).maybeSingle().then(({ data, error }) => {
+    void client.from("provider_services").select("id,provider_id,title,duration_minutes,price_amount,currency,business_id,deposit_percentage").eq("id", parsed.data).eq("is_active", true).is("archived_at", null).maybeSingle().then(({ data, error }) => {
       if (!active) return;
       const provider = catalog.find(item => item.profileId === data?.provider_id && item.serviceId === data?.id);
       if (error || !data || !provider) {
@@ -270,6 +272,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       if (authError) {
         const messages: Record<string, string> = {
           email_link_invalid: "Le lien de confirmation est expiré, déjà utilisé ou invalide. Connectez-vous si votre adresse est déjà confirmée, ou choisissez « Renvoyer la confirmation » pour terminer votre inscription.",
+          workspace_unavailable: "Votre espace est momentanément indisponible. Réessayez dans quelques instants.",
           email_confirmation_unavailable: "La confirmation est momentanément indisponible. Réessayez votre lien dans quelques instants.",
           google_cancelled: "Connexion Google annulée.", google_provider_error: "Google n’a pas pu autoriser la connexion.",
           invalid_callback: "Retour Google invalide.", oauth_exchange_failed: "La session Google a expiré. Recommencez.",
@@ -469,7 +472,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       if (provider) {
         setNotice("");
         setRestoredBookingRequest(null);
-        setBooking({ provider, service: pendingSocialBooking.service, sourcePostId: pendingSocialBooking.sourcePostId });
+        setBooking({ provider, service: { ...pendingSocialBooking.service, currency: pendingSocialBooking.service.currency ?? provider.currency ?? "XOF", deposit_percentage: provider.depositPercentage ?? 0 }, sourcePostId: pendingSocialBooking.sourcePostId });
         setPendingSocialBooking(null);
       } else {
         setNotice("Cette prestation n’est pas disponible actuellement.");
@@ -493,7 +496,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   function startBooking(selection: BookingSelection) {
     setRestoredBookingRequest(null);
     const matchingProvider = catalog.find((item) => item.serviceId === selection.service.id && item.profileId === selection.provider.profileId);
-    setBooking({ ...selection, provider: matchingProvider ?? { ...selection.provider, address: undefined, coordinates: undefined, businessId: selection.service.business_id ?? undefined } });
+    setBooking({ ...selection, service: { ...selection.service, currency: selection.service.currency ?? matchingProvider?.currency ?? selection.provider.currency ?? "XOF", deposit_percentage: matchingProvider?.depositPercentage ?? selection.service.deposit_percentage ?? 0 }, provider: matchingProvider ?? { ...selection.provider, address: undefined, coordinates: undefined, businessId: selection.service.business_id ?? undefined } });
     const client = getSupabaseBrowserClient();
     if (client) void recordProductEvent(client, "booking_started", { provider_id: selection.provider.profileId, service_id: selection.service.id, source: selection.sourcePostId ? "video" : "catalog" });
   }
@@ -645,6 +648,10 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     if (!booking) {
       if (authRequest?.role === "provider" && !signedIn.roles.includes("provider")) { window.location.assign("/app/application"); return; }
       const requested = authRequest?.returnTo ? safeOAuthDestination(authRequest.returnTo) : null;
+      if (signedIn.role === "admin" && (!requested || ["/", "/app", "/app/profile"].includes(requested))) {
+        window.location.assign("/auth/workspace");
+        return;
+      }
       if (requested && requested !== "/") {
         window.location.assign(requested);
         return;
@@ -845,7 +852,7 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
     let active = true;
     void Promise.all([
       supabase.from("provider_profiles").select("bio").eq("profile_id", provider.profileId).maybeSingle(),
-      supabase.from("provider_services").select("id,title,duration_minutes,price_amount,currency,business_id").eq("provider_id", provider.profileId).eq("is_active", true).order("price_amount"),
+      supabase.from("provider_services").select("id,title,duration_minutes,price_amount,currency,business_id,deposit_percentage").eq("provider_id", provider.profileId).eq("is_active", true).order("price_amount"),
       supabase.from("portfolio_items").select("storage_path").eq("provider_id", provider.profileId).order("sort_order").limit(12),
     ]).then(([profileResult, servicesResult, portfolioResult]) => {
       if (!active) return;
@@ -857,7 +864,7 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
     });
     return () => { active = false; };
   }, [provider.profileId]);
-  const services = detail.services.length ? detail.services : [{ id: provider.serviceId, title: provider.specialty, duration_minutes: provider.durationMinutes, price_amount: provider.price }];
+  const services = detail.services.length ? detail.services : [defaultService(provider)];
   return <main className="premium-mobile-app"><div className="premium-app-frame profile-app-frame"><div className="mobile-screen premium-profile-screen">
     <div className="premium-profile-hero">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={provider.specialty} priority sizes="430px" /> : <div>{provider.initials}</div>}<div className="profile-hero-actions"><button aria-label="Retour" onClick={onBack}>‹</button><span /><button aria-label="Partager" onClick={() => void navigator.share?.({ title: provider.name, url: window.location.href })}>⇧</button><button aria-label="Favori" onClick={onFavorite}>{favorite ? "♥" : "♡"}</button></div></div>
     <section className="premium-profile-info"><div className="profile-heading-row"><h1>{provider.name}</h1>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}</div><p className="profile-rating">★ {provider.rating.toFixed(1)} ({provider.reviews} avis) <i>•</i> {provider.area}</p><p>{detail.bio || `${provider.specialty}, avec une approche professionnelle et personnalisée.`}</p><div className="profile-facts"><span>◷<strong>Sur rendez-vous</strong><small>Horaires réels</small></span><span>⌂<strong>{provider.homeService ? "À domicile" : "En salon"}</strong><small>{provider.homeService ? "Disponible" : "Sur place"}</small></span><span>◫<strong>Clientèle</strong><small>Mixte</small></span></div>
@@ -894,7 +901,8 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const timeZone = providerTimeZone(provider);
   const localToday = localDateAt(new Date(), timeZone);
   const [form, setForm] = useState<BookingRequest>(initialRequest ?? { date: initialDate || addCalendarDays(localToday, 1), time: "", locationMode: "salon", address: "", note: "", collaboratorId: "", paymentMethod: "on_site" });
-  const onlinePaymentAvailable = paymentCapabilities.onlineCheckoutEnabled && (service.currency ?? "XOF") === "XOF";
+  const depositQuote = serviceDepositQuote(service.price_amount, service.deposit_percentage ?? provider.depositPercentage ?? 0, service.currency ?? "XOF");
+  const onlinePaymentAvailable = depositQuote.percentage === 0 && paymentCapabilities.onlineCheckoutEnabled && (service.currency ?? "XOF") === "XOF";
 
   useEffect(() => {
     writeBrowserStorage("sessionStorage", bookingDraftKey, JSON.stringify({ selection, request: form }));
@@ -949,7 +957,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
     label: new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone, timeZoneName: "short" }).format(new Date(slot.slot_start)),
   }));
 
-  const quickDates = useMemo(() => buildQuickDates(timeZone, locale), [timeZone, locale]);
+  const quickDates = buildQuickDates(timeZone, locale);
   const confirm = useCallback(async () => {
     if (submissionPending.current) return;
     submissionPending.current = true;
@@ -995,6 +1003,14 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
           {step === 2 && <>
             <h3>{t("Vérifiez et confirmez")}</h3>
             <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date, locale)} {" "}{t("à")}{" "}{form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name} · {timeZone}</small></div><b>{formatPrice(service.price_amount, service.currency, locale)}</b></div>
+            <section className="booking-money-summary" aria-label={t("Détail du prix")}>
+              <h4>{t("Détail du prix")}</h4><p>{t("Prix total")}{" : "}<strong>{formatPrice(depositQuote.totalAmount, service.currency, locale)}</strong></p>
+              <p>{t("Acompte prévu")}{" ("}{depositQuote.percentage}{" %) : "}<strong>{formatPrice(depositQuote.depositAmount, service.currency, locale)}</strong></p>
+              <p>{t("Solde après paiement de l’acompte")}{" : "}{formatPrice(depositQuote.balanceAmount, service.currency, locale)}</p>
+              {depositQuote.percentage > 0 && <p>{t("Répartition prévue à l’activation du paiement en ligne.")}</p>}
+              <p><strong>{t("À payer aujourd’hui")}{" : "}{formatPrice(0, service.currency, locale)}</strong></p>
+              <p>{t("Aucun acompte encaissé. À régler sur place")}{" : "}<strong>{formatPrice(depositQuote.totalAmount, service.currency, locale)}</strong></p>
+            </section>
             {teamEnabled && <p>{t("Professionnel :")}{" "}{availablePeople.find(person => person.collaborator_id === form.collaboratorId)?.display_name ?? t("Affectation automatique à une personne qualifiée et disponible")}</p>}
             <fieldset className="location-choice"><legend>{t("Où ?")}</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>{t("Chez le professionnel")}</strong><small>{provider.address ? `${provider.address} · ${provider.area}` : `${provider.area} · ${t("adresse à confirmer avec le professionnel")}`}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>{t("À mon domicile")}</strong><small>{t("Le professionnel se déplace")}</small></span></label>}</fieldset>
             {form.locationMode === "client_address" && <label>{t("Adresse")}<textarea autoFocus value={form.address} placeholder={t("Votre adresse complète")} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}
@@ -1006,7 +1022,8 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
                 {paymentCapabilities.methods.includes("card") && <label><input type="radio" name="payment" checked={form.paymentMethod === "card"} onChange={() => setForm({ ...form, paymentMethod: "card" })} /><span><strong>{t("Carte · Paiement de démonstration")}</strong><small>{t("PayDunya Sandbox · aucune carte réelle")}</small></span></label>}
               </> : <label><input type="radio" name="payment" disabled /><span><strong>{t("Wave, Orange Money ou carte")}</strong><small>{paymentCapabilitiesLoading ? t("Vérification…") : t("Le paiement en ligne n’est pas encore disponible")}</small></span></label>}
             </fieldset>
-            <details className="booking-options"><summary>{t("Politique d’annulation et note")}</summary><p>{t("Votre demande reste en attente de confirmation du professionnel. Aucun montant ne sera débité en ligne.")}</p><label>{t("Note")}<textarea maxLength={1000} value={form.note} placeholder={t("Précision utile pour le professionnel")} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></details>
+            <section className="booking-cancellation-policy" aria-label={t("Politique d’annulation")}><h4>{t("Politique d’annulation")}</h4><p>{t("Annulation gratuite au moins 48 h avant le rendez-vous. Si le professionnel annule, les sommes versées sont intégralement remboursées. À moins de 48 h ou en cas d’absence, seul l’acompte effectivement payé peut être conservé, sous réserve des droits applicables.")}</p><p>{t("Aucun acompte payé : aucune retenue d’acompte.")}</p><Link href="/legal/annulation" target="_blank" rel="noopener noreferrer">{t("Lire la politique d’annulation")}</Link></section>
+            <details className="booking-options"><summary>{t("Note")}</summary><label>{t("Note")}<textarea maxLength={1000} value={form.note} placeholder={t("Précision utile pour le professionnel")} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></details>
             <div className="payment-note">{form.paymentMethod === "on_site" ? t("Paiement sur place · aucun débit aujourd’hui.") : t("Paiement de démonstration · aucun argent réel.")}</div>
           </>}
         </div>
@@ -1048,7 +1065,7 @@ function formatDuration(minutes: number) {
 }
 
 function defaultService(provider: Provider): ProviderService {
-  return { id: provider.serviceId, title: provider.specialty, duration_minutes: provider.durationMinutes, price_amount: provider.price, currency: provider.currency ?? "XOF", business_id: provider.businessId ?? null };
+  return { deposit_percentage: provider.depositPercentage ?? 0, id: provider.serviceId, title: provider.specialty, duration_minutes: provider.durationMinutes, price_amount: provider.price, currency: provider.currency ?? "XOF", business_id: provider.businessId ?? null };
 }
 
 function buildQuickDates(timeZone = "Africa/Dakar", locale = "fr-FR") {

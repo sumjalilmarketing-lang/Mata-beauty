@@ -14,7 +14,7 @@ test("the public experience is a real booking application", async () => {
   assert.match(page, /MataBeautyApp/);
   assert.match(app, /<h1>Explorer<\/h1>/);
   assert.match(app, /Catégories populaires/);
-  assert.match(app, /Étape \$\{step\} sur 2/);
+  assert.match(app, /fast-booking-progress/);
   assert.match(app, /Voir les créneaux/);
   assert.match(app, /Mis à jour en direct/);
   assert.match(app, /waitingForAuthentication/);
@@ -96,7 +96,7 @@ test("the commercial launch layer is measurable, curated, RLS-protected, and hon
   assert.match(launchAdmin, /100 utilisateurs et 20 professionnels/);
   assert.match(checklist, /Configurer mon activité/);
   assert.match(referrals, /Aucune récompense financière n’est active/);
-  assert.match(studio, /Filmer/);
+  assert.match(studio, /Importer une photo ou une vidéo/);
   assert.match(studio, /Avant \/ Après/);
   assert.match(feed, /from\("social_feed"\)/);
   assert.match(legalPage, /Validation juridique requise/);
@@ -386,8 +386,8 @@ test("the provider Studio publishes validated and bookable media", async () => {
   assert.match(publisher, /provider-social-media/);
   assert.match(publisher, /\/video\.\$\{extension\}/);
   assert.match(publisher, /create_provider_video_post/);
-  assert.match(publisher, /Miniature personnalisée/);
-  assert.match(publisher, /Supprimer et recommencer/);
+  assert.match(publisher, /customThumbnail/);
+  assert.match(publisher, /\.remove\(\[videoPath\]\)/);
   assert.match(migration, /storage\.objects/);
   assert.match(migration, /owner_id=auth\.uid\(\)::text/);
   assert.match(migration, /target_provider_service_id is null/);

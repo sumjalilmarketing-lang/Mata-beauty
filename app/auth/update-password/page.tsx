@@ -113,7 +113,8 @@ export default function UpdatePasswordPage() {
           <button className="primary-button full" disabled={!ready || isSubmitting || complete}>{isSubmitting ? "Mise à jour…" : "Mettre à jour"}</button>
         </form>
         {!checking && !ready && <Link className="outline-button return-home" href="/?auth=reset">Demander un nouveau lien</Link>}
-        {complete && <Link className="outline-button return-home" href={internalInvitation ? "/admin" : "/?connexion=requise"}>{internalInvitation ? "Se connecter et configurer le MFA" : "Se connecter"}</Link>}
+        {/* This endpoint resolves the verified role using a document request, not an App Router transition. */}
+        {complete && <a className="outline-button return-home" href="/auth/workspace">Rejoindre mon espace</a>}
         <Link className="outline-button return-home" href="/">Retour à Mata Beauty</Link>
       </section>
     </main>

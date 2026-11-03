@@ -46,3 +46,13 @@ describe("Mata Beauty admin RBAC", () => {
     expect(requiresAdminReason("users.read")).toBe(false);
   });
 });
+
+
+it("commercial can review dossiers without global user, finance, support or role management", () => {
+  for (const permission of ['providers.read','providers.verify','documents.review'] as const) expect(roleHasPermission('commercial',permission)).toBe(true);
+  for (const permission of ['users.read','payments.read','support.manage','roles.manage','audit.read','bookings.update'] as const) expect(roleHasPermission('commercial',permission)).toBe(false);
+});
+it("finance keeps financial access without global audit", () => {
+  expect(roleHasPermission('finance','payments.read')).toBe(true);
+  expect(roleHasPermission('finance','audit.read')).toBe(false);
+});

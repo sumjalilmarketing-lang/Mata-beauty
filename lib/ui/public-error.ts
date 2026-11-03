@@ -8,6 +8,9 @@ export function publicErrorMessage(error: unknown, fallback = "L’action n’a 
   const normalizedMessage = typeof message === "string" ? message.toLocaleLowerCase("fr") : "";
 
   const teamMessages: Record<string, string> = {
+    MATA_TEAM_recipient_suppressed: "Cette adresse a déjà été rejetée ou a signalé un message. Confirmez l’adresse et l’accès à la boîte avec son titulaire, puis contactez l’assistance avant de réinviter.",
+    MATA_TEAM_recipient_check_unavailable: "Le contrôle de livraison est indisponible. Aucun e-mail n’a été envoyé ; réessayez plus tard.",
+    MATA_TEAM_invitation_owner_required: "Seul le propriétaire autorisé peut inviter un membre dans ce salon.",
     MATA_TEAM_email_unavailable: "Le service d’invitation par e-mail n’est pas configuré. Contactez l’assistance.",
     MATA_TEAM_delivery_failed: "L’e-mail n’a pas pu être envoyé ; l’invitation a été annulée.",
     MATA_TEAM_delivery_receipt_failed: "L’e-mail a été envoyé, mais son reçu n’a pas pu être enregistré. Actualisez les invitations avant tout nouvel envoi.",

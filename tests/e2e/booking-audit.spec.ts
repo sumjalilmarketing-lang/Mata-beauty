@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { bookingVideo } from "./fixtures/booking-video";
 
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://audit.supabase.co";
 const appOrigin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -11,6 +12,10 @@ const socialPostId = "66666666-6666-4666-8666-666666666666";
 
 type AuditState = {
   bookingCreated: boolean;
+  depositPercentage?: number;
+  currency?: "XOF" | "EUR";
+  priceAmount?: number;
+  lastBookingCurrency?: string;
   currentRole: "client" | "provider" | "other";
   selectedSlot: string;
   lastBookingSource?: string | null;
@@ -26,6 +31,8 @@ function json(route: Route, body: unknown, status = 200) {
 }
 
 async function mockSupabase(page: Page, state: AuditState) {
+  await page.route("**/api/public/social-posts/*/media", route => json(route, { videoUrl: "https://audit.supabase.co/storage/v1/object/sign/provider-social-media/audit.mp4", thumbnailUrl: null }));
+  await page.route("https://audit.supabase.co/storage/**", route => route.fulfill({ body: bookingVideo, contentType: "video/mp4", headers: { "Access-Control-Allow-Origin": appOrigin } }));
   const tomorrow = new Date();
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   const date = tomorrow.toISOString().slice(0, 10);
@@ -79,7 +86,7 @@ async function mockSupabase(page: Page, state: AuditState) {
         published_at: new Date().toISOString(), business_name: "Mata Audit Tresses", slug: "mata-audit-tresses",
         city: "Dakar", average_rating: 4.9, review_count: 48, verified_at: "2026-01-01T00:00:00Z",
         cover_url: null, avatar_url: null, provider_service_id: serviceId, service_title: "Tresses express",
-        duration_minutes: 60, price_amount: 10000, currency: "XOF", age_hours: 0,
+        duration_minutes: 60, price_amount: state.priceAmount ?? 10000, currency: state.currency ?? "XOF", age_hours: 0,
       }]);
     }
     if (path === "/rest/v1/provider_profiles" && url.searchParams.get("select")?.includes("provider_services!inner")) {
@@ -98,8 +105,9 @@ async function mockSupabase(page: Page, state: AuditState) {
           id: serviceId,
           title: "Tresses express",
           duration_minutes: 60,
-          price_amount: 10000,
-          currency: "XOF",
+          price_amount: state.priceAmount ?? 10000,
+          deposit_percentage: state.depositPercentage ?? 0,
+          currency: state.currency ?? "XOF",
           services: { name: "Tresses", categories: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses" } },
         }],
       }]);
@@ -159,8 +167,9 @@ async function mockSupabase(page: Page, state: AuditState) {
     if (path === "/rest/v1/client_profiles") return json(route, { city: "Dakar", default_address: null, preferences: {} });
     if (path === "/rest/v1/bookings" && request.method() === "POST") {
       if (state.bookingCreated) return json(route, { code: "23P01", message: "slot overlap" }, 409);
-      const payload = request.postDataJSON() as { source_post_id?: string | null; starts_at?: string };
+      const payload = request.postDataJSON() as { source_post_id?: string | null; currency?: string; starts_at?: string };
       state.lastBookingSource = payload.source_post_id ?? null;
+      state.lastBookingCurrency = payload.currency;
       state.bookingCreated = true;
       return json(route, { id: bookingId, starts_at: payload.starts_at, collaborator_name: null, collaborator_avatar_url: null }, 201);
     }
@@ -216,6 +225,45 @@ test.describe("audit chronométré de réservation", () => {
     });
   });
 
+  for (const percentage of [30, 60]) test(`affiche l’acompte prévu ${percentage}% avant confirmation sans encaissement`, async ({ page }, testInfo) => {
+    const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "", depositPercentage: percentage };
+    await mockSupabase(page, state);
+    await page.goto("/");
+    await openFirstFeedBooking(page);
+    await page.getByRole("button", { name: "10:00" }).click();
+    const summary = page.getByRole("region", { name: "Détail du prix" });
+    await expect(summary).toBeVisible();
+    await expect(summary).toContainText(`Acompte prévu (${percentage} %)`);
+    await expect(summary).toContainText(percentage === 60 ? /6\s*000/ : /3\s*000/);
+    await expect(summary).toContainText(percentage === 60 ? /4\s*000/ : /7\s*000/);
+    await expect(summary).toContainText(/À payer aujourd’hui : 0/);
+    await expect(summary).toContainText(/Aucun acompte encaissé.*10\s*000/);
+    await expect(page.getByRole("link", { name: "Lire la politique d’annulation" })).toBeVisible();
+    if (percentage === 60) await page.screenshot({ path: testInfo.outputPath("deposit-summary.png") });
+    expect(state.bookingCreated).toBe(false);
+    await page.getByRole("button", { name: /Confirmer.*10.*000/ }).click();
+    await signIn(page, "client-deposit@example.test");
+    await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
+    await expect(page.getByRole("dialog")).toContainText("À régler sur place · aucun débit en ligne");
+  });
+
+  test("conserve l’euro et les centimes de l’acompte depuis une vidéo après connexion", async ({ page }) => {
+    const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "", depositPercentage: 30, currency: "EUR", priceAmount: 35 };
+    await mockSupabase(page, state);
+    await page.goto("/");
+    await openFirstFeedBooking(page);
+    await page.getByRole("button", { name: "10:00" }).click();
+    const summary = page.getByRole("region", { name: "Détail du prix" });
+    await expect(summary).toContainText(/10,50\s*€/);
+    await expect(summary).toContainText(/24,50\s*€/);
+    await expect(summary).not.toContainText("CFA");
+    await page.getByRole("button", { name: /Confirmer.*35/ }).click();
+    await signIn(page, "client-euro@example.test");
+    await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
+    expect(state.lastBookingCurrency).toBe("EUR");
+    await expect(page.getByRole("dialog")).toContainText(/35,00\s*€/);
+  });
+
   test("filtre Inspiration puis termine une réservation après connexion", async ({ page }) => {
     const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);
@@ -238,7 +286,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.getByRole("button", { name: "Se connecter", exact: true }).click(); actions += 1;
     await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByText(/10:00/)).toBeVisible();
+    await expect(page.getByRole("dialog").getByText(/10:00/).first()).toBeVisible();
     const durationMs = Date.now() - startedAt;
     expect(actions).toBe(7);
     expect(durationMs).toBeLessThan(30_000);
@@ -345,7 +393,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.reload();
     await expect(page.getByRole("dialog", { name: "Réserver" })).toBeVisible();
     await expect(page.getByRole("dialog", { name: "Réserver" }).getByText("Tresses express", { exact: true })).toBeVisible();
-    await expect(page.getByText(/10:00/)).toBeVisible();
+    await expect(page.getByRole("dialog").getByText(/10:00/).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirmer.*10.*000.*F\s*CFA/ })).toBeVisible();
   });
 

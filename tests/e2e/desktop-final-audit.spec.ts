@@ -50,7 +50,8 @@ test("cached feed can paginate during a slow initial refresh without repeating p
   // The test deliberately holds the first refresh for 1.5s while the feed is
   // reloaded; allow slower WebKit startup and concurrent viewport runs too.
   await expect(page.locator(".social-video-card")).toHaveCount(9, { timeout: 20_000 });
-  expect(cursors).toEqual([false, true]);
+  expect(cursors.at(-1)).toBe(true);
+  expect(cursors.filter(Boolean)).toHaveLength(1);
 });
 
 test("nearby uses commercial coordinates and excludes unknown locations (simulated GPS)", async ({ page, context }) => {

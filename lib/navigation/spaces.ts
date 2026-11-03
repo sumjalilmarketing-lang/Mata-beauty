@@ -1,6 +1,6 @@
 import type { AdminPermissionKey, AdminRoleKey } from "../domain/admin";
 
-export type WorkspaceSpaceKey = "client" | "pro" | "salon" | "staff" | "onboarding" | "support" | "moderation" | "finance" | "operations" | "admin";
+export type WorkspaceSpaceKey = "client" | "pro" | "salon" | "staff" | "commercial" | "onboarding" | "support" | "moderation" | "finance" | "operations" | "admin";
 
 export type WorkspaceModule = {
   key: string;
@@ -11,7 +11,7 @@ export type WorkspaceModule = {
   permission?: AdminPermissionKey;
   staffPermission?: "bookings.read" | "bookings.manage" | "messages.read" | "messages.reply" | "services.read";
   primary?: boolean;
-  resource?: "bookings" | "payments" | "notifications" | "messages" | "profiles" | "providers" | "businesses" | "collaborators" | "services" | "videos" | "reviews" | "reports" | "audit" | "wallets" | "payouts" | "reconciliation" | "financial-events" | "commissions" | "disputes" | "comments" | "sessions" | "promotions" | "campaigns" | "settings" | "deletion-requests";
+  resource?: "bookings" | "payments" | "notifications" | "messages" | "profiles" | "providers" | "businesses" | "collaborators" | "services" | "videos" | "reviews" | "reports" | "audit" | "wallets" | "payouts" | "reconciliation" | "financial-events" | "ledger" | "commissions" | "disputes" | "comments" | "sessions" | "promotions" | "campaigns" | "settings" | "deletion-requests";
 };
 
 export type WorkspaceSpace = {
@@ -102,8 +102,20 @@ const onboardingModules = [
   module("notifications", "Notifications", "◌", "Compte", "Alertes liées aux dossiers.", { resource: "notifications" }),
 ] as const;
 
+const commercialModules = [
+  module("teams", "Mes équipes", "◎", "Supervision", "Accès des agents, affectations et suivi des activités.", { permission:"teams.manage" }),
+  module("cases", "Dossiers attribués", "▣", "Dossiers", "Vos dossiers et comptes rendus.", { permission:"commercial.cases" }),
+  module("dashboard", "Vue commerciale", "⌂", "CRM", "Prospection, pipeline et relances de vos prospects.", { primary:true,permission:"crm.manage" }),
+  module("crm", "Prospects", "◎", "CRM", "Fiches contacts, suivi commercial et historique.", { primary:true,permission:"crm.manage" }),
+  module("follow-ups", "Relances", "◷", "CRM", "Prochaines actions arrivées à échéance.", { primary:true,permission:"crm.manage" }),
+  module("dossiers", "Validation des dossiers", "✓", "Dossiers", "Pièces, compléments et décisions professionnelles.", { primary:true,permission:"commercial.cases",resource:"providers" }),
+  ...onboardingModules.filter(item => item.key !== "dashboard").map(item => ({...item,primary:false})),
+] as const;
+
 const supportModules = [
-  module("dashboard", "Dashboard", "⌂", "Assistance", "Files, urgences, SLA et tâches de l’agent.", { primary: true, permission: "support.manage" }),
+  module("teams", "Mes équipes", "◎", "Supervision", "Accès, affectations et suivi des dossiers.", { permission:"teams.manage" }),
+  module("cases", "Dossiers attribués", "▣", "Traitement", "Dossiers attribués et comptes rendus.", { permission:"support.cases" }),
+  module("dashboard", "Dashboard", "⌂", "Assistance", "Vos dossiers et priorités du service client.", { primary: true }),
   module("tickets", "Tickets", "▣", "Assistance", "Tous les tickets autorisés.", { primary: true, permission: "support.manage", resource: "reports" }),
   module("unassigned", "Non assignés", "+", "Files", "Tickets à prendre en charge.", { primary: true, permission: "support.manage", resource: "reports" }),
   module("mine", "Mes tickets", "◎", "Files", "Tickets affectés à votre compte.", { primary: true, permission: "support.manage", resource: "reports" }),
@@ -125,18 +137,21 @@ const moderationModules = [
 ] as const;
 
 const financeModules = [
-  module("dashboard", "Dashboard", "⌂", "Finance", "Volume, commissions, remboursements, versements et anomalies.", { primary: true, permission: "payments.read" }),
+  module("teams", "Mes équipes", "◎", "Supervision", "Accès, affectations et suivi des dossiers.", { permission:"teams.manage" }),
+  module("cases", "Dossiers attribués", "▣", "Traitement", "Dossiers attribués et comptes rendus.", { permission:"finance.cases" }),
+  module("dashboard", "Dashboard", "⌂", "Finance", "Vos dossiers et la synthèse financière autorisée.", { primary: true }),
   module("transactions", "Transactions", "¤", "Paiements", "Transactions autorisées et leur statut.", { primary: true, permission: "payments.read", resource: "payments" }),
   module("pending", "Paiements en attente", "…", "Paiements", "Paiements non finalisés.", { primary: true, permission: "payments.read", resource: "payments" }),
   module("failed", "Paiements échoués", "×", "Paiements", "Échecs et motifs disponibles.", { primary: true, permission: "payments.read", resource: "payments" }),
-  module("refunds", "Remboursements", "↺", "Paiements", "Demandes, décisions et audit.", { primary: true, permission: "payments.refund", resource: "payments" }),
+  module("refunds", "Remboursements", "↺", "Paiements", "Demandes, décisions et audit.", { primary: true, permission: "payments.read", resource: "payments" }),
   module("disputes", "Litiges", "⚖", "Contrôle", "Litiges réservés aux agents habilités au traitement des signalements.", { permission: "reports.manage", resource: "disputes" }),
-  module("commissions", "Commissions", "%", "Contrôle", "Écritures de commission enregistrées.", { permission: "commissions.manage", resource: "commissions" }),
+  module("commissions", "Commissions", "%", "Contrôle", "Écritures de commission enregistrées.", { permission: "payments.read", resource: "commissions" }),
   module("wallets", "Wallets", "▣", "Trésorerie", "Soldes dérivés des écritures autorisées.", { permission: "payments.read", resource: "wallets" }),
-  module("payouts", "Versements", "↗", "Trésorerie", "État des versements enregistrés. Aucun versement réel ne peut être déclenché en mode mock.", { permission: "payouts.manage", resource: "payouts" }),
+  module("payouts", "Versements", "↗", "Trésorerie", "État des versements enregistrés. Aucun versement réel ne peut être déclenché en mode mock.", { permission: "payouts.read", resource: "payouts" }),
   module("reconciliation", "Rapprochement", "≋", "Contrôle", "Résultats de rapprochement enregistrés ; aucun fournisseur réel n’est activé.", { permission: "payments.read", resource: "reconciliation" }),
-  module("anomalies", "Anomalies", "!", "Contrôle", "Événements financiers de sécurité enregistrés.", { permission: "audit.read", resource: "financial-events" }),
-  module("audit", "Audit financier", "≣", "Contrôle", "Journal non modifiable des actions financières.", { permission: "audit.read", resource: "audit" }),
+  module("anomalies", "Anomalies", "!", "Contrôle", "Événements financiers de sécurité enregistrés.", { permission: "payments.read", resource: "financial-events" }),
+  module("accounting", "Journal financier", "≡", "Comptabilité", "Les 100 derniers mouvements enregistrés dans les wallets, avec leur référence et leur devise.", { permission: "payments.read", resource: "ledger" }),
+  module("audit", "Audit financier", "≣", "Contrôle", "Journal non modifiable des actions financières.", { permission: "payments.read", resource: "audit" }),
 ] as const;
 
 const operationsModules = [
@@ -157,6 +172,7 @@ const operationsModules = [
 ] as const;
 
 const superAdminModules = [
+  module("teams", "Branches et responsables", "◎", "Utilisateurs et accès", "Équipes déléguées et responsables de service.", { permission:"roles.manage" }),
   module("dashboard", "Dashboard exécutif", "⌂", "Vue générale", "Indicateurs et santé de la plateforme.", { primary: true, permission: "users.read" }),
   module("alerts", "Centre d’alertes", "!", "Vue générale", "Alertes critiques et événements récents.", { primary: true, permission: "audit.read", resource: "audit" }),
   module("activity", "Activité récente", "↗", "Vue générale", "Activité globale autorisée.", { primary: true, permission: "audit.read", resource: "audit" }),
@@ -201,10 +217,11 @@ export const workspaceSpaces: Record<WorkspaceSpaceKey, WorkspaceSpace> = {
   pro: { key: "pro", label: "Espace professionnel", prefix: "/pro", eyebrow: "Votre activité", modules: proModules },
   salon: { key: "salon", label: "Espace salon", prefix: "/salon", eyebrow: "Votre établissement", modules: salonModules },
   staff: { key: "staff", label: "Espace employé", prefix: "/staff", eyebrow: "Votre activité au salon", modules: staffModules },
+  commercial: { key: "commercial", label: "Espace commercial", prefix: "/commercial", eyebrow: "Dossiers et validation des professionnels", allowedAdminRoles: ["commercial", "commercial_manager", "commercial_agent", "super_admin"], modules: commercialModules },
   onboarding: { key: "onboarding", label: "Onboarding", prefix: "/onboarding", eyebrow: "Validation professionnelle", allowedAdminRoles: ["verification_agent", "super_admin"], modules: onboardingModules },
-  support: { key: "support", label: "Support", prefix: "/support-agent", eyebrow: "Relation client", allowedAdminRoles: ["support", "admin", "super_admin"], modules: supportModules },
+  support: { key: "support", label: "Service client et réclamations", prefix: "/support-agent", eyebrow: "Relation client", allowedAdminRoles: ["support", "support_manager", "support_agent", "admin", "super_admin"], modules: supportModules },
   moderation: { key: "moderation", label: "Modération", prefix: "/moderation", eyebrow: "Confiance et sécurité", allowedAdminRoles: ["moderator", "admin", "super_admin"], modules: moderationModules },
-  finance: { key: "finance", label: "Finance", prefix: "/finance", eyebrow: "Contrôle financier", allowedAdminRoles: ["finance", "super_admin"], modules: financeModules },
+  finance: { key: "finance", label: "Finance", prefix: "/finance", eyebrow: "Contrôle financier", allowedAdminRoles: ["finance", "finance_manager", "finance_agent", "super_admin"], modules: financeModules },
   operations: { key: "operations", label: "Opérations", prefix: "/operations", eyebrow: "Administration opérationnelle", allowedAdminRoles: ["admin", "content_manager", "super_admin"], modules: operationsModules },
   admin: { key: "admin", label: "Super administration", prefix: "/admin", eyebrow: "Contrôle de la plateforme", allowedAdminRoles: ["super_admin"], modules: superAdminModules },
 };

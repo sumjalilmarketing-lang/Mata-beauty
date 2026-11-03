@@ -54,7 +54,7 @@ export function SalonControlCenter({ module, userId, collaboratorAccessEnabled =
     const { data: catalogData } = await supabase.from("services").select("id,name").eq("is_active", true).order("name"); setCatalog((catalogData ?? []) as CatalogService[]);
     if (!nextBusiness) { setServices([]); setCollaborators([]); setBookings([]); setHours([]); setClosures([]); setMedia([]); setState("ready"); return; }
     const [serviceResult, collaboratorResult, bookingResult, hoursResult, closureResult, mediaResult, reviewResult] = await Promise.all([
-      supabase.from("provider_services").select("id,service_id,title,description,duration_minutes,price_amount,currency,is_active,archived_at,updated_at").eq("business_id", nextBusiness.id).is("archived_at", null).order("title"),
+      supabase.from("provider_services").select("id,service_id,title,description,duration_minutes,price_amount,currency,deposit_percentage,is_active,archived_at,updated_at").eq("business_id", nextBusiness.id).is("archived_at", null).order("title"),
       supabase.from(collaboratorAccessEnabled ? "collaborators_public" : "collaborators").select("id,display_name,title,is_bookable,is_active,archived_at").eq("business_id", nextBusiness.id).is("archived_at", null).order("display_name"),
       supabase.from("bookings").select("id,starts_at,ends_at,status,total_amount,currency,collaborator_id,provider_service_id").eq("business_id", nextBusiness.id).order("starts_at", { ascending: false }).limit(200),
       supabase.from("business_hours").select("id,weekday,opens_at,closes_at,is_closed").eq("business_id", nextBusiness.id).order("weekday"),

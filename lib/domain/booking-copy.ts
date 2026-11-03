@@ -1,6 +1,18 @@
 import { feedText } from "./feed-copy";
 
 const copy: Record<string, readonly [string, string]> = {
+  "Détail du prix": ["Price breakdown", "Desglose del precio"],
+  "Prix total": ["Total price", "Precio total"],
+  "Acompte prévu": ["Planned deposit", "Anticipo previsto"],
+  "Solde après paiement de l’acompte": ["Balance after deposit payment", "Saldo tras pagar el anticipo"],
+  "Répartition prévue à l’activation du paiement en ligne.": ["Planned breakdown when online payments become available.", "Desglose previsto cuando se active el pago en línea."],
+  "À payer aujourd’hui": ["Due today", "A pagar hoy"],
+  "Aucun acompte encaissé. À régler sur place": ["No deposit collected. Due on site", "No se ha cobrado anticipo. A pagar en el establecimiento"],
+  "Politique d’annulation": ["Cancellation policy", "Política de cancelación"],
+  "Aucun acompte payé : aucune retenue d’acompte.": ["No deposit paid: no deposit can be withheld.", "Sin anticipo pagado: no se retiene ningún anticipo."],
+  "Lire la politique d’annulation": ["Read the cancellation policy", "Leer la política de cancelación"],
+  "Annulation gratuite au moins 48 h avant le rendez-vous. Si le professionnel annule, les sommes versées sont intégralement remboursées. À moins de 48 h ou en cas d’absence, seul l’acompte effectivement payé peut être conservé, sous réserve des droits applicables.": ["Free cancellation at least 48 hours before the appointment. If the professional cancels, all amounts paid are refunded. With less than 48 hours notice or for a no-show, only the deposit actually paid may be retained, subject to applicable rights.", "Cancelación gratuita al menos 48 horas antes de la cita. Si el profesional cancela, se reembolsan todos los importes pagados. Con menos de 48 horas o en caso de ausencia, solo puede retenerse el anticipo realmente pagado, con sujeción a los derechos aplicables."],
+
   "Ce créneau vient d’être réservé. Choisissez une nouvelle disponibilité.": ["This time slot has just been booked. Choose a new available time.", "Esta hora acaba de reservarse. Elige otra disponibilidad."],
   "La confirmation n’a pas pu être vérifiée. Consultez vos rendez-vous avant de réessayer.": ["Confirmation could not be verified. Check your appointments before trying again.", "No se ha podido verificar la confirmación. Consulta tus citas antes de volver a intentarlo."],
   "réservation rapide": ["quick booking", "reserva rápida"],

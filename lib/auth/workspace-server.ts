@@ -3,7 +3,7 @@ import { ensureAuthenticatedProfile } from "@/lib/auth/profile";
 import type { AdminRoleKey } from "@/lib/domain/admin";
 import { workspaceModule, workspaceSpaces, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import { createSupabasePageClient } from "@/lib/supabase/server";
-import { availableWorkspaces, canAccessWorkspace, canAccessWorkspaceModule, type WorkspaceIdentity } from "./workspace-access";
+import { availableWorkspaces, internalWorkspaceDestination, canAccessWorkspace, canAccessWorkspaceModule, type WorkspaceIdentity } from "./workspace-access";
 
 type AdminContext = { roles?: string[]; permissions?: string[] };
 type CollaboratorAccess = { business_id: string; collaborator_id: string; internal_role: string; permissions: string[] };
@@ -17,12 +17,15 @@ export async function requireWorkspace(space: WorkspaceSpaceKey, moduleKey: stri
   const profile = await ensureAuthenticatedProfile(supabase, user.id).catch(() => null);
   if (!profile) redirect("/?auth_error=profile_creation_failed");
   const collaboratorAccessEnabled = process.env.NEXT_PUBLIC_SALON_COLLABORATOR_ACCESS_ENABLED === "true";
-  const [adminResult, ownedResult, collaboratorResult, providerResult] = await Promise.all([
+  const [adminResult, ownedResult, collaboratorResult, providerResult, mfaResult] = await Promise.all([
     supabase.rpc("get_admin_context"),
     supabase.from("businesses").select("id", { count: "exact", head: true }).eq("owner_id", user.id),
     collaboratorAccessEnabled ? supabase.rpc("current_collaborator_access") : Promise.resolve({ data: [], error: null }),
     supabase.from("provider_profiles").select("status").eq("profile_id", user.id).maybeSingle(),
+    supabase.rpc("admin_mfa_required"),
   ]);
+  const internal = !["client", "pro", "salon", "staff"].includes(space);
+  if (internal && mfaResult.data === true) redirect("/admin");
   const admin = (adminResult.data ?? {}) as AdminContext;
   const collaboratorAccess = (collaboratorResult.error ? [] : collaboratorResult.data ?? []) as CollaboratorAccess[];
   const staffPermissions = [...new Set(collaboratorAccess.flatMap((membership) => membership.permissions ?? []))];
@@ -35,7 +38,11 @@ export async function requireWorkspace(space: WorkspaceSpaceKey, moduleKey: stri
     isCollaborator: staffPermissions.length > 0,
   };
   if (["pro", "salon"].includes(space) && providerResult.data?.status !== "approved") redirect("/app/application");
-  if (!canAccessWorkspace(space, identity)) redirect(`/?acces=refuse&returnTo=${encodeURIComponent(requestedPath)}`);
+  if (!canAccessWorkspace(space, identity)) {
+    const destination = internalWorkspaceDestination(identity.adminRoles);
+    if (internal && destination && destination !== workspacePath(space)) redirect(destination);
+    redirect(`/?acces=refuse&returnTo=${encodeURIComponent(requestedPath)}`);
+  }
   if (!workspaceSpaces[space].modules.some((item) => item.key === moduleKey)) notFound();
   const currentModule = workspaceModule(space, moduleKey);
   if (!canAccessWorkspaceModule(identity, currentModule.permission, currentModule.staffPermission)) {
@@ -49,6 +56,6 @@ export async function requireWorkspace(space: WorkspaceSpaceKey, moduleKey: stri
 }
 
 function workspacePath(space: WorkspaceSpaceKey) {
-  const prefixes: Record<WorkspaceSpaceKey, string> = { client: "/app", pro: "/pro", salon: "/salon", staff: "/staff", onboarding: "/onboarding", support: "/support-agent", moderation: "/moderation", finance: "/finance", operations: "/operations", admin: "/admin" };
+  const prefixes: Record<WorkspaceSpaceKey, string> = { client: "/app", pro: "/pro", salon: "/salon", staff: "/staff", commercial: "/commercial", onboarding: "/onboarding", support: "/support-agent", moderation: "/moderation", finance: "/finance", operations: "/operations", admin: "/admin" };
   return prefixes[space];
 }

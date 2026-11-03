@@ -1,3 +1,4 @@
+import {handleDepartmentFixture} from "./department-workspaces.mjs";
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 
@@ -12,7 +13,7 @@ function respond(response, status, body, headers = {}) {
 }
 
 export function createSupabaseFixtureServer(port) {
-  return createServer((request, response) => {
+  return createServer(async(request, response) => {
   const url = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
   const testPort = Number(process.env.MATA_PLAYWRIGHT_PORT ?? 3160);
   const origin = request.headers.origin;
@@ -33,6 +34,7 @@ export function createSupabaseFixtureServer(port) {
     response.end();
     return;
   }
+  if(await handleDepartmentFixture(request,response,send))return;
   if (url.pathname === "/health") return send(200, { ok: true });
   if (url.pathname === "/rest/v1/provider_profiles") {
     return send(200, {

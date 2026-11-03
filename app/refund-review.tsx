@@ -7,7 +7,7 @@ import { publicErrorMessage } from "@/lib/ui/public-error";
 
 type Refund = { id: string; payment_id: string; amount: number; status: string; reason: string; created_at: string; payments: { currency: string } | { currency: string }[] | null };
 
-export function RefundReview() {
+export function RefundReview({readOnly=false}:{readOnly?:boolean}) {
   const [rows, setRows] = useState<Refund[]>([]);
   const [selected, setSelected] = useState<Refund | null>(null);
   const [notice, setNotice] = useState("");
@@ -26,7 +26,7 @@ export function RefundReview() {
   }, []);
   useEffect(() => { const start = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(start); }, [load]);
   async function decide(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (!selected || submitting.current) return;
+    event.preventDefault(); if (readOnly || !selected || submitting.current) return;
     const data = new FormData(event.currentTarget);
     submitting.current = true; setBusy(true); setNotice("");
     try {
@@ -43,9 +43,9 @@ export function RefundReview() {
     {notice && <p role="status">{notice}</p>}
     {loading ? <p>Chargement…</p> : rows.length ? rows.map(row => <article className="control-list-row" key={row.id}>
       <div><strong>{formatRecordedMoney(row.amount, (Array.isArray(row.payments) ? row.payments[0] : row.payments)?.currency)}</strong><p>{row.reason}</p><small>{row.status} · {new Date(row.created_at).toLocaleString("fr-FR")}</small></div>
-      {["requested", "approved"].includes(row.status) && <button disabled={busy} onClick={() => setSelected(row)}>Examiner la demande</button>}
+      {!readOnly && ["requested", "approved"].includes(row.status) && <button disabled={busy} onClick={() => setSelected(row)}>Examiner la demande</button>}
     </article>) : !notice && <p>Aucune demande de remboursement.</p>}
-    {selected && <form className="dashboard-form" onSubmit={event => void decide(event)}>
+    {!readOnly && selected && <form className="dashboard-form" onSubmit={event => void decide(event)}>
       <h3>Décision sur la demande</h3><p>{selected.reason}</p>
       <label htmlFor="refund-action">Décision</label><select id="refund-action" name="action">{selected.status === "requested" ? <><option value="approve">Approuver la demande</option><option value="reject">Rejeter la demande</option></> : <option value="processing">Marquer en traitement (mock)</option>}</select>
       <label>Justification<textarea name="reason" required minLength={2} maxLength={1000} /></label>
