@@ -56,7 +56,7 @@ describe("workspace navigation", () => {
 describe("department isolation", () => {
   it.each([['commercial','commercial'],['finance','finance'],['support','support']] as const)("keeps %s in its department", (role, space) => {
     const identity = { ...base, applicationRoles: ['admin'] as const, adminRoles: [role] };
-    expect(availableWorkspaces(identity)).toEqual([space]);
+    expect(availableWorkspaces(identity)).toEqual(space === "commercial" ? ["client", space] : [space]);
     for (const other of ['admin','commercial','finance','support','operations'] as const) {
       expect(canAccessWorkspace(other,identity)).toBe(other === space);
     }
@@ -72,4 +72,4 @@ describe("department isolation", () => {
 });
 
 import{defaultRolePermissions}from "../../lib/domain/admin";
-it("isolates six delegated roles and prevents agent team/global administration",()=>{for(const department of["commercial","finance","support"]as const)for(const suffix of["manager","agent"]as const){const role=`${department}_${suffix}`as const,identity={...base,applicationRoles:["admin"]as const,adminRoles:[role],permissions:defaultRolePermissions[role]};expect(availableWorkspaces(identity)).toEqual([department]);expect(internalWorkspaceDestination([role])).toBe(department==="support"?"/support-agent":`/${department}`);expect(canAccessWorkspaceModule(identity,"teams.manage")).toBe(suffix==="manager");expect(canAccessWorkspaceModule(identity,"roles.manage")).toBe(false);}expect(defaultRolePermissions.finance_agent).toEqual(["finance.cases"]);expect(defaultRolePermissions.finance_manager).not.toContain("payments.refund");});
+it("isolates six delegated roles and prevents agent team/global administration",()=>{for(const department of["commercial","finance","support"]as const)for(const suffix of["manager","agent"]as const){const role=`${department}_${suffix}`as const,identity={...base,applicationRoles:["admin"]as const,adminRoles:[role],permissions:defaultRolePermissions[role]};expect(availableWorkspaces(identity)).toEqual(department === "commercial" ? ["client", department] : [department]);expect(internalWorkspaceDestination([role])).toBe(department==="support"?"/support-agent":`/${department}`);expect(canAccessWorkspaceModule(identity,"teams.manage")).toBe(suffix==="manager");expect(canAccessWorkspaceModule(identity,"roles.manage")).toBe(false);}expect(defaultRolePermissions.finance_agent).toEqual(["finance.cases"]);expect(defaultRolePermissions.finance_manager).not.toContain("payments.refund");});

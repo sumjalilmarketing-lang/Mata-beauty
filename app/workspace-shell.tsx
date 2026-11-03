@@ -39,7 +39,8 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
   const parent = navigationParent(space, moduleKey);
   const secondary = simpleKeys ? modules.filter((item) => item.key !== "dashboard" && !mainModules.includes(item) && navigationParent(space, item.key) === parent) : [];
   const notificationsModule = modules.find((item) => item.key === "notifications");
-  const visibleSpaces = availableSpaces;
+  const visibleSpaces = ["client", "pro", "salon", "staff"].includes(space)
+    ? availableSpaces.filter(key => ["client", "pro", "salon", "staff"].includes(key)) : availableSpaces;
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -76,6 +77,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
           })}
         </div>)}
       </nav>
+      {space === "commercial" && <nav aria-label="Autres espaces Mata Beauty"><Link href="/">Découvrir le feed</Link>{availableSpaces.includes("client") && <Link href="/app">Mon espace client</Link>}</nav>}
       <button className="workspace-signout" type="button" onClick={signOut}>{t("Se déconnecter")}</button>
     </aside>
     <main className="workspace-main">
@@ -95,6 +97,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
     <dialog ref={moreDialog} id="workspace-more-menu" className="workspace-more-menu" aria-labelledby="workspace-more-title" onClose={() => setMoreOpen(false)} onClick={event => { if (event.target === event.currentTarget) moreDialog.current?.close(); }}>
       <div className="workspace-more-content"><header><div><h2 id="workspace-more-title">{t("Plus")}</h2><p>{t(definition.label)}</p></div><button type="button" autoFocus aria-label={t("Fermer le menu")} onClick={() => moreDialog.current?.close()}>✕</button></header>
       <nav aria-label={t("Autres rubriques")}>{moreItems.map(item => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined} onClick={() => moreDialog.current?.close()}><span aria-hidden>{item.icon}</span><span>{t(navigationLabel(space, item))}</span><span aria-hidden>›</span></Link>)}</nav>
+      {space === "commercial" && <nav aria-label="Changer d’espace"><Link href="/" onClick={() => moreDialog.current?.close()}>Découvrir le feed</Link>{availableSpaces.filter(key => key !== "commercial").map(key => <Link key={key} href={workspaceHref(key)} onClick={() => moreDialog.current?.close()}>{t(workspaceSpaces[key].label)}</Link>)}</nav>}
       <button className="workspace-more-signout" type="button" onClick={() => { moreDialog.current?.close(); void signOut(); }}>{t("Se déconnecter")}</button></div>
     </dialog>
   </div>;

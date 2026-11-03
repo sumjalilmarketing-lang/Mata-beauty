@@ -12,7 +12,7 @@ export type WorkspaceIdentity = {
 };
 
 export function canAccessWorkspace(space: WorkspaceSpaceKey, identity: WorkspaceIdentity) {
-  if (space === "client") return identity.applicationRoles.includes("client");
+  if (space === "client") return identity.applicationRoles.includes("client") || identity.adminRoles.some(role => ["commercial", "commercial_manager", "commercial_agent"].includes(role));
   if (space === "pro") return identity.applicationRoles.includes("provider");
   // A professional must be able to enter the Salon workspace to create their
   // first business. Row-level policies still restrict every existing salon to
