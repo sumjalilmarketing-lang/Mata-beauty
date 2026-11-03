@@ -35,6 +35,11 @@ export function createSupabaseFixtureServer(port) {
     return;
   }
   if(await handleDepartmentFixture(request,response,send))return;
+  // The own-profile loader uses a server credential, so scope its synthetic
+  // record by ID rather than relying on a browser fixture JWT.
+  const auditClientId="aaaaaaaa-aaaa-4aaa-8aaa-000000000008";
+  if(url.pathname==="/rest/v1/profiles" && url.searchParams.get("id")==="eq."+auditClientId) return send(200,{id:auditClientId,role:"client",is_suspended:false,account_status:"active",username:"recette_client",display_name:"Client Recette",first_name:"Client",last_name:"Recette",avatar_url:null,bio:""});
+  if(url.pathname==="/rest/v1/account_roles" && url.searchParams.get("profile_id")==="eq."+auditClientId) return send(200,[{role:"customer"}]);
   if (url.pathname === "/health") return send(200, { ok: true });
   if (url.pathname === "/rest/v1/provider_profiles") {
     return send(200, {

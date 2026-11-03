@@ -112,13 +112,13 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
     if (definition.table === "app_settings") request = request.eq("is_sensitive", false);
     if (space === "admin" && module.key === "suspended") request = request.eq("is_suspended", true);
     if (definition.select.includes("created_at")) request = request.order("created_at", { ascending: false });
-    request.then(({ data, error }) => {
+    void Promise.resolve(request).then(({ data, error }) => {
       window.clearTimeout(timeout);
       if (!active) return;
       if (error) { setState("unavailable"); return; }
       const next = (data ?? []) as unknown as Row[];
       setRows(next); setState(next.length ? "ready" : "empty");
-    });
+    }).catch(() => { window.clearTimeout(timeout); if (active) { setRows([]); setState("unavailable"); } });
     return () => { active = false; window.clearTimeout(timeout); controller.abort(); };
   }, [definition, paymentStatus, space, module.key, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
