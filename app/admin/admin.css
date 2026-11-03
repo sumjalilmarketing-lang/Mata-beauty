@@ -67,3 +67,5 @@
 .internal-departments { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: 16px; margin: 20px 0; }
 .internal-departments article { margin: 0; }
 .internal-departments a { display: inline-block; margin: 12px 0 0; }
+
+.admin-hr-link{display:flex;align-items:center;gap:10px;margin:0 12px 14px;padding:12px 14px;min-height:44px;border:1px solid rgba(239,82,157,.3);border-radius:10px;color:#f9d7e9;text-decoration:none;background:rgba(239,82,157,.1);font-size:13px;font-weight:700}.admin-hr-link:focus-visible{outline:2px solid #ef529d;outline-offset:3px}

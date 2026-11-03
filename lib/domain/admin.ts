@@ -7,12 +7,14 @@ export const adminRoleKeys = [
   "commercial",
   "finance",
   "content_manager",
+  "hr_manager", "hr_agent",
   "commercial_manager", "commercial_agent", "finance_manager", "finance_agent", "support_manager", "support_agent",
 ] as const;
 
 export type AdminRoleKey = typeof adminRoleKeys[number];
 
 export const adminPermissionKeys = [
+  "hr.manage", "hr.cases",
   "users.read", "users.update", "users.suspend", "users.delete",
   "providers.read", "providers.verify", "providers.suspend",
   "bookings.read", "bookings.update",
@@ -32,6 +34,8 @@ export const defaultRolePermissions: Record<AdminRoleKey, readonly AdminPermissi
     "categories.manage", "content.manage", "notifications.send", "settings.read", "audit.read",
     "support.manage", "documents.review",
   ],
+  hr_manager: ["teams.manage", "hr.manage", "hr.cases"],
+  hr_agent: ["hr.cases"],
   support_manager: ["teams.manage", "support.cases"],
   support_agent: ["support.cases"],
   commercial_manager: ["teams.manage", "crm.manage", "commercial.cases"],

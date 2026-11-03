@@ -3,6 +3,7 @@ import { formatAdminMoney, totalAdminMoneyByCurrency, formatCurrencyBreakdown } 
 import { PasswordField } from "@/app/password-field";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { internalWorkspaceDestination } from "@/lib/auth/workspace-access";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -496,6 +497,7 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
     <aside id="admin-sidebar" className={`admin-sidebar ${mobileNav ? "mobile-open" : ""}`}>
       <button className="admin-brand" onClick={() => navigateToModule(landingModule(context))}><Image src="/brand/mata-app-icon.webp" alt="" width={42} height={42} unoptimized /><strong>MATA<small>CONTROL CENTER</small></strong></button>
       <div className="admin-role-card"><i>{roleInitials}</i><span><strong>{roleLabel}</strong><small>Accès sécurisé</small></span></div>
+      {context.is_super_admin && <Link href="/admin/hr" className="admin-hr-link" onClick={() => setMobileNav(false)}>◎ Ressources humaines</Link>}
       <nav aria-label="Navigation Super Admin">{visibleGroups.map((group) => {
         const isOpen = expandedGroup === group.key;
         const containsCurrent = group.moduleKeys.includes(effectiveModule);

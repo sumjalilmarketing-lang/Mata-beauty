@@ -2,6 +2,7 @@ import type { Metadata, MetadataRoute } from "next";
 import { privateMetadata } from "./private";
 
 export const workspaceInstallations = {
+  hr:{prefix:"/admin/hr",name:"Mata Beauty — Ressources humaines",shortName:"Mata RH"},
   client: { prefix: "/app", name: "Mata Beauty — Espace client", shortName: "Mata Client" },
   pro: { prefix: "/pro", name: "Mata Beauty — Espace professionnel", shortName: "Mata Pro" },
   salon: { prefix: "/salon", name: "Mata Beauty — Gestion du salon", shortName: "Mata Salon" },

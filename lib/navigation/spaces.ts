@@ -1,6 +1,6 @@
 import type { AdminPermissionKey, AdminRoleKey } from "../domain/admin";
 
-export type WorkspaceSpaceKey = "client" | "pro" | "salon" | "staff" | "commercial" | "onboarding" | "support" | "moderation" | "finance" | "operations" | "admin";
+export type WorkspaceSpaceKey = "hr" | "client" | "pro" | "salon" | "staff" | "commercial" | "onboarding" | "support" | "moderation" | "finance" | "operations" | "admin";
 
 export type WorkspaceModule = {
   key: string;
@@ -175,6 +175,7 @@ const operationsModules = [
 ] as const;
 
 const superAdminModules = [
+  module("hr", "Ressources humaines", "◎", "Personnel", "Dossiers salariés, contrats, congés, horaires et paie.", {permission:"hr.manage"}),
   module("teams", "Branches et responsables", "◎", "Utilisateurs et accès", "Équipes déléguées et responsables de service.", { permission:"roles.manage" }),
   module("dashboard", "Dashboard exécutif", "⌂", "Vue générale", "Indicateurs et santé de la plateforme.", { primary: true, permission: "users.read" }),
   module("alerts", "Centre d’alertes", "!", "Vue générale", "Alertes critiques et événements récents.", { primary: true, permission: "audit.read", resource: "audit" }),
@@ -215,7 +216,14 @@ const superAdminModules = [
   module("deletion-requests", "Demandes de suppression", "×", "Sécurité et audit", "Demandes reçues et statut de traitement. Aucune suppression automatique n’est effectuée depuis cette liste.", { permission: "users.delete", resource: "deletion-requests" }),
 ] as const;
 
+const hrModules = [
+ module("dashboard","Vue RH","⌂","RH","Personnel et travaux RH autorisés.",{primary:true,permission:"hr.cases"}),
+ module("teams","Équipes RH","◎","RH","Délégation, recrutement et accès des gestionnaires.",{permission:"teams.manage"}),
+ module("personnel","Personnel","○","RH","Fiches et affectations des salariés.",{primary:true,permission:"hr.cases"}),
+ ...(["contract","document","leave","time","payroll","task"]as const).map((key,i)=>module(key,["Contrats","Documents privés","Congés et absences","Horaires et présences","Paie","Tâches RH"][i],"▣","RH","Dossiers et contrôles RH autorisés.",{permission:"hr.cases",primary:key==="payroll"||key==="leave"})),
+]as const;
 export const workspaceSpaces: Record<WorkspaceSpaceKey, WorkspaceSpace> = {
+ hr:{key:"hr",label:"Ressources humaines",prefix:"/admin/hr",eyebrow:"Personnel et gestion RH",allowedAdminRoles:["super_admin","hr_manager","hr_agent"],modules:hrModules},
   client: { key: "client", label: "Espace client", prefix: "/app", eyebrow: "Votre beauté", modules: clientModules },
   pro: { key: "pro", label: "Espace professionnel", prefix: "/pro", eyebrow: "Votre activité", modules: proModules },
   salon: { key: "salon", label: "Espace salon", prefix: "/salon", eyebrow: "Votre établissement", modules: salonModules },

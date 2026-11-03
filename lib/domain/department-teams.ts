@@ -1,10 +1,11 @@
 import {z} from "zod";
-export const departments=["commercial","finance","support"]as const;
+export const departments=["commercial","finance","support","hr"]as const;
 export type Department=typeof departments[number];
-export const departmentLabels:Record<Department,string>={commercial:"Commercial",finance:"Finance",support:"Service client"};
+export const departmentLabels:Record<Department,string>={hr:"Ressources humaines",commercial:"Commercial",finance:"Finance",support:"Service client"};
 export const caseStatuses={open:"À traiter",in_progress:"En cours",waiting:"En attente",completed:"Terminé"}as const;
 const reason=z.string().trim().min(2).max(1000),teamId=z.uuid(),email=z.email().max(254).transform(v=>v.toLowerCase());
 export const departmentTeamInput=z.discriminatedUnion("action",[
+ z.object({action:z.literal("hr-team"),name:z.string().trim().min(2).max(120),reason}).strict(),
  z.object({action:z.literal("commercial-team"),name:z.string().trim().min(2).max(120),reason}).strict(),
  z.object({action:z.literal("team"),teamId:teamId.nullable(),version:z.number().int().positive().nullable(),department:z.enum(departments),name:z.string().trim().min(2).max(120),managerEmail:email,enabled:z.boolean(),reason}).strict(),
  z.object({action:z.literal("member"),teamId,email,reason}).strict(),

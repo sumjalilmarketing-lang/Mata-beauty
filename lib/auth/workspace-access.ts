@@ -36,6 +36,7 @@ export function availableWorkspaces(identity: WorkspaceIdentity): WorkspaceSpace
 /** Internal roles use their own workspace, never the general administration UI. */
 export function internalWorkspaceDestination(roles: readonly string[]): string | null {
   if (roles.includes("super_admin")) return "/admin";
+  if (roles.some(role=>["hr_manager","hr_agent"].includes(role))) return "/admin/hr";
   if (roles.includes("admin")) return "/operations";
   if (roles.some(role => ["commercial", "commercial_manager", "commercial_agent"].includes(role))) return "/commercial";
   if (roles.includes("verification_agent")) return "/onboarding";

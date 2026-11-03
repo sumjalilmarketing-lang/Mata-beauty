@@ -56,6 +56,6 @@ export async function requireWorkspace(space: WorkspaceSpaceKey, moduleKey: stri
 }
 
 function workspacePath(space: WorkspaceSpaceKey) {
-  const prefixes: Record<WorkspaceSpaceKey, string> = { client: "/app", pro: "/pro", salon: "/salon", staff: "/staff", commercial: "/commercial", onboarding: "/onboarding", support: "/support-agent", moderation: "/moderation", finance: "/finance", operations: "/operations", admin: "/admin" };
+  const prefixes: Record<WorkspaceSpaceKey, string> = { hr:"/admin/hr", client: "/app", pro: "/pro", salon: "/salon", staff: "/staff", commercial: "/commercial", onboarding: "/onboarding", support: "/support-agent", moderation: "/moderation", finance: "/finance", operations: "/operations", admin: "/admin" };
   return prefixes[space];
 }
