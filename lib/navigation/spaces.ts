@@ -241,3 +241,10 @@ export function navigationParent(space: WorkspaceSpaceKey, key: string) {
   }
   return key;
 }
+
+// Preserve old bookmarks without silently opening an unrelated dashboard.
+export function normalizeWorkspaceModule(space: WorkspaceSpaceKey, key: string) {
+  if (key === "studio") return "videos";
+  if (key === "menu") return workspaceSpaces[space].modules.some(item => item.key === "settings") ? "settings" : "dashboard";
+  return key;
+}

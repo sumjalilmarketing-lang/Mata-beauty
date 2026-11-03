@@ -34,6 +34,15 @@ export function createSupabaseFixtureServer(port) {
     return;
   }
   if (url.pathname === "/health") return send(200, { ok: true });
+  // Opt-in identity for workspace navigation tests only. Never accepts real tokens.
+  if (request.headers.authorization?.endsWith(".workspace-menu-fixture")) {
+    if (url.pathname === "/auth/v1/user") return send(200, { id: providerId, aud: "authenticated", role: "authenticated", email: "workspace@example.test", app_metadata: {}, user_metadata: {} });
+    if (url.pathname === "/rest/v1/rpc/get_my_private_profile") return send(200, { role: "provider", is_suspended: false, account_status: "active", first_name: "Test", last_name: "Navigation", phone: "+221770000000" });
+    if (url.pathname === "/rest/v1/rpc/get_admin_context") return send(200, { roles: [], permissions: [] });
+    if (url.pathname === "/rest/v1/account_roles") return send(200, [{ role: "customer" }, { role: "professional" }]);
+    if (url.pathname === "/rest/v1/provider_profiles") return send(200, { profile_id: providerId, status: "approved" });
+  }
+
   if (url.pathname === "/rest/v1/provider_profiles") {
     return send(200, {
       profile_id: providerId,
