@@ -395,9 +395,9 @@ export function LiveDashboard({
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setFeedback("");
-    const { error: updateError } = await supabase.from("bookings").update({ status }).eq("id", booking.id);
-    if (updateError) {
-      setFeedback(updateError.message);
+    const { data: updated, error: updateError } = await supabase.from("bookings").update({ status }).eq("id", booking.id).eq("status", booking.status).select("id").maybeSingle();
+    if (updateError || !updated) {
+      setFeedback(publicErrorMessage(updateError, "La réservation a changé ou cette action n’est plus autorisée. Actualisez puis réessayez."));
       return;
     }
     setFeedback("Réservation mise à jour.");
