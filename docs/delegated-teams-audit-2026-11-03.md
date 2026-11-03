@@ -35,7 +35,13 @@ Les tests navigateur utilisent des sessions et services locaux simulés. Les tes
 
 ## Statut hébergé et limites bloquantes
 
-**Pas de validation de mise en production.** Les appels d’application de migration sur Test n’ont pas abouti à une exécution confirmée : erreur de transport du connecteur « Conflicting MCP request metadata », puis appel interrompu sans résultat exploitable. Une lecture ultérieure confirme l’absence du rôle `commercial`, de `crm_leads` et de `department_teams` sur Test. Les nouveaux espaces ne peuvent donc pas encore être déclarés utilisables sur le site officiel.
+**Les trois migrations sont appliquées et vérifiées sur Test** (`skrrfronlhoddtgxvezu`). Le blocage de transport précédent est résolu. Les sept tables CRM/équipes/dossiers ont toutes RLS et des politiques actives.
+
+La recette `tests/integration/delegated-teams-rollback.sql` a réussi sur PostgreSQL Test hébergé : refus AAL1, nomination de responsables, isolation des équipes, recrutement, CRM/visites, refus KYC incomplet, réaffectation/retrait des accès, finance restreinte, réponse publique/note privée, remplacement du responsable et révocation. Elle emploie des identités et claims JWT synthétiques dans une transaction annulée ; ce n’est pas un test de connexion Supabase Auth. Une lecture après rollback confirme zéro profil et zéro équipe de recette restants.
+
+La sauvegarde quotidienne de Production du **2 novembre 2026 à 23:09:01 UTC**, type PHYSICAL, a été vérifiée dans le tableau de bord Supabase authentifié du projet `qjdwxdbvrxedyfolnpol`. Aucune restauration n’a été lancée et la restauration n’a pas été testée. Les sauvegardes de base ne contiennent pas les objets Storage ; cette livraison ne les modifie pas. Les définitions actuelles des fonctions de Production ont également été relues avant toute migration.
+
+**La validation de production reste suspendue à la recette Auth/MFA réelle.** La revue automatique de sécurité a refusé le déploiement d’un outil temporaire de recette privilégié sur Test, car il aurait créé un point d’accès capable de gérer des comptes et attribuer des droits. Cet outil n’a pas été déployé. Le test transactionnel ci-dessus ne crée aucun point d’accès persistant et ne remplace pas cette recette Auth.
 
 Aucune nouvelle migration en Production, fusion de PR, nomination réelle, import de prospects ou modification des réservations/paiements existants n’a été effectuée. Le code ne déclenche aucun paiement réel et conserve le mode mock.
 
@@ -43,8 +49,8 @@ Les conseillers sécurité de Test, consultés avant application, signalent des 
 
 ## Intégration restante, dans l’ordre
 
-1. Rétablir l’exécution des migrations sur Test via le connecteur ou un opérateur disposant de l’accès SQL. Vérifier le projet ciblé et son historique. Ne pas contourner une confirmation expirée par du DDL dans un outil de lecture.
-2. Appliquer successivement `20261103103837_department_workspaces.sql`, `20261103112737_commercial_crm.sql`, `20261103120014_delegated_department_teams.sql`. Ne pas relancer une migration déjà inscrite ; contrôler son résultat et l’historique. La dernière migration est transactionnelle, limite l’attente de verrou et échoue sur une forme de fonction existante inattendue.
+1. Terminé : appliquer les migrations sur Test via le connecteur et contrôler leur résultat.
+2. Terminé : `20261103103837_department_workspaces.sql`, `20261103112737_commercial_crm.sql`, `20261103120014_delegated_department_teams.sql` appliquées dans cet ordre. Ne pas les relancer. Recette SQL hébergée réussie, sans données de recette persistantes.
 3. Raccorder une prévisualisation au projet Test avec les secrets exclusivement serveur et l’URL de confirmation autorisée par Supabase. Vérifier Auth, PostgREST, Storage et conseillers sécurité après application.
 4. Recette réelle avec comptes de recette contrôlés : deux équipes commerciales, responsables/agents des trois services, AAL1/AAL2, ajout existant, invitation/lien consommé une seule fois, remplacement du responsable pendant une invitation, réaffectation et révocation. Tester aussi les URL directes et RPC interdits. Pour les emails, utiliser uniquement des boîtes de recette explicitement autorisées ; confirmer la réception et non seulement l’acceptation fournisseur.
 5. Comparer avant/après les réservations et paiements existants et tester les fonctions publiques essentielles. Les nouveaux scripts n’effectuent aucune mise à jour de réservation ni mouvement financier.
