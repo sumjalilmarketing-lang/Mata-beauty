@@ -26,3 +26,13 @@ test("robots and sitemap are served as crawl directives and valid XML", async ({
   expect(sitemap).toMatch(/<loc>https:\/\/mata-beauty\.com\/?<\/loc>/);
   expect(sitemap).not.toMatch(/https:\/\/mata-beauty\.com\/(?:app|admin|staff|pro)\//);
 });
+
+test("publishes the cancellation policy with the payment activation limit", async ({ page }) => {
+  const response = await page.goto("/legal/annulation");
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Politique d’annulation" })).toBeVisible();
+  await expect(page.getByRole("article")).toContainText("au moins 48 heures");
+  await expect(page.getByRole("article")).toContainText("sans frais d’annulation");
+  await expect(page.getByRole("article")).toContainText("Aucun acompte n’est actuellement encaissé");
+  await expect(page.getByText("DOCUMENT EN PRÉPARATION")).toHaveCount(0);
+});

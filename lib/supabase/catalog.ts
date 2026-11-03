@@ -5,6 +5,7 @@ export type CatalogProvider = {
   id: string;
   profileId: string;
   serviceId: string;
+  depositPercentage?: number;
   categoryId?: string;
   countryCode?: string;
   country?: string;
@@ -72,6 +73,7 @@ type ProviderRecord = {
     title: string;
     duration_minutes: number;
     price_amount: number;
+    deposit_percentage: number;
     business_id: string | null;
     currency: string;
     businesses: { address: string; city: string; area: string | null; latitude: number | null; longitude: number | null; country_code: string | null; region: string | null; timezone: string | null; currency: string | null } | null;
@@ -87,7 +89,7 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
     .select(`
       profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,cover_url,latitude,longitude,country_code,region,timezone,
       provider_services!inner(
-        id,title,duration_minutes,price_amount,business_id,currency,
+        id,title,duration_minutes,price_amount,business_id,currency,deposit_percentage,
         businesses(address,city,area,latitude,longitude,country_code,region,timezone,currency),
         services(name,categories(id,name))
       )
@@ -168,6 +170,7 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
       timeZone: service.businesses?.timezone ?? provider.timezone ?? "Africa/Dakar",
       currency: (service.businesses?.currency ?? service.currency ?? "XOF") as CatalogProvider["currency"],
       price: service.price_amount,
+      depositPercentage: service.deposit_percentage ?? 0,
       rating: Number(provider.average_rating),
       reviews: provider.review_count,
       verified: Boolean(provider.verified_at),

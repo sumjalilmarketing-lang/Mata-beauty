@@ -309,7 +309,7 @@ export function LiveDashboard({
               .eq("profile_id", userId)
               .maybeSingle(),
             supabase.from("services").select("id,name").eq("is_active", true).order("name"),
-            supabase.from("provider_services").select("id,business_id,service_id,title,description,price_amount,duration_minutes,currency,is_active,archived_at,updated_at").eq("provider_id", userId).is("archived_at", null).order("title"),
+            supabase.from("provider_services").select("id,business_id,service_id,title,description,price_amount,duration_minutes,currency,deposit_percentage,is_active,archived_at,updated_at").eq("provider_id", userId).is("archived_at", null).order("title"),
             businessIds.length ? supabase.from("businesses").select("id,timezone").in("id", businessIds) : Promise.resolve({ data: [], error: null }),
           ]);
           if (profileResult.error) throw profileResult.error;
