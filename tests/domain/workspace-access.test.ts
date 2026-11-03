@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availableWorkspaces, canAccessWorkspace, canAccessWorkspaceModule, type WorkspaceIdentity } from "../../lib/auth/workspace-access";
+import { availableWorkspaces, internalWorkspaceDestination, canAccessWorkspace, canAccessWorkspaceModule, type WorkspaceIdentity } from "../../lib/auth/workspace-access";
 import { workspaceSpaces } from "../../lib/navigation/spaces";
 
 const base: WorkspaceIdentity = { applicationRoles: [], adminRoles: [], permissions: [], staffPermissions: [], ownsBusiness: false, isCollaborator: false };
@@ -49,5 +49,24 @@ describe("workspace navigation", () => {
       const keys = space.modules.map((module) => module.key);
       expect(new Set(keys).size).toBe(keys.length);
     }
+  });
+});
+
+
+describe("department isolation", () => {
+  it.each([['commercial','commercial'],['finance','finance'],['support','support']] as const)("keeps %s in its department", (role, space) => {
+    const identity = { ...base, applicationRoles: ['admin'] as const, adminRoles: [role] };
+    expect(availableWorkspaces(identity)).toEqual([space]);
+    for (const other of ['admin','commercial','finance','support','operations'] as const) {
+      expect(canAccessWorkspace(other,identity)).toBe(other === space);
+    }
+  });
+  it("routes staff after MFA without exposing the super administration", () => {
+    expect(internalWorkspaceDestination(['commercial'])).toBe('/commercial');
+    expect(internalWorkspaceDestination(['finance'])).toBe('/finance');
+    expect(internalWorkspaceDestination(['support'])).toBe('/support-agent');
+    expect(internalWorkspaceDestination(['verification_agent'])).toBe('/onboarding');
+    expect(internalWorkspaceDestination(['super_admin'])).toBe('/admin');
+    expect(internalWorkspaceDestination(['unknown'])).toBeNull();
   });
 });

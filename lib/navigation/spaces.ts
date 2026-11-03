@@ -1,6 +1,6 @@
 import type { AdminPermissionKey, AdminRoleKey } from "../domain/admin";
 
-export type WorkspaceSpaceKey = "client" | "pro" | "salon" | "staff" | "onboarding" | "support" | "moderation" | "finance" | "operations" | "admin";
+export type WorkspaceSpaceKey = "client" | "pro" | "salon" | "staff" | "commercial" | "onboarding" | "support" | "moderation" | "finance" | "operations" | "admin";
 
 export type WorkspaceModule = {
   key: string;
@@ -11,7 +11,7 @@ export type WorkspaceModule = {
   permission?: AdminPermissionKey;
   staffPermission?: "bookings.read" | "bookings.manage" | "messages.read" | "messages.reply" | "services.read";
   primary?: boolean;
-  resource?: "bookings" | "payments" | "notifications" | "messages" | "profiles" | "providers" | "businesses" | "collaborators" | "services" | "videos" | "reviews" | "reports" | "audit" | "wallets" | "payouts" | "reconciliation" | "financial-events" | "commissions" | "disputes" | "comments" | "sessions" | "promotions" | "campaigns" | "settings" | "deletion-requests";
+  resource?: "bookings" | "payments" | "notifications" | "messages" | "profiles" | "providers" | "businesses" | "collaborators" | "services" | "videos" | "reviews" | "reports" | "audit" | "wallets" | "payouts" | "reconciliation" | "financial-events" | "ledger" | "commissions" | "disputes" | "comments" | "sessions" | "promotions" | "campaigns" | "settings" | "deletion-requests";
 };
 
 export type WorkspaceSpace = {
@@ -135,8 +135,9 @@ const financeModules = [
   module("wallets", "Wallets", "▣", "Trésorerie", "Soldes dérivés des écritures autorisées.", { permission: "payments.read", resource: "wallets" }),
   module("payouts", "Versements", "↗", "Trésorerie", "État des versements enregistrés. Aucun versement réel ne peut être déclenché en mode mock.", { permission: "payouts.manage", resource: "payouts" }),
   module("reconciliation", "Rapprochement", "≋", "Contrôle", "Résultats de rapprochement enregistrés ; aucun fournisseur réel n’est activé.", { permission: "payments.read", resource: "reconciliation" }),
-  module("anomalies", "Anomalies", "!", "Contrôle", "Événements financiers de sécurité enregistrés.", { permission: "audit.read", resource: "financial-events" }),
-  module("audit", "Audit financier", "≣", "Contrôle", "Journal non modifiable des actions financières.", { permission: "audit.read", resource: "audit" }),
+  module("anomalies", "Anomalies", "!", "Contrôle", "Événements financiers de sécurité enregistrés.", { permission: "payments.read", resource: "financial-events" }),
+  module("accounting", "Journal financier", "≡", "Comptabilité", "Les 100 derniers mouvements enregistrés dans les wallets, avec leur référence et leur devise.", { permission: "payments.read", resource: "ledger" }),
+  module("audit", "Audit financier", "≣", "Contrôle", "Journal non modifiable des actions financières.", { permission: "payments.read", resource: "audit" }),
 ] as const;
 
 const operationsModules = [
@@ -201,8 +202,9 @@ export const workspaceSpaces: Record<WorkspaceSpaceKey, WorkspaceSpace> = {
   pro: { key: "pro", label: "Espace professionnel", prefix: "/pro", eyebrow: "Votre activité", modules: proModules },
   salon: { key: "salon", label: "Espace salon", prefix: "/salon", eyebrow: "Votre établissement", modules: salonModules },
   staff: { key: "staff", label: "Espace employé", prefix: "/staff", eyebrow: "Votre activité au salon", modules: staffModules },
+  commercial: { key: "commercial", label: "Espace commercial", prefix: "/commercial", eyebrow: "Dossiers et validation des professionnels", allowedAdminRoles: ["commercial", "super_admin"], modules: onboardingModules },
   onboarding: { key: "onboarding", label: "Onboarding", prefix: "/onboarding", eyebrow: "Validation professionnelle", allowedAdminRoles: ["verification_agent", "super_admin"], modules: onboardingModules },
-  support: { key: "support", label: "Support", prefix: "/support-agent", eyebrow: "Relation client", allowedAdminRoles: ["support", "admin", "super_admin"], modules: supportModules },
+  support: { key: "support", label: "Service client et réclamations", prefix: "/support-agent", eyebrow: "Relation client", allowedAdminRoles: ["support", "admin", "super_admin"], modules: supportModules },
   moderation: { key: "moderation", label: "Modération", prefix: "/moderation", eyebrow: "Confiance et sécurité", allowedAdminRoles: ["moderator", "admin", "super_admin"], modules: moderationModules },
   finance: { key: "finance", label: "Finance", prefix: "/finance", eyebrow: "Contrôle financier", allowedAdminRoles: ["finance", "super_admin"], modules: financeModules },
   operations: { key: "operations", label: "Opérations", prefix: "/operations", eyebrow: "Administration opérationnelle", allowedAdminRoles: ["admin", "content_manager", "super_admin"], modules: operationsModules },

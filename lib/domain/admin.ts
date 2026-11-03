@@ -4,6 +4,7 @@ export const adminRoleKeys = [
   "support",
   "moderator",
   "verification_agent",
+  "commercial",
   "finance",
   "content_manager",
 ] as const;
@@ -33,7 +34,8 @@ export const defaultRolePermissions: Record<AdminRoleKey, readonly AdminPermissi
   support: ["users.read", "bookings.read", "bookings.update", "support.manage"],
   moderator: ["users.read", "providers.read", "bookings.read", "reviews.moderate", "reports.manage"],
   verification_agent: ["users.read", "providers.read", "providers.verify", "documents.review"],
-  finance: ["bookings.read", "payments.read", "payments.refund", "commissions.manage", "payouts.manage", "audit.read"],
+  commercial: ["providers.read", "providers.verify", "documents.review"],
+  finance: ["bookings.read", "payments.read", "payments.refund", "commissions.manage", "payouts.manage"],
   content_manager: ["providers.read", "categories.manage", "content.manage", "notifications.send", "settings.read"],
 };
 

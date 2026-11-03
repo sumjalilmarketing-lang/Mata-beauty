@@ -3,6 +3,8 @@ import { formatAdminMoney, totalAdminMoneyByCurrency, formatCurrencyBreakdown } 
 import { PasswordField } from "@/app/password-field";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { internalWorkspaceDestination } from "@/lib/auth/workspace-access";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
@@ -225,6 +227,7 @@ const adminRoleLabels: Record<string, string> = {
   admin: "Administrateur",
   support: "Agent support",
   verification_agent: "Agent onboarding",
+  commercial: "Commercial — validation des dossiers",
   finance: "Responsable finance",
   moderator: "Modérateur",
   content_manager: "Responsable contenu",
@@ -334,6 +337,7 @@ function ConfirmationModal({
 
 export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "overview" }: { supabaseUrl: string; supabaseAnonKey: string; initialModule?: ModuleKey }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
+  const router = useRouter();
   const [context, setContext] = useState<AdminContext | null>(null);
   const [sessionState, setSessionState] = useState<"loading" | "anonymous" | "unauthorized" | "mfa" | "ready">("loading");
   const [activeModule, setActiveModule] = useState<ModuleKey>(initialModule);
@@ -372,6 +376,12 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
         setSessionState("unauthorized");
         return;
       }
+      const destination = internalWorkspaceDestination(next.roles);
+      if (!next.is_super_admin) {
+        if (destination && destination !== "/admin") router.replace(destination);
+        else setSessionState("unauthorized");
+        return;
+      }
       setContext(next);
       let preferredModule = initialModule;
       if (initialModule === "overview") {
@@ -405,7 +415,7 @@ export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "o
       setSessionState("anonymous");
       setNotice("Connexion au service momentanément indisponible. Réessayez.");
     }
-  }, [initialModule]);
+  }, [initialModule, router]);
 
   useEffect(() => {
     void Promise.resolve().then(resolveSession);

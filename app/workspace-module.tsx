@@ -24,6 +24,7 @@ import { SupportInbox } from "./support-inbox";
 import { ModerationInbox } from "./moderation-inbox";
 import { CommentModeration } from "./comment-moderation";
 import { CatalogModule } from "./super-admin";
+import { FinanceOverview } from "./finance-overview";
 import { RefundReview } from "./refund-review";
 import { AccountDeletionQueue } from "./account-deletion-queue";
 
@@ -48,6 +49,7 @@ const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, Resour
   payouts: { table: "payouts", select: "id,provider_id,amount,currency,status,created_at", title: (row) => `${money(row.amount, row.currency)} · ${label(row.status)}`, meta: (row) => `Professionnel ${shortId(row.provider_id)} · ${date(row.created_at)}` },
   reconciliation: { table: "reconciliation_runs", select: "id,provider,environment,status,matched_count,mismatch_count,missing_count,started_at", title: (row) => `${text(row.provider, "Fournisseur")} · ${label(row.status)}`, meta: (row) => `${text(row.environment, "")} · Écarts ${Number(row.mismatch_count)} · Manquants ${Number(row.missing_count)} · ${date(row.started_at)}` },
   "financial-events": { table: "financial_security_events", select: "id,event_type,severity,transaction_reference,created_at", title: (row) => `${label(row.event_type)} · ${label(row.severity)}`, meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` },
+  ledger: { table: "wallet_ledger", select: "id,transaction_type,amount,status,reference,created_at,wallets(currency)", title: row => `${label(row.transaction_type)} · ${money(row.amount, paymentCurrency(row.wallets))}`, meta: row => `${label(row.status)} · ${text(row.reference, "")} · ${date(row.created_at)}` },
   commissions: { table: "platform_commissions", select: "id,payment_id,rate,amount,currency,created_at", title: (row) => `${money(row.amount, row.currency)} · ${Number(row.rate)} %`, meta: (row) => `Paiement ${shortId(row.payment_id)} · ${date(row.created_at)}` },
   disputes: { table: "disputes", select: "id,booking_id,priority,status,reason,created_at", title: (row) => `${text(row.reason, "Litige")} · ${label(row.status)}`, meta: (row) => `${label(row.priority)} · ${date(row.created_at)}` },
   sessions: { table: "admin_sessions", select: "id,user_id,signed_in_at,last_seen_at,mfa_verified,revoked_at", title: (row) => `Compte ${shortId(row.user_id)} · ${row.revoked_at ? "Révoquée" : "Enregistrée"}`, meta: (row) => `MFA ${row.mfa_verified ? "vérifié" : "non vérifié"} · Dernière activité ${date(row.last_seen_at)}` },
@@ -68,17 +70,18 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const focused = (space === "pro" && ["dashboard", "services", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
   const supportInbox = (space === "support" && ["dashboard", "tickets", "unassigned", "mine", "priority", "escalations"].includes(module.key)) || (space === "operations" && module.key === "support") || (space === "admin" && module.key === "escalations");
   const moderationInbox = (space === "moderation" && ["dashboard", "reports"].includes(module.key)) || (space === "operations" && module.key === "moderation");
-  const onboardingInbox = (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "operations" && module.key === "onboarding");
+  const onboardingInbox = (["onboarding", "commercial"].includes(space) && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "operations" && module.key === "onboarding");
   const commentModeration = ["moderation", "admin"].includes(space) && module.key === "comments";
   const categoryManagement = space === "operations" && module.key === "categories";
   const refundReview = ["finance", "admin"].includes(space) && module.key === "refunds";
   const deletionQueue = space === "admin" && module.key === "deletion-requests";
   const [notice, setNotice] = useState("");
-  const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
+  const financeOverview = space === "finance" && module.key === "dashboard";
+  const custom = financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
     : space === "admin" && module.key === "alerts" ? fraudAlerts
     : space === "admin" && module.key === "security" ? resources.sessions
-    : space === "onboarding" && module.key === "history" ? onboardingHistory
+    : ["onboarding", "commercial"].includes(space) && module.key === "history" ? onboardingHistory
     : space === "moderation" && module.key === "history" ? moderationHistory
     : (space === "finance" && module.key === "audit") || (space === "admin" && module.key === "financial-reports") ? financialHistory
     : ["finance", "admin"].includes(space) && module.key === "refunds" ? refunds
@@ -113,6 +116,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   }, [definition, paymentStatus, space, module.key, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
+  if (financeOverview) return <FinanceOverview allowedModuleKeys={allowedModuleKeys} />;
   if (moderationInbox) return <ModerationInbox />;
   if (commentModeration) return <CommentModeration />;
   if (refundReview) return <RefundReview />;
