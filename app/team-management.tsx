@@ -268,8 +268,8 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
         const path = `${businessId}/employee-${result.data}-${crypto.randomUUID()}.${extension}`;
         const upload = await api().storage.from("business-media").upload(path, file, { contentType: file.type, upsert: false });
         if (upload.error) throw upload.error;
-        const update = await api().from("collaborators").update({ avatar_url: api().storage.from("business-media").getPublicUrl(path).data.publicUrl }).eq("id", result.data as string);
-        if (update.error) { await api().storage.from("business-media").remove([path]); throw update.error; }
+        const update = await api().from("collaborators").update({ avatar_url: api().storage.from("business-media").getPublicUrl(path).data.publicUrl }).eq("id", result.data as string).eq("business_id", businessId).select("id").maybeSingle();
+        if (update.error || !update.data) { await api().storage.from("business-media").remove([path]); throw update.error ?? new Error("La photo du collaborateur n’a pas pu être enregistrée. Actualisez l’équipe."); }
       }
       savedMemberId.current = null; setEditing(false);
     }, "Fiche enregistrée. Vérifiez ses horaires et les rendez-vous existants ci-dessous.");

@@ -396,8 +396,8 @@ export function LiveDashboard({
     if (!supabase) return;
     setFeedback("");
     const { data: updated, error: updateError } = await supabase.from("bookings").update({ status }).eq("id", booking.id).eq("status", booking.status).select("id").maybeSingle();
-    if (updateError) {
-      setFeedback(updateError.message);
+    if (updateError || !updated) {
+      setFeedback(publicErrorMessage(updateError, "La réservation a changé ou n’est plus accessible. Actualisez la liste."));
       return;
     }
     setFeedback("Réservation mise à jour.");
