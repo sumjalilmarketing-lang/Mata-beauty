@@ -10,9 +10,9 @@
 ## Motif désormais vérifié directement chez Resend
 
 L’envoi Outlook correspondant à la capture est `bounced`, type `Permanent`, sous-type `General`. Microsoft a répondu : `550 5.5.0 Requested action not taken: mailbox unavailable (S2017062302)`.
-Cela établit que la boîte était indisponible pour cet envoi ; cela ne prouve ni une faute de frappe ni un blocage général d’Outlook/Hotmail. Il faut confirmer l’adresse et l’accès à la boîte avec son titulaire avant une nouvelle invitation. Aucun renvoi et aucun retrait de suppression ne sont effectués sans cette vérification.
+Cela établit que la boîte était indisponible pour cet envoi ; cela ne prouve ni une faute de frappe ni un blocage général d’Outlook/Hotmail. Il faut confirmer l’adresse et l’accès à la boîte avec son titulaire avant une nouvelle invitation. Le propriétaire a ensuite confirmé que le titulaire accède à la boîte. Le blocage d’origine bounce a été retiré uniquement pour cette adresse ; une seconde lecture Resend a confirmé son absence (404). Aucun nouvel email n’a été envoyé.
 
-La liste récente Resend contient aussi un autre envoi Outlook livré : elle ne démontre donc pas un blocage général du domaine. L’adresse concernée a été placée en suppression après son rejet permanent ; aucune suppression n’a été retirée.
+La liste récente Resend contient aussi un autre envoi Outlook livré : elle ne démontre donc pas un blocage général du domaine. L’adresse concernée a été placée en suppression après son rejet permanent ; ce blocage a ensuite été levé après la confirmation du titulaire rapportée par le propriétaire.
 
 Le domaine Resend est vérifié, SPF et DKIM sont vérifiés, et le suivi des ouvertures/liens est désactivé. L’absence de DMARC ne doit pas être annoncée comme la cause de ce rejet précis.
 
