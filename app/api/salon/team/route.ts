@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { authenticatedSupabase, applicationOrigin, hasTrustedOrigin, jsonError } from "@/lib/payments/server";
+import { emailDeliveryLabel } from "@/lib/email/delivery-status";
 import { salonInvitationEmail } from "@/lib/email/salon-invitation";
 
 const noStore = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
@@ -51,6 +52,21 @@ export async function GET(request: Request) {
     auth.client.rpc("owner_list_collaborator_audit", { target_business_id: businessId }),
   ]);
   if (invitations.error || access.error || audit.error) return jsonError("La gestion de l’équipe est indisponible.", 503, "team_unavailable");
+  const invitationId = new URL(request.url).searchParams.get("invitationId");
+  if (invitationId !== null) {
+    if (!validId(invitationId)) return jsonError("Invitation invalide.", 400, "invalid_invitation");
+    const rows = (audit.data ?? []) as { invitation_id: string; details: { resend_email_id?: unknown } }[];
+    const receipt = rows.find(row => row.invitation_id === invitationId && validId(row.details?.resend_email_id));
+    if (!receipt || !process.env.RESEND_API_KEY) return Response.json({ message: "Le suivi de cet ancien envoi est indisponible. Sa réception n’est pas confirmée." }, { headers: noStore });
+    try {
+      const response = await fetch(`https://api.resend.com/emails/${receipt.details.resend_email_id}`, {
+        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` }, cache: "no-store", signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) return jsonError("Le suivi de livraison est momentanément indisponible.", 503, "delivery_lookup_failed");
+      const result = await response.json() as { last_event?: unknown; bounce?: { diagnosticCode?: unknown } };
+      return Response.json({ message: emailDeliveryLabel(result.last_event, result.bounce) }, { headers: noStore });
+    } catch { return jsonError("Le suivi de livraison est momentanément indisponible.", 503, "delivery_lookup_failed"); }
+  }
   return Response.json({ invitations: invitations.data ?? [], access: access.data ?? [], audit: audit.data ?? [] }, { headers: noStore });
 }
 
@@ -82,11 +98,22 @@ export async function POST(request: Request) {
 
   const emailKey = process.env.RESEND_API_KEY;
   if (!emailKey) return jsonError("Le service d’invitation par e-mail n’est pas configuré.", 503, "email_unavailable");
+  // Check ownership before consulting any recipient-specific delivery state.
+  const ownerCheck = await auth.client.rpc("owner_list_business_invitations", { target_business_id: action.businessId });
+  if (ownerCheck.error) return jsonError("Accès au salon refusé.", 403, "invitation_owner_required");
+  try {
+    const suppression = await fetch(`https://api.resend.com/suppressions/${encodeURIComponent(action.email)}`, {
+      headers: { Authorization: `Bearer ${emailKey}` }, cache: "no-store", signal: AbortSignal.timeout(8000),
+    });
+    if (suppression.ok) return jsonError("Cette adresse a été bloquée après un rejet ou un signalement. Vérifiez la boîte avec son titulaire avant tout nouvel envoi.", 409, "recipient_suppressed");
+    if (suppression.status !== 404) return jsonError("La vérification du destinataire est indisponible. Aucun envoi effectué.", 503, "recipient_check_unavailable");
+  } catch { return jsonError("La vérification du destinataire est indisponible. Aucun envoi effectué.", 503, "recipient_check_unavailable"); }
   const token = randomBytes(32).toString("base64url");
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const created = await auth.client.rpc("create_business_invitation", { target_business_id: action.businessId, target_email: action.email, target_role: action.role, target_permissions: action.permissions, target_token_hash: tokenHash });
   if (created.error || typeof created.data !== "string") return jsonError("L’invitation n’a pas pu être créée.", 409, "invitation_create_failed");
   const inviteUrl = new URL(`/salon/invitation/accept#token=${token}`, applicationOrigin(request)).toString();
+  let providerMessageId = "";
   try {
     const business = await auth.client.from("businesses").select("name").eq("id", action.businessId).maybeSingle();
     const invitationEmail = salonInvitationEmail(inviteUrl, business.data?.name ?? "Une équipe");
@@ -98,6 +125,7 @@ export async function POST(request: Request) {
     });
     const result: unknown = await response.json();
     if (!response.ok || !result || typeof result !== "object" || !("id" in result) || typeof result.id !== "string") throw new Error("delivery_failed");
+    providerMessageId = result.id;
   } catch {
     await auth.client.rpc("fail_business_invitation_delivery", { target_invitation_id: created.data });
     console.error("salon_invitation_delivery_failed");
@@ -105,5 +133,8 @@ export async function POST(request: Request) {
   }
   const sent = await auth.client.rpc("mark_business_invitation_sent", { target_invitation_id: created.data });
   if (sent.error) return jsonError("E-mail envoyé, mais son reçu n’a pas pu être enregistré. Vérifiez l’invitation avant tout nouvel envoi.", 503, "delivery_receipt_failed");
-  return Response.json({ ok: true, invitationId: created.data }, { status: 201, headers: noStore });
+  const receipt = await auth.client.rpc("record_business_invitation_receipt", { target_invitation_id: created.data, target_message_id: providerMessageId });
+  // Never revoke a valid, already-sent invitation for a telemetry failure.
+  console.info(JSON.stringify({ event: "salon_invitation_provider_accepted", invitationId: created.data, providerMessageId, receiptSaved: !receipt.error }));
+  return Response.json({ ok: true, invitationId: created.data, deliveryState: "provider_accepted" }, { status: 201, headers: noStore });
 }

@@ -167,6 +167,20 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     catch (error) { setMessage(publicErrorMessage(error, "La modification n’a pas pu être enregistrée.")); return false; }
     finally { inFlight.current = false; setBusy(false); }
   }
+  async function checkDelivery(invitationId: string) {
+    if (inFlight.current) return;
+    inFlight.current = true; setBusy(true); setMessage("");
+    try {
+      const { data } = await api().auth.getSession();
+      if (!data.session) throw new Error("Connexion requise.");
+      const response = await fetch(`/api/salon/team?businessId=${encodeURIComponent(businessId)}&invitationId=${encodeURIComponent(invitationId)}`, {
+        headers: { Authorization: `Bearer ${data.session.access_token}` }, signal: AbortSignal.timeout(12000),
+      });
+      if (!response.ok) throw new Error("Le suivi de livraison est indisponible.");
+      const result = await response.json() as { message: string }; setMessage(result.message);
+    } catch (error) { setMessage(publicErrorMessage(error, "Le suivi de livraison est indisponible.")); }
+    finally { inFlight.current = false; setBusy(false); }
+  }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget);
     const file = form.get("photo");
@@ -217,7 +231,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
       </form>
     </article>
     <article className="workspace-panel salon-panel"><h3>Invitations et accès</h3>
-      <div className="salon-list">{invitations.map(invite => <div key={invite.id}><div><strong>{invite.email}</strong><small>{invite.internal_role} · {invite.status === "pending" ? `Expire le ${new Date(invite.expires_at).toLocaleString("fr-FR")}` : invite.status === "accepted" ? `Acceptée le ${invite.accepted_at ? new Date(invite.accepted_at).toLocaleDateString("fr-FR") : "—"}` : invite.status}</small></div>{invite.status === "pending" && <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "revoke_invitation", businessId, invitationId: invite.id }); }, "Invitation révoquée.")}>Révoquer</button>}</div>)}{!invitations.length && <p>Aucune invitation pour le moment.</p>}</div>
+      <div className="salon-list">{invitations.map(invite => <div key={invite.id}><div><strong>{invite.email}</strong><small>{invite.internal_role} · {invite.status === "pending" ? `Expire le ${new Date(invite.expires_at).toLocaleString("fr-FR")}` : invite.status === "accepted" ? `Acceptée le ${invite.accepted_at ? new Date(invite.accepted_at).toLocaleDateString("fr-FR") : "—"}` : invite.status}</small></div>{invite.status === "pending" && <button disabled={busy} onClick={() => void checkDelivery(invite.id)}>Vérifier la livraison</button>}{invite.status === "pending" && <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "revoke_invitation", businessId, invitationId: invite.id }); }, "Invitation révoquée.")}>Révoquer</button>}</div>)}{!invitations.length && <p>Aucune invitation pour le moment.</p>}</div>
       <h4>Comptes associés</h4><div className="team-cards">{staffAccess.map(account => <article className="workspace-panel salon-panel" key={account.collaborator_id}><h5>{account.display_name}</h5><p>{account.email || "Adresse non disponible"} · {account.internal_role} · {account.revoked_at ? "Accès révoqué" : "Accès actif"}</p>
         <form className="salon-form" onSubmit={event => { event.preventDefault(); const values = new FormData(event.currentTarget); const permissions = normalizePermissions(values.getAll("permission").map(String)); const role = String(values.get("role") ?? account.internal_role); void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "update_access", businessId, collaboratorId: account.collaborator_id, role, permissions }); }, "Rôle et permissions mis à jour."); }}>
           <label>Rôle<select name="role" defaultValue={account.internal_role}><option value="member">Membre</option><option value="reception">Accueil</option><option value="manager">Responsable d’équipe</option></select></label>
