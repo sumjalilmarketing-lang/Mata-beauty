@@ -51,10 +51,27 @@
     "complete": true
   },
   "environment": "Test skrrfronlhoddtgxvezu",
-  "production_changed": false,
   "limits": [
     "No real email receipt tested",
     "Hosted Vercel browser/server integration pending protection access",
     "Synthetic accounts disabled, not deleted"
-  ]
+  ],
+  "production_changed_during_test_recipe": false,
+  "production_release": {
+    "deployment": "dpl_G5s3dhz6KmA8znHsHVu7C4UVTFan",
+    "commit": "4aca274e6053ee43214d16b5a4973aadbcd208ca",
+    "domain": "https://mata-beauty.com",
+    "status": "READY",
+    "health_status": 200,
+    "anonymous_teams_api_status": 403,
+    "unauthenticated_workspace_status": 307,
+    "booking_count_before_after": 11,
+    "payment_count_before_after": 1,
+    "row_checksums_unchanged": true,
+    "new_tables_all_rls": true,
+    "anonymous_department_rpc_count": 0,
+    "qa_function_removed": true,
+    "qa_share_links_remaining": 0,
+    "runtime_error_fatal_logs_in_observed_window": 0
+  }
 }
