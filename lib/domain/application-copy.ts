@@ -1,6 +1,12 @@
 import { bookingText, applicationLocale } from "./booking-copy";
 
 const copy: Record<string, readonly [string, string]> = {
+  "Pour toi": ["For you", "Para ti"],
+  "Abonnements": ["Following", "Siguiendo"],
+  "Vos abonnements n’ont pas pu être chargés.": ["Your followed creators could not be loaded.", "No se pudieron cargar los creadores que sigues."],
+  "Actualiser le fil": ["Refresh feed", "Actualizar feed"],
+  "Choix du fil": ["Choose a feed", "Elegir un feed"],
+  "Aucune vidéo de vos abonnements pour le moment.": ["No videos from your followed creators yet.", "Aún no hay vídeos de los creadores que sigues."],
   "Compte sécurisé": [
     "Secure account",
     "Cuenta segura"

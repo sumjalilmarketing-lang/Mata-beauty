@@ -49,3 +49,41 @@ export function diversifyFeed<T extends FeedSignals>(posts: readonly T[], now = 
   }
   return result;
 }
+
+export const discoveryTopics = {
+  tresses: ["tresse", "braid", "knotless"],
+  barbier: ["barbier", "barber", "barbe", "coupe homme"],
+  coiffure: ["coiffure", "cheveu", "hair", "locks"],
+  perruques: ["perruque", "wig", "lace"],
+  maquillage: ["maquillage", "makeup", "make-up"],
+  ongles: ["ongle", "nail", "manucure", "pedicure"],
+  spa: ["spa", "hammam", "sauna"],
+  massage: ["massage", "massages", "relaxation"],
+  soins: ["soin", "soins", "visage", "facial"],
+} as const;
+export type DiscoveryTopic = keyof typeof discoveryTopics;
+
+/** Content interests only: no gender, identity or inferred sensitive attributes. */
+export function videoTopics(text: string): DiscoveryTopic[] {
+  const words = new Set(text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().match(/[a-z]+(?:-[a-z]+)*/g) ?? []);
+  const normalized = [...words].join(" ");
+  return (Object.keys(discoveryTopics) as DiscoveryTopic[]).filter(topic => discoveryTopics[topic].some(term => term.includes(" ") ? normalized.includes(term) : words.has(term) || words.has(`${term}s`)));
+}
+
+export function videoInterestAffinity(text: string, interests: ReadonlySet<DiscoveryTopic>): number {
+  return videoTopics(text).some(topic => interests.has(topic)) ? 1 : 0;
+}
+
+/** Reserve one slot in five for a recent, low-exposure creator when available. */
+export function discoverFeed<T extends FeedSignals>(posts: readonly T[], now = Date.now()): T[] {
+  const remaining = diversifyFeed(posts, now);
+  const result: T[] = [];
+  while (remaining.length) {
+    const previous = result.at(-1)?.authorId;
+    const discoverySlot = result.length % 5 === 2;
+    let index = discoverySlot ? remaining.findIndex(post => post.authorId !== previous && post.viewCount < 100 && now - Date.parse(post.publishedAt) <= 72 * 3_600_000) : -1;
+    if (index < 0) index = remaining.findIndex(post => post.authorId !== previous);
+    result.push(remaining.splice(index < 0 ? 0 : index, 1)[0]);
+  }
+  return result;
+}

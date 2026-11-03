@@ -659,3 +659,5 @@ body{background:#080810;color:#fff8fc}
 /* Keep selected dates readable on the pink surface, including small mobile labels. */
 .quick-date-strip button.active small,.quick-date-strip button.active span{color:#2a180a}
 .quick-date-strip button small,.quick-date-strip label small,.quick-date-strip button span{font-size:11px}
+
+.feed-discovery-tabs{display:flex;justify-content:center;gap:8px;padding:4px 0}.feed-discovery-tabs button{min-height:36px;padding:6px 14px;border-radius:999px;background:#211420;color:#fff;font-weight:700;border:1px solid #ffffff24}.feed-discovery-tabs button[aria-pressed="true"]{background:#fff;color:#5b0b45}.feed-discovery-tabs button:focus-visible{outline:2px solid #e2b65f;outline-offset:2px}

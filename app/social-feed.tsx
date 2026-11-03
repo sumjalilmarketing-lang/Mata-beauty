@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { diversifyFeed } from "@/lib/domain/social-feed";
+import { discoverFeed, videoTopics, videoInterestAffinity, type DiscoveryTopic } from "@/lib/domain/social-feed";
 import type { CatalogCategory } from "@/lib/supabase/catalog";
 import { filterInspirationPosts, validSearchRadius, type InspirationSearchProvider } from "@/lib/domain/inspiration-search";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -143,7 +143,9 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [favoriteProviders, setFavoriteProviders] = useState<Set<string>>(new Set());
-  const [bookingInterests, setBookingInterests] = useState<Set<string>>(new Set());
+  const interests = useRef(new Set<DiscoveryTopic>());
+  const [followingUnavailable, setFollowingUnavailable] = useState(false);
+  const [feedTab, setFeedTab] = useState<"for-you" | "following">("for-you");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
@@ -255,14 +257,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const activeSearch = Boolean(searchQuery.trim() || selectedCategoryId || selectedCountryCode || selectedProviderId || location.area.trim() || location.position);
   const visiblePosts = useMemo(() => {
     const matches = collection ? collection.posts : filterInspirationPosts(posts, location.providers, searchFilters);
-    return diversifyFeed(matches.filter((post) => !unavailablePosts.has(post.id)).map((post) => ({ ...post,
+    return matches.filter((post) => !unavailablePosts.has(post.id) && (collection || feedTab === "for-you" || followed.has(post.authorId))).map((post) => ({ ...post,
       distance: location.position ? distanceKm(location.position, location.providers.find((item) => item.serviceId === post.serviceId && item.profileId === post.authorId)?.coordinates) : null,
       followed: followed.has(post.authorId) || favoriteProviders.has(post.authorId),
-      specialtyAffinity: liked.has(post.id) || saved.has(post.id) || [...bookingInterests].some((term) => `${post.serviceTitle ?? ""} ${post.hashtags.join(" ")}`.toLocaleLowerCase("fr").includes(term)) ? 1 : 0,
       proximityScore: 0,
       availableSoon: Boolean((realAvailability[post.id] ?? post.availableAt) && new Date(realAvailability[post.id] ?? post.availableAt ?? 0).getTime() < FEED_RANKING_REFERENCE_TIME+72*3_600_000),
-    }))).sort((a, b) => location.position ? (a.distance ?? Infinity) - (b.distance ?? Infinity) : 0);
-  }, [bookingInterests, collection, favoriteProviders, followed, liked, location, posts, realAvailability, saved, searchFilters, unavailablePosts]);
+    })).sort((a, b) => location.position ? (a.distance ?? Infinity) - (b.distance ?? Infinity) : 0);
+  }, [collection, favoriteProviders, feedTab, followed, location, posts, realAvailability, searchFilters, unavailablePosts]);
 
   const activePostId = visiblePosts[activeIndex]?.id;
   useEffect(() => {
@@ -292,6 +293,9 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const load = useCallback(async () => {
     if (collection) return;
     const generation = ++loadGeneration.current;
+    interests.current.clear();
+    setFollowingUnavailable(false);
+    setLiked(new Set()); setSaved(new Set()); setFollowed(new Set()); setFavoriteProviders(new Set());
     initialPageReady.current = false;
     const signal = pageRequests.current.signal;
     if (signal.aborted) return;
@@ -303,36 +307,46 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     setPosts([]);
     setActiveIndex(0);
     setState("loading");
+    try {
     const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE).abortSignal(signal);
     if (signal.aborted || generation !== loadGeneration.current) return;
     if (error) { setState("error"); return; }
     const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
     if (signal.aborted || generation !== loadGeneration.current) return;
     const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
-    const ranked = diversifyFeed(mapped);
-    setPosts(ranked);
-    setHasMore(mapped.length === FEED_BATCH_SIZE);
-    const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
-    feedCursor.current = last ? { publishedAt: last.published_at, id: last.id } : null;
-    initialPageReady.current = true;
-    setState(mapped.length ? "ready" : "empty");
     if (authenticated) {
+      try {
+      const personalSignal = AbortSignal.any([signal, AbortSignal.timeout(5000)]);
       const ids = mapped.map((item) => item.id);
       const authors = [...new Set(mapped.map((item) => item.authorId))];
-      const [{ data: likes }, { data: saves }, { data: follows }, { data: favorites }, { data: bookings }] = await Promise.all([
-        ids.length ? supabase.from("post_likes").select("post_id").in("post_id", ids) : Promise.resolve({ data: [] }),
-        ids.length ? supabase.from("post_saves").select("post_id").in("post_id", ids) : Promise.resolve({ data: [] }),
-        authors.length ? supabase.from("follows").select("followed_provider_id").in("followed_provider_id", authors) : Promise.resolve({ data: [] }),
-        authors.length ? supabase.from("favorites").select("provider_id").in("provider_id", authors) : Promise.resolve({ data: [] }),
-        supabase.from("bookings").select("provider_services(title)").eq("client_id", authenticated.userId).order("created_at", { ascending: false }).limit(20),
+      const [{ data: likes }, { data: saves }, { data: follows, error: followsError }, { data: favorites }, { data: bookings }] = await Promise.all([
+        ids.length ? supabase.from("post_likes").select("post_id").eq("profile_id", authenticated.userId).in("post_id", ids).abortSignal(personalSignal) : Promise.resolve({ data: [] }),
+        ids.length ? supabase.from("post_saves").select("post_id").eq("profile_id", authenticated.userId).in("post_id", ids).abortSignal(personalSignal) : Promise.resolve({ data: [] }),
+        supabase.from("follows").select("followed_provider_id").eq("follower_id", authenticated.userId).abortSignal(personalSignal),
+        authors.length ? supabase.from("favorites").select("provider_id").eq("client_id", authenticated.userId).in("provider_id", authors).abortSignal(personalSignal) : Promise.resolve({ data: [] }),
+        supabase.from("bookings").select("provider_services(title)").eq("client_id", authenticated.userId).order("created_at", { ascending: false }).limit(20).abortSignal(personalSignal),
       ]);
       if (signal.aborted || generation !== loadGeneration.current) return;
       setLiked(new Set((likes ?? []).map((item) => item.post_id)));
       setSaved(new Set((saves ?? []).map((item) => item.post_id)));
+      setFollowingUnavailable(Boolean(followsError));
       setFollowed(new Set((follows ?? []).map((item) => item.followed_provider_id)));
       setFavoriteProviders(new Set((favorites ?? []).map((item) => item.provider_id)));
-      setBookingInterests(new Set((bookings ?? []).flatMap((item) => { const service=item.provider_services as { title?: string } | null; return (service?.title ?? "").toLocaleLowerCase("fr").split(/\s+/).filter((word) => word.length>=4); })));
+      const reacted = new Set([...(likes ?? []), ...(saves ?? [])].map(item => item.post_id));
+      const texts = [...mapped.filter(post => reacted.has(post.id)).map(post => `${post.serviceTitle ?? ""} ${post.caption} ${post.hashtags.join(" ")}`), ...(bookings ?? []).map(item => (item.provider_services as { title?: string } | null)?.title ?? "")];
+      texts.flatMap(videoTopics).forEach(topic => interests.current.add(topic));
+      // Personalise before showing the first clip; never reorder it during playback.
+      } catch { if (!signal.aborted && generation === loadGeneration.current) setFollowingUnavailable(true); /* Public discovery remains available. */ }
     }
+    if (signal.aborted || generation !== loadGeneration.current) return;
+    const ranked = discoverFeed(mapped.map(post => ({ ...post, specialtyAffinity: videoInterestAffinity(`${post.serviceTitle ?? ""} ${post.caption} ${post.hashtags.join(" ")}`, interests.current) })));
+    setPosts(ranked);
+    setHasMore((data ?? []).length === FEED_BATCH_SIZE);
+    const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
+    feedCursor.current = last ? { publishedAt: last.published_at, id: last.id } : null;
+    initialPageReady.current = true;
+    setState(mapped.length ? "ready" : "empty");
+    } catch { if (!signal.aborted && generation === loadGeneration.current) setState("error"); }
   }, [authenticated, collection]);
 
   const loadMore = useCallback(async () => {
@@ -353,16 +367,18 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
       if (signal.aborted || generation !== loadGeneration.current) return;
       const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
-      setPosts((current) => { const next = diversifyFeed([...current, ...mapped.filter((item) => !current.some((existing) => existing.id === item.id))]); return next; });
+      setPosts(current => [...current, ...discoverFeed(mapped.filter(item => !current.some(existing => existing.id === item.id)).map(post => ({ ...post, specialtyAffinity: videoInterestAffinity(`${post.serviceTitle ?? ""} ${post.caption} ${post.hashtags.join(" ")}`, interests.current) })))]);
       const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
       if (last) feedCursor.current = { publishedAt: last.published_at, id: last.id };
       setHasMore((data ?? []).length === FEED_BATCH_SIZE);
-    } finally { loadingMore.current = false; }
+    } catch { queueMicrotask(() => { if (!signal.aborted && generation === loadGeneration.current) setFeedback("La suite des inspirations n’a pas pu être chargée. Actualisez pour réessayer."); }); } finally { loadingMore.current = false; }
   }, [collection, hasMore]);
 
   useEffect(() => {
-    if (!collection && activeSearch && state === "ready" && hasMore && visiblePosts.length < 4) void loadMore();
-  }, [activeSearch, collection, hasMore, loadMore, posts.length, state, visiblePosts.length]);
+    if (collection || state !== "ready" || !hasMore || visiblePosts.length >= 4 || (!activeSearch && feedTab !== "following")) return;
+    const frame = requestAnimationFrame(() => { void loadMore(); });
+    return () => cancelAnimationFrame(frame);
+  }, [activeSearch, collection, feedTab, hasMore, loadMore, posts.length, state, visiblePosts.length]);
 
   useEffect(() => {
     const leave = () => pageRequests.current.abort();
@@ -415,7 +431,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     return () => observer.disconnect();
   }, [visiblePosts]);
 
-  const searchSignature = JSON.stringify([searchQuery, selectedCategoryId, selectedCountryCode, selectedProviderId, location.area, location.position, radiusKm]);
+  const searchSignature = JSON.stringify([feedTab, searchQuery, selectedCategoryId, selectedCountryCode, selectedProviderId, location.area, location.position, radiusKm]);
   const lastSearchSignature = useRef(searchSignature);
   useEffect(() => {
     if (lastSearchSignature.current === searchSignature) return;
@@ -460,8 +476,8 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       const supabase = getSupabaseBrowserClient();
       if (supabase) void recordSessionMetric(supabase, "record_video_view", { target_post_id: post.id, target_watched_ms: 2000, target_completed: false }, "mata-feed-session", pageRequests.current.signal);
     }, 2000);
-    if (activeIndex >= visiblePosts.length - 3) void loadMore();
-    return () => window.clearTimeout(timer);
+    const frame = activeIndex >= visiblePosts.length - 3 ? requestAnimationFrame(() => { void loadMore(); }) : null;
+    return () => { window.clearTimeout(timer); if (frame !== null) cancelAnimationFrame(frame); };
   }, [activeIndex, loadMore, pageVisible, pausedPosts, searchOpen, visiblePosts]);
 
   useEffect(() => {
@@ -586,6 +602,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const { data, error } = await supabase.rpc(kind === "like" ? "toggle_post_like" : "toggle_post_save", { target_post_id: post.id });
     if (error || !data) { setFeedback(t("Cette action n’a pas pu être enregistrée.")); return; }
     const result = data as { active: boolean; count: number };
+    if (result.active) videoTopics(`${post.serviceTitle ?? ""} ${post.caption} ${post.hashtags.join(" ")}`).forEach(topic => interests.current.add(topic));
     const setter = kind === "like" ? setLiked : setSaved;
     setter((current) => { const next = new Set(current); if (result.active) next.add(post.id); else next.delete(post.id); return next; });
     setPosts((current) => current.map((item) => item.id === post.id ? { ...item, [kind === "like" ? "likeCount" : "saveCount"]: result.count } : item));
@@ -762,7 +779,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   };
 
   const activePost = visiblePosts[activeIndex];
-  const header = <header className="social-feed-header"><div className="feed-title-row">{collection ? <button type="button" aria-label="Retour aux vidéos du profil" onClick={() => { collection.onBack(); onDiscover?.(); }}>‹</button> : <><strong>MATA</strong><span>INSPIRATION</span></>}<div className="feed-header-actions">{!collection && <><button className="feed-mode-toggle" aria-label={t(feedMode === "immersive" ? t("Afficher le mode Premium") : t("Afficher le mode immersif"))} aria-pressed={feedMode === "premium"} title={t(feedMode === "immersive" ? t("Afficher le mode Premium") : t("Afficher le mode immersif"))} onClick={() => changeFeedMode(feedMode === "immersive" ? "premium" : "immersive")}>{t(feedMode === "immersive" ? t("Premium") : t("Immersif"))}</button><button disabled={authPending} aria-label={t("Publier une vidéo")} onClick={onPublish}>＋</button><button aria-label={t("Rechercher")} onClick={openSearch}>⌕</button></>}</div></div>{!collection && activeSearch && <div className="inspiration-active-filters" aria-label="Filtres actifs"><span>{[categoryLabel, countryLabel, selectedProvider?.name, location.area, location.position ? `Autour de moi · ${radiusKm} km` : "", searchQuery].filter(Boolean).join(" · ")}</span><button type="button" onClick={clearSearch}>Effacer les filtres</button></div>}</header>;
+  const header = <header className="social-feed-header"><div className="feed-title-row">{collection ? <button type="button" aria-label="Retour aux vidéos du profil" onClick={() => { collection.onBack(); onDiscover?.(); }}>‹</button> : <><strong>MATA</strong><span>INSPIRATION</span></>}<div className="feed-header-actions">{!collection && <><button className="feed-mode-toggle" aria-label={t(feedMode === "immersive" ? t("Afficher le mode Premium") : t("Afficher le mode immersif"))} aria-pressed={feedMode === "premium"} title={t(feedMode === "immersive" ? t("Afficher le mode Premium") : t("Afficher le mode immersif"))} onClick={() => changeFeedMode(feedMode === "immersive" ? "premium" : "immersive")}>{t(feedMode === "immersive" ? t("Premium") : t("Immersif"))}</button><button disabled={authPending} aria-label={t("Publier une vidéo")} onClick={onPublish}>＋</button><button aria-label={t("Rechercher")} onClick={openSearch}>⌕</button></>}</div></div>{!collection && <nav className="feed-discovery-tabs" aria-label={t("Choix du fil")}><button type="button" aria-pressed={feedTab === "for-you"} onClick={() => setFeedTab("for-you")}>{t("Pour toi")}</button><button type="button" aria-pressed={feedTab === "following"} disabled={authPending} onClick={() => { if (!authenticated) { onRequireAuth(); return; } setFeedTab("following"); }}>{t("Abonnements")}</button><button type="button" aria-label={t("Actualiser le fil")} onClick={() => void load()}>↻</button></nav>}{!collection && activeSearch && <div className="inspiration-active-filters" aria-label="Filtres actifs"><span>{[categoryLabel, countryLabel, selectedProvider?.name, location.area, location.position ? `Autour de moi · ${radiusKm} km` : "", searchQuery].filter(Boolean).join(" · ")}</span><button type="button" onClick={clearSearch}>Effacer les filtres</button></div>}</header>;
 
   const searchDialog = searchOpen && !collection ? <div className="inspiration-search-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) { setSearchOpen(false); writeSearchUrl(activeSearch); } }}>
     <section className="inspiration-search-dialog" role="dialog" aria-modal="true" aria-labelledby="inspiration-search-title">
@@ -783,7 +800,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   if (state !== "ready") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="social-feed-empty"><span>▶</span><h1>{state === "error" ? t("Le feed est indisponible") : t("Les premières inspirations arrivent bientôt.")}</h1><p>{state === "error" ? t("Réessayez dans quelques instants.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={state === "error" ? () => void load() : openSearch}>{state === "error" ? t("Réessayer") : t("Rechercher une prestation")}</button></div></section>;
 
   return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="social-feed" aria-label={t("Vidéos beauté")} onScroll={(event) => { const node=event.currentTarget; const cardHeight=cards.current[0]?.getBoundingClientRect().height ?? node.clientHeight; const index=Math.round(node.scrollTop/Math.max(1,cardHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>
-    {visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{activeSearch ? t("Aucune vidéo pour ces filtres") : t("Les premières inspirations arrivent bientôt.")}</h1><p>{activeSearch ? t("Aucun contenu publié ne correspond à cette prestation, ce professionnel ou cette zone.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={activeSearch ? clearSearch : openSearch}>{activeSearch ? t("Voir toutes les vidéos") : t("Rechercher une prestation")}</button></div>}
+    {feedTab === "following" && followingUnavailable && !collection ? <div className="social-feed-empty" role="alert"><h1>{t("Vos abonnements n’ont pas pu être chargés.")}</h1><button type="button" onClick={() => void load()}>{t("Réessayer")}</button></div> : visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{activeSearch ? t("Aucune vidéo pour ces filtres") : t(feedTab === "following" ? "Aucune vidéo de vos abonnements pour le moment." : "Les premières inspirations arrivent bientôt.")}</h1><p>{activeSearch ? t("Aucun contenu publié ne correspond à cette prestation, ce professionnel ou cette zone.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={activeSearch ? clearSearch : openSearch}>{activeSearch ? t("Voir toutes les vidéos") : t("Rechercher une prestation")}</button></div>}
     {visiblePosts.map((post, index) => <article className="social-video-card" data-post-id={post.id} data-video-state={post.postType === "video" ? videoErrors.has(post.id) ? "error" : index === activeIndex && (videoLoading.has(post.id) || videoRefreshing.has(post.id)) ? "loading" : videoReady.has(post.id) ? "ready" : "waiting" : undefined} key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`${t("Publication de")} ${post.businessName}`}>
       {post.postType === "video" ? (
         videoErrors.has(post.id) ? (
@@ -853,6 +870,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
               setProgress((current) => Math.abs((current[post.id] ?? 0) - ratio) < 0.01 ? current : ({ ...current, [post.id]: ratio }));
               if (ratio >= 0.95 && !completedViews.current.has(post.id)) {
                 completedViews.current.add(post.id);
+                videoTopics(`${post.serviceTitle ?? ""} ${post.caption} ${post.hashtags.join(" ")}`).forEach(topic => interests.current.add(topic));
                 const supabase = getSupabaseBrowserClient();
                 if (supabase) void recordSessionMetric(supabase, "record_video_view", {
                   target_post_id: post.id,
