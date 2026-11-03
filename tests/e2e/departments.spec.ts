@@ -1,6 +1,16 @@
 import {expect,test,type BrowserContext}from "@playwright/test";
 import {syntheticSession,departmentContext,departmentCase}from "./fixtures/department-workspaces.mjs";
 async function login(context:BrowserContext,role:string){const session=syntheticSession(role);await context.addCookies([{name:'sb-127-auth-token',value:'base64-'+Buffer.from(JSON.stringify(session)).toString('base64url'),domain:'127.0.0.1',path:'/',httpOnly:false,sameSite:'Lax'}]);}
+test('entrée par lien : le responsable commercial rejoint son CRM et ses équipes',async({page,context})=>{
+ await login(context,'commercial_manager');
+ await page.goto('/auth/workspace?role=super_admin&next=/admin');
+ await expect(page).toHaveURL(/\/commercial$/);
+ await expect(page.getByRole('heading',{name:'Vue commerciale',exact:true})).toBeVisible();
+ await page.goto('/commercial/teams');
+ await expect(page.getByRole('heading',{name:'Mes équipes · Commercial'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Suivi des agents'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Créer une équipe'})).toHaveCount(0);
+});
 test('responsable : équipe, recrutement et invitation par lien conservé après actualisation',async({page,context})=>{
  await login(context,'commercial_manager');const data=departmentContext('commercial_manager');
  await page.route('**/api/department-teams',async route=>{if(route.request().method()==='GET')return route.fulfill({json:data});const body=route.request().postDataJSON();if(body.action==='member'){expect(body).not.toHaveProperty('role');data.members.push({...data.members[0],user_id:'aaaaaaaa-aaaa-4aaa-8aaa-000000000090',email:body.email,display_name:'Agent ajouté'});return route.fulfill({json:{ok:true}});}expect(body.action).toBe('invite');expect(body.channel).toBe('link');return route.fulfill({json:{ok:true,link:'http://127.0.0.1/auth/confirm?type=invite&token_hash=synthetic-ui-token'}});});

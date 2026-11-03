@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     }
     try { await sendWelcomeEmail(data.user.id); }
     catch { console.error("welcome_email_delivery_failed"); }
-    return redirect(request, "/app/profile?auth=email_confirmed");
+    return redirect(request, "/auth/workspace");
   } catch {
     return redirect(request, "/?connexion=requise&auth_error=email_confirmation_unavailable");
   }

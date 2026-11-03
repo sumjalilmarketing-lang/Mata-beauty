@@ -113,7 +113,7 @@ export default function UpdatePasswordPage() {
           <button className="primary-button full" disabled={!ready || isSubmitting || complete}>{isSubmitting ? "Mise à jour…" : "Mettre à jour"}</button>
         </form>
         {!checking && !ready && <Link className="outline-button return-home" href="/?auth=reset">Demander un nouveau lien</Link>}
-        {complete && <Link className="outline-button return-home" href={internalInvitation ? "/admin" : "/?connexion=requise"}>{internalInvitation ? "Se connecter et configurer le MFA" : "Se connecter"}</Link>}
+        {complete && <Link className="outline-button return-home" href="/auth/workspace">{internalInvitation ? "Rejoindre mon espace et configurer le MFA" : "Rejoindre mon espace"}</Link>}
         <Link className="outline-button return-home" href="/">Retour à Mata Beauty</Link>
       </section>
     </main>

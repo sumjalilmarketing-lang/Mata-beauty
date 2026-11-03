@@ -270,6 +270,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       if (authError) {
         const messages: Record<string, string> = {
           email_link_invalid: "Le lien de confirmation est expiré, déjà utilisé ou invalide. Connectez-vous si votre adresse est déjà confirmée, ou choisissez « Renvoyer la confirmation » pour terminer votre inscription.",
+          workspace_unavailable: "Votre espace est momentanément indisponible. Réessayez dans quelques instants.",
           email_confirmation_unavailable: "La confirmation est momentanément indisponible. Réessayez votre lien dans quelques instants.",
           google_cancelled: "Connexion Google annulée.", google_provider_error: "Google n’a pas pu autoriser la connexion.",
           invalid_callback: "Retour Google invalide.", oauth_exchange_failed: "La session Google a expiré. Recommencez.",
@@ -645,6 +646,10 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     if (!booking) {
       if (authRequest?.role === "provider" && !signedIn.roles.includes("provider")) { window.location.assign("/app/application"); return; }
       const requested = authRequest?.returnTo ? safeOAuthDestination(authRequest.returnTo) : null;
+      if (signedIn.role === "admin" && (!requested || ["/", "/app", "/app/profile"].includes(requested))) {
+        window.location.assign("/auth/workspace");
+        return;
+      }
       if (requested && requested !== "/") {
         window.location.assign(requested);
         return;
