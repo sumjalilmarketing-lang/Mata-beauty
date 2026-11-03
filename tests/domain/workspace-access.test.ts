@@ -70,3 +70,6 @@ describe("department isolation", () => {
     expect(internalWorkspaceDestination(['unknown'])).toBeNull();
   });
 });
+
+import{defaultRolePermissions}from "../../lib/domain/admin";
+it("isolates six delegated roles and prevents agent team/global administration",()=>{for(const department of["commercial","finance","support"]as const)for(const suffix of["manager","agent"]as const){const role=`${department}_${suffix}`as const,identity={...base,applicationRoles:["admin"]as const,adminRoles:[role],permissions:defaultRolePermissions[role]};expect(availableWorkspaces(identity)).toEqual([department]);expect(internalWorkspaceDestination([role])).toBe(department==="support"?"/support-agent":`/${department}`);expect(canAccessWorkspaceModule(identity,"teams.manage")).toBe(suffix==="manager");expect(canAccessWorkspaceModule(identity,"roles.manage")).toBe(false);}expect(defaultRolePermissions.finance_agent).toEqual(["finance.cases"]);expect(defaultRolePermissions.finance_manager).not.toContain("payments.refund");});

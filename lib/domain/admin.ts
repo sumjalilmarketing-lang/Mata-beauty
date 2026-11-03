@@ -7,6 +7,7 @@ export const adminRoleKeys = [
   "commercial",
   "finance",
   "content_manager",
+  "commercial_manager", "commercial_agent", "finance_manager", "finance_agent", "support_manager", "support_agent",
 ] as const;
 
 export type AdminRoleKey = typeof adminRoleKeys[number];
@@ -15,10 +16,10 @@ export const adminPermissionKeys = [
   "users.read", "users.update", "users.suspend", "users.delete",
   "providers.read", "providers.verify", "providers.suspend",
   "bookings.read", "bookings.update",
-  "payments.read", "payments.refund", "commissions.manage", "payouts.manage",
+  "payments.read", "payments.refund", "payouts.read", "commissions.manage", "payouts.manage",
   "reviews.moderate", "reports.manage", "categories.manage", "content.manage",
   "notifications.send", "settings.read", "settings.update", "roles.manage",
-  "audit.read", "support.manage", "documents.review", "crm.manage",
+  "audit.read", "support.manage", "documents.review", "crm.manage", "teams.manage", "commercial.cases", "finance.cases", "support.cases",
 ] as const;
 
 export type AdminPermissionKey = typeof adminPermissionKeys[number];
@@ -31,11 +32,17 @@ export const defaultRolePermissions: Record<AdminRoleKey, readonly AdminPermissi
     "categories.manage", "content.manage", "notifications.send", "settings.read", "audit.read",
     "support.manage", "documents.review",
   ],
-  support: ["users.read", "bookings.read", "bookings.update", "support.manage"],
+  support_manager: ["teams.manage", "support.cases"],
+  support_agent: ["support.cases"],
+  commercial_manager: ["teams.manage", "crm.manage", "commercial.cases"],
+  commercial_agent: ["crm.manage", "commercial.cases"],
+  finance_manager: ["teams.manage", "payments.read", "payouts.read", "finance.cases"],
+  finance_agent: ["finance.cases"],
+  support: ["support.cases", "users.read", "bookings.read", "bookings.update", "support.manage"],
   moderator: ["users.read", "providers.read", "bookings.read", "reviews.moderate", "reports.manage"],
   verification_agent: ["users.read", "providers.read", "providers.verify", "documents.review"],
-  commercial: ["providers.read", "providers.verify", "documents.review", "crm.manage"],
-  finance: ["bookings.read", "payments.read", "payments.refund", "commissions.manage", "payouts.manage"],
+  commercial: ["commercial.cases", "providers.read", "providers.verify", "documents.review", "crm.manage"],
+  finance: ["payouts.read", "finance.cases", "bookings.read", "payments.read", "payments.refund", "commissions.manage", "payouts.manage"],
   content_manager: ["providers.read", "categories.manage", "content.manage", "notifications.send", "settings.read"],
 };
 

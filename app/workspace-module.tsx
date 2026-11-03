@@ -24,6 +24,8 @@ import { SupportInbox } from "./support-inbox";
 import { ModerationInbox } from "./moderation-inbox";
 import { CommentModeration } from "./comment-moderation";
 import { CatalogModule } from "./super-admin";
+import { DepartmentTeamConsole } from "./department-team-console";
+import { DepartmentCases } from "./department-cases";
 import { CommercialCrm } from "./commercial-crm";
 import { FinanceOverview } from "./finance-overview";
 import { RefundReview } from "./refund-review";
@@ -66,7 +68,7 @@ const moderationHistory: ResourceDefinition = { table: "moderation_actions", sel
 const financialHistory: ResourceDefinition = { table: "financial_audit_log", select: "id,action,transaction_reference,created_at", title: (row) => label(row.action), meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` };
 const refunds: ResourceDefinition = { table: "refunds", select: "id,payment_id,amount,status,reason,created_at,payments(currency)", title: (row) => `${money(row.amount, paymentCurrency(row.payments))} · ${label(row.status)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
 
-export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, canManageCrmAssignments = false, providerApproved, staffCanReply, staffCanManageBookings, collaboratorAccessEnabled = false }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; canManageCrmAssignments?: boolean; providerApproved: boolean; staffCanReply: boolean; staffCanManageBookings: boolean; collaboratorAccessEnabled?: boolean }) {
+export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, canManageCrmAssignments = false, isSuperAdmin=false, canReadFinance=false, canDecideRefunds=false, canManageSupport=false, providerApproved, staffCanReply, staffCanManageBookings, collaboratorAccessEnabled = false }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; canManageCrmAssignments?: boolean; isSuperAdmin?:boolean; canReadFinance?:boolean; canDecideRefunds?:boolean; canManageSupport?:boolean; providerApproved: boolean; staffCanReply: boolean; staffCanManageBookings: boolean; collaboratorAccessEnabled?: boolean }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const focused = (space === "pro" && ["dashboard", "services", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
   const supportInbox = (space === "support" && ["dashboard", "tickets", "unassigned", "mine", "priority", "escalations"].includes(module.key)) || (space === "operations" && module.key === "support") || (space === "admin" && module.key === "escalations");
@@ -79,7 +81,9 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const deletionQueue = space === "admin" && module.key === "deletion-requests";
   const [notice, setNotice] = useState("");
   const financeOverview = space === "finance" && module.key === "dashboard";
-  const custom = crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
+  const departmentCases = ["commercial","finance","support"].includes(space) && (module.key === "cases" || (module.key === "dashboard" && ((space === "finance" && !canReadFinance) || (space === "support" && !canManageSupport))));
+  const teamConsole = module.key === "teams" && ["admin","commercial","finance","support"].includes(space);
+  const custom = departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
     : space === "admin" && module.key === "alerts" ? fraudAlerts
     : space === "admin" && module.key === "security" ? resources.sessions
@@ -118,11 +122,13 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   }, [definition, paymentStatus, space, module.key, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
-  if (crmView) return <CommercialCrm key={module.key} userId={userId} canAssign={canManageCrmAssignments} dueOnly={module.key === "follow-ups"} />;
+  if (teamConsole) return <DepartmentTeamConsole department={space === "admin" ? undefined : space as "commercial"|"finance"|"support"} />;
+  if (departmentCases) return <DepartmentCases department={space as "commercial"|"finance"|"support"} />;
+  if (crmView) return <CommercialCrm key={module.key} userId={userId} canAssign={canManageCrmAssignments} isSuper={isSuperAdmin} dueOnly={module.key === "follow-ups"} />;
   if (financeOverview) return <FinanceOverview allowedModuleKeys={allowedModuleKeys} />;
   if (moderationInbox) return <ModerationInbox />;
   if (commentModeration) return <CommentModeration />;
-  if (refundReview) return <RefundReview />;
+  if (refundReview) return <RefundReview readOnly={space === "finance" && !canDecideRefunds} />;
   if (deletionQueue) return <AccountDeletionQueue />;
   if (categoryManagement) return <section>{notice && <p role="status">{notice}</p>}<CatalogModule services={false} notify={setNotice} /></section>;
   if (supportInbox) return <SupportInbox key={module.key} filter={module.key} userId={userId} />;

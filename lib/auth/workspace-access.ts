@@ -37,10 +37,10 @@ export function availableWorkspaces(identity: WorkspaceIdentity): WorkspaceSpace
 export function internalWorkspaceDestination(roles: readonly string[]): string | null {
   if (roles.includes("super_admin")) return "/admin";
   if (roles.includes("admin")) return "/operations";
-  if (roles.includes("commercial")) return "/commercial";
+  if (roles.some(role => ["commercial", "commercial_manager", "commercial_agent"].includes(role))) return "/commercial";
   if (roles.includes("verification_agent")) return "/onboarding";
-  if (roles.includes("finance")) return "/finance";
-  if (roles.includes("support")) return "/support-agent";
+  if (roles.some(role => ["finance", "finance_manager", "finance_agent"].includes(role))) return "/finance";
+  if (roles.some(role => ["support", "support_manager", "support_agent"].includes(role))) return "/support-agent";
   if (roles.includes("moderator")) return "/moderation";
   if (roles.includes("content_manager")) return "/operations";
   return null;

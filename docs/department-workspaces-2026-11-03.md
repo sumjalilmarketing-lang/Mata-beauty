@@ -1,5 +1,7 @@
 # Accès commerciaux, finance et service client
 
+> État intermédiaire : la livraison et les contrôles de la délégation hiérarchique sont décrits dans [l’audit actualisé](delegated-teams-audit-2026-11-03.md).
+
 ## Comportement préparé
 
 Dans Super Admin → Équipe & accès, trois services permettent de filtrer les membres, inviter un nouveau membre ou attribuer un rôle à un compte existant. L’attribution et la révocation restent réservées au Super Admin avec MFA, motif et journal d’audit. Aucun compte réel n’a été créé ou modifié pendant ce développement.

@@ -17,6 +17,7 @@ import { NotificationCenter, NotificationBadge } from "./notification-center";
 import { LaunchAdmin } from "./launch-admin";
 import { SupportInbox } from "./support-inbox";
 import { ModerationInbox } from "./moderation-inbox";
+import { DepartmentTeamConsole } from "./department-team-console";
 import { InternalTeam } from "./internal-team";
 import { CommentModeration } from "./comment-moderation";
 import { isPlatformSettingKey, parsePlatformSetting, validatePlatformSetting, type PlatformSettingKey, type PlatformSettingValue, type PlatformSettingsMap } from "@/lib/domain/admin-platform-settings";
@@ -198,6 +199,7 @@ const navigation = [
   { key: "notifications", label: "Notifications", icon: "◌", permission: "notifications.send" },
   { key: "support", label: "Support", icon: "?", permission: "support.manage" },
   { key: "content", label: "Contenu social", icon: "▶", permission: "content.manage" },
+  { key: "teams", label: "Branches & responsables", icon: "◎", permission: "roles.manage" },
   { key: "administrators", label: "Équipe & accès", icon: "♜", permission: "roles.manage" },
   { key: "roles", label: "Rôles et permissions", icon: "⌘", permission: "roles.manage" },
   { key: "statistics", label: "Statistiques", icon: "↗", permission: "users.read" },
@@ -211,7 +213,7 @@ type ModuleKey = typeof navigation[number]["key"];
 
 const adminNavigationGroups: ReadonlyArray<{ key: string; label: string; icon: string; moduleKeys: readonly ModuleKey[] }> = [
   { key: "pilotage", label: "Pilotage", icon: "◉", moduleKeys: ["overview", "launch", "cohort", "statistics"] },
-  { key: "users-access", label: "Utilisateurs & accès", icon: "♙", moduleKeys: ["users", "providers", "salons", "verification", "administrators", "roles"] },
+  { key: "users-access", label: "Utilisateurs & accès", icon: "♙", moduleKeys: ["users", "providers", "salons", "verification", "teams", "administrators", "roles"] },
   { key: "activity-services", label: "Activité & prestations", icon: "▣", moduleKeys: ["categories", "services", "bookings", "calendar"] },
   { key: "finance", label: "Finances", icon: "¤", moduleKeys: ["payments", "commissions", "payouts"] },
   { key: "communication-quality", label: "Communication & qualité", icon: "✉", moduleKeys: ["notifications", "reviews", "comments", "reports", "disputes", "support", "content", "promotions"] },
@@ -228,7 +230,13 @@ const adminRoleLabels: Record<string, string> = {
   support: "Agent support",
   verification_agent: "Agent onboarding",
   commercial: "Commercial — validation des dossiers",
-  finance: "Responsable finance",
+  finance: "Finance — accès historique",
+  commercial_manager: "Responsable commercial",
+  commercial_agent: "Commercial d’équipe",
+  finance_manager: "Responsable financier",
+  finance_agent: "Agent financier",
+  support_manager: "Responsable service client",
+  support_agent: "Agent service client",
   moderator: "Modérateur",
   content_manager: "Responsable contenu",
 };
@@ -620,6 +628,7 @@ function AdminModule({
   if (module === "payments" || module === "commissions") return <FinanceModule section={module} />;
   if (module === "content") return <SocialContentModule context={context} notify={notify} />;
   if (module === "audit") return <AuditModule context={context} />;
+  if (module === "teams") return <DepartmentTeamConsole />;
   if (module === "administrators" || module === "roles") return <InternalTeam matrixOnly={module === "roles"} />;
   if (module === "settings" || module === "maintenance") return <SettingsModule context={context} maintenance={module === "maintenance"} notify={notify} />;
   return <OperationalModule module={module} context={context} />;

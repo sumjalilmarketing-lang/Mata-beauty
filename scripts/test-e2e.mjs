@@ -12,7 +12,7 @@ const testPort = Number(process.env.MATA_PLAYWRIGHT_PORT ?? 3160);
 const fixturePort = Number(process.env.MATA_SUPABASE_FIXTURE_PORT ?? 3161);
 const testOrigin = `http://127.0.0.1:${testPort}`;
 const fixtureOrigin = `http://127.0.0.1:${fixturePort}`;
-const distDir = process.env.MATA_E2E_NEXT_DIST_DIR ?? ".next/playwright-stabilization-prod";
+const distDir = process.env.MATA_E2E_NEXT_DIST_DIR ?? "outputs/playwright-stabilization-prod";
 const e2eTsconfig = resolve(root, ".next/playwright-tsconfig.json");
 
 Object.assign(process.env, {
@@ -132,7 +132,8 @@ try {
   fixture = await startSupabaseFixture(fixturePort);
   // A production server removes dev HMR races from mobile WebKit while keeping
   // the same isolated fixture URLs compiled into this disposable build.
-  const buildCode = await buildTestApp();
+  // Optional reuse for browser-only reruns against the already-built local app.
+  const buildCode = process.env.MATA_E2E_SKIP_BUILD === "true" ? 0 : await buildTestApp();
   if (buildCode !== 0) throw new Error(`Next.js isolated E2E build exited with code ${buildCode}.`);
   nextApp = next({ dev: false, dir: root, port: testPort, hostname: "127.0.0.1" });
   await nextApp.prepare();

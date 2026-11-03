@@ -1,5 +1,7 @@
 # CRM commercial Mata Beauty — 3 novembre 2026
 
+> État intermédiaire : la livraison et les contrôles de la délégation hiérarchique sont décrits dans [l’audit actualisé](delegated-teams-audit-2026-11-03.md).
+
 ## Fonctionnalités développées
 
 - CRM natif dans l’espace commercial : vue commerciale, prospects et relances à échéance, avec accès séparé aux dossiers professionnels.
