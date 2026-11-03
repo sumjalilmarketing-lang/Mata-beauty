@@ -1,0 +1,36 @@
+.workspace-main > .workspace-install-help {
+  min-height: 0;
+  margin: 20px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.workspace-install-help > summary {
+  display: list-item;
+  box-sizing: border-box;
+  width: fit-content;
+  min-height: 44px;
+  padding: 11px 0;
+  cursor: pointer;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 400;
+}
+.workspace-install-help > summary::marker { font-size: 10px; }
+.workspace-install-help > summary:focus-visible {
+  outline: 2px solid var(--ws-pink);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.workspace-install-help[open] > summary { font-weight: 600; }
+.workspace-install-help > p {
+  max-width: 560px;
+  margin: 6px 0;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
