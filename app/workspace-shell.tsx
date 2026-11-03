@@ -39,8 +39,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
   const parent = navigationParent(space, moduleKey);
   const secondary = simpleKeys ? modules.filter((item) => item.key !== "dashboard" && !mainModules.includes(item) && navigationParent(space, item.key) === parent) : [];
   const notificationsModule = modules.find((item) => item.key === "notifications");
-  const visibleSpaces = ["client", "pro", "salon", "staff"].includes(space)
-    ? availableSpaces.filter(key => ["client", "pro", "salon", "staff"].includes(key)) : availableSpaces;
+  const visibleSpaces = availableSpaces;
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,7 +59,8 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
       <Link className="workspace-brand" href="/"><span>M</span><strong>Mata Beauty</strong></Link>
       <label className="workspace-space-picker">
         <span>{t("Espace actif")}</span>
-        <select aria-label={t("Espace actif")} value={space} onChange={(event) => router.push(workspaceHref(event.target.value as WorkspaceSpaceKey))}>
+        <select aria-label={t("Espace actif")} value={space} onChange={(event) => router.push(event.target.value === "feed" ? "/" : workspaceHref(event.target.value as WorkspaceSpaceKey))}>
+          <option value="feed">{t("Fil d’inspiration")}</option>
           {visibleSpaces.map((key) => <option key={key} value={key}>{t(workspaceSpaces[key].label)}</option>)}
         </select>
       </label>
