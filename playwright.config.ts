@@ -15,11 +15,13 @@ export default defineConfig({
   globalSetup: "./scripts/playwright-global-setup.mjs",
   use: {
     baseURL: localBaseUrl,
+    locale: "fr-FR",
     // These tests exercise the application through Playwright route fixtures.
     // Keep the production PWA worker from bypassing those deterministic API
     // fixtures in browser engines with different service-worker scheduling.
     serviceWorkers: "block",
     trace: "retain-on-failure",
+    ...(process.env.MATA_PLAYWRIGHT_CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.MATA_PLAYWRIGHT_CHROMIUM_PATH, args: JSON.parse(process.env.MATA_PLAYWRIGHT_CHROMIUM_ARGS ?? "[]") as string[] } } : {}),
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },

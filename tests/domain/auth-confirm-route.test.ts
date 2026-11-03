@@ -26,10 +26,10 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("email confirmation route", () => {
-  it.each(["email", "signup"])("verifies a %s confirmation before opening the profile", async (type) => {
+  it.each(["email", "signup"])("verifies a %s confirmation before resolving the assigned workspace", async (type) => {
     const result = await GET(new Request(`${origin}/auth/confirm?type=${type}&token_hash=test-hash`));
     expect(mocks.verifyOtp).toHaveBeenCalledWith({ type, token_hash: "test-hash" });
-    expect(result.headers.get("location")).toBe(`${origin}/app/profile?auth=email_confirmed`);
+    expect(result.headers.get("location")).toBe(`${origin}/auth/workspace`);
     expect(result.headers.get("cache-control")).toBe("no-store");
     expect(result.headers.get("referrer-policy")).toBe("no-referrer");
     expect(mocks.rpc).toHaveBeenCalledWith("synchronize_account_status");

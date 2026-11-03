@@ -25,8 +25,9 @@ export async function proxy(request: NextRequest) {
   });
   await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const privilegedOrTechnical = /^\/(admin|onboarding|support-agent|moderation|finance|operations|auth)(\/|$)/.test(path)
+  const privilegedOrTechnical = /^\/(admin|commercial|onboarding|support-agent|moderation|finance|operations|auth)(\/|$)/.test(path)
     || /^\/api\/(admin|auth|cron|health)(\/|$)/.test(path)
+    || path === "/api/department-teams"
     || path === "/api/payments/webhook"
     || /\.[a-z0-9]+$/i.test(path);
   if (!privilegedOrTechnical) {

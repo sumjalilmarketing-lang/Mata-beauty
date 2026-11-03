@@ -32,3 +32,16 @@ export function canAccessWorkspaceModule(identity: WorkspaceIdentity, permission
 export function availableWorkspaces(identity: WorkspaceIdentity): WorkspaceSpaceKey[] {
   return (Object.keys(workspaceSpaces) as WorkspaceSpaceKey[]).filter((space) => canAccessWorkspace(space, identity));
 }
+
+/** Internal roles use their own workspace, never the general administration UI. */
+export function internalWorkspaceDestination(roles: readonly string[]): string | null {
+  if (roles.includes("super_admin")) return "/admin";
+  if (roles.includes("admin")) return "/operations";
+  if (roles.some(role => ["commercial", "commercial_manager", "commercial_agent"].includes(role))) return "/commercial";
+  if (roles.includes("verification_agent")) return "/onboarding";
+  if (roles.some(role => ["finance", "finance_manager", "finance_agent"].includes(role))) return "/finance";
+  if (roles.some(role => ["support", "support_manager", "support_agent"].includes(role))) return "/support-agent";
+  if (roles.includes("moderator")) return "/moderation";
+  if (roles.includes("content_manager")) return "/operations";
+  return null;
+}

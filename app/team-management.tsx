@@ -98,6 +98,9 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
   const [rows, setRows] = useState<StaffAppointment[]>([]);
   const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA").format(new Date()));
   const [loading, setLoading] = useState(true), [busyId, setBusyId] = useState<string | null>(null), [feedback, setFeedback] = useState("");
+  const [transfer, setTransfer] = useState<StaffAppointment | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer); }, []);
   const load = useCallback(async () => {
     setLoading(true);
     const result = await api().rpc("get_staff_booking_agenda_global", { from_date: date, days: 7 });
@@ -121,8 +124,52 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
         {canManage && row.status === "pending" && <><button disabled={busyId === row.id} onClick={() => void transition(row, "confirmed")}>{t("Confirmer")}</button><button disabled={busyId === row.id} onClick={() => void transition(row, "declined")}>{t("Refuser")}</button></>}
         {canManage && row.status === "confirmed" && <button disabled={busyId === row.id} onClick={() => void transition(row, "in_progress")}>{t("Démarrer")}</button>}
         {canManage && row.status === "in_progress" && <button disabled={busyId === row.id} onClick={() => void transition(row, "completed")}>{t("Terminer")}</button>}
+        {canManage && ["pending", "confirmed"].includes(row.status) && Date.parse(row.starts_at) > now && <button disabled={Boolean(busyId)} onClick={() => setTransfer(row)}>{t("Réattribuer à un collègue")}</button>}
       </div>)}</div>
-    </article></section>;
+    </article>{transfer && <StaffBookingTransfer key={transfer.id} appointment={transfer} onClose={() => setTransfer(null)} onTransferred={async () => { await load(); setTransfer(null); setFeedback("Rendez-vous réattribué. Le client, votre collègue et le responsable ont été informés."); }} />}</section>;
+}
+
+function StaffBookingTransfer({ appointment, onClose, onTransferred }: { appointment: StaffAppointment; onClose: () => void; onTransferred: () => Promise<void> }) {
+  const locale = useApplicationLocale();
+  const t = (text: string) => workspaceText(text, locale);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const lock = useRef(false);
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve(api().rpc("get_reassignment_candidates", { target_booking_id: appointment.id })).then(({ data, error: failure }) => {
+      if (!active) return;
+      if (failure) { setCandidates([]); setError("Les collègues disponibles n’ont pas pu être chargés."); }
+      else { setCandidates((data ?? []) as Candidate[]); setError(""); }
+      setLoading(false);
+    }).catch(() => { if (active) { setLoading(false); setError("Les collègues disponibles n’ont pas pu être chargés."); } });
+    return () => { active = false; };
+  }, [appointment.id, attempt]);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (lock.current || loading || !candidates.length) return;
+    const values = new FormData(event.currentTarget);
+    lock.current = true; setBusy(true); setError("");
+    try {
+      const result = await api().rpc("reassign_booking_collaborator", { target_booking_id: appointment.id, target_collaborator_id: values.get("employee"), reason: values.get("reason") });
+      if (result.error) throw result.error;
+      await onTransferred();
+    } catch (failure) { setError(publicErrorMessage(failure, "Réattribution impossible. Actualisez les collègues disponibles et réessayez.")); }
+    finally { lock.current = false; setBusy(false); }
+  }
+  return <section className="workspace-panel salon-panel" aria-label={t("Réattribuer à un collègue")}>
+    <h3>{t("Réattribuer à un collègue")}</h3><p>{appointment.client_name} · {appointment.service_title}</p>
+    <p>{t("Le rendez-vous conserve sa date, son heure et son prix. Le client, votre collègue et le responsable seront informés.")}</p>
+    {error && <p role="alert">{t(error)}</p>}
+    {loading ? <p role="status">{t("Recherche des collègues disponibles…")}</p> : candidates.length ? <form className="salon-form" onSubmit={submit}>
+      <label>{t("Collègue disponible")}<select name="employee" required defaultValue="" disabled={busy}><option value="" disabled>{t("Choisir")}</option>{candidates.map(person => <option key={person.id} value={person.id}>{person.display_name}</option>)}</select></label>
+      <label>{t("Motif")}<input name="reason" required minLength={3} maxLength={240} disabled={busy} /></label>
+      <button disabled={busy}>{t(busy ? "Réattribution en cours…" : "Confirmer la réattribution")}</button>
+    </form> : !error && <p>{t("Aucun collègue qualifié n’est disponible sur ce créneau. Contactez le responsable du salon.")}</p>}
+    <button type="button" disabled={busy || loading} onClick={() => { setLoading(true); setError(""); setAttempt(value => value + 1); }}>{t("Actualiser les disponibilités")}</button>
+    <button type="button" disabled={busy} onClick={onClose}>{t("Fermer")}</button>
+  </section>;
 }
 
 export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled = false }: { businessId: string; ownerId: string; collaboratorAccessEnabled?: boolean }) {
@@ -221,8 +268,8 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
         const path = `${businessId}/employee-${result.data}-${crypto.randomUUID()}.${extension}`;
         const upload = await api().storage.from("business-media").upload(path, file, { contentType: file.type, upsert: false });
         if (upload.error) throw upload.error;
-        const update = await api().from("collaborators").update({ avatar_url: api().storage.from("business-media").getPublicUrl(path).data.publicUrl }).eq("id", result.data as string);
-        if (update.error) { await api().storage.from("business-media").remove([path]); throw update.error; }
+        const update = await api().from("collaborators").update({ avatar_url: api().storage.from("business-media").getPublicUrl(path).data.publicUrl }).eq("id", result.data as string).eq("business_id", businessId).select("id").maybeSingle();
+        if (update.error || !update.data) { await api().storage.from("business-media").remove([path]); throw update.error ?? new Error("La photo du collaborateur n’a pas pu être enregistrée. Actualisez l’équipe."); }
       }
       savedMemberId.current = null; setEditing(false);
     }, "Fiche enregistrée. Vérifiez ses horaires et les rendez-vous existants ci-dessous.");

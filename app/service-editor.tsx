@@ -2,12 +2,13 @@
 
 import { FormEvent, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { validDepositPercentage } from "@/lib/domain/service-deposit";
 import { serviceDetailsError } from "@/lib/domain/service-creation";
 import { formatServiceMoney } from "@/lib/domain/service-money";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import "./service-editor.css";
 
-export type EditableService = { business_id?: string | null; id: string; service_id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; currency: string; is_active: boolean; archived_at: string | null; updated_at: string };
+export type EditableService = { deposit_percentage?: number; business_id?: string | null; id: string; service_id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; currency: string; is_active: boolean; archived_at: string | null; updated_at: string };
 export function ServiceEditor({ service, catalog, userId, businessId, activityCurrency, onSaved, onRemoved }: {
   service: EditableService; catalog: Array<{ id: string; name: string }>; userId: string; businessId?: string;
   activityCurrency: string | null; onSaved: (value: EditableService) => void; onRemoved: (id: string) => void;
@@ -28,12 +29,14 @@ export function ServiceEditor({ service, catalog, userId, businessId, activityCu
     const values = event ? new FormData(event.currentTarget) : null;
     const details = values ? { serviceId: String(values.get("serviceId") ?? ""), title: String(values.get("title") ?? "").trim(), durationMinutes: Number(values.get("duration")), priceAmount: Number(values.get("price")) } : null;
     if (details) { const error = serviceDetailsError(details); if (error) { setMessage(error); return; } }
-    const payload = details ? { service_id: details.serviceId, title: details.title, description: String(values?.get("description") ?? "").trim() || null, duration_minutes: details.durationMinutes, price_amount: details.priceAmount, currency } : { is_active: false, archived_at: new Date().toISOString() };
+    const depositPercentage = Number(values?.get("depositPercentage") ?? service.deposit_percentage ?? 0);
+    if (details && !validDepositPercentage(depositPercentage)) { setMessage("Choisissez un acompte entier entre 0 et 60 %."); return; }
+    const payload = details ? { deposit_percentage: depositPercentage, service_id: details.serviceId, title: details.title, description: String(values?.get("description") ?? "").trim() || null, duration_minutes: details.durationMinutes, price_amount: details.priceAmount, currency } : { is_active: false, archived_at: new Date().toISOString() };
     pending.current = true; setBusy(true); setMessage("");
     try {
       let query = supabase.from("provider_services").update(payload).eq("id", service.id).eq("provider_id", userId).eq("updated_at", service.updated_at).is("archived_at", null);
       query = businessId ? query.eq("business_id", businessId) : query.is("business_id", null);
-      const { data, error } = await query.select("id,business_id,service_id,title,description,duration_minutes,price_amount,currency,is_active,archived_at,updated_at").maybeSingle();
+      const { data, error } = await query.select("id,business_id,service_id,title,description,duration_minutes,price_amount,currency,deposit_percentage,is_active,archived_at,updated_at").maybeSingle();
       if (error) throw error;
       if (!data) { setMessage("Cette prestation a changé ou n’est plus accessible. Actualisez la page avant de réessayer."); return; }
       if (details) { onSaved(data as EditableService); setEditing(false); setMessage("Prestation modifiée. Les dates, durées et montants des réservations existantes restent inchangés."); }
@@ -51,6 +54,8 @@ export function ServiceEditor({ service, catalog, userId, businessId, activityCu
       <label>Nom de votre prestation<input name="title" defaultValue={service.title} required minLength={2} maxLength={120} disabled={busy} /></label>
       <label>Durée (minutes)<input name="duration" type="number" inputMode="numeric" defaultValue={service.duration_minutes} required min={15} max={720} step={1} disabled={busy} /></label>
       <label>Prix ({currency})<input key={currency} name="price" type="number" inputMode="numeric" defaultValue={currencyChanged ? "" : service.price_amount} required min={0} max={10000000} step={1} disabled={busy} /></label>
+      <label>Acompte prévu (%)<input name="depositPercentage" type="number" inputMode="numeric" defaultValue={service.deposit_percentage ?? 0} required min={0} max={60} step={1} disabled={busy} /></label>
+      <p>0 % : sans acompte. Un taux de 20 à 30 % convient aux prestations courtes ; jusqu’à 60 % pour les prestations longues ou coûteuses. Ce réglage prépare le paiement en ligne : aucun acompte n’est actuellement encaissé.</p>
       <label>Description<textarea name="description" defaultValue={service.description ?? ""} maxLength={2000} disabled={busy} /></label>
       <p>Les modifications s’appliquent aux prochaines réservations. Les rendez-vous déjà réservés conservent leurs dates, durées et montants.</p>
       <div className="service-editor-actions"><button type="submit" disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer les modifications"}</button><button type="button" disabled={busy} onClick={() => setEditing(false)}>Annuler</button></div>

@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
     const documentFrameSource = configuredSupabaseOrigin ? `${configuredSupabaseOrigin}/storage/v1/object/sign/provider-documents/` : "'none'";
     const mapFrameSource = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY ? " https://www.google.com" : "";
     const supabaseConnectSource = configuredSupabaseOrigin ? ` ${configuredSupabaseOrigin}` : "";
-    const noIndexHeaders = ["/app/:path*", "/admin/:path*", "/auth/:path*", "/finance/:path*", "/moderation/:path*", "/onboarding/:path*", "/operations/:path*", "/pro/:path*", "/salon/:path*", "/staff/:path*", "/support-agent/:path*"].map(source => ({
+    const noIndexHeaders = ["/app/:path*", "/admin/:path*", "/commercial/:path*", "/auth/:path*", "/finance/:path*", "/moderation/:path*", "/onboarding/:path*", "/operations/:path*", "/pro/:path*", "/salon/:path*", "/staff/:path*", "/support-agent/:path*"].map(source => ({
       source,
       headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
     }));

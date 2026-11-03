@@ -62,3 +62,8 @@
 @media(max-width:640px){.admin-breadcrumb{font-size:11px;gap:6px}.admin-page-heading h1{font-size:clamp(25px,8vw,34px)}}
 @media(prefers-color-scheme:dark){.admin-breadcrumb{color:#e4d5de}.admin-breadcrumb [aria-hidden="true"]{color:#bca8b5}.admin-sidebar nav .admin-nav-group-trigger{color:#f8edf3}.admin-sidebar nav .admin-nav-group-links button{color:#e5d7e0}}
 @media(prefers-reduced-motion:reduce){.admin-nav-group-content,.admin-nav-chevron{transition:none}}
+
+/* Department access management remains usable on a phone. */
+.internal-departments { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: 16px; margin: 20px 0; }
+.internal-departments article { margin: 0; }
+.internal-departments a { display: inline-block; margin: 12px 0 0; }

@@ -24,6 +24,10 @@ import { SupportInbox } from "./support-inbox";
 import { ModerationInbox } from "./moderation-inbox";
 import { CommentModeration } from "./comment-moderation";
 import { CatalogModule } from "./super-admin";
+import { DepartmentTeamConsole } from "./department-team-console";
+import { DepartmentCases } from "./department-cases";
+import { CommercialCrm } from "./commercial-crm";
+import { FinanceOverview } from "./finance-overview";
 import { RefundReview } from "./refund-review";
 import { AccountDeletionQueue } from "./account-deletion-queue";
 
@@ -48,6 +52,7 @@ const resources: Partial<Record<NonNullable<WorkspaceModule["resource"]>, Resour
   payouts: { table: "payouts", select: "id,provider_id,amount,currency,status,created_at", title: (row) => `${money(row.amount, row.currency)} · ${label(row.status)}`, meta: (row) => `Professionnel ${shortId(row.provider_id)} · ${date(row.created_at)}` },
   reconciliation: { table: "reconciliation_runs", select: "id,provider,environment,status,matched_count,mismatch_count,missing_count,started_at", title: (row) => `${text(row.provider, "Fournisseur")} · ${label(row.status)}`, meta: (row) => `${text(row.environment, "")} · Écarts ${Number(row.mismatch_count)} · Manquants ${Number(row.missing_count)} · ${date(row.started_at)}` },
   "financial-events": { table: "financial_security_events", select: "id,event_type,severity,transaction_reference,created_at", title: (row) => `${label(row.event_type)} · ${label(row.severity)}`, meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` },
+  ledger: { table: "wallet_ledger", select: "id,transaction_type,amount,status,reference,created_at,wallets(currency)", title: row => `${label(row.transaction_type)} · ${money(row.amount, paymentCurrency(row.wallets))}`, meta: row => `${label(row.status)} · ${text(row.reference, "")} · ${date(row.created_at)}` },
   commissions: { table: "platform_commissions", select: "id,payment_id,rate,amount,currency,created_at", title: (row) => `${money(row.amount, row.currency)} · ${Number(row.rate)} %`, meta: (row) => `Paiement ${shortId(row.payment_id)} · ${date(row.created_at)}` },
   disputes: { table: "disputes", select: "id,booking_id,priority,status,reason,created_at", title: (row) => `${text(row.reason, "Litige")} · ${label(row.status)}`, meta: (row) => `${label(row.priority)} · ${date(row.created_at)}` },
   sessions: { table: "admin_sessions", select: "id,user_id,signed_in_at,last_seen_at,mfa_verified,revoked_at", title: (row) => `Compte ${shortId(row.user_id)} · ${row.revoked_at ? "Révoquée" : "Enregistrée"}`, meta: (row) => `MFA ${row.mfa_verified ? "vérifié" : "non vérifié"} · Dernière activité ${date(row.last_seen_at)}` },
@@ -63,22 +68,27 @@ const moderationHistory: ResourceDefinition = { table: "moderation_actions", sel
 const financialHistory: ResourceDefinition = { table: "financial_audit_log", select: "id,action,transaction_reference,created_at", title: (row) => label(row.action), meta: (row) => `${text(row.transaction_reference, "")} · ${date(row.created_at)}` };
 const refunds: ResourceDefinition = { table: "refunds", select: "id,payment_id,amount,status,reason,created_at,payments(currency)", title: (row) => `${money(row.amount, paymentCurrency(row.payments))} · ${label(row.status)}`, meta: (row) => `${text(row.reason, "")} · ${date(row.created_at)}` };
 
-export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, providerApproved, staffCanReply, staffCanManageBookings, collaboratorAccessEnabled = false }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; providerApproved: boolean; staffCanReply: boolean; staffCanManageBookings: boolean; collaboratorAccessEnabled?: boolean }) {
+export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, canManageCrmAssignments = false, isSuperAdmin=false, canReadFinance=false, canDecideRefunds=false, canManageSupport=false, providerApproved, staffCanReply, staffCanManageBookings, collaboratorAccessEnabled = false }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; canManageCrmAssignments?: boolean; isSuperAdmin?:boolean; canReadFinance?:boolean; canDecideRefunds?:boolean; canManageSupport?:boolean; providerApproved: boolean; staffCanReply: boolean; staffCanManageBookings: boolean; collaboratorAccessEnabled?: boolean }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
   const focused = (space === "pro" && ["dashboard", "services", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
   const supportInbox = (space === "support" && ["dashboard", "tickets", "unassigned", "mine", "priority", "escalations"].includes(module.key)) || (space === "operations" && module.key === "support") || (space === "admin" && module.key === "escalations");
   const moderationInbox = (space === "moderation" && ["dashboard", "reports"].includes(module.key)) || (space === "operations" && module.key === "moderation");
-  const onboardingInbox = (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "operations" && module.key === "onboarding");
+  const crmView = space === "commercial" && ["dashboard","crm","follow-ups"].includes(module.key);
+  const onboardingInbox = (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "operations" && module.key === "onboarding");
   const commentModeration = ["moderation", "admin"].includes(space) && module.key === "comments";
   const categoryManagement = space === "operations" && module.key === "categories";
   const refundReview = ["finance", "admin"].includes(space) && module.key === "refunds";
   const deletionQueue = space === "admin" && module.key === "deletion-requests";
   const [notice, setNotice] = useState("");
-  const custom = moderationInbox || supportInbox || focused || (space === "onboarding" && ["dashboard", "new", "in-progress", "requests", "approved", "rejected", "documents"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
+  const financeOverview = space === "finance" && module.key === "dashboard";
+  const departmentCases = ["commercial","finance","support"].includes(space) && (module.key === "cases" || (module.key === "dashboard" && ((space === "finance" && !canReadFinance) || (space === "support" && !canManageSupport))));
+  const teamConsole = module.key === "teams" && ["admin","commercial","finance","support"].includes(space);
+  const accountSettings = space === "pro" && module.key === "settings";
+  const custom = accountSettings || departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
     : space === "admin" && module.key === "alerts" ? fraudAlerts
     : space === "admin" && module.key === "security" ? resources.sessions
-    : space === "onboarding" && module.key === "history" ? onboardingHistory
+    : ["onboarding", "commercial"].includes(space) && module.key === "history" ? onboardingHistory
     : space === "moderation" && module.key === "history" ? moderationHistory
     : (space === "finance" && module.key === "audit") || (space === "admin" && module.key === "financial-reports") ? financialHistory
     : ["finance", "admin"].includes(space) && module.key === "refunds" ? refunds
@@ -102,26 +112,30 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
     if (definition.table === "app_settings") request = request.eq("is_sensitive", false);
     if (space === "admin" && module.key === "suspended") request = request.eq("is_suspended", true);
     if (definition.select.includes("created_at")) request = request.order("created_at", { ascending: false });
-    request.then(({ data, error }) => {
+    void Promise.resolve(request).then(({ data, error }) => {
       window.clearTimeout(timeout);
       if (!active) return;
       if (error) { setState("unavailable"); return; }
       const next = (data ?? []) as unknown as Row[];
       setRows(next); setState(next.length ? "ready" : "empty");
-    });
+    }).catch(() => { window.clearTimeout(timeout); if (active) { setRows([]); setState("unavailable"); } });
     return () => { active = false; window.clearTimeout(timeout); controller.abort(); };
   }, [definition, paymentStatus, space, module.key, supabaseAnonKey, supabaseUrl]);
   const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
 
+  if (teamConsole) return <DepartmentTeamConsole department={space === "admin" ? undefined : space as "commercial"|"finance"|"support"} />;
+  if (departmentCases) return <DepartmentCases department={space as "commercial"|"finance"|"support"} />;
+  if (crmView) return <CommercialCrm key={module.key} userId={userId} canAssign={canManageCrmAssignments} isSuper={isSuperAdmin} dueOnly={module.key === "follow-ups"} />;
+  if (financeOverview) return <FinanceOverview allowedModuleKeys={allowedModuleKeys} />;
   if (moderationInbox) return <ModerationInbox />;
   if (commentModeration) return <CommentModeration />;
-  if (refundReview) return <RefundReview />;
+  if (refundReview) return <RefundReview readOnly={space === "finance" && !canDecideRefunds} />;
   if (deletionQueue) return <AccountDeletionQueue />;
   if (categoryManagement) return <section>{notice && <p role="status">{notice}</p>}<CatalogModule services={false} notify={setNotice} /></section>;
   if (supportInbox) return <SupportInbox key={module.key} filter={module.key} userId={userId} />;
   if (module.key === "notifications") return <NotificationCenter userId={userId} />;
   if (focused) return <LiveDashboard role={space === "client" ? "client" : "provider"} userId={userId} displayName="" moduleKey={module.key} onBack={() => window.location.assign("/")} onSignOut={async () => { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/"); }} />;
-  if (onboardingInbox) return <OnboardingQueue moduleKey={module.key === "onboarding" ? "dashboard" : module.key} />;
+  if (onboardingInbox) return <OnboardingQueue moduleKey={["onboarding","dossiers"].includes(module.key) ? "dashboard" : module.key} />;
   if (space === "pro" && module.key === "team") return <SalonControlCenter module={module} userId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />;
   if (space === "pro" && module.key === "agenda") return <><ProviderTeamAgenda userId={userId} /><ProviderAgenda userId={userId} /></>;
   if (space === "pro" && module.key === "revenue") return <ProviderRevenue userId={userId} />;
@@ -138,6 +152,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
   if (space === "client" && module.key === "profile") return <ClientProfile userId={userId} />;
   if (space === "client" && module.key === "application") return <ProfessionalApplication userId={userId} />;
+  if (accountSettings) return <ClientControlCenter userId={userId} section="settings" />;
   if (space === "client" && ["settings", "payments", "reviews", "support"].includes(module.key)) return <ClientControlCenter userId={userId} section={module.key} />;
   const shortcuts = workspaceSpaces[space].modules.filter((item) => item.key !== module.key && allowedModuleKeys.includes(item.key)).slice(0, 4);
   return <section className="workspace-content">

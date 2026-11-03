@@ -32,6 +32,10 @@ export async function POST(request: Request) {
   if (!booking) return jsonError("Réservation introuvable.", 404, "BOOKING_NOT_FOUND");
   if (booking.currency !== "XOF" || booking.status !== "pending") return jsonError("Cette réservation ne peut pas être payée.", 409, "BOOKING_NOT_PAYABLE");
 
+  const { data: service, error: serviceError } = await auth.client.from("provider_services").select("deposit_percentage").eq("id", booking.provider_service_id).maybeSingle();
+  if (serviceError || !service) return jsonError("Configuration de prestation indisponible.", 503, "SERVICE_UNAVAILABLE");
+  if (service.deposit_percentage > 0) return jsonError("L’encaissement d’acomptes n’est pas encore activé. Choisissez le paiement sur place.", 409, "DEPOSIT_COLLECTION_UNAVAILABLE");
+
   const quote = calculatePaymentQuote({ grossAmount: booking.total_amount, mode: "full", commission: { percentageBasisPoints: 1000, fixedAmount: 0 } });
   const reference = `MB-${randomUUID()}`;
   const fingerprint = requestFingerprint({ bookingId: booking.id, method: parsed.data.method, amount: quote.payableAmount, currency: "XOF" });
