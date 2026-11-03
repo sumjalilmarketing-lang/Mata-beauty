@@ -22,11 +22,11 @@ La correction s’applique à toutes les futures invitations de tous les salons.
 
 Branche indépendante de la PR #35 : 343 tests automatisés réussis, TypeScript et compilation de production réussis ; lint sans erreur et six avertissements existants. Les tests n’envoient aucune invitation réelle.
 
-Migration appliquée uniquement à Test. Vérifié : anon ne peut pas exécuter la nouvelle fonction ; authenticated ne peut pas modifier directement les événements privés ; appel par utilisateur sans autorisation refusé.
+Avant publication, migration et contrôles de permissions validés sur Test. Vérifié : anon ne peut pas exécuter la nouvelle fonction ; authenticated ne peut pas modifier directement les événements privés ; appel par utilisateur sans autorisation refusé.
 
 Contrôle supplémentaire en Test, avec fixtures synthétiques et transaction annulée : création réservée au propriétaire, refus d’un autre compte ou d’une adresse non confirmée, permissions exactes, usage unique, révocation et expiration. Aucun faux reçu email pour un lien partagé. Absence des utilisateurs synthétiques vérifiée après rollback. Les définitions d’acceptation Test/Production sont identiques après normalisation des fins de ligne.
 
-Aucun test navigateur ni scénario réel complet d’acceptation Outlook/Hotmail validé. Les recettes restantes couvrent réception réelle, courriers indésirables, copie sur mobile et redirection après authentification. Le lien de secours conserve l’exigence d’une adresse confirmée : si la confirmation d’inscription n’arrive pas non plus, utiliser une autre adresse possédée et confirmable ne remplace pas l’investigation de délivrabilité.
+Les contrôles navigateur après publication confirment la présence des nouveaux boutons et le fonctionnement du suivi des anciens envois. Aucun scénario réel complet d’acceptation Outlook/Hotmail validé. Les recettes restantes couvrent réception réelle, courriers indésirables, copie sur mobile et redirection après authentification. Le lien de secours conserve l’exigence d’une adresse confirmée : si la confirmation d’inscription n’arrive pas non plus, utiliser une autre adresse possédée et confirmable ne remplace pas l’investigation de délivrabilité.
 
 ## Limite du correctif
 
@@ -34,7 +34,11 @@ Le suivi et le lien de secours ne lèvent pas un rejet SMTP par le fournisseur d
 
 ## Intégration
 
-La PR #36 reste en brouillon. Aucune fusion, migration ou mise en production réalisée. Après validation et autorisation explicite, appliquer la migration avant le déploiement applicatif. Aucune réécriture des invitations ou des rôles existants n’est nécessaire. Le lien de secours réutilise les fonctions de création et d’acceptation existantes, sans migration supplémentaire.
+Le 3 novembre 2026, après autorisation explicite du propriétaire, la migration additive de reçu a été appliquée en production, puis le commit fa4ef79a588a4293c2765aba2c466c1127a84812 a été déployé directement sur mata-beauty.com. Vercel confirme READY et le domaine officiel est associé à ce déploiement. La PR reste en brouillon et n’a pas été fusionnée ; les autres PR ne font pas partie de cette livraison.
+
+Vérifications après déploiement : accueil et page d’acceptation HTTP 200, API équipe sans session HTTP 401, nouveaux boutons visibles dans l’espace salon authentifié, suivi d’un ancien envoi sans reçu explicitement indisponible. Aucun envoi, révocation ou rôle réel supplémentaire créé pendant ces vérifications. Aucun log error/fatal trouvé dans la fenêtre de démarrage interrogée ; cela ne constitue pas une garantie d’absence d’incident.
+
+La fonction de reçu est exécutable par authenticated avec contrôle propriétaire, non exécutable par anon ; les modifications directes des événements privés restent refusées à authenticated. Le lien de secours réutilise les fonctions de création et d’acceptation existantes. Aucune réécriture des invitations ou des rôles existants.
 
 Retour arrière : redéployer la version applicative précédente. Les invitations créées restent valables jusqu’à leur expiration ou leur révocation et les rôles acceptés restent conservés. La fonction de reçu additive peut rester en place ; ne pas effacer les événements pour revenir en arrière.
 
