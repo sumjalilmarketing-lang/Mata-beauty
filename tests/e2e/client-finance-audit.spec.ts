@@ -7,7 +7,7 @@ test('client : les paramètres ouvrent les formulaires, les modifications et la 
  await login(context,'client');
  await page.goto('/app/profile');
  await expect(page.getByRole('button',{name:'Modifier mon profil',exact:true})).toBeVisible();
- const install=page.locator('.workspace-install-help');await expect(install).toBeVisible();await expect(install).not.toHaveAttribute('open','');await install.locator('summary').click();await expect(install.getByText('iPhone : Safari → Partager → Sur l’écran d’accueil.',{exact:true})).toBeVisible();await install.locator('summary').click();await expect(install).not.toHaveAttribute('open','');
+ const install=page.locator('.workspace-install-help');await expect(install).toBeVisible();await expect(install).not.toHaveAttribute('open','');await install.locator('summary').click();await expect(install.getByText(/iPhone et iPad : Safari/)).toBeVisible();await expect(install.getByText(/Téléphone et tablette Android/)).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await install.locator('summary').click();await expect(install).not.toHaveAttribute('open','');
  await page.getByRole('link',{name:'Paramètres et confidentialité',exact:true}).click();
  await expect(page).toHaveURL(/\/app\/profile\?edit=1/);
  await expect(page.getByRole('heading',{name:'Identité',exact:true})).toBeVisible();

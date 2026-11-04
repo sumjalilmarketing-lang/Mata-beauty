@@ -2,6 +2,9 @@ import { applicationText } from "./application-copy";
 import { applicationLocale } from "./booking-copy";
 
 const copy: Record<string, readonly [string, string]> = {
+  "Installer sur mon appareil": ["Install on my device", "Instalar en mi dispositivo"],
+  "iPhone et iPad : Safari → Partager → Sur l’écran d’accueil → Ajouter. Si l’option est masquée, touchez Plus.": ["iPhone and iPad: Safari → Share → Add to Home Screen → Add. If the option is hidden, tap More.", "iPhone y iPad: Safari → Compartir → Añadir a pantalla de inicio → Añadir. Si la opción está oculta, toca Más."],
+  "Téléphone et tablette Android : Chrome → menu ⋮ → Installer et créer un raccourci → Installer. Selon la version : Installer l’application ou Ajouter à l’écran d’accueil.": ["Android phones and tablets: Chrome → ⋮ menu → Install and create shortcut → Install. Depending on your version: Install app or Add to Home screen.", "Teléfonos y tabletas Android: Chrome → menú ⋮ → Instalar y crear acceso directo → Instalar. Según la versión: Instalar aplicación o Añadir a pantalla de inicio."],
   "Espace actif": [
     "Active workspace",
     "Espacio activo"
