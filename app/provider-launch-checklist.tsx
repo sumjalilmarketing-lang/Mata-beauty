@@ -17,9 +17,9 @@ export function ProviderLaunchChecklist({ userId }: { userId: string }) {
 
   const load = useCallback(async () => {
     const client = getSupabaseBrowserClient();
-    if (!client) return;
+    if (!client) { setAvailable(false); return; }
     const { data, error } = await client.rpc("get_provider_launch_checklist", { target_provider_id: userId });
-    if (error) { setAvailable(false); return; }
+    if (error || !data || typeof data !== "object" || Array.isArray(data)) { setAvailable(false); return; }
     setChecklist(data as Checklist); setAvailable(true);
   }, [userId]);
 
@@ -33,7 +33,11 @@ export function ProviderLaunchChecklist({ userId }: { userId: string }) {
     ["Publier ma première réalisation", checklist.video, "/pro/videos"],
   ] as Array<[string, boolean, string]>, [checklist]);
 
-  if (!available) return null;
+  if (!available) return <article className="panel launch-checklist">
+    <h2>Configurer mon activité</h2>
+    <p role="status">Le suivi de configuration est momentanément indisponible. Votre activité reste accessible.</p>
+    <button type="button" onClick={() => void load()}>Réessayer le suivi de configuration</button>
+  </article>;
   const completed = items.filter(([, complete]) => complete).length;
   const progressLabel = `${completed} / ${items.length}`;
   return <article className="panel launch-checklist">

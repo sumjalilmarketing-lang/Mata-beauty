@@ -25,7 +25,7 @@ Object.assign(process.env, {
   NEXT_PUBLIC_SUPABASE_ANON_KEY: randomUUID(),
   NEXT_PUBLIC_APP_URL: testOrigin,
   SUPABASE_SERVICE_ROLE_KEY: randomUUID(),
-  NEXT_PUBLIC_SALON_COLLABORATOR_ACCESS_ENABLED: "false",
+  NEXT_PUBLIC_SALON_COLLABORATOR_ACCESS_ENABLED: process.env.MATA_E2E_COLLABORATOR_ACCESS_ENABLED === "true" ? "true" : "false",
 });
 
 await mkdir(resolve(root, ".next"), { recursive: true });

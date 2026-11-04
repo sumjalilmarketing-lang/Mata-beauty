@@ -11,6 +11,7 @@ import { ClientControlCenter } from "./client-control-center";
 import styles from "./public-social-profile.module.css";
 import { publicMetadataImage } from "@/lib/public-image";
 import { ProviderMap } from "./location-ui";
+import { WorkspaceInstallHelp } from "./workspace-install-help";
 
 type TabKey = "videos" | "favorites" | "likes" | "services" | "reviews" | "following";
 
@@ -219,6 +220,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
           <Link href="/app/inspirations">Contenus enregistrés</Link>
           <Link href="/app/settings?edit=1">Paramètres et confidentialité</Link>
         </nav>
+        <WorkspaceInstallHelp />
         <article className={styles.applicationCard}>
           <div><h3>Devenir professionnel MATA Beauty</h3>
             <p>{applicationStatus === "loading" ? "Chargement du statut de votre candidature…" : applicationStatus === "unavailable" ? "Le statut sera consultable dans votre dossier professionnel." : applicationStatus === "verified" ? "Votre activité est approuvée." : applicationStatus === "submitted" || applicationStatus === "under_review" ? "Votre candidature est en cours de vérification." : applicationStatus === "rejected" ? "Votre candidature a été refusée. Consultez votre dossier pour connaître la suite." : applicationStatus ? "Votre candidature est enregistrée." : "Aucune candidature n’a encore été commencée."}</p>

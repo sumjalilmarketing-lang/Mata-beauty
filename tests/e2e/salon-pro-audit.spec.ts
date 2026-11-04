@@ -62,3 +62,14 @@ for(const legacy of [false,true]) test(`salon : une nouvelle prestation sans hor
  await page.goto('/salon/services');await page.locator('select[name="serviceId"]').first().selectOption('aaaaaaaa-aaaa-4aaa-8aaa-000000000503');await page.locator('input[name="title"]').fill('Nouvelle prestation');await page.locator('input[name="duration"]').fill('60');await page.locator('input[name="price"]').fill('10000');await page.getByRole('button',{name:'Ajouter la prestation',exact:true}).click();
  await expect(page.getByText('Prestation enregistrée en brouillon. Publiez vos horaires pour l’activer.',{exact:true})).toBeVisible();expect(attempts).toBe(legacy?2:1);
 });
+
+
+test('pro : un suivi de configuration vide ne bloque pas le tableau de bord et permet la reprise',async({page,context})=>{
+ await login(context);let unavailable=true;
+ await page.route(`${api}/rest/v1/rpc/get_provider_launch_checklist`,route=>route.fulfill({json:unavailable?null:{score:100,photo:true,description:true,services:1,prices:1,availability:true,portfolio:1,video:true,verified:true,ready:true}}));
+ await page.goto('/pro');
+ await expect(page.getByText('Le suivi de configuration est momentanément indisponible. Votre activité reste accessible.',{exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Un problème est survenu',exact:true})).toHaveCount(0);
+ unavailable=false;await page.getByRole('button',{name:'Réessayer le suivi de configuration',exact:true}).click();
+ await expect(page.getByRole('progressbar',{name:'5 étapes sur 5'})).toBeVisible();
+});

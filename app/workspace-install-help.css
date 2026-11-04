@@ -1,4 +1,4 @@
-.workspace-main > .workspace-install-help {
+.workspace-install-help {
   min-height: 0;
   margin: 20px 0 0;
   padding: 0;
@@ -21,7 +21,7 @@
 }
 .workspace-install-help > summary::marker { font-size: 10px; }
 .workspace-install-help > summary:focus-visible {
-  outline: 2px solid var(--ws-pink);
+  outline: 2px solid var(--ws-pink, #a7195b);
   outline-offset: 3px;
   border-radius: 4px;
 }

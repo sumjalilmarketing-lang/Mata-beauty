@@ -2,6 +2,8 @@
 -- Synthetic identities, no auth API calls or email sends. SQL claims exercise SQL
 -- authorization; browser login and actual MFA enrollment require separate tests.
 begin;
+-- Privileged fixture setup must use the same service claim as the current guards.
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
 do $$ begin
   if not exists(select 1 from public.admin_roles where key='commercial') then
     raise exception 'Apply department_workspaces to Test first';

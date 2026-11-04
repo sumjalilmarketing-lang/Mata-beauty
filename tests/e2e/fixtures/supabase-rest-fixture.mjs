@@ -41,6 +41,7 @@ export function createSupabaseFixtureServer(port) {
   if(url.pathname==="/rest/v1/profiles" && url.searchParams.get("id")==="eq."+auditClientId) return send(200,{id:auditClientId,role:"client",is_suspended:false,account_status:"active",username:"recette_client",display_name:"Client Recette",first_name:"Client",last_name:"Recette",avatar_url:null,bio:""});
   if(url.pathname==="/rest/v1/account_roles" && url.searchParams.get("profile_id")==="eq."+auditClientId) return send(200,[{role:"customer"}]);
   if (url.pathname === "/health") return send(200, { ok: true });
+  if (["/rest/v1/profiles", "/rest/v1/provider_profiles"].includes(url.pathname) && [...url.searchParams.values()].some(value => value.startsWith("in."))) return send(200, []);
   if (url.pathname === "/rest/v1/provider_profiles") {
     return send(200, {
       profile_id: providerId,

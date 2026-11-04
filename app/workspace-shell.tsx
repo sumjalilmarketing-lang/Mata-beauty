@@ -8,7 +8,7 @@ import { FormEvent, useRef, useState, type ReactNode } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { workspaceHref, workspaceSpaces, simpleNavigation, navigationLabel, navigationParent, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import "./workspace.css";
-import "./workspace-install-help.css";
+import { WorkspaceInstallHelp } from "./workspace-install-help";
 import "./workspace-more-menu.css";
 import { ProductHelp } from "./product-help";
 import { NotificationBadge } from "./notification-center";
@@ -89,7 +89,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
       <div className="workspace-breadcrumb"><Link href={definition.prefix}>{t(definition.label)}</Link><span>/</span><span>{t(activeModule.label)}</span></div>
       {secondary.length > 0 && !(space === "client" && moduleKey === "profile") && <details className="workspace-secondary" open={secondary.some((item) => item.key === moduleKey)}><summary>{space === "client" ? t("Mon compte") : t("Dans cette rubrique")}</summary><nav aria-label={t("Navigation secondaire")}>{secondary.map((item) => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined}>{t(navigationLabel(space, item))}</Link>)}</nav></details>}
       {children}
-      <details className="workspace-install-help"><summary>{t("Installer sur mon téléphone")}</summary><p>{t("Ouvrez cet espace dans le navigateur et connectez-vous avant de l’ajouter à l’écran d’accueil.")}</p><p>iPhone : Safari → Partager → Sur l’écran d’accueil.</p><p>Android : menu du navigateur → Installer l’application ou Ajouter à l’écran d’accueil.</p><p>{t("L’icône ouvrira directement cet espace. Un ancien raccourci qui ouvre le feed doit être recréé depuis cette page.")}</p></details>
+      <WorkspaceInstallHelp />
       {(parent === "profile" || parent === "public-profile") && <ProductHelp professional={space === "pro"} />}
     </main>
     <nav className="workspace-mobile-nav" aria-label={t("Navigation mobile")}>
