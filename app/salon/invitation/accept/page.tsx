@@ -9,6 +9,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { readBrowserStorage, removeBrowserStorage, writeBrowserStorage } from "@/lib/browser-storage";
 import { pendingSalonInvitation, salonInvitationPath, salonInvitationTokenKey } from "@/lib/domain/salon-invitation";
 import "./invitation.css";
+import { PhoneJoin } from "./phone-join";
 
 export default function AcceptSalonInvitationPage() {
   const router = useRouter();
@@ -92,6 +93,7 @@ export default function AcceptSalonInvitationPage() {
         <p>Une équipe vous invite sur Mata Beauty. Choisissez votre réponse ci-dessous : vous n’avez rien à écrire ni à répondre par email.</p>
         <p>{signedIn ? <>Compte connecté : <strong>{email}</strong>. Ce compte sera présenté au responsable du salon.</> : "Connectez-vous ou créez un compte confirmé. Pour une invitation par email, utilisez l’adresse invitée. Pour WhatsApp, le responsable confirmera votre identité avant d’activer vos accès."}</p>
         <p className="team-invitation-note">Le lien est personnel et valable 48 heures. L’ouverture de cette page ne donne aucun accès. En répondant, vous présentez votre nom et votre compte au responsable du salon.</p>
+        <PhoneJoin onVerified={accept} />
         <div className="team-invitation-actions"><button className="team-invitation-primary" type="button" disabled={busy} onClick={() => void accept()}>{busy ? "Validation…" : "Oui, rejoindre l’équipe"}</button><button className="team-invitation-secondary" type="button" disabled={busy} onClick={notNow}>Non, pas maintenant</button></div>
         {signedIn && <button className="team-invitation-account" type="button" disabled={busy} onClick={() => void changeAccount()}>Utiliser un autre compte</button>}
       </> : <p role="status">{feedback || "Ce lien d’invitation est manquant ou invalide. Ouvrez le lien transmis par le responsable du salon, ou demandez une nouvelle invitation."}</p>}
