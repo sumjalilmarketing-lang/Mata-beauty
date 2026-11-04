@@ -80,6 +80,7 @@ const salonModules = [
   module("support", "Support", "?", "Compte", "Assistance du salon.", { resource: "reports" }),
   module("profile", "Profil du salon", "○", "Compte", "Identité publique, localisation et informations pratiques.", { resource: "businesses" }),
   module("settings", "Paramètres", "⚙", "Compte", "Compte propriétaire, sécurité, paiements et permissions."),
+  module("notifications", "Notifications", "◌", "Compte", "Réservations et activité de mon équipe.", { resource: "notifications" }),
 ] as const;
 
 const staffModules = [
@@ -88,6 +89,8 @@ const staffModules = [
   module("bookings", "Mes rendez-vous", "▣", "Mon activité", "Rendez-vous qui vous sont affectés.", { primary: true, resource: "bookings", staffPermission: "bookings.read" }),
   module("messages", "Mes messages", "✉", "Relations", "Conversations des rendez-vous qui vous sont affectés.", { primary: true, resource: "messages", staffPermission: "messages.read" }),
   module("services", "Mes prestations", "≡", "Mon activité", "Prestations que le salon vous autorise à réaliser.", { resource: "services", staffPermission: "services.read" }),
+  module("availability", "Mes disponibilités", "□", "Mon activité", "Mes horaires, congés et périodes complètes.", { resource: "bookings", staffPermission: "bookings.read" }),
+  module("notifications", "Notifications", "◌", "Compte", "Mes affectations et changements de rendez-vous.", { resource: "notifications" }),
 ] as const;
 
 const onboardingModules = [
@@ -227,7 +230,7 @@ export const workspaceSpaces: Record<WorkspaceSpaceKey, WorkspaceSpace> = {
   client: { key: "client", label: "Espace client", prefix: "/app", eyebrow: "Votre beauté", modules: clientModules },
   pro: { key: "pro", label: "Espace professionnel", prefix: "/pro", eyebrow: "Votre activité", modules: proModules },
   salon: { key: "salon", label: "Espace salon", prefix: "/salon", eyebrow: "Votre établissement", modules: salonModules },
-  staff: { key: "staff", label: "Espace employé", prefix: "/staff", eyebrow: "Votre activité au salon", modules: staffModules },
+  staff: { key: "staff", label: "Espace collaborateur", prefix: "/staff", eyebrow: "Votre activité au salon", modules: staffModules },
   commercial: { key: "commercial", label: "Espace commercial", prefix: "/commercial", eyebrow: "Dossiers et validation des professionnels", allowedAdminRoles: ["commercial", "commercial_manager", "commercial_agent", "super_admin"], modules: commercialModules },
   onboarding: { key: "onboarding", label: "Onboarding", prefix: "/onboarding", eyebrow: "Validation professionnelle", allowedAdminRoles: ["verification_agent", "super_admin"], modules: onboardingModules },
   support: { key: "support", label: "Service client et réclamations", prefix: "/support-agent", eyebrow: "Relation client", allowedAdminRoles: ["support", "support_manager", "support_agent", "admin", "super_admin"], modules: supportModules },

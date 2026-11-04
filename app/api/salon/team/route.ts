@@ -8,7 +8,7 @@ const noStore = { "Cache-Control": "private, no-store", "X-Content-Type-Options"
 const allowedPermissions = new Set(["bookings.read", "bookings.manage", "messages.read", "messages.reply", "services.read"]);
 const roles = new Set(["manager", "reception", "member"]);
 type InvitationAction =
-  | { action: "invite_phone"; businessId: string; phone: string; role: string; permissions: string[] }
+  | { action: "invite_phone"; businessId: string; phone: string; role: string; permissions: string[]; memberId: string | null }
   | { action: "review_phone"; businessId: string; claimId: string; approve: boolean }
   | { action: "invite" | "invite_link"; businessId: string; email: string; role: string; permissions: string[] }
   | { action: "revoke_invitation"; businessId: string; invitationId: string }
@@ -30,7 +30,7 @@ function parseAction(value: unknown): InvitationAction | null {
   if (!value || typeof value !== "object") return null;
   const action = value as Record<string, unknown>;
   if (!validId(action.businessId)) return null;
-  if (action.action === "invite_phone" && normalizeInvitationPhone(action.phone) && validRole(action.role) && validPermissions(action.permissions)) return { action: "invite_phone", businessId: action.businessId, phone: normalizeInvitationPhone(action.phone)!, role: action.role, permissions: action.permissions };
+  if (action.action === "invite_phone" && (action.memberId == null || validId(action.memberId)) && normalizeInvitationPhone(action.phone) && validRole(action.role) && validPermissions(action.permissions)) return { action: "invite_phone", businessId: action.businessId, phone: normalizeInvitationPhone(action.phone)!, memberId: typeof action.memberId === "string" ? action.memberId : null, role: action.role, permissions: action.permissions };
   if (action.action === "review_phone" && validId(action.claimId) && typeof action.approve === "boolean") return { action: "review_phone", businessId: action.businessId, claimId: action.claimId, approve: action.approve };
   if ((action.action === "invite" || action.action === "invite_link") && typeof action.email === "string" && action.email.length <= 254
     && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(action.email) && validRole(action.role) && validPermissions(action.permissions)) {
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
   }
   const token = randomBytes(32).toString("base64url");
   const tokenHash = createHash("sha256").update(token).digest("hex");
-  const created = action.action === "invite_phone" ? await auth.client.rpc("create_business_phone_invitation", { target_business_id: action.businessId, target_phone: action.phone, target_role: action.role, target_permissions: action.permissions, target_token_hash: tokenHash }) : await auth.client.rpc("create_business_invitation", { target_business_id: action.businessId, target_email: action.email, target_role: action.role, target_permissions: action.permissions, target_token_hash: tokenHash });
+  const created = action.action === "invite_phone" ? await auth.client.rpc("create_member_phone_invitation", { target_member_id: action.memberId, target_business_id: action.businessId, target_phone: action.phone, target_role: action.role, target_permissions: action.permissions, target_token_hash: tokenHash }) : await auth.client.rpc("create_business_invitation", { target_business_id: action.businessId, target_email: action.email, target_role: action.role, target_permissions: action.permissions, target_token_hash: tokenHash });
   if (created.error || typeof created.data !== "string") return jsonError("L’invitation n’a pas pu être créée.", 409, "invitation_create_failed");
   const inviteUrl = new URL(`/salon/invitation/accept#token=${token}`, applicationOrigin(request)).toString();
   if (action.action === "invite_phone") return Response.json({ ok: true, invitationId: created.data, deliveryState: "whatsapp_ready", phone: action.phone, inviteUrl }, { status: 201, headers: noStore });

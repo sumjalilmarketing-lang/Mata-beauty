@@ -6,7 +6,7 @@ export const workspaceInstallations = {
   client: { prefix: "/app", name: "Mata Beauty — Espace client", shortName: "Mata Client" },
   pro: { prefix: "/pro", name: "Mata Beauty — Espace professionnel", shortName: "Mata Pro" },
   salon: { prefix: "/salon", name: "Mata Beauty — Gestion du salon", shortName: "Mata Salon" },
-  staff: { prefix: "/staff", name: "Mata Beauty — Équipe du salon", shortName: "Mata Équipe" },
+  staff: { prefix: "/staff", name: "Mata Beauty — Espace collaborateur", shortName: "Mata Collab" },
   finance: { prefix: "/finance", name: "Mata Beauty — Espace financier", shortName: "Mata Finance" },
   support: { prefix: "/support-agent", name: "Mata Beauty — Service client", shortName: "Mata Support" },
   onboarding: { prefix: "/onboarding", name: "Mata Beauty — Vérification des professionnels", shortName: "Mata Dossiers" },

@@ -3,6 +3,7 @@ import { normalizeInvitationPhone, whatsappSalonInvitation } from "@/lib/domain/
 
 
 import Image from "next/image";
+import Link from "next/link";
 import { workspaceText } from "@/lib/domain/workspace-copy";
 import { useApplicationLocale } from "./use-application-locale";
 import { formatServiceMoney } from "@/lib/domain/service-money";
@@ -110,7 +111,7 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
     else { setFeedback(""); setRows((result.data ?? []) as StaffAppointment[]); }
     setLoading(false);
   }, [date]);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); const refresh = () => void load(); const polling = window.setInterval(refresh, 30_000); window.addEventListener("focus", refresh); return () => { window.clearTimeout(timer); window.clearInterval(polling); window.removeEventListener("focus", refresh); }; }, [load]);
   async function transition(row: StaffAppointment, status: string) {
     if (busyId) return;
     setBusyId(row.id); setFeedback("");
@@ -119,7 +120,7 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
     else { setFeedback("Rendez-vous mis à jour."); await load(); }
     setBusyId(null);
   }
-  return <section className="workspace-content"><div className="workspace-intro"><div><span>{t("Espace collaborateur")}</span><h2>{t("Mes rendez-vous")}</h2><p>{t("Seuls les rendez-vous attribués à votre compte sont affichés.")}</p></div></div>
+  return <section className="workspace-content"><p><Link href="/staff/availability">Mes disponibilités</Link> · <Link href="/staff/notifications">Mes notifications</Link></p><div className="workspace-intro"><div><span>{t("Espace collaborateur")}</span><h2>{t("Mes rendez-vous")}</h2><p>{t("Seuls les rendez-vous attribués à votre compte sont affichés.")}</p></div></div>
     {feedback && <p role="status">{t(feedback)}</p>}<article className="workspace-panel salon-panel"><label>{t("Semaine à partir du")}<input type="date" value={date} onChange={event => setDate(event.target.value)} /></label><p>{t("Les heures sont affichées selon le fuseau de chaque salon.")}</p>
       {loading && <p role="status">{t("Chargement des rendez-vous…")}</p>}{!loading && rows.length === 0 && <p>{t("Aucun rendez-vous attribué pour cette période.")}</p>}
       <div className="salon-list">{rows.map(row => <div key={row.id}><div><strong>{row.service_title}</strong><small>{row.client_name} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: row.time_zone }).format(new Date(row.starts_at))} · {t(statusNames[row.status] ?? row.status)}</small></div>
@@ -244,6 +245,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     await mutate(async () => {
       const result = await requestTeamApi<{ invitationId: string; inviteUrl: string }>(businessId, "POST", {
         action: phone ? "invite_phone" : linkOnly ? "invite_link" : "invite", businessId, ...(phone ? { phone } : { email }),
+        ...(phone ? { memberId: String(values.get("memberId") ?? "") || null } : {}),
         role: String(values.get("role") ?? "member"), permissions: normalizePermissions(values.getAll("permission").map(String)),
       });
       setShareLink({ businessId, invitationId: result.invitationId, email: phone ?? email, ...(phone ? { phone } : {}), url: result.inviteUrl });
@@ -296,10 +298,11 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     {!collaboratorAccessEnabled && <p className="salon-feedback" role="status">Les invitations, rôles de compte et permissions sont désactivés jusqu’à validation et application de la migration de sécurité.</p>}
     {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><h3>Inviter un collaborateur</h3><p>Invitez par numéro de téléphone et partagez le lien sur WhatsApp. Le lien expire après 48 heures. Le collaborateur accepte le lien et accède directement à son espace équipe. L’invitation par email reste disponible.</p>
       <form className="salon-form" onSubmit={event => void invite(event)}>
+        {invitationMode === "whatsapp" && <label>Fiche collaborateur à associer<select name="memberId" defaultValue=""><option value="">Créer une nouvelle fiche à l’acceptation</option>{members.filter(person => !staffAccess.some(account => account.collaborator_id === person.id) && person.is_active && !person.archived_at).map(person => <option key={person.id} value={person.id}>{person.display_name}</option>)}</select><small>Associez une fiche existante pour conserver ses rendez-vous, horaires et prestations.</small></label>}
         <label>Mode d’invitation<select aria-label="Mode d’invitation" value={invitationMode} onChange={event => { setInvitationMode(event.target.value); setShareLink(null); }}><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>
         {invitationMode === "whatsapp" ? <label>Numéro WhatsApp avec indicatif<input name="phone" type="tel" required maxLength={40} placeholder="+221770000000" autoComplete="tel" /></label> : <label>E-mail<input name="email" type="email" required maxLength={254} autoComplete="email" /></label>}
         <label>Rôle<select name="role" defaultValue="member"><option value="member">Membre</option><option value="reception">Accueil</option><option value="manager">Responsable d’équipe</option></select></label>
-        <fieldset className="wide"><legend>Permissions de cette invitation</legend>{permissionChoices.map(([key, label]) => <label className="check" key={key}><input type="checkbox" name="permission" value={key} defaultChecked={["bookings.read", "messages.read", "messages.reply"].includes(key)} />{label}</label>)}</fieldset>
+        <fieldset className="wide"><legend>Permissions de cette invitation</legend>{permissionChoices.map(([key, label]) => <label className="check" key={key}><input type="checkbox" name="permission" value={key} defaultChecked={true} />{label}</label>)}</fieldset>
         {invitationMode === "whatsapp" ? <button className="salon-primary" type="submit" value="whatsapp" disabled={busy}>Créer l’invitation WhatsApp</button> : <><button className="salon-primary" type="submit" value="email" disabled={busy}>Envoyer l’invitation par email</button><button type="submit" value="link" disabled={busy}>Créer un lien à partager</button></>}
       </form>
       <p>Si une invitation est déjà en attente pour ce destinataire, révoquez-la avant d’en créer une nouvelle.</p>
