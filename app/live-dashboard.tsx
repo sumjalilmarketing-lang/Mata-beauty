@@ -556,7 +556,7 @@ export function LiveDashboard({
         {show("dashboard") && (loading ? (
           <div className="metric-grid" role="status" aria-label="Chargement"><article className="skeleton-card" /><article className="skeleton-card" /><article className="skeleton-card" /></div>
         ) : (
-          <><div className="metric-grid">{metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>{role === "provider" && <p className="dashboard-scope-note">Indicateurs calculés sur les 30 rendez-vous chargés. Les revenus théoriques ne sont pas un solde encaissé.</p>}</>
+          <><div className="metric-grid">{metrics.map(([value, label]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>{role === "provider" && <p className="dashboard-scope-note">Indicateurs calculés sur les 200 réservations les plus récentes chargées. Les revenus théoriques ne sont pas un solde encaissé.</p>}</>
         ))}
         {role === "client" && show("profile") && <ClientControlCenter userId={userId} />}
         {role === "client" && !moduleKey && <ReferralCard type="client" />}
