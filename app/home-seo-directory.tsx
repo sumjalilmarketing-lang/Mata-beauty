@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import { beautyGuideHref, beautyGuides } from "@/lib/beauty-guides";
 
 type PublicProvider = { slug: string; business_name: string; city: string | null };
 type PublicService = { id: string; title: string; provider_profiles: { slug: string; business_name: string; status: string } | null };
@@ -13,9 +14,9 @@ async function loadDirectory() {
   try {
     const client = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } });
     const [categoryResult, providerResult, serviceResult] = await Promise.allSettled([
-      client.from("categories").select("id,name,slug").eq("is_active", true).order("sort_order").order("name").limit(40),
-      client.from("provider_profiles").select("slug,business_name,city,provider_services!inner(id)").eq("status", "approved").eq("provider_services.is_active", true).is("provider_services.archived_at", null).not("slug", "is", null).order("business_name").limit(12),
-      client.from("provider_services").select("id,title,provider_profiles!inner(slug,business_name,status)").eq("is_active", true).is("archived_at", null).eq("provider_profiles.status", "approved").order("title").limit(12),
+      client.from("categories").select("id,name,slug").eq("is_active", true).order("sort_order").order("name").limit(40).abortSignal(AbortSignal.timeout(5000)),
+      client.from("provider_profiles").select("slug,business_name,city,provider_services!inner(id)").eq("status", "approved").eq("provider_services.is_active", true).is("provider_services.archived_at", null).not("slug", "is", null).order("business_name").limit(12).abortSignal(AbortSignal.timeout(5000)),
+      client.from("provider_services").select("id,title,provider_profiles!inner(slug,business_name,status)").eq("is_active", true).is("archived_at", null).eq("provider_profiles.status", "approved").order("title").limit(12).abortSignal(AbortSignal.timeout(5000)),
     ]);
 
     const categories = categoryResult.status === "fulfilled" && !categoryResult.value.error && Array.isArray(categoryResult.value.data)
@@ -40,12 +41,19 @@ export async function HomeSeoDirectory() {
     url: "https://mata-beauty.com/",
     inLanguage: "fr",
     description: "Découvrez et réservez des prestations beauté auprès des professionnels et salons publiés sur MATA Beauty.",
+    publisher: { "@id": "https://mata-beauty.com/#organization" },
+  };
+  const organizationData = {
+    "@type": "Organization", "@id": "https://mata-beauty.com/#organization",
+    name: "Mata Beauty", legalName: "AFRICRM SUARL", url: "https://mata-beauty.com/",
+    logo: "https://mata-beauty.com/brand/icon-192.png",
+    description: "Plateforme de découverte et de réservation de prestations beauté au Sénégal et à l’international.",
   };
 
   return <>
       {categories.length > 0 && <nav aria-label="Catégories de prestations beauté">
         <h2>Explorer les prestations</h2>
-        <ul>{categories.map(category => <li key={category.id}><Link href={`/?search=1&applied=1&categoryId=${encodeURIComponent(category.id)}`}>{category.name}</Link></li>)}</ul>
+        <ul>{categories.map(category => { const guide=beautyGuides.find(item=>item.category===category.name); return <li key={category.id}><Link href={guide ? beautyGuideHref(guide.slug) : `/?search=1&applied=1&categoryId=${encodeURIComponent(category.id)}`}>{category.name}</Link></li>; })}</ul>
       </nav>}
       {cities.length > 0 && <nav aria-label="Villes desservies par les professionnels publiés">
         <h2>Rechercher par ville</h2>
@@ -60,6 +68,7 @@ export async function HomeSeoDirectory() {
         <ul>{providers.map(provider => <li key={provider.slug}><Link href={`/professional/${encodeURIComponent(provider.slug)}`}>{provider.business_name}{provider.city ? ` · ${provider.city}` : ""}</Link></li>)}</ul>
       </nav>}
       <p className="seo-directory-note">Les fiches et disponibilités dépendent des informations publiées par chaque professionnel.</p>
-    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteData).replace(/</g, "\\u003c") }} />
+      <p><Link href="/conseils">Conseils pour préparer votre rendez-vous beauté au Sénégal</Link></p>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({"@context":"https://schema.org","@graph":[organizationData,websiteData]}).replace(/</g, "\\u003c") }} />
   </>;
 }

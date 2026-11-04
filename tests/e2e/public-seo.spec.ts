@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("homepage renders indexable public content and a canonical URL", async ({ page }) => {
   const response = await page.goto("/");
   expect(response?.ok()).toBeTruthy();
-  await expect(page.getByRole("heading", { level: 1, name: /réservez une prestation beauté près de vous/i })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /coiffure, esthétique et beauté au Sénégal/i })).toBeVisible();
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://mata-beauty.com");
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /https:\/\/mata-beauty\.com\/og\.png/);
 });

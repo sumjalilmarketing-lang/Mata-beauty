@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@supabase/supabase-js";
+import { beautyGuideHref, beautyGuides } from "@/lib/beauty-guides";
 
 const siteUrl = "https://mata-beauty.com";
 
@@ -12,6 +13,8 @@ type PublicSalonRow = { owner_id: string; slug: string | null };
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [
     { url: siteUrl, changeFrequency: "daily", priority: 1 },
+    { url: `${siteUrl}/conseils`, changeFrequency: "monthly", priority: 0.6 },
+    ...beautyGuides.map(guide => ({url:`${siteUrl}${beautyGuideHref(guide.slug)}`,changeFrequency:"monthly" as const,priority:0.6})),
   ];
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -22,9 +25,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
     });
     const [profiles, salons, services] = await Promise.all([
-      client.from("provider_profiles").select("profile_id,slug").eq("status", "approved").not("slug", "is", null).order("profile_id").limit(5000),
-      client.from("businesses").select("owner_id,slug").eq("status", "approved").eq("is_active", true).is("archived_at", null).not("slug", "is", null).order("owner_id").limit(5000),
-      client.from("provider_services").select("id,provider_profiles!inner(status)").eq("is_active", true).is("archived_at", null).eq("provider_profiles.status", "approved").order("id").limit(5000),
+      client.from("provider_profiles").select("profile_id,slug").eq("status", "approved").not("slug", "is", null).order("profile_id").limit(5000).abortSignal(AbortSignal.timeout(5000)),
+      client.from("businesses").select("owner_id,slug").eq("status", "approved").eq("is_active", true).is("archived_at", null).not("slug", "is", null).order("owner_id").limit(5000).abortSignal(AbortSignal.timeout(5000)),
+      client.from("provider_services").select("id,provider_profiles!inner(status)").eq("is_active", true).is("archived_at", null).eq("provider_profiles.status", "approved").order("id").limit(5000).abortSignal(AbortSignal.timeout(5000)),
     ]);
 
     const profileRows = !profiles.error && Array.isArray(profiles.data) ? profiles.data as unknown as PublicProfileRow[] : [];
