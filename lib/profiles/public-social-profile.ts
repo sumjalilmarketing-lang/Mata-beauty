@@ -75,6 +75,7 @@ type ProviderRow = {
   area: string | null;
   latitude: number | null;
   longitude: number | null;
+  logo_url?: string | null;
 };
 type BusinessRow = {
   id: string;
@@ -231,7 +232,7 @@ async function reviewsFor(providerId: string) {
 async function loadProfessional(lookup: string, viewerId: string | null): Promise<PublicSocialProfileData | null> {
   const client = publicProfileClient();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookup);
-  let query = client.from("provider_profiles").select("profile_id,business_name,slug,bio,city,base_address,latitude,longitude,cover_url,average_rating,review_count,verified_at")
+  let query = client.from("provider_profiles").select("profile_id,business_name,slug,bio,city,base_address,latitude,longitude,cover_url,logo_url,average_rating,review_count,verified_at")
     .eq("status", "approved");
   query = isUuid ? query.eq("profile_id", lookup) : query.eq("slug", lookup.toLowerCase());
   const { data, error } = await query.maybeSingle();
@@ -253,7 +254,7 @@ async function loadProfessional(lookup: string, viewerId: string | null): Promis
     handle: publicHandle(identity.data?.username, provider.business_name),
     bio: provider.bio, city: provider.city, area: null, address: provider.base_address,
     latitude: provider.latitude, longitude: provider.longitude,
-    avatarUrl: safeHttpUrl(identity.data?.avatar_url), coverUrl: safeHttpUrl(provider.cover_url),
+    avatarUrl: safeHttpUrl(provider.logo_url) ?? safeHttpUrl(identity.data?.avatar_url), coverUrl: safeHttpUrl(provider.cover_url),
     verified: Boolean(provider.verified_at), specialties,
     rating: Number(provider.average_rating) || 0, reviewCount: Number(provider.review_count) || 0,
     followersCount: counts.followers, followingCount: counts.following, videoCount,

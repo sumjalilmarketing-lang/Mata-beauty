@@ -128,3 +128,19 @@ it("keeps email sending and provides its owner with the same fallback link", asy
   expect(mail.text).toContain(body.inviteUrl);
   expect(mocks.rpc.mock.calls.map(call => call[0])).toEqual(["owner_list_business_invitations", "create_business_invitation", "mark_business_invitation_sent", "record_business_invitation_receipt"]);
 });
+
+it("creates a phone invitation without email, does not send WhatsApp, and normalizes the number", async () => {
+  configure(); vi.stubEnv("RESEND_API_KEY", "");
+  mocks.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === "create_business_phone_invitation" ? invite : [] }));
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  const response = await POST(linkRequest({ action: "invite_phone", email: undefined, phone: "+221 77 000 00 99" }));
+  expect(response.status).toBe(201);
+  const result = await response.json();
+  expect(result.phone).toBe("+221770000099"); expect(result.deliveryState).toBe("whatsapp_ready");
+  expect(fetch).not.toHaveBeenCalled();
+  expect(mocks.rpc).toHaveBeenCalledWith("create_business_phone_invitation", expect.objectContaining({ target_phone: "+221770000099" }));
+});
+it("rejects a phone without country code before accessing the database", async () => {
+  configure(); expect((await POST(linkRequest({ action: "invite_phone", phone: "770000099", email: undefined }))).status).toBe(400);
+  expect(mocks.rpc).not.toHaveBeenCalled();
+});

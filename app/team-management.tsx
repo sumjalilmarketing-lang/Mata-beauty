@@ -1,4 +1,6 @@
 "use client";
+import { normalizeInvitationPhone, whatsappSalonInvitation } from "@/lib/domain/salon-invitation-phone";
+
 
 import Image from "next/image";
 import { workspaceText } from "@/lib/domain/workspace-copy";
@@ -19,7 +21,7 @@ type Appointment = { id: string; starts_at: string; ends_at: string; status: str
 type Candidate = { id: string; display_name: string; avatar_url: string | null };
 type Assignment = { id: string; collaborator_name: string | null; reason: string | null; created_at: string };
 type TeamAccess = { collaborator_id: string; profile_id: string; display_name: string; email: string | null; internal_role: string; permissions: string[]; revoked_at: string | null };
-type TeamInvitation = { id: string; email: string; internal_role: string; status: string; expires_at: string; created_at: string; accepted_at: string | null; sent_at: string | null };
+type TeamInvitation = { id: string; email: string | null; phone?: string; claims?: { id: string; display_name: string; email: string | null; status: string }[]; internal_role: string; status: string; expires_at: string; created_at: string; accepted_at: string | null; sent_at: string | null };
 type TeamAudit = { id: string; invitation_id: string | null; collaborator_id: string | null; actor_id: string | null; event_type: string; details: Record<string, unknown>; created_at: string };
 const permissionChoices = [
   ["bookings.read", "Voir les rendez-vous"], ["bookings.manage", "Gérer les rendez-vous"],
@@ -177,7 +179,8 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
   const [qualifications, setQualifications] = useState<Qualification[]>([]), [hours, setHours] = useState<Hours[]>([]), [absences, setAbsences] = useState<Absence[]>([]);
   const [selected, setSelected] = useState<Member | null>(null), [editing, setEditing] = useState(false);
   const [staffAccess, setStaffAccess] = useState<TeamAccess[]>([]), [invitations, setInvitations] = useState<TeamInvitation[]>([]), [audit, setAudit] = useState<TeamAudit[]>([]);
-  const [shareLink, setShareLink] = useState<{ businessId: string; invitationId: string; email: string; url: string } | null>(null);
+  const [shareLink, setShareLink] = useState<{ businessId: string; invitationId: string; email: string; phone?: string; url: string } | null>(null);
+  const [invitationMode, setInvitationMode] = useState("whatsapp");
   const [enabled, setEnabled] = useState(false), [timeZone, setTimeZone] = useState("Africa/Dakar"), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const inFlight = useRef(false);
   const savedMemberId = useRef<string | null>(null);
@@ -236,14 +239,16 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     const submitter = (event.nativeEvent as SubmitEvent).submitter;
     const linkOnly = submitter instanceof HTMLButtonElement && submitter.value === "link";
     const email = String(values.get("email") ?? "").trim().toLowerCase();
+    const phone = invitationMode === "whatsapp" ? normalizeInvitationPhone(values.get("phone")) : null;
+    if (invitationMode === "whatsapp" && !phone) { setMessage("Saisissez un numéro avec son indicatif, par exemple +221770000000."); return; }
     await mutate(async () => {
       const result = await requestTeamApi<{ invitationId: string; inviteUrl: string }>(businessId, "POST", {
-        action: linkOnly ? "invite_link" : "invite", businessId, email,
+        action: phone ? "invite_phone" : linkOnly ? "invite_link" : "invite", businessId, ...(phone ? { phone } : { email }),
         role: String(values.get("role") ?? "member"), permissions: normalizePermissions(values.getAll("permission").map(String)),
       });
-      setShareLink({ businessId, invitationId: result.invitationId, email, url: result.inviteUrl });
+      setShareLink({ businessId, invitationId: result.invitationId, email: phone ?? email, ...(phone ? { phone } : {}), url: result.inviteUrl });
       form.reset();
-    }, linkOnly ? "Lien créé. Aucun email envoyé. Partagez le lien uniquement avec le destinataire indiqué." : "Email pris en charge ; réception non confirmée. Vous pouvez aussi transmettre le lien au destinataire.");
+    }, phone ? "Invitation WhatsApp prête. Ouvrez WhatsApp ci-dessous pour l’envoyer ; aucun message n’a encore été envoyé." : linkOnly ? "Lien créé. Aucun email envoyé. Partagez le lien uniquement avec le destinataire indiqué." : "Email pris en charge ; réception non confirmée. Vous pouvez aussi transmettre le lien au destinataire.");
   }
   async function copyInvitationLink() {
     if (!shareLink || shareLink.businessId !== businessId) return;
@@ -289,24 +294,30 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     <header><h2>Mon équipe</h2><p>Les fiches d’équipe gèrent les prestations et les horaires. Les accès de compte sont séparés et limités aux permissions attribuées côté serveur. Les horaires suivent le fuseau du salon ({timeZone}).</p></header>
     {message && <p className="salon-feedback" role="status">{message}</p>}
     {!collaboratorAccessEnabled && <p className="salon-feedback" role="status">Les invitations, rôles de compte et permissions sont désactivés jusqu’à validation et application de la migration de sécurité.</p>}
-    {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><h3>Inviter un collaborateur</h3><p>Envoyez un email ou créez un lien à transmettre directement au destinataire. Le lien expire après 48 heures et ne peut être accepté qu’une fois, avec un compte utilisant l’adresse invitée et confirmée.</p>
+    {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><h3>Inviter un collaborateur</h3><p>Invitez par numéro de téléphone et partagez le lien sur WhatsApp. Le lien expire après 48 heures. Confirmez le compte qui répond avant d’activer ses accès. L’invitation par email reste disponible.</p>
       <form className="salon-form" onSubmit={event => void invite(event)}>
-        <label>E-mail<input name="email" type="email" required maxLength={254} autoComplete="email" /></label>
+        <label>Mode d’invitation<select aria-label="Mode d’invitation" value={invitationMode} onChange={event => { setInvitationMode(event.target.value); setShareLink(null); }}><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>
+        {invitationMode === "whatsapp" ? <label>Numéro WhatsApp avec indicatif<input name="phone" type="tel" required maxLength={40} placeholder="+221770000000" autoComplete="tel" /></label> : <label>E-mail<input name="email" type="email" required maxLength={254} autoComplete="email" /></label>}
         <label>Rôle<select name="role" defaultValue="member"><option value="member">Membre</option><option value="reception">Accueil</option><option value="manager">Responsable d’équipe</option></select></label>
         <fieldset className="wide"><legend>Permissions de cette invitation</legend>{permissionChoices.map(([key, label]) => <label className="check" key={key}><input type="checkbox" name="permission" value={key} defaultChecked={["bookings.read", "messages.read", "messages.reply"].includes(key)} />{label}</label>)}</fieldset>
-        <button className="salon-primary" type="submit" value="email" disabled={busy}>Envoyer l’invitation par email</button>
-        <button type="submit" value="link" disabled={busy}>Créer un lien à partager</button>
+        {invitationMode === "whatsapp" ? <button className="salon-primary" type="submit" value="whatsapp" disabled={busy}>Créer l’invitation WhatsApp</button> : <><button className="salon-primary" type="submit" value="email" disabled={busy}>Envoyer l’invitation par email</button><button type="submit" value="link" disabled={busy}>Créer un lien à partager</button></>}
       </form>
-      <p>Si une invitation est déjà en attente pour cette adresse, révoquez-la avant d’en créer une nouvelle.</p>
+      <p>Si une invitation est déjà en attente pour ce destinataire, révoquez-la avant d’en créer une nouvelle.</p>
       {shareLink?.businessId === businessId && <div className="salon-form">
-        <p className="wide">Lien personnel pour <strong>{shareLink.email}</strong>. Copiez-le avant de quitter cette page. Si le destinataire ne peut pas confirmer cette adresse, utilisez une autre adresse qu’il possède et peut confirmer.</p>
+        <p className="wide">Lien personnel pour <strong>{shareLink.email}</strong>. Copiez-le avant de quitter cette page. {shareLink.phone ? "Après sa réponse, vérifiez son compte dans les demandes ci-dessous." : "Le destinataire doit confirmer cette adresse."}</p>
         <label className="wide">Lien d’invitation<input readOnly value={shareLink.url} onFocus={event => event.currentTarget.select()} autoComplete="off" spellCheck={false} /></label>
+        {shareLink.phone && <a className="salon-primary" href={whatsappSalonInvitation(shareLink.phone, shareLink.url) ?? undefined} target="_blank" rel="noopener noreferrer">Partager sur WhatsApp</a>}
         <button type="button" onClick={() => void copyInvitationLink()}>Copier le lien</button>
         <button type="button" onClick={() => setShareLink(null)}>Masquer le lien</button>
       </div>}
     </article>
     <article className="workspace-panel salon-panel"><h3>Invitations et accès</h3>
-      <div className="salon-list">{invitations.map(invite => <div key={invite.id}><div><strong>{invite.email}</strong><small>{invite.internal_role} · {invite.status === "pending" ? `Expire le ${new Date(invite.expires_at).toLocaleString("fr-FR")}` : invite.status === "accepted" ? `Acceptée le ${invite.accepted_at ? new Date(invite.accepted_at).toLocaleDateString("fr-FR") : "—"}` : invite.status}</small></div>{invite.status === "pending" && <button disabled={busy} onClick={() => void checkDelivery(invite.id)}>Vérifier la livraison</button>}{invite.status === "pending" && <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "revoke_invitation", businessId, invitationId: invite.id }); if (shareLink?.invitationId === invite.id) setShareLink(null); }, "Invitation révoquée.")}>Révoquer</button>}</div>)}{!invitations.length && <p>Aucune invitation pour le moment.</p>}</div>
+      <div className="salon-list">{invitations.map(invite => <div key={invite.id}><div><strong>{invite.phone ?? invite.email}</strong><small>{invite.internal_role} · {invite.status === "pending" ? `Expire le ${new Date(invite.expires_at).toLocaleString("fr-FR")}` : invite.status === "accepted" ? `Acceptée le ${invite.accepted_at ? new Date(invite.accepted_at).toLocaleDateString("fr-FR") : "—"}` : invite.status}</small></div>{invite.status === "pending" && !invite.phone && <button disabled={busy} onClick={() => void checkDelivery(invite.id)}>Vérifier la livraison</button>}{invite.status === "pending" && <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "revoke_invitation", businessId, invitationId: invite.id }); if (shareLink?.invitationId === invite.id) setShareLink(null); }, "Invitation révoquée.")}>Révoquer</button>}</div>)}{!invitations.length && <p>Aucune invitation pour le moment.</p>}</div>
+      {invitations.filter(invite => invite.phone && invite.status === "pending").flatMap(invite => (invite.claims ?? []).filter(claim => claim.status === "pending").map(claim => <article className="workspace-panel salon-panel" key={claim.id}>
+        <h4>Confirmer un équipier</h4><p>Invitation WhatsApp : {invite.phone}</p><p>Compte : <strong>{claim.display_name}</strong> · {claim.email ?? "Compte confirmé par téléphone"}</p><p>Vérifiez auprès du destinataire que ce compte lui appartient avant de confirmer.</p>
+        <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "review_phone", businessId, claimId: claim.id, approve: true }); }, "Accès de l’équipier confirmé.")}>Confirmer l’accès de {claim.display_name}</button>
+        <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "review_phone", businessId, claimId: claim.id, approve: false }); }, "Demande refusée.")}>Refuser ce compte</button>
+      </article>))}
       <h4>Comptes associés</h4><div className="team-cards">{staffAccess.map(account => <article className="workspace-panel salon-panel" key={account.collaborator_id}><h5>{account.display_name}</h5><p>{account.email || "Adresse non disponible"} · {account.internal_role} · {account.revoked_at ? "Accès révoqué" : "Accès actif"}</p>
         <form className="salon-form" onSubmit={event => { event.preventDefault(); const values = new FormData(event.currentTarget); const permissions = normalizePermissions(values.getAll("permission").map(String)); const role = String(values.get("role") ?? account.internal_role); void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "update_access", businessId, collaboratorId: account.collaborator_id, role, permissions }); }, "Rôle et permissions mis à jour."); }}>
           <label>Rôle<select name="role" defaultValue={account.internal_role}><option value="member">Membre</option><option value="reception">Accueil</option><option value="manager">Responsable d’équipe</option></select></label>

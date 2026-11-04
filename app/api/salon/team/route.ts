@@ -1,3 +1,4 @@
+import { normalizeInvitationPhone } from "@/lib/domain/salon-invitation-phone";
 import { createHash, randomBytes } from "node:crypto";
 import { authenticatedSupabase, applicationOrigin, hasTrustedOrigin, jsonError } from "@/lib/payments/server";
 import { emailDeliveryLabel } from "@/lib/email/delivery-status";
@@ -7,6 +8,8 @@ const noStore = { "Cache-Control": "private, no-store", "X-Content-Type-Options"
 const allowedPermissions = new Set(["bookings.read", "bookings.manage", "messages.read", "messages.reply", "services.read"]);
 const roles = new Set(["manager", "reception", "member"]);
 type InvitationAction =
+  | { action: "invite_phone"; businessId: string; phone: string; role: string; permissions: string[] }
+  | { action: "review_phone"; businessId: string; claimId: string; approve: boolean }
   | { action: "invite" | "invite_link"; businessId: string; email: string; role: string; permissions: string[] }
   | { action: "revoke_invitation"; businessId: string; invitationId: string }
   | { action: "update_access"; businessId: string; collaboratorId: string; role: string; permissions: string[] }
@@ -27,6 +30,8 @@ function parseAction(value: unknown): InvitationAction | null {
   if (!value || typeof value !== "object") return null;
   const action = value as Record<string, unknown>;
   if (!validId(action.businessId)) return null;
+  if (action.action === "invite_phone" && normalizeInvitationPhone(action.phone) && validRole(action.role) && validPermissions(action.permissions)) return { action: "invite_phone", businessId: action.businessId, phone: normalizeInvitationPhone(action.phone)!, role: action.role, permissions: action.permissions };
+  if (action.action === "review_phone" && validId(action.claimId) && typeof action.approve === "boolean") return { action: "review_phone", businessId: action.businessId, claimId: action.claimId, approve: action.approve };
   if ((action.action === "invite" || action.action === "invite_link") && typeof action.email === "string" && action.email.length <= 254
     && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(action.email) && validRole(action.role) && validPermissions(action.permissions)) {
     return { action: action.action, businessId: action.businessId, email: action.email.trim().toLowerCase(), role: action.role, permissions: action.permissions };
@@ -46,12 +51,13 @@ export async function GET(request: Request) {
   if (!auth) return jsonError("Connexion requise.", 401, "unauthorized");
   const businessId = new URL(request.url).searchParams.get("businessId");
   if (!validId(businessId)) return jsonError("Salon invalide.", 400, "invalid_business");
-  const [invitations, access, audit] = await Promise.all([
+  const [invitations, access, audit, phoneInvitations] = await Promise.all([
     auth.client.rpc("owner_list_business_invitations", { target_business_id: businessId }),
     auth.client.rpc("owner_list_collaborator_access", { target_business_id: businessId }),
     auth.client.rpc("owner_list_collaborator_audit", { target_business_id: businessId }),
+    auth.client.rpc("owner_list_business_phone_invitations", { target_business_id: businessId }),
   ]);
-  if (invitations.error || access.error || audit.error) return jsonError("La gestion de l’équipe est indisponible.", 503, "team_unavailable");
+  if (invitations.error || access.error || audit.error || phoneInvitations.error) return jsonError("La gestion de l’équipe est indisponible.", 503, "team_unavailable");
   const invitationId = new URL(request.url).searchParams.get("invitationId");
   if (invitationId !== null) {
     if (!validId(invitationId)) return jsonError("Invitation invalide.", 400, "invalid_invitation");
@@ -67,7 +73,7 @@ export async function GET(request: Request) {
       return Response.json({ message: emailDeliveryLabel(result.last_event, result.bounce) }, { headers: noStore });
     } catch { return jsonError("Le suivi de livraison est momentanément indisponible.", 503, "delivery_lookup_failed"); }
   }
-  return Response.json({ invitations: invitations.data ?? [], access: access.data ?? [], audit: audit.data ?? [] }, { headers: noStore });
+  return Response.json({ invitations: [...(invitations.data ?? []).filter((row: { email: string | null }) => row.email !== null), ...(phoneInvitations.data ?? [])], access: access.data ?? [], audit: audit.data ?? [] }, { headers: noStore });
 }
 
 export async function POST(request: Request) {
@@ -80,6 +86,11 @@ export async function POST(request: Request) {
   try { payload = await request.json(); } catch { return jsonError("Requête invalide.", 400, "invalid_json"); }
   const action = parseAction(payload);
   if (!action) return jsonError("Vérifiez les informations et les permissions.", 400, "invalid_request");
+  if (action.action === "review_phone") {
+    const reviewed = await auth.client.rpc("review_business_phone_invitation", { target_claim_id: action.claimId, approve: action.approve });
+    if (reviewed.error) return jsonError("La demande n’a pas pu être traitée. Actualisez l’équipe.", 409, "phone_review_failed");
+    return Response.json({ ok: true }, { headers: noStore });
+  }
   if (action.action === "revoke_invitation") {
     const { error } = await auth.client.rpc("revoke_business_invitation", { target_invitation_id: action.invitationId });
     if (error) return jsonError("L’invitation n’a pas pu être révoquée.", 409, "invitation_revoke_failed");
@@ -112,9 +123,10 @@ export async function POST(request: Request) {
   }
   const token = randomBytes(32).toString("base64url");
   const tokenHash = createHash("sha256").update(token).digest("hex");
-  const created = await auth.client.rpc("create_business_invitation", { target_business_id: action.businessId, target_email: action.email, target_role: action.role, target_permissions: action.permissions, target_token_hash: tokenHash });
+  const created = action.action === "invite_phone" ? await auth.client.rpc("create_business_phone_invitation", { target_business_id: action.businessId, target_phone: action.phone, target_role: action.role, target_permissions: action.permissions, target_token_hash: tokenHash }) : await auth.client.rpc("create_business_invitation", { target_business_id: action.businessId, target_email: action.email, target_role: action.role, target_permissions: action.permissions, target_token_hash: tokenHash });
   if (created.error || typeof created.data !== "string") return jsonError("L’invitation n’a pas pu être créée.", 409, "invitation_create_failed");
   const inviteUrl = new URL(`/salon/invitation/accept#token=${token}`, applicationOrigin(request)).toString();
+  if (action.action === "invite_phone") return Response.json({ ok: true, invitationId: created.data, deliveryState: "whatsapp_ready", phone: action.phone, inviteUrl }, { status: 201, headers: noStore });
   if (action.action === "invite_link") {
     // Explicit owner-only sharing. No email, no fake delivery receipt, no role grant.
     // Acceptance still requires the invited, confirmed email and consumes the token.

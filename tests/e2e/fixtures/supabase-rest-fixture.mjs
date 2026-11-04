@@ -47,6 +47,7 @@ export function createSupabaseFixtureServer(port) {
       profile_id: providerId,
       slug: "mata-audit-tresses",
       business_name: "Mata Audit Tresses",
+      logo_url: `http://127.0.0.1:${testPort}/brand/icon-512.png`,
       bio: "Spécialiste des tresses rapides à Dakar.",
       city: "Dakar",
       cover_url: null,

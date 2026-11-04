@@ -245,6 +245,7 @@ test.describe("audit chronométré de réservation", () => {
     await signIn(page, "client-deposit@example.test");
     await expect(page.getByText("Votre rendez-vous est créé")).toBeVisible();
     await expect(page.getByRole("dialog")).toContainText("À régler sur place · aucun débit en ligne");
+    await expect(page.getByRole("link", { name: "Message", exact: true })).toHaveAttribute("href", `/app/messages?booking=${bookingId}`);
   });
 
   test("conserve l’euro et les centimes de l’acompte depuis une vidéo après connexion", async ({ page }) => {
