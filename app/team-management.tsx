@@ -294,7 +294,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     <header><h2>Mon équipe</h2><p>Les fiches d’équipe gèrent les prestations et les horaires. Les accès de compte sont séparés et limités aux permissions attribuées côté serveur. Les horaires suivent le fuseau du salon ({timeZone}).</p></header>
     {message && <p className="salon-feedback" role="status">{message}</p>}
     {!collaboratorAccessEnabled && <p className="salon-feedback" role="status">Les invitations, rôles de compte et permissions sont désactivés jusqu’à validation et application de la migration de sécurité.</p>}
-    {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><h3>Inviter un collaborateur</h3><p>Invitez par numéro de téléphone et partagez le lien sur WhatsApp. Le lien expire après 48 heures. Confirmez le compte qui répond avant d’activer ses accès. L’invitation par email reste disponible.</p>
+    {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><h3>Inviter un collaborateur</h3><p>Invitez par numéro de téléphone et partagez le lien sur WhatsApp. Le lien expire après 48 heures. Le collaborateur accepte le lien et accède directement à son espace équipe. L’invitation par email reste disponible.</p>
       <form className="salon-form" onSubmit={event => void invite(event)}>
         <label>Mode d’invitation<select aria-label="Mode d’invitation" value={invitationMode} onChange={event => { setInvitationMode(event.target.value); setShareLink(null); }}><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>
         {invitationMode === "whatsapp" ? <label>Numéro WhatsApp avec indicatif<input name="phone" type="tel" required maxLength={40} placeholder="+221770000000" autoComplete="tel" /></label> : <label>E-mail<input name="email" type="email" required maxLength={254} autoComplete="email" /></label>}
@@ -304,7 +304,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
       </form>
       <p>Si une invitation est déjà en attente pour ce destinataire, révoquez-la avant d’en créer une nouvelle.</p>
       {shareLink?.businessId === businessId && <div className="salon-form">
-        <p className="wide">Lien personnel pour <strong>{shareLink.email}</strong>. Copiez-le avant de quitter cette page. {shareLink.phone ? "Après sa réponse, vérifiez son compte dans les demandes ci-dessous." : "Le destinataire doit confirmer cette adresse."}</p>
+        <p className="wide">Lien personnel pour <strong>{shareLink.email}</strong>. Copiez-le avant de quitter cette page. {shareLink.phone ? "Ce lien donne les accès prévus au compte qui l’accepte. Envoyez-le uniquement à cet équipier." : "Le destinataire doit confirmer cette adresse."}</p>
         <label className="wide">Lien d’invitation<input readOnly value={shareLink.url} onFocus={event => event.currentTarget.select()} autoComplete="off" spellCheck={false} /></label>
         {shareLink.phone && <a className="salon-primary" href={whatsappSalonInvitation(shareLink.phone, shareLink.url) ?? undefined} target="_blank" rel="noopener noreferrer">Partager sur WhatsApp</a>}
         <button type="button" onClick={() => void copyInvitationLink()}>Copier le lien</button>

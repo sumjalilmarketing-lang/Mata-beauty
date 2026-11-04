@@ -58,14 +58,17 @@ test('salon invites by phone and prepares a WhatsApp draft without requiring ema
   await expect(page.getByText('Accès de l’équipier confirmé.',{exact:true})).toBeVisible();expect(approved).toBe(true);
 });
 
-test('WhatsApp recipient waits for owner confirmation instead of receiving immediate staff access',async({page,context})=>{
+test('WhatsApp recipient accepts once and opens the staff space without OTP or owner approval',async({page,context})=>{
   test.skip(process.env.MATA_E2E_COLLABORATOR_ACCESS_ENABLED !== 'true', 'Collaborator-enabled build required');
-  await login(context,'client');
-  await page.route('**/api/salon/invitations/accept',route=>route.fulfill({json:{ok:true,state:'pending_approval'}}));
+  // The server fixture supplies the membership created by acceptance; SQL tests exercise the grant itself.
+  await login(context,'staff');
+  await page.route(`${api}/rest/v1/rpc/preview_business_invitation`,route=>route.fulfill({json:{salonName:'Salon de recette'}}));
+  await page.route('**/api/salon/invitations/accept',route=>route.fulfill({json:{ok:true,state:'accepted',redirectTo:'/staff'}}));
   await page.goto('/salon/invitation/accept#token='+'q'.repeat(43));
-  await page.getByRole('button',{name:'Oui, rejoindre l’équipe',exact:true}).click();
-  await expect(page.getByText('Votre demande a été transmise au responsable du salon. Votre accès sera activé après sa confirmation.',{exact:true})).toBeVisible();
-  expect(new URL(page.url()).pathname).toBe('/salon/invitation/accept');
+  await expect(page.getByRole('heading',{name:'Rejoindre l’équipe de Salon de recette',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:/Recevoir mon code/})).toHaveCount(0);
+  await page.getByRole('button',{name:'Accepter et accéder à mon espace',exact:true}).click();
+  await expect(page).toHaveURL(/\/staff(?:[/?#]|$)/);
 });
 
 test('uploaded salon logo is propagated through the controlled branding operation',async({page,context})=>{

@@ -1,0 +1,15 @@
+create role anon; create role authenticated;
+create schema auth; create schema booking_private;
+create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;
+create table auth.users(id uuid primary key,email_confirmed_at timestamptz,phone_confirmed_at timestamptz);
+create table public.profiles(id uuid primary key,display_name text,account_status text default 'active',is_suspended boolean default false);
+create table public.businesses(id uuid primary key,name text,owner_id uuid);
+create table public.business_invitations(id uuid primary key,business_id uuid,recipient_phone text,email text,internal_role text,status text,invited_by uuid,expires_at timestamptz,accepted_at timestamptz,accepted_by uuid,collaborator_id uuid);
+create table booking_private.business_invitation_secrets(invitation_id uuid primary key,token_hash text unique,permissions text[]);
+create table booking_private.phone_invitation_claims(id uuid primary key default gen_random_uuid(),invitation_id uuid,profile_id uuid,status text default 'pending',decided_at timestamptz);
+create table public.collaborators(id uuid primary key default gen_random_uuid(),business_id uuid,profile_id uuid,display_name text,title text,internal_role text,is_active boolean,is_bookable boolean,archived_at timestamptz,updated_at timestamptz,unique(business_id,profile_id));
+create table booking_private.collaborator_access(collaborator_id uuid primary key,business_id uuid,profile_id uuid,internal_role text,permissions text[],granted_by uuid,revoked_at timestamptz,updated_at timestamptz);
+create table booking_private.business_invitation_events(business_id uuid,invitation_id uuid,collaborator_id uuid,actor_id uuid,event_type text,details jsonb);
+create table public.notifications(profile_id uuid,kind text,title text,body text,data jsonb);
+create function public.accept_business_invitation(text) returns uuid language plpgsql as $$begin raise exception 'Email acceptance stub must not be used for phone invitations';end$$;

@@ -39,18 +39,10 @@ select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting(
 do $$declare result jsonb;begin
  begin perform public.accept_business_invitation(repeat('b',64));raise exception 'Phone invitation accepted through email bypass';exception when insufficient_privilege then null;end;
  result:=public.respond_business_invitation(repeat('b',64));
- if result->>'state'<>'pending_approval' then raise exception 'Approval not required';end if;
- if exists(select 1 from public.current_collaborator_access()) then raise exception 'Premature access grant';end if;
- perform public.respond_business_invitation(repeat('b',64));
+ if result->>'state'<>'accepted' then raise exception 'Direct acceptance failed';end if;
+ perform set_config('test.phone_collaborator',result->>'collaboratorId',true);
+ if not exists(select 1 from public.current_collaborator_access() a where 'messages.reply'=any(a.permissions)) then raise exception 'Direct access grant absent';end if;
 end $$;
-reset role;
-select set_config('test.phone_claim',(select id::text from booking_private.phone_invitation_claims where invitation_id=current_setting('test.phone_invite')::uuid and profile_id=current_setting('test.link_recipient')::uuid),true);
-do $$begin if (select count(*) from booking_private.phone_invitation_claims where invitation_id=current_setting('test.phone_invite')::uuid)<>1 then raise exception 'Duplicate claim on retry';end if;end $$;
-set local role authenticated;
-select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.link_recipient'),'role','authenticated')::text,true);
-do $$begin begin perform public.review_business_phone_invitation(current_setting('test.phone_claim')::uuid,true);raise exception 'Claimant approved own access';exception when insufficient_privilege then null;end;end $$;
-select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.link_owner'),'role','authenticated')::text,true);
-select set_config('test.phone_collaborator',public.review_business_phone_invitation(current_setting('test.phone_claim')::uuid,true)::text,true);
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.link_recipient'),'role','authenticated')::text,true);
 do $$begin
  if not exists(select 1 from public.current_collaborator_access() a where a.collaborator_id=current_setting('test.phone_collaborator')::uuid and 'messages.reply'=any(a.permissions)) then raise exception 'Approved permissions absent';end if;
@@ -78,4 +70,4 @@ do $$begin
 end $$;
 reset role;
 rollback;
-select 'PASS: messages with NULL legacy link, recipient/owner replies, outsider denied; logo propagation; phone invitation owner approval, no email bypass, idempotency, token consumption, revocation. All writes rolled back; no actual WhatsApp/email sent.' as result;
+select 'PASS: messages with NULL legacy link, recipient/owner replies, outsider denied; logo propagation; phone invitation direct acceptance, no email bypass, token consumption, revocation. All writes rolled back; no actual WhatsApp/email sent.' as result;

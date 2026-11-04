@@ -17,6 +17,7 @@ export default function AcceptSalonInvitationPage() {
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [email, setEmail] = useState("");
+  const [salonName, setSalonName] = useState("");
   const [busy, setBusy] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [declined, setDeclined] = useState(false);
@@ -34,6 +35,12 @@ export default function AcceptSalonInvitationPage() {
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
     queueMicrotask(() => { if (active) setToken(candidate); });
     const client = getSupabaseBrowserClient();
+    if (candidate && client) void (async () => {
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(candidate));
+      const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+      const { data } = await client.rpc("preview_business_invitation", { target_token_hash: hash });
+      if (active && data && typeof data.salonName === "string") setSalonName(data.salonName);
+    })().catch(() => {});
     const listener = client?.auth.onAuthStateChange((_event, session) => {
       if (active) { setSignedIn(Boolean(session)); setEmail(session?.user.email ?? ""); }
     });
@@ -84,19 +91,19 @@ export default function AcceptSalonInvitationPage() {
     <section className="team-invitation-card" aria-labelledby="salon-invitation-title">
       <Link className="team-invitation-brand" href="/" aria-label="Mata Beauty, accueil"><Image src="/brand/icon-192.png" alt="" width={56} height={56} /><span>Mata Beauty</span></Link>
       <p className="team-invitation-kicker">Invitation à rejoindre une équipe</p>
-      <h1 id="salon-invitation-title">Souhaitez-vous rejoindre l’équipe ?</h1>
+      <h1 id="salon-invitation-title">{salonName ? `Rejoindre l’équipe de ${salonName}` : "Souhaitez-vous rejoindre l’équipe ?"}</h1>
       {!enabled ? <p role="status">Les invitations collaborateur sont temporairement indisponibles.</p> : !ready ? <p role="status">Chargement de votre invitation…</p> : pendingApproval ? <><p role="status">Votre demande a été transmise au responsable du salon. Votre accès sera activé après sa confirmation.</p><Link className="team-invitation-secondary" href="/auth/workspace">Accéder à mon compte</Link></> : declined ? <>
         <p role="status">Vous n’avez pas rejoint l’équipe. Aucun accès n’a été ajouté à votre compte.</p>
         <p>Vous pouvez fermer cette page. Si vous changez d’avis avant l’expiration du lien, rouvrez le lien d’invitation.</p><Link className="team-invitation-secondary" href="/">Retour à Mata Beauty</Link>
       </> : token ? <>
         <p>Une équipe vous invite sur Mata Beauty. Choisissez votre réponse ci-dessous : vous n’avez rien à écrire ni à répondre par email.</p>
-        <p>{signedIn ? <>Compte connecté : <strong>{email}</strong>. Ce compte sera présenté au responsable du salon.</> : "Connectez-vous ou créez un compte confirmé. Pour une invitation par email, utilisez l’adresse invitée. Pour WhatsApp, le responsable confirmera votre identité avant d’activer vos accès."}</p>
-        <p className="team-invitation-note">Le lien est personnel et valable 48 heures. L’ouverture de cette page ne donne aucun accès. En répondant, vous présentez votre nom et votre compte au responsable du salon.</p>
-        <div className="team-invitation-actions"><button className="team-invitation-primary" type="button" disabled={busy} onClick={() => void accept()}>{busy ? "Validation…" : "Oui, rejoindre l’équipe"}</button><button className="team-invitation-secondary" type="button" disabled={busy} onClick={notNow}>Non, pas maintenant</button></div>
+        <p>{signedIn ? <>Compte connecté : <strong>{email}</strong>. L’invitation sera rattachée à ce compte.</> : "Connectez-vous ou créez un compte confirmé. Pour une invitation par email, utilisez l’adresse invitée. Pour WhatsApp, acceptez le lien personnel envoyé par le responsable pour accéder à votre espace équipe."}</p>
+        <p className="team-invitation-note">Le lien est personnel et valable 48 heures. L’ouverture de cette page ne donne aucun accès. En acceptant, vous rejoignez le salon avec les droits définis par le responsable. Ne transférez pas ce lien personnel.</p>
+        <div className="team-invitation-actions"><button className="team-invitation-primary" type="button" disabled={busy} onClick={() => void accept()}>{busy ? "Validation…" : "Accepter et accéder à mon espace"}</button><button className="team-invitation-secondary" type="button" disabled={busy} onClick={notNow}>Non, pas maintenant</button></div>
         {signedIn && <button className="team-invitation-account" type="button" disabled={busy} onClick={() => void changeAccount()}>Utiliser un autre compte</button>}
       </> : <p role="status">{feedback || "Ce lien d’invitation est manquant ou invalide. Ouvrez le lien transmis par le responsable du salon, ou demandez une nouvelle invitation."}</p>}
       {token && feedback && <p className="team-invitation-error" role="alert">{feedback}</p>}
     </section>
-    {authOpen && <AuthModal intendedRole="client" returnTo={salonInvitationPath} onClose={() => setAuthOpen(false)} onAuthenticated={() => { setAuthOpen(false); setSignedIn(true); setFeedback("Vous êtes connecté. Touchez « Oui, rejoindre l’équipe » pour confirmer votre choix."); }} />}
+    {authOpen && <AuthModal intendedRole="client" returnTo={salonInvitationPath} onClose={() => setAuthOpen(false)} onAuthenticated={() => { setAuthOpen(false); setSignedIn(true); setFeedback("Vous êtes connecté. Touchez « Accepter et accéder à mon espace » pour confirmer votre choix."); }} />}
   </main>;
 }
