@@ -1,4 +1,6 @@
 "use client";
+import { StaffTeamDirectory } from "./staff-team-directory";
+import { BookingFeedback } from "./booking-feedback";
 import { normalizeInvitationPhone, whatsappSalonInvitation } from "@/lib/domain/salon-invitation-phone";
 
 
@@ -112,6 +114,24 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
     setLoading(false);
   }, [date]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); const refresh = () => void load(); const polling = window.setInterval(refresh, 30_000); window.addEventListener("focus", refresh); return () => { window.clearTimeout(timer); window.clearInterval(polling); window.removeEventListener("focus", refresh); }; }, [load]);
+  useEffect(() => {
+    const client = api();
+    let channel: ReturnType<typeof client.channel> | undefined;
+    let active = true;
+    void client.auth.getUser().then(({ data }) => {
+      if (!active || !data.user) return;
+      channel = client.channel(`staff-agenda:${data.user.id}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `profile_id=eq.${data.user.id}` }, () => void load()).subscribe();
+    });
+    return () => { active = false; if (channel) void client.removeChannel(channel); };
+  }, [load]);
+  useEffect(() => {
+    let active = true;
+    void api().rpc("get_my_collaborator_calendar").then(({ data, error }) => {
+      const calendars = (data ?? []) as { time_zone: string }[];
+      if (active && !error && calendars[0]?.time_zone) setDate(localDateAt(new Date(), calendars[0].time_zone));
+    });
+    return () => { active = false; };
+  }, []);
   async function transition(row: StaffAppointment, status: string) {
     if (busyId) return;
     setBusyId(row.id); setFeedback("");
@@ -120,10 +140,11 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
     else { setFeedback("Rendez-vous mis à jour."); await load(); }
     setBusyId(null);
   }
-  return <section className="workspace-content"><p><Link href="/staff/availability">Mes disponibilités</Link> · <Link href="/staff/notifications">Mes notifications</Link></p><div className="workspace-intro"><div><span>{t("Espace collaborateur")}</span><h2>{t("Mes rendez-vous")}</h2><p>{t("Seuls les rendez-vous attribués à votre compte sont affichés.")}</p></div></div>
+  return <section className="workspace-content"><StaffTeamDirectory /><p><Link href="/staff/availability">Mes disponibilités</Link> · <Link href="/staff/notifications">Mes notifications</Link></p><div className="workspace-intro"><div><span>{t("Espace collaborateur")}</span><h2>{t("Mes rendez-vous")}</h2><p>{t("Seuls les rendez-vous attribués à votre compte sont affichés.")}</p></div></div>
     {feedback && <p role="status">{t(feedback)}</p>}<article className="workspace-panel salon-panel"><label>{t("Semaine à partir du")}<input type="date" value={date} onChange={event => setDate(event.target.value)} /></label><p>{t("Les heures sont affichées selon le fuseau de chaque salon.")}</p>
       {loading && <p role="status">{t("Chargement des rendez-vous…")}</p>}{!loading && rows.length === 0 && <p>{t("Aucun rendez-vous attribué pour cette période.")}</p>}
       <div className="salon-list">{rows.map(row => <div key={row.id}><div><strong>{row.service_title}</strong><small>{row.client_name} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: row.time_zone }).format(new Date(row.starts_at))} · {t(statusNames[row.status] ?? row.status)}</small></div>
+        {row.status === "completed" && canManage && <BookingFeedback bookingId={row.id} direction="provider_to_client" />}
         {canManage && row.status === "pending" && <><button disabled={busyId === row.id} onClick={() => void transition(row, "confirmed")}>{t("Confirmer")}</button><button disabled={busyId === row.id} onClick={() => void transition(row, "declined")}>{t("Refuser")}</button></>}
         {canManage && row.status === "confirmed" && <button disabled={busyId === row.id} onClick={() => void transition(row, "in_progress")}>{t("Démarrer")}</button>}
         {canManage && row.status === "in_progress" && <button disabled={busyId === row.id} onClick={() => void transition(row, "completed")}>{t("Terminer")}</button>}

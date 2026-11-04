@@ -1,4 +1,6 @@
 "use client";
+import { BookingReschedule } from "./booking-reschedule";
+import { BookingFeedback } from "./booking-feedback";
 
 import Link from "next/link";
 import { ServiceEditor, type EditableService } from "./service-editor";
@@ -243,11 +245,18 @@ export function LiveDashboard({
         setPendingProviders((providerRows.data ?? []) as PendingProviderRow[]);
       } else {
         const ownerColumn = role === "client" ? "client_id" : "provider_id";
+        const owned = role === "provider" ? await supabase.from("businesses").select("id").eq("owner_id", userId).is("archived_at", null) : null;
+        if (owned?.error) throw owned.error;
+        const businessIds = (owned?.data ?? []).map((item: { id: string }) => item.id);
         let bookingQuery = supabase.from("bookings")
           .select("id,provider_id,provider_service_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,provider_services(title,duration_minutes,business_id,is_active,archived_at)")
-          .eq(ownerColumn, userId).order("starts_at", { ascending: role === "client" && moduleKey === "bookings" ? false : true });
+          ;
+        bookingQuery = role === "provider" && businessIds.length
+          ? bookingQuery.or(`provider_id.eq.${userId},business_id.in.(${businessIds.join(",")})`)
+          : bookingQuery.eq(ownerColumn, userId);
+        bookingQuery = bookingQuery.order(role === "provider" ? "created_at" : "starts_at", { ascending: false });
         if (role === "client" && moduleKey === "bookings") bookingQuery = bookingQuery.range(0, clientBookingPageSize);
-        else bookingQuery = bookingQuery.limit(30);
+        else bookingQuery = bookingQuery.limit(200);
         const { data, error: bookingError } = await bookingQuery;
         if (bookingError) throw bookingError;
         const queryRows = (data ?? []) as unknown as BookingQueryRow[];
@@ -343,7 +352,7 @@ export function LiveDashboard({
   }, [load]);
 
   useEffect(() => {
-    if (role !== "client" || moduleKey !== "bookings") return;
+    if (role === "admin") return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     let reloadTimer: number | undefined;
@@ -352,16 +361,19 @@ export function LiveDashboard({
         event: "*",
         schema: "public",
         table: "bookings",
-        filter: `client_id=eq.${userId}`,
+        ...(role === "client" ? { filter: `client_id=eq.${userId}` } : {}),
       }, () => {
         if (reloadTimer !== undefined) window.clearTimeout(reloadTimer);
         reloadTimer = window.setTimeout(() => void load(), 150);
       })
       .subscribe();
-    const refreshFallback = window.setInterval(() => void load(), 60_000);
+    const refreshFallback = window.setInterval(() => void load(), 30_000);
+    const refresh = () => void load();
+    window.addEventListener("focus", refresh);
     return () => {
       if (reloadTimer !== undefined) window.clearTimeout(reloadTimer);
       window.clearInterval(refreshFallback);
+      window.removeEventListener("focus", refresh);
       void supabase.removeChannel(channel);
     };
   }, [load, moduleKey, role, userId]);
@@ -625,6 +637,7 @@ export function LiveDashboard({
         {role !== "admin" && !(role === "client" && moduleKey === "bookings") && show("dashboard", "bookings") && (
           <article className="panel" id="live-bookings">
             <div className="panel-heading"><h2>Réservations</h2><button onClick={() => void load()}>Actualiser</button></div>
+            {role === "provider" && <p>Les 200 réservations créées le plus récemment sont affichées, tous statuts confondus. L’agenda permet de consulter une période précise.</p>}
             {!loading && bookings.length === 0 && <div className="compact-empty">Aucun rendez-vous pour le moment.</div>}
             {bookings.map((booking) => {
               const timeZone = bookingTimeZone(booking.provider_services?.business_id ? businessTimeZones[booking.provider_services.business_id] : null, providerProfile?.timezone, providerProfile?.country_code);
@@ -634,12 +647,14 @@ export function LiveDashboard({
                 <div>
                   <strong>{booking.provider_services?.title ?? "Prestation beauté"}</strong>
                   {booking.collaborator_name && <small>{booking.collaborator_avatar_url && <Image unoptimized src={booking.collaborator_avatar_url} alt="" width={36} height={36} />} Prestation assurée par {booking.collaborator_name}</small>}
+                  {role === "provider" && booking.status === "completed" && <BookingFeedback bookingId={booking.id} direction="provider_to_client" />}
                   {role === "client" && booking.status === "completed" && <BookingReview bookingId={booking.id} clientId={userId} providerId={booking.provider_id} performer={booking.collaborator_name} />}
                   <small>{new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: role === "provider" ? timeZone : undefined }).format(new Date(booking.starts_at))}{role === "provider" && ` · ${timeZone}`} · {Math.round((new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60000)} min</small>
                   <small>{booking.location_mode === "client_address" ? booking.appointment_address : "Chez le professionnel"} · {booking.total_amount.toLocaleString("fr-FR")} {booking.currency}</small>
                 </div>
                 <span className={booking.status === "confirmed" ? "status confirmed" : "status pending"}>{{ pending: "En attente", confirmed: "Confirmé", in_progress: "En cours", completed: "Terminé", declined: "Refusé", cancelled_by_client: "Annulé", cancelled_by_provider: "Annulé", no_show: "Absence", disputed: "Litige" }[booking.status] ?? "Rendez-vous"}</span>
                 <div className="appointment-actions">
+                  {role === "provider" && ["pending","confirmed"].includes(booking.status) && <BookingReschedule bookingId={booking.id} timeZone={timeZone} onSaved={load} />}
                   {role === "provider" && booking.status === "pending" && <>
                     <button onClick={() => void updateStatus(booking, "confirmed")}>Accepter</button>
                     <button onClick={() => void updateStatus(booking, "declined")}>Refuser</button>
