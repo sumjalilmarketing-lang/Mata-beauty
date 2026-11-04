@@ -12,6 +12,6 @@ export async function POST(request: Request) {
   if (typeof token !== "string" || !/^[A-Za-z0-9_-]{40,60}$/.test(token)) return jsonError("Invitation invalide ou expirée.", 400, "invalid_invitation");
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const { data, error } = await auth.client.rpc("respond_business_invitation", { target_token_hash: tokenHash });
-  if (error || !data || typeof data !== "object" || !["accepted", "pending_approval"].includes(data.state)) return jsonError("Vérifiez votre compte et la validité du lien, puis réessayez.", 409, "acceptance_failed");
-  return Response.json({ ok: true, state: data.state, ...(data.state === "accepted" ? { redirectTo: "/staff" } : {}) }, { headers: { "Cache-Control": "private, no-store" } });
+  if (error || !data || typeof data !== "object" || !["accepted", "pending_approval", "owner"].includes(data.state)) return jsonError("Vérifiez votre compte et la validité du lien, puis réessayez.", 409, "acceptance_failed");
+  return Response.json({ ok: true, state: data.state, ...(data.state === "owner" ? { redirectTo: "/salon" } : data.state === "accepted" ? { redirectTo: "/staff" } : {}) }, { headers: { "Cache-Control": "private, no-store" } });
 }

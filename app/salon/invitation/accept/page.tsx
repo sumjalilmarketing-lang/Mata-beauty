@@ -57,11 +57,11 @@ export default function AcceptSalonInvitationPage() {
       });
       if (response.status === 401) { setSignedIn(false); setAuthOpen(true); return; }
       if (!response.ok) throw new Error("accept_failed");
-      const result = await response.json() as { state?: string };
+      const result = await response.json() as { state?: string; redirectTo?: string };
       if (result.state === "pending_approval") { removeBrowserStorage("sessionStorage", salonInvitationTokenKey); setToken(null); setPendingApproval(true); return; }
       removeBrowserStorage("sessionStorage", salonInvitationTokenKey);
       setToken(null); setFeedback("Invitation acceptée. Ouverture de votre espace équipe…");
-      router.replace("/staff");
+      router.replace(result.redirectTo === "/salon" ? "/salon" : "/staff");
       router.refresh();
     } catch {
       setFeedback("Impossible de confirmer cette invitation. Utilisez un compte confirmé ; pour une invitation par email, l’adresse doit correspondre. Si le lien a expiré ou a déjà été utilisé, demandez une nouvelle invitation.");
