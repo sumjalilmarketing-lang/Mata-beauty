@@ -3,8 +3,8 @@ import { SalonStaffTasks } from "./salon-staff-tasks";
 
 import Link from "next/link";
 import { formatRecordedMoney } from "@/lib/domain/admin-money";
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { WorkspaceModule, WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import { workspaceHref, workspaceSpaces } from "@/lib/navigation/spaces";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -34,6 +34,8 @@ import { CommercialCrm } from "./commercial-crm";
 import { FinanceOverview } from "./finance-overview";
 import { RefundReview } from "./refund-review";
 import { AccountDeletionQueue } from "./account-deletion-queue";
+
+import { workspaceListQuery, workspacePage, workspacePageSize } from "@/lib/domain/workspace-list-query";
 
 type Row = Record<string, unknown>;
 type ResourceDefinition = { table: string; select: string; title: (row: Row) => string; meta: (row: Row) => string };
@@ -101,7 +103,16 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
     : module.resource ? resources[module.resource] : module.key === "dashboard" ? resources.bookings : undefined;
   const paymentStatus = space === "finance" && ["pending", "failed"].includes(module.key) ? module.key : null;
   const searchParams = useSearchParams();
-  const query = (searchParams.get("q") ?? "").trim().toLocaleLowerCase("fr");
+  const query = (searchParams.get("q") ?? "").trim().slice(0, 160);
+  const page = workspacePage(searchParams.get("page"));
+  const router = useRouter();
+  const pathname = usePathname();
+  const [total, setTotal] = useState<number | null>(null);
+  function changePage(next: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", String(next));
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }
   const [rows, setRows] = useState<Row[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "unavailable">(definition ? "loading" : "unavailable");
   useEffect(() => {
@@ -111,22 +122,21 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
     const timeout = window.setTimeout(() => controller.abort(), 10000);
     const client = getSupabaseBrowserClient();
     if (!client) { window.clearTimeout(timeout); queueMicrotask(() => setState("unavailable")); return; }
-    queueMicrotask(() => { if (active) { setRows([]); setState("loading"); } });
-    let request = client.from(definition.table).select(definition.select).limit(100).abortSignal(controller.signal);
+    queueMicrotask(() => { if (active) { setRows([]); setTotal(null); setState("loading"); } });
+    let request = workspaceListQuery(client, definition, { page, query, signal: controller.signal });
     if (paymentStatus) request = request.eq("payment_status", paymentStatus);
     if (definition.table === "app_settings") request = request.eq("is_sensitive", false);
     if (space === "admin" && module.key === "suspended") request = request.eq("is_suspended", true);
-    if (definition.select.includes("created_at")) request = request.order("created_at", { ascending: false });
-    void Promise.resolve(request).then(({ data, error }) => {
+    void Promise.resolve(request).then(({ data, error, count }) => {
       window.clearTimeout(timeout);
       if (!active) return;
       if (error) { setState("unavailable"); return; }
       const next = (data ?? []) as unknown as Row[];
-      setRows(next); setState(next.length ? "ready" : "empty");
+      setRows(next); setTotal(count); setState(next.length ? "ready" : "empty");
     }).catch(() => { window.clearTimeout(timeout); if (active) { setRows([]); setState("unavailable"); } });
     return () => { active = false; window.clearTimeout(timeout); controller.abort(); };
-  }, [definition, paymentStatus, space, module.key, supabaseAnonKey, supabaseUrl]);
-  const visibleRows = useMemo(() => query ? rows.filter((row) => JSON.stringify(row).toLocaleLowerCase("fr").includes(query)) : rows, [query, rows]);
+  }, [definition, paymentStatus, space, module.key, supabaseAnonKey, supabaseUrl, query, page]);
+  const visibleRows = rows;
 
   if (fieldView) return <CommercialField view={module.key as "field"|"reports"|"appointments"} userId={userId} />;
   if (teamConsole) return <DepartmentTeamConsole canCreateCommercialTeam={space === "commercial" && canManageCrmAssignments} department={space === "admin" ? undefined : space as "commercial"|"finance"|"support"|"hr"} />;
@@ -175,9 +185,14 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
       <article className="workspace-panel"><header><div><span>Vue actuelle</span><h3>{module.label}</h3></div></header>
         {state === "loading" && <div className="workspace-empty">Chargement…</div>}
         {state === "unavailable" && <div className="workspace-empty"><strong>Données momentanément indisponibles</strong><p>Réessayez dans quelques instants. Aucun changement n’a été appliqué.</p></div>}
-        {state === "empty" && <div className="workspace-empty"><strong>Aucun élément à afficher</strong><p>Vos informations apparaîtront ici dès votre première activité.</p></div>}
+        {state === "empty" && <div className="workspace-empty"><strong>Aucun élément à afficher</strong><p>{query ? "Aucun intitulé ou référence ne correspond à votre recherche." : "Vos informations apparaîtront ici dès votre première activité."}</p></div>}
         {state === "ready" && definition && visibleRows.length === 0 && <div className="workspace-empty"><strong>Aucun résultat</strong><p>Essayez un autre mot-clé.</p></div>}
         {state === "ready" && definition && visibleRows.length > 0 && <div className="workspace-list">{visibleRows.map((row, index) => <div key={String(row.id ?? index)}><span>{definition.title(row)}</span><small>{definition.meta(row)}</small></div>)}</div>}
+        {definition && <nav aria-label="Pagination des résultats" className="workspace-pagination">
+          <p role="status">{total === null ? (state === "unavailable" ? "Résultats indisponibles." : "Chargement des résultats…") : `${total} résultat(s) autorisé(s) · ${workspacePageSize} par page · Page ${page}`}</p>
+          {query && <p>Recherche sur les intitulés et les références, dans tous les résultats autorisés.</p>}
+          <div><button type="button" disabled={page <= 1 || state === "loading"} onClick={() => changePage(1)}>Première page</button><button type="button" disabled={page <= 1 || state === "loading"} onClick={() => changePage(page - 1)}>Précédent</button><button type="button" disabled={total === null || page * workspacePageSize >= total || state === "loading"} onClick={() => changePage(page + 1)}>Suivant</button></div>
+        </nav>}
       </article>
       <aside className="workspace-panel workspace-shortcuts"><header><div><span>Accès rapides</span><h3>Continuer</h3></div></header>{shortcuts.map((item) => <Link href={workspaceHref(space, item.key)} key={item.key}><span>{item.icon}</span><div><strong>{item.label}</strong><small>{item.description}</small></div><b>›</b></Link>)}</aside>
     </div>

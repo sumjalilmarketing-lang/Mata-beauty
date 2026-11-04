@@ -494,3 +494,10 @@
   .workspace-layout:is(.workspace-pro,.workspace-salon) .workspace-mobile-nav > a { flex: 1 0 90px; min-width: 90px; padding-inline: 6px; }
   .workspace-layout:is(.workspace-pro,.workspace-salon) .workspace-mobile-nav small { max-width: 100%; font-size: 12px; line-height: 1.25; white-space: normal; text-align: center; }
 }
+
+.workspace-pagination {margin-top:20px;padding-top:16px;border-top:1px solid #dacbd6;}
+.workspace-pagination p {overflow-wrap:anywhere;}
+.workspace-pagination>div {display:flex;flex-wrap:wrap;gap:10px;}
+.workspace-pagination button {min-height:44px;padding:10px 14px;color:#5c173c;background:#fff;border:1px solid #8b5b78;border-radius:10px;}
+.workspace-pagination button:disabled {color:#635761;background:#eee8ed;cursor:default;}
+.workspace-pagination button:focus-visible {outline:3px solid #85234e;outline-offset:3px;}
