@@ -1,4 +1,5 @@
 "use client";
+import { PhoneAuth } from "./phone-auth";
 import { applicationText } from "@/lib/domain/application-copy";
 import { useApplicationLocale } from "./use-application-locale";
 import { PasswordField, PasswordRequirements } from "@/app/password-field";
@@ -61,6 +62,8 @@ export function AuthModal({
   const t = (text: string) => applicationText(text, locale);
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [feedback, setFeedback] = useState("");
+  const [method, setMethod] = useState<"email" | "whatsapp">("email");
+  const [phoneBusy, setPhoneBusy] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const submitting = useRef(false);
   const openingGoogle = useRef(false);
@@ -81,7 +84,7 @@ export function AuthModal({
   const confirmationValue = useWatch({ control, name: "confirmation" });
 
   async function submit(values: AuthValues) {
-    if (submitting.current || openingGoogle.current) return;
+    if (submitting.current || openingGoogle.current || phoneBusy) return;
     setFeedback("");
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
@@ -172,6 +175,17 @@ export function AuthModal({
         if (error) throw error;
       }
 
+      await completeAuthentication();
+    } catch (error) {
+      setFeedback(authErrorMessage(error));
+    } finally {
+      submitting.current = false;
+    }
+  }
+
+  async function completeAuthentication() {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) throw new Error("Connexion indisponible.");
       const { data: userData, error: userError } = await supabase.auth.getUser();
       const user = userData.user;
       if (userError) throw userError;
@@ -184,20 +198,15 @@ export function AuthModal({
       }
       const profile = await ensureAuthenticatedProfile(supabase, user.id);
       const { data: currentSession } = await supabase.auth.getSession();
-      if (currentSession.session) {
+      if (currentSession.session && user.email) {
         await fetch("/api/auth/welcome", { method: "POST", signal: AbortSignal.timeout(12_000), headers: { Authorization: `Bearer ${currentSession.session.access_token}` } })
           .catch(() => console.warn("welcome_email_request_pending"));
       }
       onAuthenticated(profile);
-    } catch (error) {
-      setFeedback(authErrorMessage(error));
-    } finally {
-      submitting.current = false;
-    }
   }
 
   async function continueWithGoogle() {
-    if (openingGoogle.current || submitting.current) return;
+    if (openingGoogle.current || submitting.current || phoneBusy) return;
     openingGoogle.current = true;
     setFeedback("");
     setGoogleLoading(true);
@@ -257,12 +266,13 @@ export function AuthModal({
             {t("La connexion sécurisée est momentanément indisponible. Réessayez ultérieurement.")}</div>
         )}
         {(mode === "login" || mode === "register") && <>
-          <button className="google-auth-button" type="button" onClick={() => void continueWithGoogle()} disabled={googleLoading || isSubmitting || !configuration.configured}>
+          <button className="google-auth-button" type="button" onClick={() => void continueWithGoogle()} disabled={googleLoading || isSubmitting || phoneBusy || !configuration.configured}>
             <span aria-hidden="true">G</span>{googleLoading ? t("Ouverture de Google…") : t("Continuer avec Google")}
           </button>
-          <div className="auth-divider"><span>{t("ou avec votre e-mail")}</span></div>
+          <div className="auth-divider"><span>ou choisissez votre méthode</span></div>
+          <div role="group" aria-label="Méthode de connexion"><button type="button" aria-pressed={method === "email"} disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => setMethod("email")}>Email</button><button type="button" aria-pressed={method === "whatsapp"} disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => setMethod("whatsapp")}>Téléphone (WhatsApp)</button></div>
         </>}
-        <form onSubmit={(event) => void handleSubmit(submit, () => setFeedback(""))(event)} noValidate>
+        {method === "whatsapp" && (mode === "login" || mode === "register") ? <PhoneAuth key={mode} registering={mode === "register"} locale={locale} onVerified={completeAuthentication} onBusyChange={setPhoneBusy} /> : <form onSubmit={(event) => void handleSubmit(submit, () => setFeedback(""))(event)} noValidate>
           {mode === "register" && (
             <label>
               {t("Nom complet")}<input autoComplete="name" {...register("displayName")} />
@@ -297,13 +307,13 @@ export function AuthModal({
           <button className="primary-button full" type="submit" disabled={isSubmitting || googleLoading || !configuration.configured}>
             {isSubmitting ? t("Veuillez patienter…") : mode === "login" ? t("Se connecter") : mode === "register" ? t("Créer le compte") : mode === "confirm" ? t("Renvoyer la confirmation") : t("Envoyer le lien")}
           </button>
-        </form>
+        </form>}
         <div className="auth-links">
-          {mode !== "login" && <button onClick={() => { setFeedback(""); setMode("login"); }}>{t("Déjà inscrit ? Se connecter")}</button>}
-          {mode === "login" && <button onClick={() => { setFeedback(""); setMode("register"); }}>{t("Créer un compte")}</button>}
-          {mode === "login" && <button onClick={() => { setFeedback(""); setMode("reset"); }}>{t("Mot de passe oublié")}</button>}
-          {mode === "login" && <button disabled={isSubmitting || googleLoading} onClick={() => { setFeedback(""); setMode("email-link"); }}>{t("Recevoir un lien de connexion")}</button>}
-          {mode !== "confirm" && mode !== "register" && <button onClick={() => { setFeedback(""); setMode("confirm"); }}>{t("Renvoyer la confirmation")}</button>}
+          {mode !== "login" && <button disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => { setFeedback(""); setMode("login"); }}>{t("Déjà inscrit ? Se connecter")}</button>}
+          {mode === "login" && <button disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => { setFeedback(""); setMode("register"); }}>{t("Créer un compte")}</button>}
+          {mode === "login" && <button disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => { setFeedback(""); setMode("reset"); }}>{t("Mot de passe oublié")}</button>}
+          {mode === "login" && <button disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => { setFeedback(""); setMode("email-link"); }}>{t("Recevoir un lien de connexion")}</button>}
+          {mode !== "confirm" && mode !== "register" && <button disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => { setFeedback(""); setMode("confirm"); }}>{t("Renvoyer la confirmation")}</button>}
         </div>
       </section>
     </div>

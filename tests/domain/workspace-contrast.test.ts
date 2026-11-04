@@ -93,3 +93,10 @@ describe("professional workspace contrast contract", () => {
     expect(contrastRatio("#ffffff", cssColor(profileTokens, "--pink"))).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+it("keeps the profile shortcuts readable on professional and salon settings", () => {
+ const normal=rule(".workspace-layout:is(.workspace-pro,.workspace-salon) .profile-shortcuts a");
+ const hover=rule(".workspace-layout:is(.workspace-pro,.workspace-salon) .profile-shortcuts a:hover");
+ expect(contrastRatio(cssColor(normal,"color"),cssColor(normal,"background"))).toBeGreaterThanOrEqual(4.5);
+ expect(contrastRatio(cssColor(hover,"color"),cssColor(hover,"background"))).toBeGreaterThanOrEqual(4.5);
+});

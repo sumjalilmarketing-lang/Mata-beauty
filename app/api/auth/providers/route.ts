@@ -1,3 +1,4 @@
+import { whatsappAuthConfiguration } from "@/lib/auth/whatsapp-hook";
 import { jsonError } from "@/lib/payments/server";
 
 export async function GET() {
@@ -11,8 +12,8 @@ export async function GET() {
       signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) return jsonError("Configuration Auth indisponible.", 503, "AUTH_PROVIDER_CHECK_FAILED");
-    const payload = await response.json() as { external?: { google?: boolean } };
-    return Response.json({ google: payload.external?.google === true }, { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+    const payload = await response.json() as { external?: { google?: boolean; phone?: boolean } };
+    return Response.json({ google: payload.external?.google === true, whatsapp: payload.external?.phone === true && whatsappAuthConfiguration() !== null }, { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
   } catch {
     return jsonError("Configuration Auth indisponible.", 503, "AUTH_PROVIDER_CHECK_FAILED");
   }

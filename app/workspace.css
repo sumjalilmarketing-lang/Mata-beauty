@@ -164,3 +164,7 @@
 .workspace-layout .workspace-quick-publish { background: linear-gradient(135deg,#86124f,#b52165); }
 
 .workspace-layout .launch-checklist .panel-heading>strong,.workspace-layout .professional-photo { color:#fff; background:linear-gradient(135deg,#86124f,#b52165); }
+
+/* Profile shortcuts must explicitly pair foreground and background on light workspaces. */
+.workspace-layout:is(.workspace-pro,.workspace-salon) .profile-shortcuts a { color:#30212a; background:#ffffff; border-color:#8b6679; }
+.workspace-layout:is(.workspace-pro,.workspace-salon) .profile-shortcuts a:hover { color:#ffffff; background:#86124f; border-color:#86124f; }

@@ -32,10 +32,15 @@ reset role;
 select set_config('test.cw_booking',(select id::text from public.bookings where provider_id=current_setting('test.cw_owner')::uuid limit 1),true);
 do $$begin
  if not exists(select 1 from public.notifications where profile_id=current_setting('test.cw_staff')::uuid and kind='booking_assignment' and data->>'booking_id'=current_setting('test.cw_booking') and body like '%Tresses QA collaborateurs%') then raise exception 'Assigned employee not notified of service';end if;
+ if (select count(*) from public.notifications where profile_id=current_setting('test.cw_staff')::uuid and data->>'booking_id'=current_setting('test.cw_booking'))<>1 then raise exception 'Duplicate employee reservation notifications';end if;
  if not exists(select 1 from public.notifications where profile_id=current_setting('test.cw_owner')::uuid and kind='booking_created' and data->>'booking_id'=current_setting('test.cw_booking') and body like '%Aïda QA%') then raise exception 'Owner not notified of assignee';end if;
 end $$;
 set local role authenticated;
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.cw_staff'),'role','authenticated')::text,true);
+do $$begin
+ if public.has_admin_permission('payments.read') or public.has_admin_permission('payments.refund') then raise exception 'Staff received financial administration rights';end if;
+ if exists(select 1 from public.payments) then raise exception 'Staff read unrelated payments';end if;
+end $$;
 select public.staff_update_booking_status(current_setting('test.cw_booking')::uuid,'confirmed');
 select set_config('test.cw_absence',public.staff_add_unavailability(current_setting('test.cw_employee')::uuid,current_setting('test.cw_start')::timestamptz,current_setting('test.cw_start')::timestamptz+interval '3 hours','rest','Planning complet QA')::text,true);
 do $$declare r jsonb;begin
@@ -72,5 +77,15 @@ do $$begin
  begin perform public.staff_add_unavailability(current_setting('test.cw_employee')::uuid,now(),now()+interval '1 hour','rest','Forbidden');raise exception 'Revoked account edited availability';exception when insufficient_privilege then null;end;
 end $$;
 reset role;
+update booking_private.collaborator_access set revoked_at=now() where collaborator_id=current_setting('test.cw_colleague')::uuid;
+select set_config('test.cw_notices_before',(select count(*)::text from public.notifications where profile_id=current_setting('test.cw_colleague_account')::uuid),true);
+set local role authenticated;
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.cw_owner'),'role','authenticated')::text,true);
+update public.bookings set status='cancelled_by_provider' where id=current_setting('test.cw_booking')::uuid;
+reset role;
+do $$begin
+ if (select count(*) from public.notifications where profile_id=current_setting('test.cw_colleague_account')::uuid)<>current_setting('test.cw_notices_before')::integer then raise exception 'Revoked employee received new booking information';end if;
+end $$;
+reset role;
 rollback;
-select 'PASS: invitation retains employee identity, hours and services; own calendar writes; assigned booking and owner notifications; status update; full period blocks new reservations and flags existing booking; same-salon reassignment; stale assignee/outsider/revoked access denied. All writes rolled back.' as result;
+select 'PASS: invitation retains employee identity, hours and services; own calendar writes; assigned booking and owner notifications; status update; full period blocks new reservations and flags existing booking; same-salon reassignment; stale assignee/outsider/revoked access denied; financial access denied; revoked employee receives no future booking notifications. All writes rolled back.' as result;
