@@ -1,4 +1,6 @@
 "use client";
+import { StaffServiceEditor } from "./staff-service-editor";
+import { SalonStaffTasks } from "./salon-staff-tasks";
 import { StaffTeamDirectory } from "./staff-team-directory";
 import { BookingFeedback } from "./booking-feedback";
 import { normalizeInvitationPhone, whatsappSalonInvitation } from "@/lib/domain/salon-invitation-phone";
@@ -8,7 +10,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { workspaceText } from "@/lib/domain/workspace-copy";
 import { useApplicationLocale } from "./use-application-locale";
-import { formatServiceMoney } from "@/lib/domain/service-money";
 import { ActionConfirmationDialog } from "./booking-cancellation-dialog";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -74,28 +75,8 @@ export function ProviderTeamAgenda({ userId }: { userId: string }) {
 }
 
 type StaffAppointment = { id: string; starts_at: string; ends_at: string; status: string; service_title: string; client_name: string; time_zone: string };
-type StaffService = { id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; currency: string; is_active: boolean };
-export function StaffServices() {
-  const locale = useApplicationLocale();
-  const t = (text: string) => workspaceText(text, locale);
-  const [services, setServices] = useState<StaffService[]>([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    let active = true;
-    void Promise.resolve(api().rpc("get_staff_services")).then(({ data, error }) => {
-      if (!active) return;
-      setServices(error ? [] : (data ?? []) as StaffService[]);
-      setLoading(false);
-    }).catch(() => { if (active) { setServices([]); setLoading(false); } });
-    return () => { active = false; };
-  }, []);
-  return <section className="workspace-content"><h2>{t("Prestations autorisées")}</h2>{loading ? <p role="status">{t("Chargement…")}</p> : services.length ? <div className="workspace-list">{services.map((service) => <article key={service.id}><strong>{service.title}</strong><small>{service.duration_minutes} min · {formatStaffPrice(service.price_amount, service.currency, locale)} · {t(service.is_active ? "Active" : "Inactive")}</small>{service.description && <p>{service.description}</p>}</article>)}</div> : <p>{t("Aucune prestation du salon ne vous est attribuée.")}</p>}</section>;
-}
+export function StaffServices() { return <StaffServiceEditor />; }
 
-function formatStaffPrice(amount: number, currency: string, locale = "fr-FR") {
-  try { return formatServiceMoney(amount, currency, locale); }
-  catch { return `${amount.toLocaleString(locale)} ${currency}`; }
-}
 
 export function StaffAgenda({ canManage }: { canManage: boolean }) {
   const locale = useApplicationLocale();
@@ -317,7 +298,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     <header><h2>Mon équipe</h2><p>Les fiches d’équipe gèrent les prestations et les horaires. Les accès de compte sont séparés et limités aux permissions attribuées côté serveur. Les horaires suivent le fuseau du salon ({timeZone}).</p></header>
     {message && <p className="salon-feedback" role="status">{message}</p>}
     {!collaboratorAccessEnabled && <p className="salon-feedback" role="status">Les invitations, rôles de compte et permissions sont désactivés jusqu’à validation et application de la migration de sécurité.</p>}
-    {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><h3>Inviter un collaborateur</h3><p>Invitez par numéro de téléphone et partagez le lien sur WhatsApp. Le lien expire après 48 heures. Le collaborateur accepte le lien et accède directement à son espace équipe. L’invitation par email reste disponible.</p>
+    {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><SalonStaffTasks businessId={businessId} timeZone={timeZone} members={members.filter(m=>m.is_active&&!m.archived_at)} /><h3>Inviter un collaborateur</h3><p>Invitez par numéro de téléphone et partagez le lien sur WhatsApp. Le lien expire après 48 heures. Le collaborateur accepte le lien et accède directement à son espace équipe. L’invitation par email reste disponible.</p>
       <form className="salon-form" onSubmit={event => void invite(event)}>
         {invitationMode === "whatsapp" && <label>Fiche collaborateur à associer<select name="memberId" defaultValue=""><option value="">Créer une nouvelle fiche à l’acceptation</option>{members.filter(person => !staffAccess.some(account => account.collaborator_id === person.id) && person.is_active && !person.archived_at).map(person => <option key={person.id} value={person.id}>{person.display_name}</option>)}</select><small>Associez une fiche existante pour conserver ses rendez-vous, horaires et prestations.</small></label>}
         <label>Mode d’invitation<select aria-label="Mode d’invitation" value={invitationMode} onChange={event => { setInvitationMode(event.target.value); setShareLink(null); }}><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>

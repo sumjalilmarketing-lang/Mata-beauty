@@ -1,4 +1,5 @@
 "use client";
+import { SalonStaffTasks } from "./salon-staff-tasks";
 
 import Link from "next/link";
 import { formatRecordedMoney } from "@/lib/domain/admin-money";
@@ -88,7 +89,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const teamConsole = module.key === "teams" && ["admin","commercial","finance","support","hr"].includes(space);
   const accountSettings = space === "pro" && module.key === "settings";
   const fieldView = space === "commercial" && ["field","reports","appointments"].includes(module.key);
-  const custom = space === "hr" || fieldView || accountSettings || departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services", "availability", "notifications"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
+  const custom = space === "hr" || fieldView || accountSettings || departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services", "availability", "notifications", "tasks"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
     : space === "admin" && module.key === "alerts" ? fraudAlerts
     : space === "admin" && module.key === "security" ? resources.sessions
@@ -149,6 +150,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (space === "client" && module.key === "inspirations") return <SocialDashboard role="client" userId={userId} />;
 
   if (space === "salon" && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
+  if (space === "staff" && module.key === "tasks") return <SalonStaffTasks />;
   if (space === "staff" && module.key === "availability") return <StaffCalendar />;
   if (space === "staff" && module.key === "messages") return <WorkspaceMessaging userId={userId} staffMode canReply={staffCanReply} />;
   if (space === "staff" && ["agenda", "bookings"].includes(module.key)) return <StaffAgenda canManage={staffCanManageBookings} />;

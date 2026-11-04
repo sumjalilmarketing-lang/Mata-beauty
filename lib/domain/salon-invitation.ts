@@ -5,3 +5,7 @@ export function pendingSalonInvitation(fromLink: string | null, saved: string | 
   const candidate = fromLink === null ? saved : fromLink;
   return candidate && /^[A-Za-z0-9_-]{40,60}$/.test(candidate) ? candidate : null;
 }
+
+export function shouldResumeSalonInvitation(token: string | null, acceptedToken: string | null): boolean {
+  return Boolean(token && pendingSalonInvitation(token, null) && token === acceptedToken);
+}

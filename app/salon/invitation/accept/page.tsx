@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { AuthModal } from "@/app/auth-modal";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { readBrowserStorage, removeBrowserStorage, writeBrowserStorage } from "@/lib/browser-storage";
-import { pendingSalonInvitation, salonInvitationPath, salonInvitationTokenKey } from "@/lib/domain/salon-invitation";
+import { pendingSalonInvitation, shouldResumeSalonInvitation, salonInvitationPath, salonInvitationTokenKey } from "@/lib/domain/salon-invitation";
 import "./invitation.css";
 
 export default function AcceptSalonInvitationPage() {
@@ -24,6 +24,9 @@ export default function AcceptSalonInvitationPage() {
   const [pendingApproval, setPendingApproval] = useState(false);
   const [feedback, setFeedback] = useState("");
   const inFlight = useRef(false);
+  const acceptanceIntentKey = "mata.salon.invitation.accept-intent";
+  const resumeAcceptance = useEffectEvent(() => { if (shouldResumeSalonInvitation(token, readBrowserStorage("sessionStorage", acceptanceIntentKey))) void accept(); });
+  useEffect(() => { if (ready && signedIn && token) resumeAcceptance(); }, [ready, signedIn, token]);
 
   useEffect(() => {
     let active = true;
@@ -54,6 +57,7 @@ export default function AcceptSalonInvitationPage() {
   async function accept() {
     const client = getSupabaseBrowserClient();
     if (!enabled || !client || !token || inFlight.current) return;
+    writeBrowserStorage("sessionStorage", acceptanceIntentKey, token);
     inFlight.current = true; setBusy(true); setFeedback("");
     try {
       const { data } = await client.auth.getSession();
@@ -67,6 +71,7 @@ export default function AcceptSalonInvitationPage() {
       const result = await response.json() as { state?: string; redirectTo?: string };
       if (result.state === "pending_approval") { removeBrowserStorage("sessionStorage", salonInvitationTokenKey); setToken(null); setPendingApproval(true); return; }
       removeBrowserStorage("sessionStorage", salonInvitationTokenKey);
+      removeBrowserStorage("sessionStorage", acceptanceIntentKey);
       setToken(null); setFeedback("Invitation acceptée. Ouverture de votre espace équipe…");
       router.replace(result.redirectTo === "/salon" ? "/salon" : "/staff");
       router.refresh();
@@ -77,10 +82,12 @@ export default function AcceptSalonInvitationPage() {
   function notNow() {
     if (inFlight.current) return;
     removeBrowserStorage("sessionStorage", salonInvitationTokenKey);
+    removeBrowserStorage("sessionStorage", acceptanceIntentKey);
     setToken(null); setDeclined(true); setFeedback("");
   }
   async function changeAccount() {
     const client = getSupabaseBrowserClient(); if (!client || busy) return;
+    removeBrowserStorage("sessionStorage", acceptanceIntentKey);
     setBusy(true);
     try { const { error } = await client.auth.signOut(); if (error) throw error; setSignedIn(false); setEmail(""); setAuthOpen(true); }
     catch { setFeedback("La déconnexion n’a pas pu être confirmée. Réessayez."); }
@@ -104,6 +111,6 @@ export default function AcceptSalonInvitationPage() {
       </> : <p role="status">{feedback || "Ce lien d’invitation est manquant ou invalide. Ouvrez le lien transmis par le responsable du salon, ou demandez une nouvelle invitation."}</p>}
       {token && feedback && <p className="team-invitation-error" role="alert">{feedback}</p>}
     </section>
-    {authOpen && <AuthModal intendedRole="client" returnTo={salonInvitationPath} onClose={() => setAuthOpen(false)} onAuthenticated={() => { setAuthOpen(false); setSignedIn(true); setFeedback("Vous êtes connecté. Touchez « Accepter et accéder à mon espace » pour confirmer votre choix."); }} />}
+    {authOpen && <AuthModal intendedRole="client" returnTo={salonInvitationPath} onClose={() => setAuthOpen(false)} onAuthenticated={() => { setAuthOpen(false); setSignedIn(true); setFeedback("Connexion confirmée. Ouverture de votre espace collaborateur…"); }} />}
   </main>;
 }
