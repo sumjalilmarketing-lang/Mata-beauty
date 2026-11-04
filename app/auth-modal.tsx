@@ -64,6 +64,18 @@ export function AuthModal({
   const [feedback, setFeedback] = useState("");
   const [method, setMethod] = useState<"email" | "whatsapp">("email");
   const [phoneBusy, setPhoneBusy] = useState(false);
+  const [phoneAvailable, setPhoneAvailable] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/auth/providers", { cache: "no-store", signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) return;
+        const providers = await response.json() as { whatsapp?: boolean };
+        if (!controller.signal.aborted) setPhoneAvailable(providers.whatsapp === true);
+      })
+      .catch(() => { /* Keep phone authentication hidden when availability cannot be verified. */ });
+    return () => controller.abort();
+  }, []);
   const [googleLoading, setGoogleLoading] = useState(false);
   const submitting = useRef(false);
   const openingGoogle = useRef(false);
@@ -269,10 +281,10 @@ export function AuthModal({
           <button className="google-auth-button" type="button" onClick={() => void continueWithGoogle()} disabled={googleLoading || isSubmitting || phoneBusy || !configuration.configured}>
             <span aria-hidden="true">G</span>{googleLoading ? t("Ouverture de Google…") : t("Continuer avec Google")}
           </button>
-          <div className="auth-divider"><span>ou choisissez votre méthode</span></div>
-          <div role="group" aria-label="Méthode de connexion"><button type="button" aria-pressed={method === "email"} disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => setMethod("email")}>Email</button><button type="button" aria-pressed={method === "whatsapp"} disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => setMethod("whatsapp")}>Téléphone (WhatsApp)</button></div>
+          <div className="auth-divider"><span>{t("Adresse e-mail")}</span></div>
+          {phoneAvailable && <div role="group" aria-label="Méthode de connexion"><button type="button" aria-pressed={method === "email"} disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => setMethod("email")}>Email</button><button type="button" aria-pressed={method === "whatsapp"} disabled={phoneBusy || isSubmitting || googleLoading} onClick={() => setMethod("whatsapp")}>Téléphone (WhatsApp)</button></div>}
         </>}
-        {method === "whatsapp" && (mode === "login" || mode === "register") ? <PhoneAuth key={mode} registering={mode === "register"} locale={locale} onVerified={completeAuthentication} onBusyChange={setPhoneBusy} /> : <form onSubmit={(event) => void handleSubmit(submit, () => setFeedback(""))(event)} noValidate>
+        {phoneAvailable && method === "whatsapp" && (mode === "login" || mode === "register") ? <PhoneAuth key={mode} registering={mode === "register"} locale={locale} onVerified={completeAuthentication} onBusyChange={setPhoneBusy} /> : <form onSubmit={(event) => void handleSubmit(submit, () => setFeedback(""))(event)} noValidate>
           {mode === "register" && (
             <label>
               {t("Nom complet")}<input autoComplete="name" {...register("displayName")} />
@@ -282,7 +294,7 @@ export function AuthModal({
             <label>{t("Pays de résidence")}<select required aria-label={t("Pays de résidence")} {...register("countryCode")}><option value="">{t("Choisir un pays")}</option>{SUPPORTED_COUNTRIES.map(country => <option key={country.code} value={country.code}>{new Intl.DisplayNames([locale], { type: "region" }).of(country.code) ?? country.name}</option>)}</select></label>
             <label>{t("Région ou État")}<input autoComplete="address-level1" maxLength={120} {...register("region")} /></label>
             <label>{t("Ville")}<input autoComplete="address-level2" maxLength={120} {...register("city")} /></label>
-            <label>{t("Téléphone international")}<input type="tel" autoComplete="tel" placeholder="+221771234567" inputMode="tel" {...register("phone")} /></label>
+            {phoneAvailable && <label>{t("Téléphone international")}<input type="tel" autoComplete="tel" placeholder="+221771234567" inputMode="tel" {...register("phone")} /></label>}
           </>}
           <label>
             {t("Adresse e-mail")}<input type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} {...register("email")} />

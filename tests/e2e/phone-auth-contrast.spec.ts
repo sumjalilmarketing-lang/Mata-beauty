@@ -21,8 +21,17 @@ for(const destination of ['/app/profile','/pro'])test(`phone registration withou
  await expect(page).toHaveURL(destination==='/pro'?/\/app\/application$/:/\/app\/profile$/);
  expect(verified).toBe(2);if(destination==='/pro')expect(professional).toBeGreaterThanOrEqual(1);
 });
-test('WhatsApp remains honestly unavailable before Meta activation',async({page})=>{
- await page.route('**/api/auth/providers',r=>r.fulfill({json:{google:false,whatsapp:false}}));await page.goto('/?connexion=requise');const dialog=page.getByRole('dialog',{name:'Se connecter',exact:true});await dialog.getByRole('button',{name:'Téléphone (WhatsApp)',exact:true}).click();await expect(dialog.getByText(/La connexion par WhatsApp est en cours d’activation/)).toBeVisible();await expect(dialog.getByRole('button',{name:'Recevoir mon code sur WhatsApp',exact:true})).toHaveCount(0);
+test('phone authentication and optional phone field stay hidden before Meta activation',async({page})=>{
+ await page.route('**/api/auth/providers',r=>r.fulfill({json:{google:true,whatsapp:false}}));
+ await page.goto('/?connexion=requise');
+ const dialog=page.getByRole('dialog',{name:'Se connecter',exact:true});
+ await expect(dialog.getByRole('button',{name:'Téléphone (WhatsApp)',exact:true})).toHaveCount(0);
+ await expect(dialog.getByRole('button',{name:'Continuer avec Google',exact:true})).toBeVisible();
+ await expect(dialog.getByLabel('Adresse e-mail',{exact:true})).toBeVisible();
+ await dialog.getByRole('button',{name:'Créer un compte',exact:true}).click();
+ await expect(dialog.getByRole('button',{name:'Téléphone (WhatsApp)',exact:true})).toHaveCount(0);
+ await expect(dialog.locator('input[type=tel]')).toHaveCount(0);
+ await expect(dialog.getByLabel('Adresse e-mail',{exact:true})).toBeVisible();
 });
 test('professional settings shortcuts match readable light surfaces',async({page,context})=>{
  await context.addCookies([{name:'sb-127-auth-token',value:'base64-'+Buffer.from(JSON.stringify(syntheticSession('provider'))).toString('base64url'),domain:'127.0.0.1',path:'/',httpOnly:false,sameSite:'Lax'}]);await page.goto('/pro/settings');const links=page.locator('.profile-shortcuts a');await expect(links).toHaveCount(6);

@@ -34,6 +34,10 @@ select set_config('test.cw_booking',(select id::text from public.bookings where 
 
 set local role authenticated;
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('test.cw_staff'),'role','authenticated')::text,true);
+select public.staff_set_service(current_setting('test.cw_employee')::uuid,current_setting('test.cw_service')::uuid,false);
+do $$begin
+ if exists(select 1 from public.staff_service_catalog()where collaborator_id=current_setting('test.cw_employee')::uuid and service_id=current_setting('test.cw_service')::uuid and assigned)then raise exception 'Own service removal failed';end if;
+end $$;
 select public.staff_set_service(current_setting('test.cw_employee')::uuid,current_setting('test.cw_service')::uuid,true);
 select public.staff_declare_service(current_setting('test.cw_employee')::uuid,'Tresses spéciales','Déclaration de compétence');
 do $$begin
