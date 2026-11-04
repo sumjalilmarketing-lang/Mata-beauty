@@ -501,3 +501,10 @@
 .workspace-pagination button {min-height:44px;padding:10px 14px;color:#5c173c;background:#fff;border:1px solid #8b5b78;border-radius:10px;}
 .workspace-pagination button:disabled {color:#635761;background:#eee8ed;cursor:default;}
 .workspace-pagination button:focus-visible {outline:3px solid #85234e;outline-offset:3px;}
+
+.workspace-list-search {display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:16px 0;}
+.workspace-list-search label {display:grid;gap:6px;flex:1 1 220px;min-width:0;}
+.workspace-list-search input {width:100%;min-width:0;min-height:44px;border:1px solid #8b5b78;border-radius:10px;padding:10px;color:#331326;background:#fff;}
+.workspace-list-search button {min-height:44px;padding:10px 14px;border:1px solid #64183f;border-radius:10px;background:#64183f;color:#fff;}
+.workspace-list-search a {color:#64183f;text-decoration:underline;}
+.workspace-list-search :focus-visible {outline:3px solid #85234e;outline-offset:3px;}

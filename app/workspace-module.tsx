@@ -183,6 +183,14 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
     </div>
     }<div className="workspace-grid">
       <article className="workspace-panel"><header><div><span>Vue actuelle</span><h3>{module.label}</h3></div></header>
+        {definition && <form className="workspace-list-search" onSubmit={event => {
+          event.preventDefault();
+          const params = new URLSearchParams(searchParams.toString());
+          const value = String(new FormData(event.currentTarget).get("query") ?? "").trim().slice(0, 160);
+          if (value) params.set("q", value); else params.delete("q");
+          params.delete("page");
+          router.push(`${pathname}${params.size ? `?${params.toString()}` : ""}`, { scroll: false });
+        }}><label>Rechercher un intitulé ou une référence<input type="search" name="query" key={query} defaultValue={query} maxLength={160} /></label><button type="submit">Rechercher</button>{query && <Link href={pathname}>Effacer la recherche</Link>}</form>}
         {state === "loading" && <div className="workspace-empty">Chargement…</div>}
         {state === "unavailable" && <div className="workspace-empty"><strong>Données momentanément indisponibles</strong><p>Réessayez dans quelques instants. Aucun changement n’a été appliqué.</p></div>}
         {state === "empty" && <div className="workspace-empty"><strong>Aucun élément à afficher</strong><p>{query ? "Aucun intitulé ou référence ne correspond à votre recherche." : "Vos informations apparaîtront ici dès votre première activité."}</p></div>}

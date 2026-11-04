@@ -74,7 +74,7 @@ export function validatePlatformSetting(key: PlatformSettingKey, value: Platform
   if (key === "booking") {
     const settings = value as BookingSettings;
     if (!Number.isInteger(settings.minimum_notice_minutes) || settings.minimum_notice_minutes < 0 || settings.minimum_notice_minutes > 43200) return "Le préavis doit être un nombre entier de 0 à 43 200 minutes.";
-    if (!Number.isInteger(settings.cancellation_window_hours) || settings.cancellation_window_hours < 0 || settings.cancellation_window_hours > 8760) return "Le délai d’annulation doit être un nombre entier de 0 à 8 760 heures.";
+    if (settings.cancellation_window_hours !== 48) return "La politique d’annulation reste fixée à 48 heures.";
     return null;
   }
 
