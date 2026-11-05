@@ -13,7 +13,7 @@ describe("commercial installation", () => {
     expect(commercial.id).not.toBe(manifest().id);
     expect(manifest().start_url).toBe("/");
     expect(commercial.scope).toBe("/");
-    expect(commercial.shortcuts.map((item: { url: string }) => item.url)).toEqual(["/commercial", "/app", "/"]);
+    expect(commercial.shortcuts.map((item: { url: string }) => item.url)).toEqual(["/commercial", "/commercial/crm", "/commercial/field", "/commercial/dossiers", "/"]);
   });
   it("advertises the commercial manifest and iPhone home-screen title", () => {
     expect(metadata.manifest).toBe("/commercial/manifest.webmanifest");

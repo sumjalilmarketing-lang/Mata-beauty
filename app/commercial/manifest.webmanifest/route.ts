@@ -19,7 +19,9 @@ export function GET() {
     ],
     shortcuts: [
       { name: "Mon espace commercial", url: "/commercial" },
-      { name: "Mon espace client", url: "/app" },
+      { name: "Mon CRM", url: "/commercial/crm" },
+      { name: "Badger une visite", url: "/commercial/field" },
+      { name: "Mes dossiers", url: "/commercial/dossiers" },
       { name: "Découvrir le feed", url: "/" },
     ],
   };

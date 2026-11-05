@@ -90,7 +90,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
       <div className="workspace-breadcrumb"><Link href={definition.prefix}>{t(definition.label)}</Link><span>/</span><span>{t(activeModule.label)}</span></div>
       {secondary.length > 0 && !(space === "client" && moduleKey === "profile") && <details className="workspace-secondary" open={secondary.some((item) => item.key === moduleKey)}><summary>{space === "client" ? t("Mon compte") : t("Dans cette rubrique")}</summary><nav aria-label={t("Navigation secondaire")}>{secondary.map((item) => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined}>{t(navigationLabel(space, item))}</Link>)}</nav></details>}
       {children}
-      <WorkspaceInstallHelp />
+      {!(space === "commercial" && moduleKey === "dashboard") && <WorkspaceInstallHelp />}
       {(parent === "profile" || parent === "public-profile") && <ProductHelp professional={space === "pro"} />}
     </main>
     <nav className="workspace-mobile-nav" aria-label={t("Navigation mobile")}>

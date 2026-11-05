@@ -107,15 +107,15 @@ const onboardingModules = [
 ] as const;
 
 const commercialModules = [
-  module("field", "Pointages et visites", "◷", "Terrain", "Journées, visites et positions enregistrées.", {permission:"commercial.cases"}),
   module("reports", "Rapports", "▣", "Terrain", "Comptes rendus transmis au responsable de votre équipe.", {permission:"commercial.cases"}),
   module("appointments", "Rendez-vous", "◷", "Terrain", "Agenda commercial et comptes rendus.", {permission:"commercial.cases"}),
   module("teams", "Mes équipes", "◎", "Supervision", "Accès des agents, affectations et suivi des activités.", { permission:"teams.manage" }),
   module("cases", "Dossiers attribués", "▣", "Dossiers", "Vos dossiers et comptes rendus.", { permission:"commercial.cases" }),
-  module("dashboard", "Vue commerciale", "⌂", "CRM", "Prospection, pipeline et relances de vos prospects.", { primary:true,permission:"crm.manage" }),
+  module("dashboard", "Mon espace commercial", "⌂", "CRM", "Vos outils commerciaux, dossiers et visites.", { primary:true,permission:"crm.manage" }),
   module("crm", "Prospects", "◎", "CRM", "Fiches contacts, suivi commercial et historique.", { primary:true,permission:"crm.manage" }),
-  module("follow-ups", "Relances", "◷", "CRM", "Prochaines actions arrivées à échéance.", { primary:true,permission:"crm.manage" }),
+  module("follow-ups", "Relances", "◷", "CRM", "Prochaines actions arrivées à échéance.", { permission:"crm.manage" }),
   module("dossiers", "Validation des dossiers", "✓", "Dossiers", "Pièces, compléments et décisions professionnelles.", { primary:true,permission:"commercial.cases",resource:"providers" }),
+  module("field", "Pointages et visites", "◷", "Terrain", "Journées, visites et positions enregistrées.", {primary:true,permission:"commercial.cases"}),
   ...onboardingModules.filter(item => item.key !== "dashboard").map(item => ({...item,primary:false})),
 ] as const;
 

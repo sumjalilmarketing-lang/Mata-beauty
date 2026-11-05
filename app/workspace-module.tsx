@@ -1,4 +1,5 @@
 "use client";
+import { CommercialHome } from "./commercial-home";
 import { ProviderReviewBookings } from "./provider-review-bookings";
 import { SalonStaffTasks } from "./salon-staff-tasks";
 
@@ -144,6 +145,8 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (module.key === "notifications") return <NotificationCenter userId={userId} />;
   if (space === "hr") return <HrWorkspace moduleKey={module.key} isSuper={isSuperAdmin}/>;
   if (departmentCases) return <DepartmentCases department={space as "commercial"|"finance"|"support"|"hr"} />;
+  if (space === "commercial" && module.key === "dashboard" && searchParams.get("dossier")) return <OnboardingQueue moduleKey="dashboard" />;
+  if (space === "commercial" && module.key === "dashboard") return <CommercialHome modules={workspaceSpaces.commercial.modules.filter(item => allowedModuleKeys.includes(item.key))} />;
   if (crmView) return <CommercialCrm key={module.key} userId={userId} canAssign={canManageCrmAssignments} isSuper={isSuperAdmin} dueOnly={module.key === "follow-ups"} />;
   if (financeOverview) return <FinanceOverview allowedModuleKeys={allowedModuleKeys} />;
   if (moderationInbox) return <ModerationInbox />;
