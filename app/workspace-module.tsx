@@ -164,8 +164,8 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (space === "staff" && module.key === "tasks") return <SalonStaffTasks />;
   if (space === "staff" && module.key === "availability") return <StaffCalendar />;
   if (space === "staff" && module.key === "messages") return <WorkspaceMessaging userId={userId} staffMode canReply={staffCanReply} />;
-  if (space === "staff" && ["agenda", "bookings"].includes(module.key)) return <StaffAgenda canManage={staffCanManageBookings} />;
-  if (space === "staff" && module.key === "dashboard") return <StaffAgenda canManage={staffCanManageBookings} />;
+  if (space === "staff" && ["agenda", "bookings"].includes(module.key)) return <StaffAgenda key={module.key} view={module.key as "agenda" | "bookings"} canManage={staffCanManageBookings} />;
+  if (space === "staff" && module.key === "dashboard") return <StaffAgenda view="dashboard" canManage={staffCanManageBookings} />;
   if (space === "staff" && module.key === "services") return <StaffServices />;
   if (space === "salon" && module.key !== "videos") return <SalonControlCenter module={module} userId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />;
   if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;

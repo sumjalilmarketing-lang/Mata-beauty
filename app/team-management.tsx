@@ -1,4 +1,5 @@
 "use client";
+import { staffViewDays, staffVisibleAppointments, type StaffView } from "@/lib/domain/staff-schedule";
 import { StaffServiceEditor } from "./staff-service-editor";
 import { SalonStaffTasks } from "./salon-staff-tasks";
 import { StaffTeamDirectory } from "./staff-team-directory";
@@ -79,7 +80,9 @@ type StaffAppointment = { id: string; starts_at: string; ends_at: string; status
 export function StaffServices() { return <StaffServiceEditor />; }
 
 
-export function StaffAgenda({ canManage }: { canManage: boolean }) {
+export function StaffAgenda({ canManage, view = "bookings" }: { canManage: boolean; view?: StaffView }) {
+  const [statusFilter, setStatusFilter] = useState("all");
+  const days = staffViewDays(view);
   const locale = useApplicationLocale();
   const t = (text: string) => workspaceText(text, locale);
   const [rows, setRows] = useState<StaffAppointment[]>([]);
@@ -94,7 +97,7 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
   const load = useCallback(async () => { await refreshRef.current?.(); }, []);
   useEffect(() => {
     const updates = latestRefresh(async signal => {
-      const result = await api().rpc("get_staff_booking_agenda_global", { from_date: date, days: 7 })
+      const result = await api().rpc("get_staff_booking_agenda_global", { from_date: date, days })
         .abortSignal(AbortSignal.any([signal, AbortSignal.timeout(12000)]));
       if (result.error) throw result.error;
       return (result.data ?? []) as StaffAppointment[];
@@ -107,7 +110,7 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
     window.addEventListener("focus", refresh);
     window.addEventListener("online", refresh);
     return () => { updates.stop(); refreshRef.current = null; window.clearTimeout(timer); window.clearInterval(polling); window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh); };
-  }, [date]);
+  }, [date, days]);
   useEffect(() => {
     const client = api();
     let channel: ReturnType<typeof client.channel> | undefined;
@@ -137,16 +140,26 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
     } catch { setFeedback("Cette transition n’est plus autorisée ou la connexion est interrompue. Actualisez la liste."); }
     finally { transitionLock.current = false; setBusyId(null); }
   }
-  return <section className="workspace-content"><StaffTeamDirectory /><p><Link href="/staff/availability">Mes disponibilités</Link> · <Link href="/staff/notifications">Mes notifications</Link></p><div className="workspace-intro"><div><span>{t("Espace collaborateur")}</span><h2>{t("Mes rendez-vous")}</h2><p>{t("Seuls les rendez-vous attribués à votre compte sont affichés.")}</p></div></div>
-    {feedback && <p role="status">{t(feedback)}</p>}<article className="workspace-panel salon-panel"><label>{t("Semaine à partir du")}<input type="date" value={date} required onChange={event => { if (event.target.value) { datePicked.current = true; setRows([]); setLoading(true); setDate(event.target.value); } }} /></label><p>{t("Les heures sont affichées selon le fuseau de chaque salon.")}</p><button type="button" onClick={() => void load()}>{t("Actualiser")}</button>
-      {loading && <p role="status">{t("Chargement des rendez-vous…")}</p>}{!loading && rows.length === 0 && <p>{t("Aucun rendez-vous attribué pour cette période.")}</p>}
-      <div className="salon-list">{rows.map(row => <div key={row.id}><div><strong>{row.service_title}</strong><small>{row.client_name} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: row.time_zone }).format(new Date(row.starts_at))} · {t(statusNames[row.status] ?? row.status)}</small></div>
+  const visible = staffVisibleAppointments(rows, view, statusFilter);
+  const groups = new Map<string, StaffAppointment[]>();
+  for (const row of visible) { const key = localDateAt(new Date(row.starts_at), row.time_zone); groups.set(key, [...(groups.get(key) ?? []), row]); }
+  const title = view === "agenda" ? "Mon planning" : view === "dashboard" ? "Ma journée" : "Mes rendez-vous";
+  return <section className="workspace-content">
+    <header className="staff-page-heading"><div><h2>{t(title)}</h2><p>{t(view === "agenda" ? "Votre semaine, organisée par jour et par heure." : view === "dashboard" ? "L’essentiel pour votre journée au salon." : "Gérez vos demandes et retrouvez l’historique sur la période choisie.")}</p></div></header>
+    {view === "dashboard" && <><div className="staff-overview"><article><strong>{loading ? "—" : visible.length}</strong><span>Rendez-vous du jour</span></article><article><strong>{loading ? "—" : rows.filter(row => row.status === "pending").length}</strong><span>À confirmer aujourd’hui</span></article></div><nav className="staff-shortcuts" aria-label="Actions du collaborateur"><Link href="/staff/agenda">Mon planning →</Link><Link href="/staff/bookings">Gérer les rendez-vous →</Link><Link href="/staff/availability">Mes disponibilités →</Link><Link href="/staff/tasks">Mes tâches →</Link></nav><StaffTeamDirectory /></>}
+    {feedback && <p role="status">{t(feedback)}</p>}
+    <article className="workspace-panel salon-panel"><div className="staff-schedule-toolbar"><label>{t(view === "dashboard" ? "Jour" : view === "agenda" ? "Semaine à partir du" : "31 jours à partir du")}<input type="date" value={date} required onChange={event => { if (event.target.value) { datePicked.current = true; setRows([]); setLoading(true); setDate(event.target.value); } }} /></label>
+      {view === "bookings" && <label>Statut<select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">Tous les statuts</option>{["pending","confirmed","in_progress","completed","declined","cancelled"].map(status => <option key={status} value={status}>{t(statusNames[status] ?? status)}</option>)}</select></label>}
+      <button type="button" onClick={() => void load()}>{t("Actualiser")}</button></div><p className="staff-schedule-note">{t("Les heures sont affichées selon le fuseau de chaque salon.")}</p>
+      {loading && <p role="status">{t("Chargement des rendez-vous…")}</p>}{!loading && visible.length === 0 && <p className="staff-empty">{t("Aucun rendez-vous pour cette période et ce filtre.")}</p>}
+      {view === "agenda" ? <div className="staff-week">{Array.from(groups.entries()).map(([day, appointments]) => <section key={day}><h3>{new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`))}</h3>{appointments.map(row => <article className="staff-time-slot" key={row.id}><time dateTime={row.starts_at}>{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone: row.time_zone }).format(new Date(row.starts_at))} – {new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone: row.time_zone }).format(new Date(row.ends_at))}</time><div><strong>{row.service_title}</strong><p>{row.client_name} · {t(statusNames[row.status] ?? row.status)}</p><small>{row.time_zone}</small></div></article>)}</section>)}<Link className="staff-manage-link" href="/staff/bookings">Gérer les demandes et les rendez-vous →</Link></div> :
+      <div className="salon-list">{visible.map(row => <div key={row.id}><div><strong>{row.service_title}</strong><small>{row.client_name} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: row.time_zone }).format(new Date(row.starts_at))} · {t(statusNames[row.status] ?? row.status)}</small></div>
         {row.status === "completed" && canManage && <BookingFeedback bookingId={row.id} direction="provider_to_client" />}
         {canManage && row.status === "pending" && <><button disabled={busyId === row.id} onClick={() => void transition(row, "confirmed")}>{t("Confirmer")}</button><button disabled={busyId === row.id} onClick={() => void transition(row, "declined")}>{t("Refuser")}</button></>}
         {canManage && row.status === "confirmed" && <button disabled={busyId === row.id} onClick={() => void transition(row, "in_progress")}>{t("Démarrer")}</button>}
         {canManage && row.status === "in_progress" && <button disabled={busyId === row.id} onClick={() => void transition(row, "completed")}>{t("Terminer")}</button>}
         {canManage && ["pending", "confirmed"].includes(row.status) && Date.parse(row.starts_at) > now && <button disabled={Boolean(busyId)} onClick={() => setTransfer(row)}>{t("Réattribuer à un collègue")}</button>}
-      </div>)}</div>
+      </div>)}</div>}
     </article>{transfer && <StaffBookingTransfer key={transfer.id} appointment={transfer} onClose={() => setTransfer(null)} onTransferred={async () => { await load(); setTransfer(null); setFeedback("Rendez-vous réattribué. Le client, votre collègue et le responsable ont été informés."); }} />}</section>;
 }
 
