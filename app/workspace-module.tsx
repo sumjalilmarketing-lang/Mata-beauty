@@ -171,6 +171,8 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
   if (space === "client" && module.key === "profile") return <ClientProfile userId={userId} />;
   if (space === "client" && module.key === "application") return <ProfessionalApplication userId={userId} />;
+  if (space === "pro" && module.key === "portfolio") return <CreatorStudio userId={userId} providerApproved={providerApproved} initialTab="photos" />;
+  if (space === "pro" && module.key === "support") return <ClientControlCenter userId={userId} section="support" />;
   if (accountSettings) return <ClientControlCenter userId={userId} section="settings" />;
   if (space === "client" && ["settings", "payments", "reviews", "support"].includes(module.key)) return <ClientControlCenter userId={userId} section={module.key} />;
   const shortcuts = workspaceSpaces[space].modules.filter((item) => item.key !== module.key && allowedModuleKeys.includes(item.key)).slice(0, 4);

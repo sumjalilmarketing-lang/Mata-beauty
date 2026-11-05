@@ -20,8 +20,8 @@ const tabs: Array<{ key: StudioTab; label: string }> = [
   { key: "scheduled", label: "Publications programmées" }, { key: "statistics", label: "Statistiques" },
 ];
 
-export function CreatorStudio({ userId, providerApproved }: { userId: string; providerApproved: boolean }) {
-  const [active, setActive] = useState<StudioTab>("create");
+export function CreatorStudio({ userId, providerApproved, initialTab = "create" }: { userId: string; providerApproved: boolean; initialTab?: StudioTab }) {
+  const [active, setActive] = useState<StudioTab>(initialTab);
   const [createType, setCreateType] = useState<"video" | "photo" | "before_after">("video");
   const picker = useRef<HTMLInputElement>(null);
   const [initialFiles, setInitialFiles] = useState<File[]>([]);
