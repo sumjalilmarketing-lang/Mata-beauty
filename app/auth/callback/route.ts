@@ -6,9 +6,16 @@ import { sendWelcomeEmail } from "@/lib/email/welcome";
 
 function callbackRedirect(request: Request, parameters: Record<string, string>, fallback = "/") {
   const requested = new URL(request.url).searchParams.get("next");
-  const url = new URL(requested ? safeOAuthDestination(requested) : fallback, applicationOrigin(request));
+  const destination = requested ? safeOAuthDestination(requested) : fallback;
+  // Errors must reach the public login UI; protected pages would redirect again
+  // and discard the error. Keep the destination for the next login attempt.
+  const url = new URL(parameters.auth_error ? "/" : destination, applicationOrigin(request));
+  if (parameters.auth_error && destination !== "/") {
+    url.searchParams.set("returnTo", destination);
+    url.searchParams.set("connexion", "requise");
+  }
   for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
-  return NextResponse.redirect(url, { status: 303 });
+  return NextResponse.redirect(url, { status: 303, headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
 }
 
 export async function GET(request: Request) {
@@ -35,7 +42,7 @@ export async function GET(request: Request) {
       const { error: professionalError } = await supabase.rpc("request_professional_profile");
       if (professionalError) return callbackRedirect(request, { auth_error: "professional_request_failed" });
     }
-    const profile = ensured as { is_suspended?: boolean; profile_incomplete?: boolean } | null;
+    const profile = ensured as { role?: string; is_suspended?: boolean; profile_incomplete?: boolean } | null;
     if (profile?.is_suspended) {
       await supabase.auth.signOut();
       return callbackRedirect(request, { auth_error: "account_suspended" });
@@ -44,6 +51,15 @@ export async function GET(request: Request) {
     if (authenticated.user) {
       try { await sendWelcomeEmail(authenticated.user.id); }
       catch { /* Email delivery must not block a valid OAuth session. */ }
+    }
+    // The role comes from the database RPC, never the OAuth intent or metadata.
+    // Preserve explicit deep links, but route generic admin logins through the
+    // existing department/MFA resolver instead of the client space.
+    const next = safeOAuthDestination(parameters.get("next"));
+    if (profile?.role === "admin" && ["/", "/app", "/app/profile"].includes(next)) {
+      return NextResponse.redirect(new URL("/auth/workspace", applicationOrigin(request)), {
+        status: 303, headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" },
+      });
     }
     return callbackRedirect(request, {
       auth: "google",
