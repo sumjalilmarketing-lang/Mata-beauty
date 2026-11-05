@@ -1,4 +1,5 @@
 "use client";
+import { PhoneInput } from "./phone-input";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -153,7 +154,7 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
         <label>Fuseau horaire IANA<select name="timezone" defaultValue={candidate.timezone ?? ""} required><option value="">Choisir un fuseau</option>{SUPPORTED_TIME_ZONES.map(zone => <option key={zone} value={zone}>{zone}</option>)}</select><small>Les horaires de réservation seront interprétés dans ce fuseau.</small></label>
         <label>Devise des tarifs<select name="currency" defaultValue={candidate.currency ?? (candidate.country_code === "SN" ? "XOF" : "")} required><option value="">Choisir une devise</option><option value="XOF">XOF · Franc CFA</option><option value="EUR">EUR · Euro</option><option value="USD">USD · Dollar US</option><option value="GBP">GBP · Livre sterling</option><option value="CAD">CAD · Dollar canadien</option></select></label>
         <label>Adresse professionnelle<input name="address" minLength={4} defaultValue={candidate.base_address ?? ""} required /></label>
-        <label>Téléphone international<input name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="+221 77 123 45 67" /><small>Nous n’affichons pas le numéro déjà enregistré. Un numéro saisi ici le mettra à jour ; laissez vide pour le conserver.</small></label>
+        <div><PhoneInput defaultCountry={candidate?.country_code}/><small>Un numéro saisi ici mettra à jour votre téléphone ; laissez vide pour conserver le numéro enregistré.</small></div>
         <label>Lieu des prestations<select name="serviceMode" defaultValue={candidate.service_mode}><option value="salon">Chez le professionnel</option><option value="mobile">À domicile</option><option value="both">Les deux</option></select></label>
         <div className="professional-geolocation"><div><strong>Position de l’activité</strong><small>Facultatif. Elle aide les clientes à trouver votre profil.</small></div><button type="button" disabled={locating} onClick={useCurrentLocation}>{locating ? "Recherche…" : "Utiliser ma position"}</button></div>
         <label>Latitude<input name="latitude" type="number" min="-90" max="90" step="0.000001" defaultValue={candidate.latitude ?? ""} /></label>

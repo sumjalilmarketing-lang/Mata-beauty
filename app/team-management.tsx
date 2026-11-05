@@ -1,4 +1,5 @@
 "use client";
+import { PhoneInput } from "./phone-input";
 import { staffViewDays, staffVisibleAppointments, type StaffView } from "@/lib/domain/staff-schedule";
 import { StaffServiceEditor } from "./staff-service-editor";
 import { SalonStaffTasks } from "./salon-staff-tasks";
@@ -331,7 +332,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
       <form className="salon-form" onSubmit={event => void invite(event)}>
         {invitationMode === "whatsapp" && <label>Fiche collaborateur à associer<select name="memberId" defaultValue=""><option value="">Créer une nouvelle fiche à l’acceptation</option>{members.filter(person => !staffAccess.some(account => account.collaborator_id === person.id) && person.is_active && !person.archived_at).map(person => <option key={person.id} value={person.id}>{person.display_name}</option>)}</select><small>Associez une fiche existante pour conserver ses rendez-vous, horaires et prestations.</small></label>}
         <label>Mode d’invitation<select aria-label="Mode d’invitation" value={invitationMode} onChange={event => { setInvitationMode(event.target.value); setShareLink(null); }}><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>
-        {invitationMode === "whatsapp" ? <label>Numéro WhatsApp avec indicatif<input name="phone" type="tel" required maxLength={40} placeholder="+221770000000" autoComplete="tel" /></label> : <label>E-mail<input name="email" type="email" required maxLength={254} autoComplete="email" /></label>}
+        {invitationMode === "whatsapp" ? <PhoneInput label="Numéro WhatsApp du collaborateur" required/> : <label>E-mail<input name="email" type="email" required maxLength={254} autoComplete="email" /></label>}
         <label>Rôle<select name="role" defaultValue="member"><option value="member">Membre</option><option value="reception">Accueil</option><option value="manager">Responsable d’équipe</option></select></label>
         <fieldset className="wide"><legend>Permissions de cette invitation</legend>{permissionChoices.map(([key, label]) => <label className="check" key={key}><input type="checkbox" name="permission" value={key} defaultChecked={true} />{label}</label>)}</fieldset>
         {invitationMode === "whatsapp" ? <button className="salon-primary" type="submit" value="whatsapp" disabled={busy}>Créer l’invitation WhatsApp</button> : <><button className="salon-primary" type="submit" value="email" disabled={busy}>Envoyer l’invitation par email</button><button type="submit" value="link" disabled={busy}>Créer un lien à partager</button></>}

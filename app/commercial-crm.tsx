@@ -1,4 +1,5 @@
 "use client";
+import { PhoneInput } from "./phone-input";
 
 import Link from "next/link";
 import type { MyDepartmentTeam } from "@/lib/domain/department-teams";
@@ -90,7 +91,7 @@ function CrmEditor({lead,canAssign,isSuper,teams,assignees,userId,onClose,onSave
     <form className="crm-form" onSubmit={event=>void save(event)}>
       {!lead&&teams.length>0&&<label>Équipe commerciale<select value={teamId} onChange={e=>setTeamId(e.target.value)} disabled={disabled}>{isSuper&&<option value="">Sans équipe — accès Super Admin</option>}{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>}
       <label>Salon ou établissement<input name="name" required minLength={2} maxLength={160} defaultValue={defaults.name} disabled={disabled}/></label><label>Personne à contacter<input name="contact_name" maxLength={120} defaultValue={defaults.contact_name} disabled={disabled}/></label>
-      <label>Téléphone<input name="phone" type="tel" maxLength={40} defaultValue={defaults.phone} disabled={disabled}/></label><label>Email<input name="email" type="email" maxLength={254} defaultValue={defaults.email??""} disabled={disabled}/></label>
+      <PhoneInput defaultValue={defaults.phone} disabled={disabled}/><label>Email<input name="email" type="email" maxLength={254} defaultValue={defaults.email??""} disabled={disabled}/></label>
       <label>Ville<input name="city" maxLength={100} defaultValue={defaults.city} disabled={disabled}/></label><label>Origine du contact<input name="source" maxLength={80} defaultValue={defaults.source} disabled={disabled}/></label>
       <label className="crm-wide">Adresse<input name="address" maxLength={300} defaultValue={defaults.address} disabled={disabled}/></label>
       <label>Étape<select name="stage" value={stage} onChange={event=>setStage(event.target.value as typeof stage)} disabled={disabled}>{crmStages.map(key=><option key={key} value={key}>{crmStageLabels[key]}</option>)}</select></label>

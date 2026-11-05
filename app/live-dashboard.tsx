@@ -1,4 +1,5 @@
 "use client";
+import { PhoneInput } from "./phone-input";
 import { BookingReschedule } from "./booking-reschedule";
 import { BookingFeedback } from "./booking-feedback";
 
@@ -566,7 +567,7 @@ export function LiveDashboard({
           <form className="dashboard-form" onSubmit={(event) => void saveClientProfile(event)}>
             <label>Prénom<input name="firstName" required minLength={2} defaultValue={clientProfile.first_name ?? ""} /></label>
             <label>Nom<input name="lastName" required minLength={2} defaultValue={clientProfile.last_name ?? ""} /></label>
-            <label>Téléphone<input name="phone" type="tel" autoComplete="tel" defaultValue={clientProfile.phone ?? ""} placeholder="+221 77 000 00 00" /></label>
+            <PhoneInput defaultValue={clientProfile.phone}/>
             <label>Ville<input name="city" autoComplete="address-level2" defaultValue={clientProfile.city ?? ""} /></label>
             <label className="wide">Adresse habituelle<input name="address" autoComplete="street-address" defaultValue={clientProfile.default_address ?? ""} /></label>
             <label className="wide">Préférences beauté, séparées par des virgules<input name="preferences" defaultValue={Array.isArray(clientProfile.preferences.categories) ? clientProfile.preferences.categories.join(", ") : ""} placeholder="Tresses, soins du visage, maquillage" /></label>

@@ -12,6 +12,7 @@ import "./staff-workspace.css";
 import { WorkspaceInstallHelp } from "./workspace-install-help";
 import "./workspace-more-menu.css";
 import { ProductHelp } from "./product-help";
+import { useStaffAccess } from "./use-staff-access";
 import { NotificationBadge } from "./notification-center";
 
 type Props = {
@@ -41,8 +42,12 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
   const parent = navigationParent(space, moduleKey);
   const secondary = simpleKeys ? modules.filter((item) => item.key !== "dashboard" && !mainModules.includes(item) && navigationParent(space, item.key) === parent) : [];
   const notificationsModule = modules.find((item) => item.key === "notifications");
+  const staffAccess=useStaffAccess();
+  const refreshedSpaces: WorkspaceSpaceKey[] = staffAccess.available === true
+    ? [...new Set<WorkspaceSpaceKey>([...availableSpaces, "staff"])]
+    : staffAccess.available === false ? availableSpaces.filter(key=>key!=="staff") : availableSpaces;
   const visibleSpaces = ["client", "pro", "salon", "staff"].includes(space)
-    ? availableSpaces.filter(key => ["client", "pro", "salon", "staff"].includes(key)) : availableSpaces;
+    ? refreshedSpaces.filter(key => ["client", "pro", "salon", "staff"].includes(key)) : refreshedSpaces;
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,6 +72,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
           {visibleSpaces.map((key) => <option key={key} value={key}>{t(workspaceSpaces[key].label)}</option>)}
         </select>
       </label>
+      {staffAccess.error && <p role="status">Vérification de l’accès collaborateur indisponible. <button type="button" onClick={staffAccess.retry}>Réessayer</button></p>}
       <nav aria-label={`Navigation ${t(definition.label)}`}>
         {groups.map((group) => <div className="workspace-nav-group" key={group}>
           <p>{t(group)}</p>
