@@ -21,6 +21,7 @@ import { ClientControlCenter } from "./client-control-center";
 import { ProviderLaunchChecklist } from "./provider-launch-checklist";
 import { ProfessionalDocuments } from "./professional-documents";
 import { ReferralCard } from "./referral-card";
+import { ProviderLogoEditor } from "./provider-logo-editor";
 import { NotificationCenter } from "./notification-center";
 import { BookingReview } from "./booking-review";
 import { ClientBookingGroups } from "./client-booking-groups";
@@ -47,7 +48,7 @@ type BookingRow = {
 type BookingQueryRow = Omit<BookingRow, "provider_services"> & {
   provider_services: BookingRow["provider_services"] | Array<NonNullable<BookingRow["provider_services"]>>;
 };
-type ProviderBookingIdentity = { profile_id: string; business_name: string; slug: string | null; city: string; base_address: string | null; cover_url: string | null; country_code: string | null; timezone: string | null };
+type ProviderBookingIdentity = { logo_url: string | null; profile_id: string; business_name: string; slug: string | null; city: string; base_address: string | null; cover_url: string | null; country_code: string | null; timezone: string | null };
 type BusinessBookingIdentity = { id: string; name: string; address: string; city: string; area: string | null; logo_url: string | null; timezone: string | null };
 type NotificationRow = {
   id: string;
@@ -152,7 +153,7 @@ export function LiveDashboard({
       return service?.business_id ?? null;
     }).filter((id): id is string => Boolean(id)))];
     const [providerResult, profileResult, businessResult] = await Promise.all([
-      supabase.from("provider_profiles").select("profile_id,business_name,slug,city,base_address,cover_url,country_code,timezone").in("profile_id", providerIds),
+      supabase.from("provider_profiles").select("profile_id,business_name,slug,city,base_address,logo_url,cover_url,country_code,timezone").in("profile_id", providerIds),
       supabase.from("profiles").select("id,avatar_url").in("id", providerIds),
       businessIds.length ? supabase.from("businesses").select("id,name,address,city,area,logo_url,timezone").in("id", businessIds) : Promise.resolve({ data: [], error: null }),
     ]);
@@ -176,7 +177,7 @@ export function LiveDashboard({
         providerId: row.provider_id,
         providerName,
         providerSlug: provider?.slug ?? null,
-        providerImage: business?.logo_url ?? provider?.cover_url ?? avatars.get(row.provider_id) ?? null,
+        providerImage: business?.logo_url ?? provider?.logo_url ?? avatars.get(row.provider_id) ?? provider?.cover_url ?? null,
         address: address || null,
         timeZone: business?.timezone ?? provider?.timezone ?? (provider?.country_code === "SN" ? "Africa/Dakar" : "UTC"),
         serviceId: row.provider_service_id,
@@ -598,7 +599,7 @@ export function LiveDashboard({
               <label className="wide">Politique d’annulation (20 caractères minimum)<textarea name="cancellationPolicy" rows={3} defaultValue={providerProfile.cancellation_policy ?? ""} /></label>
               <button className="primary-button" type="submit">Enregistrer le profil</button>
             </form>
-            <ProfessionalDocuments providerId={userId} /></>}
+            <ProviderLogoEditor userId={userId} /><ProfessionalDocuments providerId={userId} /></>}
             {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <ServiceEditor key={service.id} service={service} catalog={baseServices} userId={userId} businessId={service.business_id ?? undefined} activityCurrency={service.business_id ? null : providerProfile?.currency ?? null} onSaved={value => setOwnServices(current => current.map(item => item.id === value.id ? value : item))} onRemoved={id => { setOwnServices(current => current.filter(item => item.id !== id)); setFeedback("Prestation supprimée du catalogue. Les réservations existantes sont conservées."); }} />)}<Link href="/pro/videos">Retour au Studio</Link>{providerProfile && <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
               <h3 className="wide">Ajouter une prestation</h3>
               <label>Type<select name="serviceId" required defaultValue=""><option value="" disabled>Choisir</option>{baseServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
