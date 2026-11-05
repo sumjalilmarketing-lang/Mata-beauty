@@ -1,4 +1,4 @@
-export type NotificationItem = { id: string; title: string; body: string; kind: string; data: Record<string, unknown>; read_at: string | null; created_at: string };
+export type NotificationItem = { actor_name?: string; id: string; title: string; body: string; kind: string; data: Record<string, unknown>; read_at: string | null; created_at: string };
 export function notificationBadgeAfterRead(current: number, changedCount: number | null): number {
   return changedCount === null ? 0 : Math.max(0, current - Math.max(0, changedCount));
 }
