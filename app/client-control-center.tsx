@@ -142,7 +142,7 @@ export function ClientControlCenter({ userId, section = "settings", embedded = f
       if(result.error) throw result.error;
       setNotice("Profil mis à jour.");
       window.dispatchEvent(new CustomEvent("mata:locale-changed",{detail:`${language}-${countryCode}`}));
-      await load(); onProfileUpdated?.();
+      await load(); window.dispatchEvent(new Event("mata-profile-updated")); onProfileUpdated?.();
     } catch(error) { setNotice(publicErrorMessage(error,"Le profil n’a pas pu être mis à jour. Vérifiez votre connexion et réessayez.")); }
     finally { identityLock.current=false; setSavingIdentity(false); }
   }
@@ -162,7 +162,7 @@ export function ClientControlCenter({ userId, section = "settings", embedded = f
         throw saved.error ?? new Error("La photo n’a pas pu être enregistrée.");
       }
       setIdentity(current=>current?{...current,avatar_url}:current);
-      setNotice("Photo mise à jour."); onProfileUpdated?.();
+      setNotice("Photo mise à jour."); window.dispatchEvent(new Event("mata-profile-updated")); onProfileUpdated?.();
     } catch(error) { setNotice(publicErrorMessage(error,"La photo n’a pas pu être enregistrée. Réessayez.")); }
     finally { avatarLock.current=false; setUploadingAvatar(false); }
   }

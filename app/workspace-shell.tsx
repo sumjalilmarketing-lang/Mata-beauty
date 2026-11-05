@@ -12,6 +12,7 @@ import "./staff-workspace.css";
 import { WorkspaceInstallHelp } from "./workspace-install-help";
 import "./workspace-more-menu.css";
 import { ProductHelp } from "./product-help";
+import { WorkspaceProfileAvatar } from "./workspace-profile-avatar";
 import { useStaffAccess } from "./use-staff-access";
 import { NotificationBadge } from "./notification-center";
 
@@ -91,7 +92,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
     <main className="workspace-main">
       <header className="workspace-topbar">
         <div><p>{t(definition.eyebrow)}</p><h1>{t(activeModule.label)}</h1></div>
-        <div className="workspace-tools"><form role="search" onSubmit={search}><label><span className="sr-only">{t("Rechercher dans ce module")}</span><input name="workspace-search" type="search" placeholder={t("Rechercher…")} /></label></form>{notificationsModule && <Link className="workspace-notifications" href={workspaceHref(space, notificationsModule.key)} aria-label={t("Notifications")}>◌<NotificationBadge /></Link>}<span className="workspace-account" title={userEmail}>{userEmail.slice(0, 1).toUpperCase()}</span></div>
+        <div className="workspace-tools"><form role="search" onSubmit={search}><label><span className="sr-only">{t("Rechercher dans ce module")}</span><input name="workspace-search" type="search" placeholder={t("Rechercher…")} /></label></form>{notificationsModule && <Link className="workspace-notifications" href={workspaceHref(space, notificationsModule.key)} aria-label={t("Notifications")}>◌<NotificationBadge /></Link>}<WorkspaceProfileAvatar email={userEmail} href={space === "staff" ? "/staff/profile" : space === "pro" ? "/pro/settings" : "/app/profile?edit=1"} /></div>
       </header>
       <div className="workspace-breadcrumb"><Link href={definition.prefix}>{t(definition.label)}</Link><span>/</span><span>{t(activeModule.label)}</span></div>
       {secondary.length > 0 && !(space === "client" && moduleKey === "profile") && <details className="workspace-secondary" open={secondary.some((item) => item.key === moduleKey)}><summary>{space === "client" ? t("Mon compte") : t("Dans cette rubrique")}</summary><nav aria-label={t("Navigation secondaire")}>{secondary.map((item) => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined}>{t(navigationLabel(space, item))}</Link>)}</nav></details>}

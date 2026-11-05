@@ -91,7 +91,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const financeOverview = space === "finance" && module.key === "dashboard";
   const departmentCases = ["commercial","finance","support"].includes(space) && (module.key === "cases" || (module.key === "dashboard" && ((space === "finance" && !canReadFinance) || (space === "support" && !canManageSupport))));
   const teamConsole = module.key === "teams" && ["admin","commercial","finance","support","hr"].includes(space);
-  const accountSettings = space === "pro" && module.key === "settings";
+  const accountSettings = (space === "pro" && module.key === "settings") || (space === "staff" && module.key === "profile");
   const fieldView = space === "commercial" && ["field","reports","appointments"].includes(module.key);
   const custom = module.key === "notifications" || (space === "pro" && module.key === "reviews") || space === "hr" || fieldView || accountSettings || departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services", "availability", "notifications", "tasks"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
@@ -178,7 +178,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (space === "pro" && module.key === "portfolio") return <CreatorStudio userId={userId} providerApproved={providerApproved} initialTab="photos" />;
   if (space === "pro" && module.key === "support") return <ClientControlCenter userId={userId} section="support" />;
   if (space === "pro" && module.key === "reviews") return <section className="workspace-content"><ProviderReviewBookings providerId={userId} /></section>;
-  if (accountSettings) return <ClientControlCenter userId={userId} section="settings" />;
+  if (accountSettings) return <ClientControlCenter userId={userId} section="settings" embedded={space === "staff"} />;
   if (space === "client" && ["settings", "payments", "reviews", "support"].includes(module.key)) return <ClientControlCenter userId={userId} section={module.key} />;
   const shortcuts = workspaceSpaces[space].modules.filter((item) => item.key !== module.key && allowedModuleKeys.includes(item.key)).slice(0, 4);
   return <section className="workspace-content">

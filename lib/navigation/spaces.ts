@@ -84,6 +84,7 @@ const salonModules = [
 ] as const;
 
 const staffModules = [
+  module("profile", "Mon profil et paramètres", "○", "Compte", "Ma photo, mon identité et mes paramètres personnels.", { resource: "profiles" }),
   module("tasks", "Mes tâches", "✓", "Mon activité", "Les tâches que le responsable vous attribue.", { resource: "bookings", staffPermission: "bookings.read" }),
   module("dashboard", "Mon dashboard", "⌂", "Mon activité", "Vos rendez-vous, messages et priorités.", { primary: true, staffPermission: "bookings.read" }),
   module("agenda", "Mon agenda", "□", "Mon activité", "Vos horaires et disponibilités.", { primary: true, resource: "bookings", staffPermission: "bookings.read" }),
