@@ -29,3 +29,24 @@ const homeSchemas=[...homeHtml.matchAll(/<script[^>]*type="application\/ld\+json
 assert.equal(homeSchemas.find(item=>item["@type"]==="Organization")?.url,"https://mata-beauty.com/");
 assert.equal(homeSchemas.find(item=>item["@type"]==="WebSite")?.publisher?.["@id"],"https://mata-beauty.com/#organization");
 console.log("PASS: five server-rendered guides, canonicals, valid breadcrumb JSON, booking links, 404, robots, sitemap, home and search index directives.");
+
+// Follow real public inventory rather than fabricated profile fixtures.
+const inventory = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => new URL(match[1]).pathname);
+for (const path of inventory.filter(path => /^\/(professional|salons|service)\//.test(path))) {
+  const response = await fetch(new URL(path, base));
+  assert.equal(response.status, 200, `public inventory ${path}`);
+  const html = await response.text();
+  const schemas = [...html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map(match => JSON.parse(match[1]));
+  if (path.startsWith("/service/")) {
+    assert.equal(schemas.find(item => item["@type"] === "Service")?.url, `https://mata-beauty.com${path}`);
+    assert.equal(schemas.find(item => item["@type"] === "BreadcrumbList")?.itemListElement.at(-1).item, `https://mata-beauty.com${path}`);
+  } else {
+    const list = schemas.find(item => item["@type"] === "ItemList");
+    if (list) {
+      assert.ok(html.includes('id="prestations-publiees"'));
+      assert.equal(list.numberOfItems, list.itemListElement.length);
+      for (const item of list.itemListElement) assert.ok(html.includes(`href="${new URL(item.url).pathname}"`), `crawlable service ${item.url}`);
+    }
+  }
+}
+console.log(`PASS: ${inventory.length} sitemap entries; all public profiles and services respond with consistent structured data and crawlable offer links where available.`);

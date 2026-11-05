@@ -1,3 +1,4 @@
+import { PublicProfileCatalog } from "@/app/public-profile-catalog";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
@@ -42,5 +43,5 @@ export default async function ProfessionalPage({ params, searchParams }: { param
   const { data } = await auth.auth.getUser();
   const profile = await loadPublicSocialProfile("professional", username, data.user?.id ?? null);
   if (!profile) notFound();
-  return <PublicSocialProfile profile={profile} initialVideoId={(await searchParams)?.video ?? null} />;
+  return <><PublicSocialProfile profile={profile} initialVideoId={(await searchParams)?.video ?? null} /><PublicProfileCatalog profile={profile} /></>;
 }

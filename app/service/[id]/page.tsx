@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 
 type PublicService = { id: string; title: string; description: string | null; duration_minutes: number; price_amount: number; currency: string | null; provider_profiles: { profile_id: string; slug: string; business_name: string; city: string | null; status: string } | null; businesses: { area: string | null; city: string | null; status: string; is_active: boolean; archived_at: string | null } | null };
-async function loadService(id: string) {
+const loadService = cache(async (id: string) => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return null;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
@@ -13,7 +14,7 @@ async function loadService(id: string) {
     .select("id,title,description,duration_minutes,price_amount,currency,provider_profiles!inner(profile_id,slug,business_name,city,status),businesses(area,city,status,is_active,archived_at)")
     .eq("id", id).eq("is_active", true).is("archived_at", null).eq("provider_profiles.status", "approved").maybeSingle();
   return error || !data ? null : data as unknown as PublicService;
-}
+});
 function jsonLd(value: Record<string, unknown>) { return JSON.stringify(value).replace(/</g, "\\u003c"); }
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const item = await loadService((await params).id);
@@ -40,6 +41,7 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
   const area = publicBusiness?.area;
   const schema: Record<string, unknown> = {
     "@context": "https://schema.org", "@type": "Service", name: item.title,
+    url: `https://mata-beauty.com/service/${encodeURIComponent(item.id)}`,
     ...(item.description ? { description: item.description } : {}),
     ...(provider ? { provider: { "@type": "ProfessionalService", name: provider.business_name, url: `https://mata-beauty.com/professional/${encodeURIComponent(provider.slug)}` } } : {}),
     ...(area || city ? { areaServed: [
@@ -50,7 +52,12 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
   };
   return <main className="public-detail">
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(schema) }} />
-    <Link href="/">← Découvrir sur MATA Beauty</Link>
+    <nav aria-label="Fil d’Ariane"><Link href="/">Mata Beauty</Link>{provider && <> / <Link href={`/professional/${encodeURIComponent(provider.slug)}`}>{provider.business_name}</Link></>} / <span>{item.title}</span></nav>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd({ "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Mata Beauty", item: "https://mata-beauty.com/" },
+      ...(provider ? [{ "@type": "ListItem", position: 2, name: provider.business_name, item: `https://mata-beauty.com/professional/${encodeURIComponent(provider.slug)}` }] : []),
+      { "@type": "ListItem", position: provider ? 3 : 2, name: item.title, item: `https://mata-beauty.com/service/${encodeURIComponent(item.id)}` },
+    ] }) }} />
     <section>
       {(area || city) && <small>{[area, city].filter(Boolean).join(", ")}</small>}
       <h1>{item.title}</h1>
@@ -58,6 +65,7 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
       {item.description && <p>{item.description}</p>}
       <strong>{item.duration_minutes} min · {item.price_amount.toLocaleString("fr-FR")} {item.currency ?? ""}</strong>
       <Link className="public-primary" href={`/?service=${encodeURIComponent(item.id)}`}>Choisir un créneau</Link>
+    <p><Link href="/conseils">Préparer votre rendez-vous : nos conseils beauté</Link></p>
     </section>
   </main>;
 }

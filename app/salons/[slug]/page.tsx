@@ -1,3 +1,4 @@
+import { PublicProfileCatalog } from "@/app/public-profile-catalog";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublicSocialProfile } from "@/app/public-social-profile";
@@ -29,5 +30,5 @@ export default async function SalonSocialProfilePage({ params, searchParams }: {
   const { data } = await auth.auth.getUser();
   const profile = await loadPublicSocialProfile("salon", slug, data.user?.id ?? null);
   if (!profile) notFound();
-  return <PublicSocialProfile profile={profile} initialVideoId={(await searchParams)?.video ?? null} />;
+  return <><PublicSocialProfile profile={profile} initialVideoId={(await searchParams)?.video ?? null} /><PublicProfileCatalog profile={profile} /></>;
 }
