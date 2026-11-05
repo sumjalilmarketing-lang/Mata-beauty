@@ -144,6 +144,7 @@ const moderationModules = [
 ] as const;
 
 const financeModules = [
+  module("notifications", "Notifications", "◌", "Compte", "Vos alertes et affectations financières.", { resource: "notifications" }),
   module("teams", "Mes équipes", "◎", "Supervision", "Accès, affectations et suivi des dossiers.", { permission:"teams.manage" }),
   module("cases", "Dossiers attribués", "▣", "Traitement", "Dossiers attribués et comptes rendus.", { permission:"finance.cases" }),
   module("dashboard", "Dashboard", "⌂", "Finance", "Vos dossiers et la synthèse financière autorisée.", { primary: true }),
@@ -173,7 +174,7 @@ const operationsModules = [
   module("onboarding", "Onboarding", "✓", "Équipes", "Suivi des validations professionnelles.", { permission: "documents.review", resource: "providers" }),
   module("moderation", "Modération", "!", "Équipes", "Signalements et décisions.", { permission: "reports.manage", resource: "reports" }),
   module("content", "Contenus", "▶", "Communication", "Contenus et publications.", { permission: "content.manage", resource: "videos" }),
-  module("notifications", "Notifications", "◌", "Communication", "Notifications ciblées.", { permission: "notifications.send", resource: "notifications" }),
+  module("notifications", "Notifications", "◌", "Communication", "Vos alertes et informations opérationnelles.", { resource: "notifications" }),
   module("audit", "Audit", "≣", "Contrôle", "Actions opérationnelles journalisées.", { permission: "audit.read", resource: "audit" }),
   module("settings", "Paramètres opérationnels", "⚙", "Contrôle", "Lecture des réglages non sensibles.", { permission: "settings.read", resource: "settings" }),
 ] as const;
@@ -221,6 +222,7 @@ const superAdminModules = [
 ] as const;
 
 const hrModules = [
+ module("notifications","Notifications","◌","Compte","Vos alertes, tâches et informations RH.",{resource:"notifications"}),
  module("dashboard","Vue RH","⌂","RH","Personnel et travaux RH autorisés.",{primary:true,permission:"hr.cases"}),
  module("teams","Équipes RH","◎","RH","Délégation, recrutement et accès des gestionnaires.",{permission:"teams.manage"}),
  module("personnel","Personnel","○","RH","Fiches et affectations des salariés.",{primary:true,permission:"hr.cases"}),

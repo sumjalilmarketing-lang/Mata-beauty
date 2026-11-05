@@ -92,7 +92,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   const teamConsole = module.key === "teams" && ["admin","commercial","finance","support","hr"].includes(space);
   const accountSettings = space === "pro" && module.key === "settings";
   const fieldView = space === "commercial" && ["field","reports","appointments"].includes(module.key);
-  const custom = (space === "pro" && module.key === "reviews") || space === "hr" || fieldView || accountSettings || departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services", "availability", "notifications", "tasks"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
+  const custom = module.key === "notifications" || (space === "pro" && module.key === "reviews") || space === "hr" || fieldView || accountSettings || departmentCases || teamConsole || crmView || financeOverview || moderationInbox || supportInbox || focused || (["onboarding", "commercial"].includes(space) && ["dashboard", "dossiers", "new", "in-progress", "requests", "approved", "rejected", "documents", "history"].includes(module.key)) || (space === "client" && module.key === "application") || (["client", "pro", "salon"].includes(space) && ["messages", "profile", "videos", "inspirations"].includes(module.key)) || (space === "staff" && ["dashboard", "agenda", "bookings", "messages", "services", "availability", "notifications", "tasks"].includes(module.key)) || (space === "client" && ["settings", "payments", "reviews", "support", "favorites"].includes(module.key)) || space === "salon" || (space === "pro" && ["agenda", "revenue", "team"].includes(module.key));
   const definition = custom || commentModeration || categoryManagement || onboardingInbox || refundReview || deletionQueue ? undefined
     : space === "admin" && module.key === "alerts" ? fraudAlerts
     : space === "admin" && module.key === "security" ? resources.sessions
@@ -141,6 +141,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
 
   if (fieldView) return <CommercialField view={module.key as "field"|"reports"|"appointments"} userId={userId} />;
   if (teamConsole) return <DepartmentTeamConsole canCreateCommercialTeam={space === "commercial" && canManageCrmAssignments} department={space === "admin" ? undefined : space as "commercial"|"finance"|"support"|"hr"} />;
+  if (module.key === "notifications") return <NotificationCenter userId={userId} />;
   if (space === "hr") return <HrWorkspace moduleKey={module.key} isSuper={isSuperAdmin}/>;
   if (departmentCases) return <DepartmentCases department={space as "commercial"|"finance"|"support"|"hr"} />;
   if (crmView) return <CommercialCrm key={module.key} userId={userId} canAssign={canManageCrmAssignments} isSuper={isSuperAdmin} dueOnly={module.key === "follow-ups"} />;
@@ -151,7 +152,6 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (deletionQueue) return <AccountDeletionQueue />;
   if (categoryManagement) return <section>{notice && <p role="status">{notice}</p>}<CatalogModule services={false} notify={setNotice} /></section>;
   if (supportInbox) return <SupportInbox key={module.key} filter={module.key} userId={userId} />;
-  if (module.key === "notifications") return <NotificationCenter userId={userId} />;
   if (focused) return <LiveDashboard role={space === "client" ? "client" : "provider"} userId={userId} displayName="" moduleKey={module.key} onBack={() => window.location.assign("/")} onSignOut={async () => { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/"); }} />;
   if (onboardingInbox) return <OnboardingQueue moduleKey={["onboarding","dossiers"].includes(module.key) ? "dashboard" : module.key} />;
   if (space === "pro" && module.key === "team") return <SalonControlCenter module={module} userId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />;

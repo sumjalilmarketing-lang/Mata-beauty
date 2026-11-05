@@ -75,7 +75,7 @@ export function NotificationCenter({ userId }: { userId?: string }) {
     finally { setBusy(false); }
   }
   const visible = items.filter(item => !unreadOnly || !item.read_at);
-  return <section className="notification-center" aria-label="Centre de notifications"><header><div><h2>Mes notifications</h2><p>Vos rendez-vous, messages et informations de compte.</p></div><button disabled={busy || !items.some(item => !item.read_at)} onClick={() => void mark()}>Tout marquer comme lu</button></header>
+  return <section className="notification-center" aria-label="Centre de notifications"><header><div><h2>Mes notifications</h2><p>Vos messages, rendez-vous, affectations et informations de compte.</p></div><button disabled={busy || !items.some(item => !item.read_at)} onClick={() => void mark()}>Tout marquer comme lu</button></header>
     <details className="notification-device-settings"><summary>Réglages des notifications sur cet appareil</summary><PushSettings /></details>
     {removed && <p role="status">Notification supprimée de la liste. <button type="button" disabled={busy} onClick={() => void dismiss(removed, false)}>Annuler</button></p>}
     <label><input type="checkbox" checked={unreadOnly} onChange={event => setUnreadOnly(event.target.checked)} /> Non lues uniquement</label> <button onClick={() => void load()}>Actualiser</button>
