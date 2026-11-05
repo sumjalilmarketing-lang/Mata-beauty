@@ -87,6 +87,7 @@ export function PushSettings() {
       <p>{enabled ? "Activées sur cet appareil" : "Désactivées sur cet appareil"}</p>
       {!key && !busy && <p>L’activation est momentanément indisponible. Réessayez plus tard.</p>}
       <label><input type="checkbox" checked={sound} disabled={busy} onChange={event => void changeSound(event.target.checked)} /> Autoriser le son</label>
+      <p>Le compteur sur l’icône indique les notifications non lues, sur les appareils compatibles. Autorisez aussi les pastilles dans les réglages de votre appareil.</p>
       <p>Le son dépend du téléphone : le mode silencieux, Ne pas déranger et les réglages système restent prioritaires.</p>
       {!enabled && <button type="button" disabled={busy || !key} onClick={() => void enable()}>{busy ? "Chargement…" : "Activer les notifications"}</button>}
       {subscription && <button type="button" disabled={busy} onClick={() => void disable()}>Désactiver sur cet appareil</button>}

@@ -10,7 +10,7 @@ function pushDestination(value) {
   if (typeof value !== "string") return "/app/notifications";
   try {
     const url = new URL(value, self.location.origin);
-    return url.origin === self.location.origin && /^\/(app|pro|salon|staff)(\/|$)/.test(url.pathname) ? url.href : "/app/notifications";
+    return url.origin === self.location.origin && /^\/(app|pro|salon|staff|admin|finance|support-agent|commercial|operations|moderation|onboarding)(\/|$)/.test(url.pathname) ? url.href : "/app/notifications";
   } catch { return "/app/notifications"; }
 }
 self.addEventListener("push", (event) => {
@@ -19,15 +19,25 @@ self.addEventListener("push", (event) => {
     const data = event.data?.json();
     payload = data && typeof data === "object" ? data : {};
   } catch { /* Still show a user-visible notification. */ }
-  event.waitUntil(self.registration.showNotification("Mata Beauty", {
+  event.waitUntil(Promise.all([self.registration.showNotification("Mata Beauty", {
     body: typeof payload.body === "string" ? payload.body.slice(0, 240) : "Vous avez une nouvelle notification. Ouvrez Mata Beauty.",
     icon: "/brand/icon-192.png",
     badge: "/brand/icon-192.png",
     tag: typeof payload.tag === "string" ? payload.tag : "mata-notification",
     silent: payload.silent === true,
     data: { url: pushDestination(payload.url) },
-  }));
+  }), updatePushBadge(payload.unreadCount)]));
 });
+async function updatePushBadge(count) {
+  const api = self.navigator;
+  if (!api || typeof api.setAppBadge !== "function") return;
+  try {
+    if (Number.isSafeInteger(count) && count >= 0) {
+      if (count === 0 && typeof api.clearAppBadge === "function") await api.clearAppBadge();
+      else await api.setAppBadge(count);
+    } else await api.setAppBadge();
+  } catch { /* Badging support must never block notification delivery. */ }
+}
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target = new URL(pushDestination(event.notification.data?.url), self.location.origin).href;

@@ -14,7 +14,11 @@ export async function deliverWebPush() {
     let outcome = "failed";
     try {
       if (!allowedPushEndpoint(item.endpoint)) throw new Error("push_endpoint_rejected");
-      await webpush.sendNotification({ endpoint: item.endpoint, keys: item.keys }, JSON.stringify(pushPayload({ id: item.notification_id, kind: item.kind, data: item.data }, item.sound)), {
+      const subscription = await client.from("web_push_subscriptions").select("profile_id").eq("id", item.subscription_id).single();
+      if (subscription.error || !subscription.data) throw new Error("push_owner_unavailable");
+      const unread = await client.from("notifications").select("id", { count: "exact", head: true }).eq("profile_id", subscription.data.profile_id).is("read_at", null);
+      const payload = { ...pushPayload({ id: item.notification_id, kind: item.kind, data: item.data }, item.sound), ...(!unread.error && unread.count !== null ? { unreadCount: unread.count } : {}) };
+      await webpush.sendNotification({ endpoint: item.endpoint, keys: item.keys }, JSON.stringify(payload), {
         vapidDetails: { subject: "https://mata-beauty.com", publicKey, privateKey },
         TTL: 3600, urgency: "high", timeout: 5000,
       });

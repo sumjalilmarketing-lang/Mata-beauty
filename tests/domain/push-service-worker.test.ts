@@ -19,3 +19,21 @@ it("shows background push with sound preference and blocks external click destin
   await completion;
   expect(openWindow).toHaveBeenCalledWith("https://mata-beauty.com/app/notifications");
 });
+
+it("updates the icon count in the background without suppressing the notification", async () => {
+  const handlers: Record<string, (event: unknown) => void> = {};
+  const setAppBadge = vi.fn().mockResolvedValue(undefined);
+  const clearAppBadge = vi.fn().mockResolvedValue(undefined);
+  const showNotification = vi.fn().mockResolvedValue(undefined);
+  runInNewContext(readFileSync("public/sw.js", "utf8"), { URL, self: {
+    navigator: { setAppBadge, clearAppBadge }, location: { origin: "https://mata-beauty.com" },
+    addEventListener: (type: string, handler: (event: unknown) => void) => { handlers[type] = handler; },
+    registration: { showNotification },
+  } });
+  let completion: Promise<unknown> | undefined;
+  const send = async (unreadCount: number) => { handlers.push({ data: { json: () => ({ unreadCount }) }, waitUntil: (p: Promise<unknown>) => { completion = p; } }); await completion; };
+  await send(7); expect(setAppBadge).toHaveBeenCalledWith(7);
+  await send(0); expect(clearAppBadge).toHaveBeenCalledOnce();
+  setAppBadge.mockRejectedValueOnce(new Error("unsupported"));
+  await send(3); expect(showNotification).toHaveBeenCalledTimes(3);
+});
