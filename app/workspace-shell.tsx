@@ -8,6 +8,7 @@ import { FormEvent, useRef, useState, type ReactNode } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { workspaceHref, workspaceSpaces, simpleNavigation, navigationLabel, navigationParent, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import "./workspace.css";
+import "./staff-workspace.css";
 import { WorkspaceInstallHelp } from "./workspace-install-help";
 import "./workspace-more-menu.css";
 import { ProductHelp } from "./product-help";

@@ -261,6 +261,7 @@ export const simpleNavigation = {
 } as const;
 
 export function navigationLabel(space: WorkspaceSpaceKey, item: WorkspaceModule) {
+  if (space === "staff") return ({ dashboard: "Accueil", agenda: "Agenda", bookings: "Rendez-vous", messages: "Messages", services: "Prestations", availability: "Disponibilités" } as Record<string, string>)[item.key] ?? item.label;
   if (space === "client") return ({ feed: "Inspiration", bookings: "Rendez-vous", inspirations: "Inspirations enregistrées" } as Record<string, string>)[item.key] ?? item.label;
   if (space === "pro" && item.key === "public-profile") return "Profil";
   return item.label;
