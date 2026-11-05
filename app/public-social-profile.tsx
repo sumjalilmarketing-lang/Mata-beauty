@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { PublicSocialProfileData, SocialProfilePost } from "@/lib/profiles/public-social-profile";
 import { SocialProfileVideoFrame } from "./social-profile-video-frame";
+import { AccountStaffAccess } from "./account-staff-access";
 import { ClientControlCenter } from "./client-control-center";
 import styles from "./public-social-profile.module.css";
 import { publicMetadataImage } from "@/lib/public-image";
@@ -224,6 +225,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
           <Link href="/app/inspirations">Contenus enregistrés</Link>
           <Link href="/app/settings?edit=1">Paramètres et confidentialité</Link>
         </nav>
+        <AccountStaffAccess />
         <WorkspaceInstallHelp />
         <article className={styles.applicationCard}>
           <div><h3>Devenir professionnel MATA Beauty</h3>

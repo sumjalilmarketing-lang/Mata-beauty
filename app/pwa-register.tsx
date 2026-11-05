@@ -1,10 +1,34 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { shouldOfferAppUpdate } from "@/lib/domain/app-version";
+import "./app-update.css";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type BadgeNavigator = Navigator & { setAppBadge?: (count?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
 export function PwaRegister() {
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  useEffect(() => {
+    let active = true, pending = false;
+    async function check() {
+      if(pending || document.visibilityState === "hidden" || !navigator.onLine) return;
+      pending = true;
+      try {
+        const response = await fetch("/api/app-version", { cache: "no-store", signal: AbortSignal.timeout(10000) });
+        if(response.ok) {
+          const data: { version?: unknown } = await response.json();
+          if(active && shouldOfferAppUpdate(process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,data.version)) setUpdateAvailable(true);
+        }
+        if("serviceWorker" in navigator) await (await navigator.serviceWorker.getRegistration("/"))?.update();
+      } catch { /* Offline devices keep their current screen and retry on return. */ }
+      finally { pending=false; }
+    }
+    const refresh=()=>{void check();};
+    refresh(); const timer=window.setInterval(refresh,300000);
+    for(const event of ["focus","online"]) window.addEventListener(event,refresh);
+    document.addEventListener("visibilitychange",refresh);
+    return ()=>{active=false;window.clearInterval(timer);for(const event of ["focus","online"])window.removeEventListener(event,refresh);document.removeEventListener("visibilitychange",refresh);};
+  }, []);
   useEffect(() => {
     const api = navigator as BadgeNavigator;
     if (!api.setAppBadge) return;
@@ -31,7 +55,7 @@ export function PwaRegister() {
   }, []);
   useEffect(() => {
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
-      void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
+      void navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }).catch(() => undefined);
       const listener = getSupabaseBrowserClient()?.auth.onAuthStateChange((event) => {
         if (event !== "SIGNED_OUT") return;
         // Shared devices must stop receiving this account's push after logout.
@@ -45,5 +69,5 @@ export function PwaRegister() {
       return () => listener?.data.subscription.unsubscribe();
     }
   }, []);
-  return null;
+  return updateAvailable ? <aside className="app-update-banner" role="status" aria-label="Mise à jour de Mata Beauty"><div><strong>Une nouvelle version est disponible</strong><p>Enregistrez vos modifications en cours, puis actualisez Mata Beauty.</p></div><button type="button" onClick={()=>window.location.reload()}>Mettre à jour</button></aside> : null;
 }
