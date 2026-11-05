@@ -16,7 +16,7 @@ export function StaffCalendar() {
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const lock = useRef(false);
   const load = useCallback(async () => {
-    const result = await client().rpc("get_my_collaborator_calendar");
+    const result = await client().rpc("get_my_collaborator_calendar").abortSignal(AbortSignal.timeout(12000));
     if (result.error) throw result.error;
     setCalendars((result.data ?? []) as Calendar[]);
   }, []);
@@ -53,7 +53,7 @@ export function StaffCalendar() {
   function date(value: string) { return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: calendar?.time_zone ?? "UTC" }).format(new Date(value)); }
   return <section className="workspace-content">
     <h2>Mes disponibilités</h2><p>Gérez vos horaires et vos indisponibilités pour chaque salon. Les rendez-vous déjà acceptés restent dans votre agenda ; vous pouvez les transférer à un collègue disponible.</p>
-    {loading && <p role="status">Chargement de vos disponibilités…</p>}{error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
+    {loading && <p role="status">Chargement de vos disponibilités…</p>}{error && <><p role="alert">{error}</p><button type="button" disabled={loading || busy} onClick={() => { setLoading(true); setError(""); void load().catch(() => setError("Vos disponibilités n’ont pas pu être chargées.")).finally(() => setLoading(false)); }}>Réessayer</button></>}{notice && <p role="status">{notice}</p>}
     {!loading && !calendar && !error && <p>Aucun accès à un agenda de salon. Contactez le responsable.</p>}
     {calendar && <div key={calendar.id}>
       <article className="workspace-panel salon-panel"><label>Mon salon<select value={calendar.id} disabled={busy} onChange={event => { setSelected(event.target.value); setNotice(""); setError(""); }}>{calendars.map(item => <option key={item.id} value={item.id}>{item.salon_name}</option>)}</select></label>

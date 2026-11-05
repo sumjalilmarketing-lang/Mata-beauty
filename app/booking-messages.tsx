@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { statusLabel } from "@/lib/ui/status-label";
+import { loadMessageCatchUp } from "@/lib/messaging/message-catch-up";
 import { MessageBubble } from "./message-bubble";
 
 type MessageRow = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
@@ -151,18 +152,11 @@ export function BookingMessages({
         if (!active || refreshing) return;
         refreshing = true;
         try {
-          let received = false;
-          for (let offset = 0; active; offset += pageSize) {
-            const result = await client.from("messages").select("id,conversation_id,sender_id,body,created_at")
-              .in("conversation_id", ids).is("deleted_at", null).gte("created_at", cursor)
-              .order("created_at").order("id").range(offset, offset + pageSize - 1);
-            if (result.error) throw result.error;
-            const incoming = result.data as MessageRow[];
-            received ||= incoming.some(message => message.sender_id !== userId && message.created_at >= cursor);
-            setMessages(current => mergeMessages(current, incoming));
-            if (incoming.length) cursor = incoming.at(-1)!.created_at;
-            if (incoming.length < pageSize) break;
-          }
+          const incoming = await loadMessageCatchUp(client, ids, cursor, AbortSignal.timeout(12000));
+          if (!active) return;
+          const received = incoming.some(message => message.sender_id !== userId);
+          setMessages(current => mergeMessages(current, incoming));
+          if (incoming.length) cursor = incoming.at(-1)!.created_at;
           if (received) await markRead(ids);
           else await loadMembers(ids);
           if (active) setRefreshError("");

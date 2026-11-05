@@ -14,6 +14,7 @@ import { ActionConfirmationDialog } from "./booking-cancellation-dialog";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { latestRefresh } from "@/lib/ui/latest-refresh";
 import { localDateAt, localDateTimeInputToInstant } from "@/lib/domain/time-zone";
 
 type Member = { id: string; display_name: string; first_name: string | null; public_last_name: string | null; title: string | null; avatar_url: string | null; specialties: string[]; buffer_minutes: number; is_active: boolean; is_bookable: boolean; archived_at: string | null };
@@ -87,14 +88,26 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
   const [transfer, setTransfer] = useState<StaffAppointment | null>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer); }, []);
-  const load = useCallback(async () => {
-    setLoading(true);
-    const result = await api().rpc("get_staff_booking_agenda_global", { from_date: date, days: 7 });
-    if (result.error) { setFeedback("Les rendez-vous autorisés n’ont pas pu être chargés."); setRows([]); }
-    else { setFeedback(""); setRows((result.data ?? []) as StaffAppointment[]); }
-    setLoading(false);
+  const datePicked = useRef(false);
+  const transitionLock = useRef(false);
+  const refreshRef = useRef<(() => Promise<void>) | null>(null);
+  const load = useCallback(async () => { await refreshRef.current?.(); }, []);
+  useEffect(() => {
+    const updates = latestRefresh(async signal => {
+      const result = await api().rpc("get_staff_booking_agenda_global", { from_date: date, days: 7 })
+        .abortSignal(AbortSignal.any([signal, AbortSignal.timeout(12000)]));
+      if (result.error) throw result.error;
+      return (result.data ?? []) as StaffAppointment[];
+    }, data => { setRows(data); setFeedback(""); setLoading(false); },
+    () => { setRows([]); setFeedback("Les rendez-vous autorisés n’ont pas pu être chargés. Réessayez."); setLoading(false); });
+    refreshRef.current = updates.refresh;
+    const timer = window.setTimeout(() => { setRows([]); setLoading(true); void updates.refresh(); }, 0);
+    const refresh = () => void updates.refresh();
+    const polling = window.setInterval(refresh, 30_000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    return () => { updates.stop(); refreshRef.current = null; window.clearTimeout(timer); window.clearInterval(polling); window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh); };
   }, [date]);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); const refresh = () => void load(); const polling = window.setInterval(refresh, 30_000); window.addEventListener("focus", refresh); return () => { window.clearTimeout(timer); window.clearInterval(polling); window.removeEventListener("focus", refresh); }; }, [load]);
   useEffect(() => {
     const client = api();
     let channel: ReturnType<typeof client.channel> | undefined;
@@ -109,20 +122,23 @@ export function StaffAgenda({ canManage }: { canManage: boolean }) {
     let active = true;
     void api().rpc("get_my_collaborator_calendar").then(({ data, error }) => {
       const calendars = (data ?? []) as { time_zone: string }[];
-      if (active && !error && calendars[0]?.time_zone) setDate(localDateAt(new Date(), calendars[0].time_zone));
+      if (active && !datePicked.current && !error && calendars[0]?.time_zone) setDate(localDateAt(new Date(), calendars[0].time_zone));
     });
     return () => { active = false; };
   }, []);
   async function transition(row: StaffAppointment, status: string) {
-    if (busyId) return;
+    if (transitionLock.current) return;
+    transitionLock.current = true;
     setBusyId(row.id); setFeedback("");
-    const result = await api().rpc("staff_update_booking_status", { target_booking_id: row.id, target_status: status });
-    if (result.error) setFeedback("Cette transition n’est plus autorisée. Actualisez la liste.");
-    else { setFeedback("Rendez-vous mis à jour."); await load(); }
-    setBusyId(null);
+    try {
+      const result = await api().rpc("staff_update_booking_status", { target_booking_id: row.id, target_status: status }).abortSignal(AbortSignal.timeout(12000));
+      if (result.error) throw result.error;
+      await load();
+    } catch { setFeedback("Cette transition n’est plus autorisée ou la connexion est interrompue. Actualisez la liste."); }
+    finally { transitionLock.current = false; setBusyId(null); }
   }
   return <section className="workspace-content"><StaffTeamDirectory /><p><Link href="/staff/availability">Mes disponibilités</Link> · <Link href="/staff/notifications">Mes notifications</Link></p><div className="workspace-intro"><div><span>{t("Espace collaborateur")}</span><h2>{t("Mes rendez-vous")}</h2><p>{t("Seuls les rendez-vous attribués à votre compte sont affichés.")}</p></div></div>
-    {feedback && <p role="status">{t(feedback)}</p>}<article className="workspace-panel salon-panel"><label>{t("Semaine à partir du")}<input type="date" value={date} onChange={event => setDate(event.target.value)} /></label><p>{t("Les heures sont affichées selon le fuseau de chaque salon.")}</p>
+    {feedback && <p role="status">{t(feedback)}</p>}<article className="workspace-panel salon-panel"><label>{t("Semaine à partir du")}<input type="date" value={date} required onChange={event => { if (event.target.value) { datePicked.current = true; setRows([]); setLoading(true); setDate(event.target.value); } }} /></label><p>{t("Les heures sont affichées selon le fuseau de chaque salon.")}</p><button type="button" onClick={() => void load()}>{t("Actualiser")}</button>
       {loading && <p role="status">{t("Chargement des rendez-vous…")}</p>}{!loading && rows.length === 0 && <p>{t("Aucun rendez-vous attribué pour cette période.")}</p>}
       <div className="salon-list">{rows.map(row => <div key={row.id}><div><strong>{row.service_title}</strong><small>{row.client_name} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: row.time_zone }).format(new Date(row.starts_at))} · {t(statusNames[row.status] ?? row.status)}</small></div>
         {row.status === "completed" && canManage && <BookingFeedback bookingId={row.id} direction="provider_to_client" />}
