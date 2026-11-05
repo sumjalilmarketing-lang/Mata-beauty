@@ -1,4 +1,6 @@
 "use client";
+import { latestRefresh } from "@/lib/ui/latest-refresh";
+import { loadSalonBookings } from "@/lib/domain/salon-bookings";
 import { BookingReschedule } from "./booking-reschedule";
 import { BookingFeedback } from "./booking-feedback";
 
@@ -43,6 +45,7 @@ export function SalonControlCenter({ module, userId, collaboratorAccessEnabled =
   const [reviews, setReviews] = useState<Review[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [feedback, setFeedback] = useState("");
+  const [bookingRefreshError, setBookingRefreshError] = useState("");
   const [savingService, setSavingService] = useState(false);
   const servicePending = useRef(false);
   const [locating, setLocating] = useState(false);
@@ -52,6 +55,7 @@ export function SalonControlCenter({ module, userId, collaboratorAccessEnabled =
     const supabase = getSupabaseBrowserClient();
     if (!supabase) { setState("error"); setFeedback("Connexion indisponible. Réessayez."); return; }
     setState("loading");
+    setBookingRefreshError("");
     try {
     const { data: businessData, error } = await supabase.from("businesses").select("id,name,slug,description,phone,address,city,area,country_code,region,timezone,currency,latitude,longitude,logo_url,cover_url,status,is_active,archived_at").eq("owner_id", userId).is("archived_at", null).order("created_at").abortSignal(AbortSignal.timeout(12000));
     if (error) { setState("error"); setFeedback(publicErrorMessage(error, "Le salon n’a pas pu être chargé.")); return; }
@@ -78,15 +82,22 @@ export function SalonControlCenter({ module, userId, collaboratorAccessEnabled =
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
   useEffect(() => {
     const client = getSupabaseBrowserClient();
-    if (!client || !business?.id) return;
+    if (!client || !business?.id || state !== "ready") return;
+    // Background booking updates must not unmount profile/service editors.
+    const businessId = business.id;
     let timer: number | undefined;
-    const refresh = () => { window.clearTimeout(timer); timer = window.setTimeout(() => void load(), 150); };
-    const channel = client.channel(`salon-bookings:${business.id}`).on("postgres_changes", { event: "*", schema: "public", table: "bookings", filter: `business_id=eq.${business.id}` }, refresh).subscribe();
+    const updates = latestRefresh(
+      signal => loadSalonBookings(client, businessId, AbortSignal.any([signal, AbortSignal.timeout(12000)])),
+      data => { setBookings(data); setBookingRefreshError(""); },
+      () => setBookingRefreshError("Les réservations n’ont pas pu être actualisées. Les dernières données chargées sont conservées."),
+    );
+    const refresh = () => { window.clearTimeout(timer); timer = window.setTimeout(() => void updates.refresh(), 150); };
+    const channel = client.channel(`salon-bookings:${businessId}`).on("postgres_changes", { event: "*", schema: "public", table: "bookings", filter: `business_id=eq.${businessId}` }, refresh).subscribe();
     const fallback = window.setInterval(refresh, 30_000);
     window.addEventListener("focus", refresh);
-    return () => { window.clearTimeout(timer); window.clearInterval(fallback); window.removeEventListener("focus", refresh); void client.removeChannel(channel); };
-  }, [business?.id, load]);
-  const salonPicker = businessChoices.length > 1 ? <label>Salon actif<select aria-label="Salon actif" value={business?.id ?? selectedBusinessId} onChange={event => setSelectedBusinessId(event.target.value)}>{businessChoices.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label> : null;
+    return () => { updates.stop(); window.clearTimeout(timer); window.clearInterval(fallback); window.removeEventListener("focus", refresh); void client.removeChannel(channel); };
+  }, [business?.id, state]);
+  const salonPicker = <>{bookingRefreshError && <p role="status">{bookingRefreshError}</p>}{businessChoices.length > 1 ? <label>Salon actif<select aria-label="Salon actif" value={business?.id ?? selectedBusinessId} onChange={event => setSelectedBusinessId(event.target.value)}>{businessChoices.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label> : null}</>;
   const timezone = business?.timezone ?? (business?.country_code === "SN" ? "Africa/Dakar" : "UTC");
   const existingServiceCurrencies = [...new Set(services.map((service) => service.currency).filter(Boolean))];
   const profileCurrency = business?.currency ?? (existingServiceCurrencies.length === 1 ? existingServiceCurrencies[0] : "");

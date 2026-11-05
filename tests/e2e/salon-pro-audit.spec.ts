@@ -73,3 +73,21 @@ test('pro : un suivi de configuration vide ne bloque pas le tableau de bord et p
  unavailable=false;await page.getByRole('button',{name:'Réessayer le suivi de configuration',exact:true}).click();
  await expect(page.getByRole('progressbar',{name:'5 étapes sur 5'})).toBeVisible();
 });
+
+test('salon : une actualisation des réservations conserve la prestation en cours de modification', async ({ page, context }) => {
+ await login(context);
+ let bookingReads = 0;
+ await page.route(`${api}/rest/v1/bookings**`, async route => {
+  if (route.request().method() === 'GET') bookingReads++;
+  return route.fallback();
+ });
+ await page.goto('/salon/services');
+ const editor = page.getByRole('region', { name: 'Prestation Prestation de recette' });
+ await editor.getByRole('button', { name: 'Modifier', exact: true }).click();
+ const title = editor.getByLabel('Nom de votre prestation', { exact: true });
+ await title.fill('Tresses en cours de modification');
+ const previousReads = bookingReads;
+ await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+ await expect.poll(() => bookingReads).toBeGreaterThan(previousReads);
+ await expect(title).toHaveValue('Tresses en cours de modification');
+});
