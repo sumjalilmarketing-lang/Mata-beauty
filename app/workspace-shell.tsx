@@ -72,7 +72,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
           {visibleSpaces.map((key) => <option key={key} value={key}>{t(workspaceSpaces[key].label)}</option>)}
         </select>
       </label>
-      {staffAccess.error && <p role="status">Vérification de l’accès collaborateur indisponible. <button type="button" onClick={staffAccess.retry}>Réessayer</button></p>}
+      {["client","pro","salon","staff"].includes(space) && process.env.NEXT_PUBLIC_SALON_COLLABORATOR_ACCESS_ENABLED === "true" && <details className="workspace-staff-access-help"><summary>Mon accès collaborateur</summary><p>Compte connecté : {userEmail}</p>{staffAccess.error ? <p role="status">La vérification est indisponible. Réessayez.</p> : staffAccess.available === null ? <p>Vérification de votre accès…</p> : staffAccess.available ? <Link href="/staff">Ouvrir mon espace collaborateur</Link> : <p>Aucun accès collaborateur actif pour ce compte. Acceptez l’invitation du salon ou connectez-vous au compte qui l’a acceptée.</p>}<button type="button" onClick={staffAccess.retry}>Vérifier mon accès</button></details>}
       <nav aria-label={`Navigation ${t(definition.label)}`}>
         {groups.map((group) => <div className="workspace-nav-group" key={group}>
           <p>{t(group)}</p>

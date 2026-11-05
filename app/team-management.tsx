@@ -1,4 +1,5 @@
 "use client";
+import { teamAccessLabel, acceptedInvitationMember } from "@/lib/domain/team-access-status";
 import { PhoneInput } from "./phone-input";
 import { staffViewDays, staffVisibleAppointments, type StaffView } from "@/lib/domain/staff-schedule";
 import { StaffServiceEditor } from "./staff-service-editor";
@@ -50,7 +51,7 @@ async function requestTeamApi<T>(businessId: string, method: "GET" | "POST", bod
   if (!data.session?.access_token) throw new Error("Reconnectez-vous pour gérer les accès.");
   const response = await fetch(method === "GET" ? `/api/salon/team?businessId=${encodeURIComponent(businessId)}` : "/api/salon/team", {
     method, headers: { Authorization: `Bearer ${data.session.access_token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {}), cache: "no-store",
+    ...(body ? { body: JSON.stringify(body) } : {}), cache: "no-store", signal: AbortSignal.timeout(12000),
   });
   const result: unknown = await response.json();
   if (!response.ok) {
@@ -216,10 +217,15 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
   const [invitationMode, setInvitationMode] = useState("whatsapp");
   const [enabled, setEnabled] = useState(false), [timeZone, setTimeZone] = useState("Africa/Dakar"), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const inFlight = useRef(false);
+  const refreshing = useRef(false);
+  const loadVersion = useRef(0);
+  const inviteForm = useRef<HTMLFormElement>(null);
+  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const savedMemberId = useRef<string | null>(null);
   const [accessToRevoke, setAccessToRevoke] = useState<TeamAccess | null>(null);
   const [revision, setRevision] = useState(0);
   const load = useCallback(async () => {
+    const request=++loadVersion.current;
     const client = api();
     const [people, offers, business, accessResult] = await Promise.all([
       client.from("collaborators").select("id,display_name,first_name,public_last_name,title,avatar_url,specialties,buffer_minutes,is_active,is_bookable,archived_at").eq("business_id", businessId).order("display_name"),
@@ -228,6 +234,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
       collaboratorAccessEnabled ? requestTeamApi<{ access: TeamAccess[]; invitations: TeamInvitation[]; audit: TeamAudit[] }>(businessId, "GET") : Promise.resolve({ access: [], invitations: [], audit: [] }),
     ]);
     for (const result of [people, offers, business]) if (result.error) throw result.error;
+    if(request!==loadVersion.current) return;
     setStaffAccess(accessResult.access); setInvitations(accessResult.invitations); setAudit(accessResult.audit);
     const next = (people.data ?? []) as Member[];
     setMembers(next); setServices(((offers.data ?? []) as Service[]).filter(s => !s.business_id || s.business_id === businessId)); setEnabled(Boolean(business.data?.team_booking_enabled)); setTimeZone(business.data?.timezone ?? (business.data?.country_code === "SN" ? "Africa/Dakar" : "UTC"));
@@ -239,14 +246,31 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
         client.from("collaborator_exceptions").select("id,collaborator_id,starts_at,ends_at,kind,reason").in("collaborator_id", ids).order("starts_at"),
       ]);
       for (const result of [skills, windows, exceptions]) if (result.error) throw result.error;
+      if(request!==loadVersion.current) return;
       setQualifications((skills.data ?? []) as Qualification[]); setHours((windows.data ?? []) as Hours[]); setAbsences((exceptions.data ?? []) as Absence[]);
       setSelected(current => current ? next.find(m => m.id === current.id) ?? null : null);
     }
-    setLoading(false);
+    setLoading(false); setRefreshedAt(new Date());
   }, [businessId, ownerId, collaboratorAccessEnabled]);
-  useEffect(() => { const timer = window.setTimeout(() => { void load().catch(error => { setMessage(publicErrorMessage(error, "Chargement de l’équipe impossible.")); setLoading(false); }); }, 0); return () => window.clearTimeout(timer); }, [load]);
+  const refreshTeam = useCallback(async () => {
+    if(refreshing.current || inFlight.current || document.visibilityState === "hidden" || !navigator.onLine) return;
+    refreshing.current=true;
+    try { await load(); } catch(error) { setMessage(publicErrorMessage(error,"Actualisation de l’équipe impossible. Réessayez.")); setLoading(false); }
+    finally { refreshing.current=false; }
+  },[load]);
+  useEffect(()=>{
+    const refresh=()=>{void refreshTeam();};
+    const initial=window.setTimeout(refresh,0), timer=window.setInterval(refresh,15000);
+    window.addEventListener("focus",refresh); window.addEventListener("online",refresh); document.addEventListener("visibilitychange",refresh);
+    return ()=>{window.clearTimeout(initial);window.clearInterval(timer);window.removeEventListener("focus",refresh);window.removeEventListener("online",refresh);document.removeEventListener("visibilitychange",refresh);};
+  },[refreshTeam]);
+  function showMember(id:string) { document.getElementById(`team-member-${id}`)?.scrollIntoView({behavior:"smooth",block:"center"}); }
+  function inviteMember(id:string) {
+    setInvitationMode("whatsapp");
+    window.setTimeout(()=>{const select=inviteForm.current?.elements.namedItem("memberId");if(select instanceof HTMLSelectElement) select.value=id;inviteForm.current?.scrollIntoView({behavior:"smooth",block:"center"});},0);
+  }
   async function mutate(action: () => Promise<void>, success: string) {
-    if (inFlight.current) return false; inFlight.current = true; setBusy(true); setMessage("");
+    if (inFlight.current) return false; inFlight.current = true; loadVersion.current++; setBusy(true); setMessage("");
     try { await action(); await load(); setRevision(v => v + 1); setMessage(success); return true; }
     catch (error) { setMessage(publicErrorMessage(error, "La modification n’a pas pu être enregistrée.")); return false; }
     finally { inFlight.current = false; setBusy(false); }
@@ -326,10 +350,12 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
   if (loading) return <p role="status">Chargement de l’équipe…</p>;
   return <div className="team-management">
     <header><h2>Mon équipe</h2><p>Les fiches d’équipe gèrent les prestations et les horaires. Les accès de compte sont séparés et limités aux permissions attribuées côté serveur. Les horaires suivent le fuseau du salon ({timeZone}).</p></header>
+    <div className="team-toolbar"><button type="button" onClick={()=>void refreshTeam()} disabled={busy}>Actualiser l’équipe et les invitations</button>{refreshedAt && <small>Mis à jour à {refreshedAt.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})} · vérification automatique toutes les 15 secondes</small>}</div>
     {message && <p className="salon-feedback" role="status">{message}</p>}
+    {collaboratorAccessEnabled && <section className="workspace-panel salon-panel" aria-label="État des espaces collaborateurs"><h3>Mes collaborateurs et leurs accès</h3><p>Chaque collaborateur retrouve son espace dans le menu « Espace actif » avec le compte qui a accepté l’invitation.</p><div className="team-cards">{members.filter(person=>!person.archived_at).map(person=>{const account=staffAccess.find(access=>access.collaborator_id===person.id);return <article className="workspace-panel salon-panel" key={person.id}><h4>{person.display_name}</h4><p>{teamAccessLabel(person,account)}</p>{account && <small>Compte associé : {account.email ?? account.display_name}</small>}<div className="team-toolbar"><button type="button" onClick={()=>showMember(person.id)}>Voir sa fiche</button>{!account && person.is_active && <button type="button" onClick={()=>inviteMember(person.id)}>Inviter à cet espace</button>}</div></article>;})}</div>{!members.length && <p>Aucun collaborateur ajouté à ce salon.</p>}</section>}
     {!collaboratorAccessEnabled && <p className="salon-feedback" role="status">Les invitations, rôles de compte et permissions sont désactivés jusqu’à validation et application de la migration de sécurité.</p>}
     {collaboratorAccessEnabled && <><article className="workspace-panel salon-panel"><SalonStaffTasks businessId={businessId} timeZone={timeZone} members={members.filter(m=>m.is_active&&!m.archived_at)} /><h3>Inviter un collaborateur</h3><p>Invitez par numéro de téléphone et partagez le lien sur WhatsApp. Le lien expire après 48 heures. Le collaborateur accepte le lien et accède directement à son espace équipe. L’invitation par email reste disponible.</p>
-      <form className="salon-form" onSubmit={event => void invite(event)}>
+      <form ref={inviteForm} className="salon-form" onSubmit={event => void invite(event)}>
         {invitationMode === "whatsapp" && <label>Fiche collaborateur à associer<select name="memberId" defaultValue=""><option value="">Créer une nouvelle fiche à l’acceptation</option>{members.filter(person => !staffAccess.some(account => account.collaborator_id === person.id) && person.is_active && !person.archived_at).map(person => <option key={person.id} value={person.id}>{person.display_name}</option>)}</select><small>Associez une fiche existante pour conserver ses rendez-vous, horaires et prestations.</small></label>}
         <label>Mode d’invitation<select aria-label="Mode d’invitation" value={invitationMode} onChange={event => { setInvitationMode(event.target.value); setShareLink(null); }}><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>
         {invitationMode === "whatsapp" ? <PhoneInput label="Numéro WhatsApp du collaborateur" required/> : <label>E-mail<input name="email" type="email" required maxLength={254} autoComplete="email" /></label>}
@@ -347,7 +373,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
       </div>}
     </article>
     <article className="workspace-panel salon-panel"><h3>Invitations et accès</h3>
-      <div className="salon-list">{invitations.map(invite => <div key={invite.id}><div><strong>{invite.phone ?? invite.email}</strong><small>{invite.internal_role} · {invite.status === "pending" ? `Expire le ${new Date(invite.expires_at).toLocaleString("fr-FR")}` : invite.status === "accepted" ? `Acceptée le ${invite.accepted_at ? new Date(invite.accepted_at).toLocaleDateString("fr-FR") : "—"}` : invite.status}</small></div>{invite.status === "pending" && !invite.phone && <button disabled={busy} onClick={() => void checkDelivery(invite.id)}>Vérifier la livraison</button>}{invite.status === "pending" && <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "revoke_invitation", businessId, invitationId: invite.id }); if (shareLink?.invitationId === invite.id) setShareLink(null); }, "Invitation révoquée.")}>Révoquer</button>}</div>)}{!invitations.length && <p>Aucune invitation pour le moment.</p>}</div>
+      <div className="salon-list">{invitations.map(invite => <div key={invite.id}><div><strong>{invite.phone ?? invite.email}</strong><small>{invite.internal_role} · {invite.status === "pending" ? `Expire le ${new Date(invite.expires_at).toLocaleString("fr-FR")}` : invite.status === "accepted" ? `Acceptée le ${invite.accepted_at ? new Date(invite.accepted_at).toLocaleDateString("fr-FR") : "—"}` : invite.status}</small>{invite.status === "accepted" && (()=>{const memberId=acceptedInvitationMember(invite.id,audit);const member=members.find(person=>person.id===memberId);return member ? <><p>Acceptée par <strong>{member.display_name}</strong> · {teamAccessLabel(member,staffAccess.find(account=>account.collaborator_id===member.id))}</p><button type="button" onClick={()=>showMember(member.id)}>Retrouver le collaborateur</button></> : <p>Invitation acceptée. Consultez les comptes associés ci-dessous.</p>;})()}</div>{invite.status === "pending" && !invite.phone && <button disabled={busy} onClick={() => void checkDelivery(invite.id)}>Vérifier la livraison</button>}{invite.status === "pending" && <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "revoke_invitation", businessId, invitationId: invite.id }); if (shareLink?.invitationId === invite.id) setShareLink(null); }, "Invitation révoquée.")}>Révoquer</button>}</div>)}{!invitations.length && <p>Aucune invitation pour le moment.</p>}</div>
       {invitations.filter(invite => invite.phone && invite.status === "pending").flatMap(invite => (invite.claims ?? []).filter(claim => claim.status === "pending").map(claim => <article className="workspace-panel salon-panel" key={claim.id}>
         <h4>Confirmer un équipier</h4><p>Invitation WhatsApp : {invite.phone}</p><p>Compte : <strong>{claim.display_name}</strong> · {claim.email ?? "Compte confirmé par téléphone"}</p><p>Vérifiez auprès du destinataire que ce compte lui appartient avant de confirmer.</p>
         <button disabled={busy} onClick={() => void mutate(async () => { await requestTeamApi(businessId, "POST", { action: "review_phone", businessId, claimId: claim.id, approve: true }); }, "Accès de l’équipier confirmé.")}>Confirmer l’accès de {claim.display_name}</button>
@@ -374,7 +400,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
     <div className="team-toolbar"><button disabled={busy} className="salon-primary" onClick={() => { savedMemberId.current = null; setSelected(null); setEditing(true); }}>Ajouter un employé</button>
       <button disabled={busy} onClick={() => void mutate(async () => { const result = await api().rpc("set_team_booking_enabled", { target_business_id: businessId, enabled: !enabled }); if (result.error) throw result.error; }, enabled ? "Réservation par équipe désactivée." : "Réservation par équipe activée.")}>{enabled ? "Désactiver la réservation par équipe" : "Activer la réservation par équipe"}</button></div>
     {!enabled && <p>Configurez les prestations et les horaires avant d’activer le choix d’un collaborateur. Les indépendants peuvent conserver leur réservation habituelle.</p>}
-    <div className="team-cards">{members.map(person => <article className="workspace-panel salon-panel" key={person.id}>
+    <div className="team-cards">{members.map(person => <article className="workspace-panel salon-panel" key={person.id} id={`team-member-${person.id}`}>
       {person.avatar_url && <Image unoptimized src={person.avatar_url} alt={`Photo de ${person.display_name}`} width={64} height={64} />}
       <h3>{person.display_name}</h3><p>{person.title}</p><p>{person.specialties.join(" · ")}</p><p>{person.archived_at ? "Archivé" : !person.is_active ? "Inactif" : person.is_bookable ? "Réservable selon ses horaires" : "Non réservable"}</p>
       {!person.archived_at && <div className="team-toolbar"><button disabled={busy} onClick={() => { setSelected(person); setEditing(true); }}>Modifier la fiche</button><button disabled={busy} onClick={() => { setSelected(person); setEditing(false); }}>Horaires et absences</button>

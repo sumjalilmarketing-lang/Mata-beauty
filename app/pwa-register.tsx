@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { shouldOfferAppUpdate } from "@/lib/domain/app-version";
+import { canAutoApplyAppUpdate, shouldOfferAppUpdate } from "@/lib/domain/app-version";
 import "./app-update.css";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -9,7 +9,17 @@ type BadgeNavigator = Navigator & { setAppBadge?: (count?: number) => Promise<vo
 export function PwaRegister() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   useEffect(() => {
-    let active = true, pending = false;
+    let active = true, pending = false, dirty = false, reloadTimer: number | undefined;
+    const markDirty = (event: Event) => { const target=event.target; if(target instanceof HTMLElement && (target.closest("form") || target.isContentEditable)) dirty=true; };
+    function autoApply(version: string) {
+      const focused=document.activeElement;
+      const focusedEditor=focused instanceof HTMLElement && (focused.matches("input,textarea,select") || focused.isContentEditable);
+      const activeMedia=Array.from(document.querySelectorAll("video,audio")).some(media=>media instanceof HTMLMediaElement && !media.paused && !media.ended);
+      if(!active || !canAutoApplyAppUpdate({visible:document.visibilityState === "visible",online:navigator.onLine,hasUnsavedChanges:dirty,hasFocusedEditor:focusedEditor,hasActiveMedia:activeMedia})) return;
+      try { if(sessionStorage.getItem("mata.app.auto-applied") === version) return; sessionStorage.setItem("mata.app.auto-applied",version); } catch { return; }
+      window.location.reload();
+    }
+    for(const event of ["input","change","submit"]) document.addEventListener(event,markDirty,true);
     async function check() {
       if(pending || document.visibilityState === "hidden" || !navigator.onLine) return;
       pending = true;
@@ -17,17 +27,21 @@ export function PwaRegister() {
         const response = await fetch("/api/app-version", { cache: "no-store", signal: AbortSignal.timeout(10000) });
         if(response.ok) {
           const data: { version?: unknown } = await response.json();
-          if(active && shouldOfferAppUpdate(process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,data.version)) setUpdateAvailable(true);
+          if(active && shouldOfferAppUpdate(process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,data.version)) {
+            setUpdateAvailable(true);
+            const version=String(data.version); window.clearTimeout(reloadTimer); reloadTimer=window.setTimeout(()=>autoApply(version),1500);
+          }
         }
         if("serviceWorker" in navigator) await (await navigator.serviceWorker.getRegistration("/"))?.update();
       } catch { /* Offline devices keep their current screen and retry on return. */ }
       finally { pending=false; }
     }
     const refresh=()=>{void check();};
-    refresh(); const timer=window.setInterval(refresh,300000);
+    refresh(); const timer=window.setInterval(refresh,30000);
     for(const event of ["focus","online"]) window.addEventListener(event,refresh);
     document.addEventListener("visibilitychange",refresh);
-    return ()=>{active=false;window.clearInterval(timer);for(const event of ["focus","online"])window.removeEventListener(event,refresh);document.removeEventListener("visibilitychange",refresh);};
+    navigator.serviceWorker?.addEventListener("controllerchange",refresh);
+    return ()=>{active=false;window.clearInterval(timer);window.clearTimeout(reloadTimer);for(const event of ["input","change","submit"])document.removeEventListener(event,markDirty,true);navigator.serviceWorker?.removeEventListener("controllerchange",refresh);for(const event of ["focus","online"])window.removeEventListener(event,refresh);document.removeEventListener("visibilitychange",refresh);};
   }, []);
   useEffect(() => {
     const api = navigator as BadgeNavigator;
@@ -69,5 +83,5 @@ export function PwaRegister() {
       return () => listener?.data.subscription.unsubscribe();
     }
   }, []);
-  return updateAvailable ? <aside className="app-update-banner" role="status" aria-label="Mise à jour de Mata Beauty"><div><strong>Une nouvelle version est disponible</strong><p>Enregistrez vos modifications en cours, puis actualisez Mata Beauty.</p></div><button type="button" onClick={()=>window.location.reload()}>Mettre à jour</button></aside> : null;
+  return updateAvailable ? <aside className="app-update-banner" role="status" aria-label="Mise à jour de Mata Beauty"><div><strong>Une nouvelle version est disponible</strong><p>La mise à jour s’applique automatiquement quand aucune saisie n’est en cours. Sinon, enregistrez puis appuyez sur « Mettre à jour ».</p></div><button type="button" onClick={()=>window.location.reload()}>Mettre à jour</button></aside> : null;
 }

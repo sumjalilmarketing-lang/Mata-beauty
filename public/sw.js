@@ -1,4 +1,4 @@
-const CACHE_NAME = "mata-beauty-shell-v2";
+const CACHE_NAME = "mata-beauty-shell-v3";
 const SAFE_ASSETS = ["/offline", "/brand/icon-192.png", "/brand/mata-app-icon.webp", "/images/categories/mata-category-atlas.webp"];
 
 self.addEventListener("install", (event) => {
@@ -54,9 +54,8 @@ self.addEventListener("notificationclick", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))),
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith("mata-beauty-") && key !== CACHE_NAME).map((key) => caches.delete(key)))).then(() => self.clients.claim()),
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
@@ -64,7 +63,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
   if (event.request.mode === "navigate") {
-    event.respondWith(fetch(event.request).catch(() => caches.match("/offline")));
+    event.respondWith(fetch(event.request, { cache: "no-store" }).catch(() => caches.match("/offline")));
     return;
   }
   if (SAFE_ASSETS.includes(url.pathname)) {

@@ -12,3 +12,9 @@ it("serves the current deployment version without caching or account information
  vi.stubEnv("VERCEL_GIT_COMMIT_SHA","b".repeat(40));
  const response=GET();expect(response.headers.get("cache-control")).toContain("no-store");expect(await response.json()).toEqual({version:"b".repeat(40)});
 });
+it("automatically applies updates only on an idle visible screen",async()=>{
+ const {canAutoApplyAppUpdate}=await import("../../lib/domain/app-version");
+ const safe={visible:true,online:true,hasUnsavedChanges:false,hasFocusedEditor:false,hasActiveMedia:false};
+ expect(canAutoApplyAppUpdate(safe)).toBe(true);
+ for(const state of [{visible:false},{online:false},{hasUnsavedChanges:true},{hasFocusedEditor:true},{hasActiveMedia:true}]) expect(canAutoApplyAppUpdate({...safe,...state})).toBe(false);
+});
