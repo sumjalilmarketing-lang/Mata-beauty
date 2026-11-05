@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { formatServiceMoney } from "@/lib/domain/service-money";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
@@ -16,6 +17,7 @@ import { WorkspaceInstallHelp } from "./workspace-install-help";
 type TabKey = "videos" | "favorites" | "likes" | "services" | "reviews" | "following";
 
 export function PublicSocialProfile({ profile, initialVideoId = null, initialEditMode = false }: { profile: PublicSocialProfileData; initialVideoId?: string | null; initialEditMode?: boolean }) {
+  const router = useRouter();
   const [tab, setTab] = useState<TabKey>("videos");
   const [selectedVideo, setSelectedVideo] = useState<SocialProfilePost | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -25,6 +27,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
   const [notice, setNotice] = useState("");
   const [editorOpen, setEditorOpen] = useState(initialEditMode);
   const [applicationStatus, setApplicationStatus] = useState<string | null | "loading" | "unavailable">("loading");
+  useEffect(() => { if(editorOpen) document.getElementById("profile-editor")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [editorOpen]);
   const profilePath = profile.kind === "client" ? "/u/" + encodeURIComponent(profile.slug)
     : profile.kind === "salon" ? "/salons/" + encodeURIComponent(profile.slug)
       : "/professional/" + encodeURIComponent(profile.slug);
@@ -202,6 +205,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
       <div className={styles.actions}>
         {profile.kind === "client" ? profile.isOwner ? <>
           <button className={styles.primaryButton} type="button" aria-expanded={editorOpen} aria-controls="profile-editor" onClick={() => setEditorOpen(open => !open)}>{editorOpen ? "Fermer l’édition" : "Modifier mon profil"}</button>
+          <button className={styles.secondaryButton} type="button" onClick={() => { setEditorOpen(true); document.getElementById("edit-client-profile")?.scrollIntoView({behavior:"smooth"}); }}>Changer ma photo</button>
           <Link className={styles.secondaryButton} href="/app/bookings">Mes rendez-vous</Link>
           <Link className={styles.secondaryButton} href="/app/messages">Mes messages</Link>
         </> : <button className={styles.secondaryButton} type="button" onClick={() => void shareProfile()}>Partager</button> : <>
@@ -229,7 +233,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
         </article>
       </section>}
       {profile.kind === "client" && profile.isOwner && editorOpen && <section className={styles.profileEditor} id="profile-editor" aria-label="Modifier mon profil et mes paramètres">
-        <ClientControlCenter userId={profile.id} section="settings" embedded />
+        <ClientControlCenter userId={profile.id} section="settings" embedded onProfileUpdated={() => router.refresh()} />
       </section>}
       {profile.salon && profile.kind === "professional" && <Link className={styles.salonLink} href={"/salons/" + encodeURIComponent(profile.salon.slug)}>
         <span>Découvrir le salon</span><strong>{profile.salon.name}</strong>{profile.salon.city && <small>{profile.salon.city}</small>}<b>›</b>
