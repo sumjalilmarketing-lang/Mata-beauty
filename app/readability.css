@@ -535,3 +535,6 @@
 .social-video-card .social-actions>button:not(.creator-orb):not(.follow-mini),
 .social-video-card .feed-options>summary { background:#090712e6; }
 .social-video-card :is(button,summary):focus-visible { outline:3px solid #ffffff; outline-offset:-3px; }
+
+.review-booking-card { margin:14px 0; padding:14px; border:1px solid #927486; border-radius:10px; }
+.review-booking-card>summary { min-height:44px; cursor:pointer; font-weight:700; line-height:1.6; }

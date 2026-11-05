@@ -1,4 +1,5 @@
 "use client";
+import { ClientReviewBookings } from "./client-review-bookings";
 import { workspaceText } from "@/lib/domain/workspace-copy";
 import { useApplicationLocale } from "./use-application-locale";
 
@@ -116,7 +117,8 @@ export function ClientControlCenter({ userId, section = "settings", embedded = f
   async function requestDeletion(){if(!window.confirm(t("Demander la suppression du compte ? Cette demande sera vérifiée avant toute action irréversible.")))return;const reason=window.prompt(t("Motif facultatif"));if(reason===null)return;const supabase=getSupabaseBrowserClient();if(!supabase)return;const {error}=await supabase.rpc("request_account_deletion",{target_reason:reason});setNotice(error?publicErrorMessage(error,"La demande de suppression n’a pas pu être enregistrée."):"Demande enregistrée. Aucune donnée n’est supprimée immédiatement.");}
 
   if(section === "reviews") return <section className="client-control-center" id="client-reviews">
-    <article className="panel"><div className="panel-heading"><div><h2>{t("Mes avis")}</h2><p>Seules les réservations terminées peuvent recevoir le badge Réservation vérifiée.</p></div></div>
+    <ClientReviewBookings clientId={userId} />
+    <article className="panel"><div className="panel-heading"><div><h2>Historique des avis précédents</h2><p>Seules les réservations terminées peuvent recevoir le badge Réservation vérifiée.</p></div></div>
       {reviewsState === "loading" ? <div className="compact-empty" role="status">Chargement de vos avis…</div>
         : reviewsState === "error" ? <div className="compact-empty" role="alert"><p>{t(reviewsError)}</p><button type="button" onClick={() => void load()}>{t("Réessayer")}</button></div>
         : reviews.length ? reviews.map(r=><div className="control-list-row" key={r.id}><div><strong>{'★'.repeat(r.rating)} · Réservation vérifiée</strong><small>{r.comment??"Sans commentaire"}</small>{r.collaborator_name && <small>Prestation réalisée par {r.collaborator_name}</small>}{r.provider_reply&&<p>Réponse du professionnel : {r.provider_reply}</p>}</div><span>{r.is_visible?"Publié":"Modéré"}</span></div>)
