@@ -100,3 +100,57 @@ it("keeps the profile shortcuts readable on professional and salon settings", ()
  expect(contrastRatio(cssColor(normal,"color"),cssColor(normal,"background"))).toBeGreaterThanOrEqual(4.5);
  expect(contrastRatio(cssColor(hover,"color"),cssColor(hover,"background"))).toBeGreaterThanOrEqual(4.5);
 });
+
+const readabilityCss = readFileSync(fileURLToPath(new URL("../../app/readability.css", import.meta.url)), "utf8");
+
+it("keeps Studio actions and navigation initials readable at every gradient stop", () => {
+ for (const selector of [".workspace-layout .workspace-brand>span", ".workspace-layout:is(.workspace-pro,.workspace-salon) .studio-hero>button"]) {
+  const body = rule(selector);
+  const foreground = cssColor(body, "color");
+  const background = body.match(/background:([^;]+)/)?.[1] ?? "";
+  const stops = [...background.matchAll(/#[0-9a-fA-F]{6}/g)].map(match => match[0]);
+  expect(stops).toHaveLength(2);
+  for (const stop of stops) expect(contrastRatio(foreground, stop)).toBeGreaterThanOrEqual(4.5);
+ }
+});
+
+it("keeps both Studio publication step labels above AA on their light badge", () => {
+ const body = rule(".workspace-layout:is(.workspace-pro,.workspace-salon) .creator-studio .role-pill");
+ expect(contrastRatio(cssColor(body,"color"),cssColor(body,"background"))).toBeGreaterThanOrEqual(4.5);
+});
+
+it("keeps internal list reset links and light-field placeholders readable", () => {
+ const darkLink = cssColor(rule(".workspace-layout:not(.workspace-pro):not(.workspace-salon) .workspace-list-search a"), "color");
+ for (const panel of ["#090910", "#15151e"]) expect(contrastRatio(darkLink,panel)).toBeGreaterThanOrEqual(4.5);
+ const placeholder = cssColor(rule(".workspace-layout .workspace-list-search input::placeholder"), "color");
+ expect(contrastRatio(placeholder,"#ffffff")).toBeGreaterThanOrEqual(4.5);
+});
+
+it("keeps internal form boundaries distinguishable from white panels", () => {
+ const border = readabilityCss.match(/\.department-workspace :is\(input,select,textarea\),\s*\.crm-workspace :is\(input:not\(\[type=checkbox\]\),select,textarea\)\s*\{\s*border-color:(#[0-9a-fA-F]{6})/)?.[1];
+ expect(border).toBeDefined();
+ for (const surface of ["#ffffff", "#fff7fb"]) expect(contrastRatio(border!,surface)).toBeGreaterThanOrEqual(3);
+});
+
+it("keeps administrative panel palettes readable in both OS themes", () => {
+ const paletteRules = [...readabilityCss.matchAll(/--ui-surface:\s*(#[\da-f]+);([\s\S]*?)--ui-focus:\s*(#[\da-f]+);/gi)];
+ expect(paletteRules).toHaveLength(2);
+ for (const match of paletteRules) {
+  const body = match[0];
+  for (const foreground of ["--ui-text", "--ui-muted", "--ui-accent", "--ui-success", "--ui-danger"])
+   for (const surface of ["--ui-surface", "--ui-field"])
+    expect(contrastRatio(cssColor(body,foreground),cssColor(body,surface))).toBeGreaterThanOrEqual(4.5);
+  expect(contrastRatio(cssColor(body,"--ui-border"),cssColor(body,"--ui-field"))).toBeGreaterThanOrEqual(3);
+ }
+ expect(readabilityCss).toContain('.super-admin-shell:not(.admin-auth-shell) { --text:var(--ui-text); --muted:var(--ui-muted); --line:var(--ui-border); --bg:#160d14; }');
+ expect(readabilityCss).toContain('.admin-topbar,.admin-table-wrap,.admin-search-results,.admin-data-table,.admin-data-table th,.admin-search-results button,.admin-global-search,.admin-inline-search');
+});
+
+it("keeps video captions and action labels readable even over a white frame", () => {
+ const background = readabilityCss.match(/\.social-video-card \.social-caption \{ padding:8px 10px; border-radius:12px; background:(#[0-9a-f]{8}); \}/)?.[1];
+ expect(background).toBeDefined();
+ const hex=background!.slice(1); const alpha=Number.parseInt(hex.slice(6),16)/255;
+ const composite='#'+[0,2,4].map(offset=>Math.round(Number.parseInt(hex.slice(offset,offset+2),16)*alpha+255*(1-alpha)).toString(16).padStart(2,'0')).join('');
+ for (const foreground of ["#ffffff", "#d8cfda", "#f353a2"]) expect(contrastRatio(foreground,composite)).toBeGreaterThanOrEqual(4.5);
+ expect(readabilityCss).toContain('.social-video-card .feed-options>summary { background:#090712e6; }');
+});

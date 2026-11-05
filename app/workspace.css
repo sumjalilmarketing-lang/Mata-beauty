@@ -168,3 +168,12 @@
 /* Profile shortcuts must explicitly pair foreground and background on light workspaces. */
 .workspace-layout:is(.workspace-pro,.workspace-salon) .profile-shortcuts a { color:#30212a; background:#ffffff; border-color:#8b6679; }
 .workspace-layout:is(.workspace-pro,.workspace-salon) .profile-shortcuts a:hover { color:#ffffff; background:#86124f; border-color:#86124f; }
+
+/* Shared actions and Studio labels own both sides of their contrast. */
+.workspace-layout .workspace-brand>span { color:#ffffff; background:linear-gradient(135deg,#86124f,#b52165); }
+.workspace-layout:is(.workspace-pro,.workspace-salon) .studio-hero>button { color:#ffffff; background:linear-gradient(135deg,#86124f,#b52165); }
+.workspace-layout:is(.workspace-pro,.workspace-salon) .creator-studio .role-pill { color:#765214; background:#fff5da; border-color:#927486; }
+/* Generic lists in staff/internal workspaces retain dark panels. */
+.workspace-layout:not(.workspace-pro):not(.workspace-salon) .workspace-list-search a { color:#ffadd5; }
+.workspace-layout .workspace-list-search input::placeholder { color:#62505a; opacity:1; }
+.workspace-layout .workspace-list-search input { color-scheme:light; }

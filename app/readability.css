@@ -508,3 +508,30 @@
 .workspace-list-search button {min-height:44px;padding:10px 14px;border:1px solid #64183f;border-radius:10px;background:#64183f;color:#fff;}
 .workspace-list-search a {color:#64183f;text-decoration:underline;}
 .workspace-list-search :focus-visible {outline:3px solid #85234e;outline-offset:3px;}
+
+/* Light controls embedded in internal workspaces need visible boundaries. */
+.department-workspace :is(input,select,textarea),
+.crm-workspace :is(input:not([type=checkbox]),select,textarea) { border-color:#927486; }
+.workspace-layout .workspace-more-content button { border-color:#927486; }
+
+/* Administrative tables/search share the panel palette in both OS themes. */
+.super-admin-shell :is(.admin-topbar,.admin-table-wrap,.admin-search-results,.admin-data-table,.admin-data-table th,.admin-search-results button,.admin-global-search,.admin-inline-search) {
+  color:var(--ui-text); background:var(--ui-surface); border-color:var(--ui-border);
+}
+.super-admin-shell :is(.admin-global-search,.admin-inline-search) input { color:var(--ui-text); background:transparent; }
+.super-admin-shell .admin-search-results button:hover { background:var(--ui-field); }
+.super-admin-shell :is(.admin-collapse,.admin-menu-button,.admin-top-actions button) { color:var(--ui-accent); background:var(--ui-field); border-color:var(--ui-border); }
+.super-admin-shell .admin-page-heading h1,
+.super-admin-shell .admin-catalog-form .catalog-checkbox { color:var(--ui-text); }
+.super-admin-shell .admin-data-table .table-action { color:var(--ui-accent); background:var(--ui-field); border-color:var(--ui-border); }
+.super-admin-shell .admin-data-table .table-action.danger { color:var(--ui-danger); }
+.super-admin-shell .admin-data-table .table-action.positive { color:var(--ui-success); }
+@media (prefers-color-scheme: dark) {
+  .super-admin-shell:not(.admin-auth-shell) { --text:var(--ui-text); --muted:var(--ui-muted); --line:var(--ui-border); --bg:#160d14; }
+}
+
+/* Video brightness must not determine the legibility of captions/actions. */
+.social-video-card .social-caption { padding:8px 10px; border-radius:12px; background:#090712e6; }
+.social-video-card .social-actions>button:not(.creator-orb):not(.follow-mini),
+.social-video-card .feed-options>summary { background:#090712e6; }
+.social-video-card :is(button,summary):focus-visible { outline:3px solid #ffffff; outline-offset:-3px; }
