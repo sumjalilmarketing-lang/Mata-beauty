@@ -63,3 +63,9 @@
 .workspace-layout.workspace-staff .client-settings-editor :is(button,.primary-button){color:#751644;background:#fff;border-color:#98788e}
 .workspace-layout.workspace-staff .client-settings-editor .dashboard-form{border-color:#dfd1da}
 .workspace-layout.workspace-staff .client-settings-editor .check{display:flex;align-items:center;gap:10px}
+.workspace-layout.workspace-staff .workspace-sidebar{background:#fff;color:#30212d;border-color:#dfd1da}
+.workspace-layout.workspace-staff .workspace-sidebar .workspace-brand strong{color:#30212d}
+.workspace-layout.workspace-staff .workspace-sidebar .workspace-nav-group p{color:#695963}
+.workspace-layout.workspace-staff .workspace-sidebar nav a{color:#57434f}
+.workspace-layout.workspace-staff .workspace-sidebar nav a.active{color:#751644;background:#fff0f7}
+.workspace-layout.workspace-staff .workspace-staff-access-help{background:#fff;color:#30212d}
