@@ -1,4 +1,5 @@
 "use client";
+import { TariffPhotoImport } from "./tariff-photo-import";
 import { ServiceReferenceField } from "./service-reference-field";
 import { serviceReference } from "@/lib/domain/service-reference";
 import { PhoneInput } from "./phone-input";
@@ -603,7 +604,7 @@ export function LiveDashboard({
               <button className="primary-button" type="submit">Enregistrer le profil</button>
             </form>
             <ProviderLogoEditor userId={userId} /><ProfessionalDocuments providerId={userId} /></>}
-            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <ServiceEditor key={service.id} service={service} catalog={baseServices} userId={userId} businessId={service.business_id ?? undefined} activityCurrency={service.business_id ? null : providerProfile?.currency ?? null} onSaved={value => setOwnServices(current => current.map(item => item.id === value.id ? value : item))} onRemoved={id => { setOwnServices(current => current.filter(item => item.id !== id)); setFeedback("Prestation supprimée du catalogue. Les réservations existantes sont conservées."); }} />)}<Link href="/pro/videos">Retour au Studio</Link>{providerProfile && <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
+            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <ServiceEditor key={service.id} service={service} catalog={baseServices} userId={userId} businessId={service.business_id ?? undefined} activityCurrency={service.business_id ? null : providerProfile?.currency ?? null} onSaved={value => setOwnServices(current => current.map(item => item.id === value.id ? value : item))} onRemoved={id => { setOwnServices(current => current.filter(item => item.id !== id)); setFeedback("Prestation supprimée du catalogue. Les réservations existantes sont conservées."); }} />)}<Link href="/pro/videos">Retour au Studio</Link>{providerProfile && <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />}<TariffPhotoImport userId={userId} currency={providerProfile && activityLocationReady(providerProfile) ? providerProfile.currency : null} catalog={baseServices} onSaved={load}/><form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
               <h3 className="wide">Ajouter une prestation</h3>
               <ServiceReferenceField catalog={baseServices}/>
               <label>Nom de votre prestation<input name="title" required minLength={2} maxLength={120} placeholder="Ex. : Tresses personnalisées" /></label>

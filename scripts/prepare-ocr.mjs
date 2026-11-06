@@ -1,0 +1,13 @@
+import {createRequire} from 'node:module';
+import {dirname,join} from 'node:path';
+import {mkdir,copyFile,readdir} from 'node:fs/promises';
+const require=createRequire(import.meta.url), target=join(process.cwd(),'public/ocr');
+await mkdir(target,{recursive:true});
+const tess=dirname(require.resolve('tesseract.js/package.json'));
+const nested=createRequire(join(tess,'package.json'));
+const core=dirname(nested.resolve('tesseract.js-core/package.json'));
+await copyFile(join(tess,'dist/worker.min.js'),join(target,'worker.min.js'));
+await copyFile(join(tess,'LICENSE.md'),join(target,'TESSERACT-LICENSE.txt'));
+for(const file of await readdir(core)) if(file.endsWith('.wasm')||file.endsWith('.wasm.js'))await copyFile(join(core,file),join(target,file));
+const data=dirname(require.resolve('@tesseract.js-data/fra/package.json'));
+await copyFile(join(data,'4.0.0_best_int/fra.traineddata.gz'),join(target,'fra.traineddata.gz'));
