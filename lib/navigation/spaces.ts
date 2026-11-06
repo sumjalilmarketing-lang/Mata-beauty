@@ -45,9 +45,9 @@ const clientModules = [
 
 const proModules = [
   module("team", "Mon équipe", "◎", "Pilotage", "Collaborateurs, prestations autorisées, horaires et affectations.", { resource: "collaborators" }),
-  module("dashboard", "Dashboard", "⌂", "Pilotage", "Rendez-vous du jour, demandes, messages, revenus et alertes.", { primary: true }),
+  module("dashboard", "Accueil", "⌂", "Pilotage", "Rendez-vous du jour, demandes, messages, revenus et alertes.", { primary: true }),
   module("agenda", "Agenda", "□", "Pilotage", "Disponibilités, absences et calendrier professionnel.", { primary: true, resource: "bookings" }),
-  module("bookings", "Réservations", "▣", "Pilotage", "Demandes, confirmations, rendez-vous en cours et historique.", { primary: true, resource: "bookings" }),
+  module("bookings", "Rendez-vous", "▣", "Pilotage", "Demandes, confirmations, rendez-vous en cours et historique.", { primary: true, resource: "bookings" }),
   module("messages", "Messages", "✉", "Relations", "Conversations avec vos clientes.", { primary: true, resource: "messages" }),
   module("services", "Prestations", "≡", "Offre", "Tarifs, durées, options, acompte et disponibilité.", { primary: true, resource: "services" }),
   module("videos", "Studio", "▶", "Contenu", "Publications, création, brouillons, programmation et statistiques.", { resource: "videos" }),
@@ -64,9 +64,9 @@ const proModules = [
 
 const salonModules = [
   module("dashboard", "Dashboard", "⌂", "Pilotage", "Activité globale du salon, alertes et actions rapides.", { primary: true }),
-  module("agenda", "Agenda du salon", "□", "Pilotage", "Vues globale, membre et poste avec conflits et absences.", { primary: true, resource: "bookings" }),
+  module("agenda", "Agenda", "□", "Pilotage", "Vues globale, membre et poste avec conflits et absences.", { primary: true, resource: "bookings" }),
   module("bookings", "Réservations", "▣", "Pilotage", "Réservations et affectations du salon.", { primary: true, resource: "bookings" }),
-  module("team", "Équipe", "◎", "Organisation", "Invitations, rôles, horaires, spécialités et permissions.", { primary: true, resource: "collaborators" }),
+  module("team", "Mon équipe", "◎", "Organisation", "Invitations, rôles, horaires, spécialités et permissions.", { primary: true, resource: "collaborators" }),
   module("services", "Prestations", "≡", "Offre", "Catalogue commun et prestations par membre.", { primary: true, resource: "services" }),
   module("resources", "Postes et ressources", "⌑", "Organisation", "Fauteuils, cabines, équipements et capacité simultanée."),
   module("clients", "Clientes", "♙", "Relations", "Clientèle du salon et historique partagé.", { resource: "profiles" }),
