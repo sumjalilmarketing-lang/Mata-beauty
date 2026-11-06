@@ -1,4 +1,6 @@
 "use client";
+import { ServiceReferenceField } from "./service-reference-field";
+import { serviceReference } from "@/lib/domain/service-reference";
 
 import { FormEvent, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -27,7 +29,7 @@ export function ServiceEditor({ service, catalog, userId, businessId, activityCu
     const supabase = getSupabaseBrowserClient();
     if (!supabase) { setMessage("Connexion indisponible. Réessayez."); return; }
     const values = event ? new FormData(event.currentTarget) : null;
-    const details = values ? { serviceId: String(values.get("serviceId") ?? ""), title: String(values.get("title") ?? "").trim(), durationMinutes: Number(values.get("duration")), priceAmount: Number(values.get("price")) } : null;
+    const details = values ? { serviceId: serviceReference(values.get("serviceId"), catalog), title: String(values.get("title") ?? "").trim(), durationMinutes: Number(values.get("duration")), priceAmount: Number(values.get("price")) } : null;
     if (details) { const error = serviceDetailsError(details); if (error) { setMessage(error); return; } }
     const depositPercentage = Number(values?.get("depositPercentage") ?? service.deposit_percentage ?? 0);
     if (details && !validDepositPercentage(depositPercentage)) { setMessage("Choisissez un acompte entier entre 0 et 60 %."); return; }
@@ -50,7 +52,7 @@ export function ServiceEditor({ service, catalog, userId, businessId, activityCu
     {currencyChanged && <p className="service-editor-warning">Cette prestation est en {service.currency}, alors que votre activité est en {currency}. Modifiez son prix pour corriger la devise. Aucun montant n’est converti automatiquement.</p>}
     {!editing && !removing && <div className="service-editor-actions"><button type="button" onClick={() => { setMessage(""); setEditing(true); }}>Modifier</button><button type="button" className="service-editor-danger" onClick={() => { setMessage(""); setRemoving(true); }}>Supprimer</button></div>}
     {editing && <form onSubmit={event => void persist(event)}>
-      <label>Catégorie<select name="serviceId" defaultValue={service.service_id} required disabled={busy}>{!catalog.some(item => item.id === service.service_id) && <option value={service.service_id}>Catégorie actuelle</option>}{catalog.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <ServiceReferenceField catalog={catalog} defaultValue={service.service_id} disabled={busy}/>
       <label>Nom de votre prestation<input name="title" defaultValue={service.title} required minLength={2} maxLength={120} disabled={busy} /></label>
       <label>Durée (minutes)<input name="duration" type="number" inputMode="numeric" defaultValue={service.duration_minutes} required min={15} max={720} step={1} disabled={busy} /></label>
       <label>Prix ({currency})<input key={currency} name="price" type="number" inputMode="numeric" defaultValue={currencyChanged ? "" : service.price_amount} required min={0} max={10000000} step={1} disabled={busy} /></label>

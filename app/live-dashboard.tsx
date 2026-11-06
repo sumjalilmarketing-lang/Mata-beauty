@@ -1,4 +1,6 @@
 "use client";
+import { ServiceReferenceField } from "./service-reference-field";
+import { serviceReference } from "@/lib/domain/service-reference";
 import { PhoneInput } from "./phone-input";
 import { BookingReschedule } from "./booking-reschedule";
 import { BookingFeedback } from "./booking-feedback";
@@ -501,7 +503,7 @@ export function LiveDashboard({
     if (!supabase || !providerProfile?.currency) return;
     const form = event.currentTarget;
     const values = new FormData(form);
-    const details = { serviceId: String(values.get("serviceId") ?? ""), title: String(values.get("title") ?? "").trim(), durationMinutes: Number(values.get("durationMinutes")), priceAmount: Number(values.get("priceAmount")) };
+    const details = { serviceId: serviceReference(values.get("serviceId"), baseServices), title: String(values.get("title") ?? "").trim(), durationMinutes: Number(values.get("durationMinutes")), priceAmount: Number(values.get("priceAmount")) };
     const invalid = serviceDetailsError(details);
     if (invalid) { setFeedback(invalid); return; }
     servicePending.current = true; setSavingService(true); setFeedback("");
@@ -603,7 +605,7 @@ export function LiveDashboard({
             <ProviderLogoEditor userId={userId} /><ProfessionalDocuments providerId={userId} /></>}
             {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <ServiceEditor key={service.id} service={service} catalog={baseServices} userId={userId} businessId={service.business_id ?? undefined} activityCurrency={service.business_id ? null : providerProfile?.currency ?? null} onSaved={value => setOwnServices(current => current.map(item => item.id === value.id ? value : item))} onRemoved={id => { setOwnServices(current => current.filter(item => item.id !== id)); setFeedback("Prestation supprimée du catalogue. Les réservations existantes sont conservées."); }} />)}<Link href="/pro/videos">Retour au Studio</Link>{providerProfile && <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />}<form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
               <h3 className="wide">Ajouter une prestation</h3>
-              <label>Type<select name="serviceId" required defaultValue=""><option value="" disabled>Choisir</option>{baseServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
+              <ServiceReferenceField catalog={baseServices}/>
               <label>Nom de votre prestation<input name="title" required minLength={2} maxLength={120} placeholder="Ex. : Tresses personnalisées" /></label>
               <label>Durée au choix (minutes)<input name="durationMinutes" type="number" inputMode="numeric" required min={15} max={720} step={1} aria-describedby="service-duration-help" /><small id="service-duration-help">De 15 à 720 minutes, à la minute près.</small></label>
               <label>Prix ({providerProfile?.currency ?? "devise à définir"})<input name="priceAmount" type="number" required min={0} step={1} disabled={!activityLocationReady(providerProfile)} /></label>
