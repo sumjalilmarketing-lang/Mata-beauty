@@ -25,6 +25,7 @@ export type CatalogProvider = {
   homeService: boolean;
   durationMinutes: number;
   businessId?: string;
+  businessSlug?: string;
   coverUrl?: string;
   serviceMedia?: CategoryMedia;
 };
@@ -76,7 +77,7 @@ type ProviderRecord = {
     deposit_percentage: number;
     business_id: string | null;
     currency: string;
-    businesses: { address: string; city: string; area: string | null; latitude: number | null; longitude: number | null; country_code: string | null; region: string | null; timezone: string | null; currency: string | null } | null;
+    businesses: { name: string; slug: string; address: string; city: string; area: string | null; latitude: number | null; longitude: number | null; country_code: string | null; region: string | null; timezone: string | null; currency: string | null } | null;
     services: { name: string; categories: { id: string; name: string } | null } | null;
   }>;
 };
@@ -90,7 +91,7 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
       profile_id,business_name,city,service_mode,average_rating,review_count,verified_at,cover_url,latitude,longitude,country_code,region,timezone,
       provider_services!inner(
         id,title,duration_minutes,price_amount,business_id,currency,deposit_percentage,
-        businesses(address,city,area,latitude,longitude,country_code,region,timezone,currency),
+        businesses(name,slug,address,city,area,latitude,longitude,country_code,region,timezone,currency),
         services(name,categories(id,name))
       )
     `)
@@ -151,7 +152,8 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
       profileId: provider.profile_id,
       serviceId: service.id,
       categoryId: service.services?.categories?.id,
-      name: provider.business_name,
+      name: service.businesses?.name || provider.business_name,
+      businessSlug: service.businesses?.slug,
       specialty: service.title || service.services?.name || "Prestation beauté",
       category: service.services?.categories?.name || "Beauté",
       area: [service.businesses?.area, service.businesses?.city ?? provider.city, countryName(service.businesses?.country_code ?? provider.country_code)]

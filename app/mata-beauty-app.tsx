@@ -51,6 +51,7 @@ type Provider = {
   homeService: boolean;
   durationMinutes: number;
   businessId?: string;
+  businessSlug?: string;
   countryCode?: string;
   timeZone?: string;
   currency?: BookingCurrency;
@@ -529,7 +530,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
   function viewProvider(provider: Provider) {
     const client = getSupabaseBrowserClient();
     if (client) void recordProductEvent(client, "provider_viewed", { provider_id: provider.profileId, category: provider.category });
-    window.location.assign("/professional/" + encodeURIComponent(provider.profileId));
+    window.location.assign(provider.businessSlug ? "/salons/" + encodeURIComponent(provider.businessSlug) : "/professional/" + encodeURIComponent(provider.profileId));
   }
 
   async function openSocialProvider(authorId: string) {
@@ -1080,7 +1081,7 @@ function BookingMicroFeedback({ bookingId }: { bookingId: string }) {
 function BottomNav({ authenticated, active, onFeed, onAccount }: { authenticated: boolean; active: "inspiration"; onFeed: () => void; onAccount: (page: "bookings" | "messages" | "profile") => void }) {
   const locale = useApplicationLocale();
   const t = (text: string) => bookingText(text, locale);
-  return <nav className="premium-bottom-nav" aria-label={t("Navigation de l’application")}><button className={`inspiration-nav ${active === "inspiration" ? "active" : ""}`} onClick={onFeed}><i>▶</i>Inspiration</button><button onClick={() => onAccount("bookings")}><i>□</i>{t("Rendez-vous")}</button><button onClick={() => onAccount("messages")}><i className="inbox-icon">✉{authenticated && <UnreadBadge kind="messages"/>}</i>{t("Messages")}</button><button aria-label={authenticated ? t("Profil") : t("Se connecter à MATA Beauty")} onClick={() => onAccount("profile")}><i aria-hidden>○</i>{authenticated ? t("Profil") : t("Se connecter")}</button></nav>;
+  return <nav className="premium-bottom-nav" aria-label={t("Navigation de l’application")}><button className={`inspiration-nav ${active === "inspiration" ? "active" : ""}`} onClick={onFeed}><i>▶</i>Inspiration</button><button onClick={() => onAccount("bookings")}><i className="inbox-icon">□{authenticated && <UnreadBadge kind="bookings"/>}</i>{t("Rendez-vous")}</button><button onClick={() => onAccount("messages")}><i className="inbox-icon">✉{authenticated && <UnreadBadge kind="messages"/>}</i>{t("Messages")}</button><button aria-label={authenticated ? t("Profil") : t("Se connecter à MATA Beauty")} onClick={() => onAccount("profile")}><i aria-hidden>○</i>{authenticated ? t("Profil") : t("Se connecter")}</button></nav>;
 }
 
 function formatDuration(minutes: number) {
