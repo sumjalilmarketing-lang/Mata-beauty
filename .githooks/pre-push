@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+if ! git diff --quiet || ! git diff --cached --quiet || test -n "$(git ls-files --others --exclude-standard)"; then
+  echo "Pre-push: commit or stash working changes before validating the release." >&2
+  exit 1
+fi
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
+  if test "$local_sha" != "$(git rev-parse HEAD)"; then
+    echo "Pre-push: check out the version being pushed before validating it." >&2
+    exit 1
+  fi
+done
+node scripts/quality-gate.mjs
