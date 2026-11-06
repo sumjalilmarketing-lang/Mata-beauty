@@ -1,9 +1,11 @@
 "use client";
+import { TeamPhoto, useTeamPhotos } from "./team-photos";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 type Colleague = { business_id: string; collaborator_id: string; display_name: string; title: string | null };
 export function StaffTeamDirectory() {
   const [rows, setRows] = useState<Colleague[]>([]);
+  const photos=useTeamPhotos(rows.map(row=>row.business_id));
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
@@ -23,7 +25,7 @@ export function StaffTeamDirectory() {
   return <details><summary>Mon équipe</summary>
     {loading && <p role="status">Chargement de l’équipe…</p>}
     {error && <><p role="alert">Équipe indisponible.</p><button type="button" onClick={() => { setError(false); setLoading(true); setAttempt(value => value + 1); }}>Réessayer</button></>}
-    {!loading && !error && (rows.length ? <ul>{rows.map(person => <li key={person.collaborator_id}>{person.display_name}{person.title ? ` · ${person.title}` : ""}</li>)}</ul> : <p>Aucun membre d’équipe disponible.</p>)}
+    {!loading && !error && (rows.length ? <ul>{rows.map(person => <li key={person.collaborator_id}><TeamPhoto name={person.display_name} url={photos[person.collaborator_id]}/>{person.display_name}{person.title ? ` · ${person.title}` : ""}</li>)}</ul> : <p>Aucun membre d’équipe disponible.</p>)}
     <p>Les plannings personnels de vos collègues restent privés.</p>
   </details>;
 }
