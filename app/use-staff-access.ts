@@ -14,10 +14,21 @@ export function useStaffAccess() {
       const request = ++version;
       setChecking(true);
       try {
+        // Session expiry/sign-out must clear access instead of invoking a
+        // private RPC as anon and leaving a previously granted menu visible.
+        const { data: { session }, error: sessionError } = await client!.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!active || request !== version) return;
+        if (!session) {
+          setAvailable(false);
+          setError(false);
+          setCheckedAt(new Date().toLocaleTimeString("fr-FR"));
+          return;
+        }
         const result = await client!.rpc("current_collaborator_access").abortSignal(AbortSignal.timeout(12000));
         if(result.error) throw result.error;
         if(active && request === version) { setAvailable(Array.isArray(result.data) && result.data.some(row => Array.isArray(row.permissions) && row.permissions.length > 0)); setError(false); setCheckedAt(new Date().toLocaleTimeString("fr-FR")); }
-      } catch { if(active && request === version) { setError(true); } }
+      } catch { if(active && request === version) { setAvailable(null); setError(true); } }
       finally {if(active && request===version)setChecking(false);}
     }
     const update=()=>{void refresh();};

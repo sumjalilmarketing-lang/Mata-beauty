@@ -643,6 +643,7 @@ export function LiveDashboard({
           <article className="panel" id="live-bookings">
             <div className="panel-heading"><h2>Réservations</h2><button onClick={() => void load()}>Actualiser</button></div>
             {role === "provider" && <p>Les 200 réservations créées le plus récemment sont affichées, tous statuts confondus. L’agenda permet de consulter une période précise.</p>}
+            {loading && <p role="status">Chargement des réservations…</p>}
             {!loading && bookings.length === 0 && <div className="compact-empty">Aucun rendez-vous pour le moment.</div>}
             {bookings.map((booking) => {
               const timeZone = bookingTimeZone(booking.provider_services?.business_id ? businessTimeZones[booking.provider_services.business_id] : null, providerProfile?.timezone, providerProfile?.country_code);
