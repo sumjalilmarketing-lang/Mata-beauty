@@ -177,3 +177,12 @@
 .workspace-layout:not(.workspace-pro):not(.workspace-salon) .workspace-list-search a { color:#ffadd5; }
 .workspace-layout .workspace-list-search input::placeholder { color:#62505a; opacity:1; }
 .workspace-layout .workspace-list-search input { color-scheme:light; }
+
+/* Keep the menu anchored even in the 721–767px range where it is visible. */
+.workspace-mobile-nav{position:fixed;inset:auto 0 0;margin:0;z-index:60;box-sizing:border-box;transform:none}
+@media(max-width:767px){
+ .workspace-layout{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+ .workspace-mobile-nav{height:calc(72px + env(safe-area-inset-bottom,0px));padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));overflow-y:hidden;overscroll-behavior-x:contain}
+ .workspace-mobile-nav>a,.workspace-mobile-nav>button{min-height:54px;flex:1 0 64px}
+ .workspace-mobile-nav small{max-width:100%;white-space:normal;text-overflow:clip;text-align:center;font-size:11px;line-height:1.2}
+}
