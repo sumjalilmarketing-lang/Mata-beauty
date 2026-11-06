@@ -206,7 +206,8 @@ async function followerCounts(providerId: string, viewerId: string | null) {
 }
 
 async function serviceRows(providerId: string, businessId?: string) {
-  let query = publicProfileClient().from("provider_services")
+  // Public catalogs retain RLS even when other server lookups need a service key.
+  let query = publicProfileClient(false).from("provider_services")
     .select("id,title,description,duration_minutes,price_amount,currency")
     .eq("provider_id", providerId).eq("is_active", true).is("archived_at", null).order("title").limit(80);
   if (businessId) query = query.eq("business_id", businessId);

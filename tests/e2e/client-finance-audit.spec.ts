@@ -73,7 +73,7 @@ test('client : une photo sans ligne modifiée ne produit pas de faux succès',as
  await page.route(`${api}/storage/v1/object/avatars/**`,route=>route.fulfill({json:{Key:'avatars/synthetic.png'}}));
  await page.route(`${api}/rest/v1/profiles**`,route=>route.request().method()==='PATCH'?route.fulfill({json:null}):route.fallback());
  await page.goto('/app/profile?edit=1');
- await page.getByLabel('Photo de profil',{exact:true}).setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64')});
+ await page.getByLabel('Changer ma photo de profil',{exact:true}).setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64')});
  await expect(page.getByText('La photo n’a pas pu être enregistrée.',{exact:true})).toBeVisible();
  await expect(page.getByText('Photo mise à jour.',{exact:true})).toHaveCount(0);
 });

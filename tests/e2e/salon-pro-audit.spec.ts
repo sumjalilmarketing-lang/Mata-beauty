@@ -59,7 +59,7 @@ for(const legacy of [false,true]) test(`salon : une nouvelle prestation sans hor
   else expect(body).not.toHaveProperty('status');
   return route.fulfill({json:null});
  });
- await page.goto('/salon/services');await page.locator('select[name="serviceId"]').first().selectOption('aaaaaaaa-aaaa-4aaa-8aaa-000000000503');await page.locator('input[name="title"]').fill('Nouvelle prestation');await page.locator('input[name="duration"]').fill('60');await page.locator('input[name="price"]').fill('10000');await page.getByRole('button',{name:'Ajouter la prestation',exact:true}).click();
+ await page.goto('/salon/services');await page.locator('select[name="serviceId"]').first().selectOption('aaaaaaaa-aaaa-4aaa-8aaa-000000000503');await page.locator('input[name="title"]').fill('Nouvelle prestation');await page.locator('form.salon-form').getByLabel('Heures',{exact:true}).fill('1');await page.locator('form.salon-form').getByLabel('Minutes',{exact:true}).fill('0');await page.locator('input[name="price"]').fill('10000');await page.getByRole('button',{name:'Ajouter la prestation',exact:true}).click();
  await expect(page.getByText('Prestation enregistrée en brouillon. Publiez vos horaires pour l’activer.',{exact:true})).toBeVisible();expect(attempts).toBe(legacy?2:1);
 });
 

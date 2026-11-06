@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getPaymentGateway, type GatewayConfirmation } from "@/lib/payments/gateway";
 import { consumeRateLimit, jsonError, requestContext, serviceSupabase } from "@/lib/payments/server";
 import { isWebhookFresh } from "@/lib/payments/security";
+import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 
 const mockEventSchema = z.object({
   eventId: z.string().min(1).max(200), providerReference: z.string().min(1).max(250),
@@ -23,10 +24,15 @@ async function recordSuspicion(input: { requestId: string; type: string; severit
 }
 
 export async function POST(request: Request) {
-  const rawBody = await request.text();
+  let rawBody: string;
+  try {
+    rawBody = await readBoundedText(request, 128_000);
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) return jsonError("Événement trop volumineux.", 413, "PAYLOAD_TOO_LARGE");
+    return jsonError("Webhook non authentique ou invalide.", 400, "INVALID_WEBHOOK");
+  }
   const context = requestContext(request);
   const payloadHash = createHash("sha256").update(rawBody).digest("hex");
-  if (rawBody.length > 128_000) return jsonError("Événement trop volumineux.", 413, "PAYLOAD_TOO_LARGE");
   let rateLimitAllowed = false;
   try {
     rateLimitAllowed = await consumeRateLimit({ scope: "payment_webhook", key: context.ipHash, limit: 120, windowSeconds: 60 });

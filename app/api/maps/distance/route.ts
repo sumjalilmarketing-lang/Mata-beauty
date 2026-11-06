@@ -1,3 +1,4 @@
+import { limitMapsRequest } from "@/lib/maps-rate-limit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { distanceKm } from "@/lib/maps";
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
   const fallback = distanceKm(parsed.data.origin, parsed.data.destination);
   const key = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!key) return NextResponse.json({ distanceKm: fallback, source: "haversine", configured: false });
+  const limited = await limitMapsRequest(request);
+  if (limited) return limited;
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 6500);
   try {
     const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {

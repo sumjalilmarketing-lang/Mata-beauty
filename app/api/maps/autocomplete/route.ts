@@ -1,3 +1,4 @@
+import { limitMapsRequest } from "@/lib/maps-rate-limit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -9,6 +10,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const parsed = querySchema.safeParse({ input: url.searchParams.get("input"), sessionToken: url.searchParams.get("sessionToken") ?? undefined, countryCode: url.searchParams.get("countryCode") ?? undefined, languageCode: url.searchParams.get("languageCode") ?? undefined });
   if (!parsed.success) return NextResponse.json({ error: "Recherche d’adresse invalide." }, { status: 400 });
+  const limited = await limitMapsRequest(request);
+  if (limited) return limited;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6000);
   try {

@@ -8,6 +8,14 @@ vi.mock("@/lib/payments/server", () => ({ serviceSupabase: mocks.service }));
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
 
 describe("public profile database access", () => {
+  it("retains RLS for public catalogs even with a server credential configured", () => {
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-server-key");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://test.supabase.co");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "public-test-key");
+    publicProfileClient(false);
+    expect(mocks.service).not.toHaveBeenCalled();
+    expect(mocks.create).toHaveBeenCalledOnce();
+  });
   it("keeps public browsing available through RLS without a payment service credential", () => {
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://test.supabase.co");
