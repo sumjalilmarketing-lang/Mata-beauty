@@ -1,6 +1,11 @@
 import { feedText } from "./feed-copy";
 
 const copy: Record<string, readonly [string, string]> = {
+  "Cette prestation n’est pas encore ouverte à la réservation. Le salon doit terminer sa publication.": ["This service is not open for bookings yet. The salon must finish publication.", "Este servicio aún no admite reservas. El salón debe completar su publicación."],
+  "Voir les prochaines disponibilités": ["See next available slots", "Ver las próximas horas disponibles"],
+  "Recherche…": ["Searching…", "Buscando…"],
+  "Aucun créneau disponible dans les 14 prochains jours.": ["No slots available in the next 14 days.", "No hay horas disponibles en los próximos 14 días."],
+  "La recherche n’a pas abouti. Réessayez.": ["The search failed. Try again.", "La búsqueda ha fallado. Inténtalo de nuevo."],
   "Détail du prix": ["Price breakdown", "Desglose del precio"],
   "Prix total": ["Total price", "Precio total"],
   "Acompte prévu": ["Planned deposit", "Anticipo previsto"],

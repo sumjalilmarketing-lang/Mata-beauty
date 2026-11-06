@@ -1,9 +1,10 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { UnreadBadge } from "./unread-inbox";
 import { PushSettings } from "./push-settings";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { notificationBadgeAfterRead, notificationDestination, type NotificationItem } from "@/lib/domain/notifications";
+import { notificationDestination, type NotificationItem } from "@/lib/domain/notifications";
 
 export function NotificationCenter({ userId }: { userId?: string }) {
   const router = useRouter();
@@ -86,32 +87,7 @@ export function NotificationCenter({ userId }: { userId?: string }) {
   </section>;
 }
 
-export function NotificationBadge() {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    let active = true;
-    let profileId = "";
-    async function refresh() {
-      const client = getSupabaseBrowserClient(); if (!client) return;
-      const { data } = await client.auth.getUser(); if (!data.user || !active) return;
-      profileId = data.user.id;
-      const result = await client.from("notifications").select("id", { count: "exact", head: true }).eq("profile_id", data.user.id).is("read_at", null);
-      if (active && !result.error) setCount(result.count ?? 0);
-    }
-    const changed = (event: Event) => {
-      const detail = (event as CustomEvent<{ profileId?: unknown; changedCount?: unknown }>).detail;
-      if (typeof detail?.profileId !== "string" || detail.profileId !== profileId) return;
-      if (detail.changedCount === null || (typeof detail.changedCount === "number" && detail.changedCount > 0)) {
-        setCount(current => notificationBadgeAfterRead(current, detail.changedCount as number | null));
-      }
-      void refresh();
-    };
-    void refresh(); const timer = setInterval(() => void refresh(), 30_000);
-    window.addEventListener("mata-notifications-changed", changed); window.addEventListener("focus", refresh);
-    return () => { active = false; clearInterval(timer); window.removeEventListener("mata-notifications-changed", changed); window.removeEventListener("focus", refresh); };
-  }, []);
-  return count > 0 ? <span className="notification-badge" aria-label={`${count} notifications non lues`}>{count > 99 ? "99+" : count}</span> : null;
-}
+export function NotificationBadge() { return <UnreadBadge kind="notifications"/>; }
 
 function InboxNotification({ item, busy, onRead, onOpen, onDismiss }: { item: NotificationItem; busy: boolean; onRead: () => void; onOpen: () => void; onDismiss: () => void }) {
   const [open, setOpen] = useState(false), [actions, setActions] = useState(false);

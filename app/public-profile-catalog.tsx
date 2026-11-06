@@ -22,9 +22,9 @@ export function PublicProfileCatalog({ profile }: { profile: PublicSocialProfile
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
     <h2 id="published-services-title">Prestations de {profile.name}</h2>
     <p>{[profile.area, profile.city].filter(Boolean).join(" · ")}</p>
-    <p>Consultez le détail de chaque prestation, puis choisissez parmi les créneaux proposés.</p>
+    <p>Choisissez une prestation pour voir ses disponibilités et réserver.</p>
     <ul>{profile.services.map(service => <li key={service.id}>
-      <Link href={`/service/${encodeURIComponent(service.id)}`}>{service.title}</Link>
+      <Link href={`/?service=${encodeURIComponent(service.id)}`}>{service.title} · Voir les créneaux</Link>
       <span>{service.durationMinutes} min · {service.priceAmount.toLocaleString("fr-FR")} {service.currency}</span>
     </li>)}</ul>
     <Link href="/conseils">Conseils pour préparer votre rendez-vous beauté</Link>

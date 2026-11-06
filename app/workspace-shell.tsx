@@ -14,6 +14,7 @@ import "./workspace-more-menu.css";
 import { ProductHelp } from "./product-help";
 import { WorkspaceProfileAvatar } from "./workspace-profile-avatar";
 import { useStaffAccess } from "./use-staff-access";
+import { UnreadBadge, MenuUnreadBadge } from "./unread-inbox";
 import { NotificationBadge } from "./notification-center";
 
 type Props = {
@@ -81,7 +82,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
             const href = workspaceHref(space, item.key);
             const active = pathname === href || item.key === parent;
             return <Link aria-current={active ? "page" : undefined} className={active ? "active" : ""} href={href} key={item.key}>
-              <span aria-hidden>{item.icon}</span>{t(navigationLabel(space, item))}
+              <span className="inbox-icon">{item.icon}<MenuUnreadBadge moduleKey={item.key}/></span>{t(navigationLabel(space, item))}
             </Link>;
           })}
         </div>)}
@@ -92,7 +93,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
     <main className="workspace-main">
       <header className="workspace-topbar">
         <div><p>{t(definition.eyebrow)}</p><h1>{t(activeModule.label)}</h1></div>
-        <div className="workspace-tools"><form role="search" onSubmit={search}><label><span className="sr-only">{t("Rechercher dans ce module")}</span><input name="workspace-search" type="search" placeholder={t("Rechercher…")} /></label></form>{notificationsModule && <Link className="workspace-notifications" href={workspaceHref(space, notificationsModule.key)} aria-label={t("Notifications")}>◌<NotificationBadge /></Link>}<WorkspaceProfileAvatar email={userEmail} href={space === "staff" ? "/staff/profile" : space === "pro" ? "/pro/settings" : "/app/profile?edit=1"} /></div>
+        <div className="workspace-tools"><form role="search" onSubmit={search}><label><span className="sr-only">{t("Rechercher dans ce module")}</span><input name="workspace-search" type="search" placeholder={t("Rechercher…")} /></label></form>{modules.some(item=>item.key==="messages") && <Link className="inbox-icon" href={workspaceHref(space,"messages")} aria-label={t("Messages")}>✉<UnreadBadge kind="messages"/></Link>}{notificationsModule && <Link className="workspace-notifications" href={workspaceHref(space, notificationsModule.key)} aria-label={t("Notifications")}>◌<NotificationBadge /></Link>}<WorkspaceProfileAvatar email={userEmail} href={space === "staff" ? "/staff/profile" : space === "pro" ? "/pro/settings" : "/app/profile?edit=1"} /></div>
       </header>
       <div className="workspace-breadcrumb"><Link href={definition.prefix}>{t(definition.label)}</Link><span>/</span><span>{t(activeModule.label)}</span></div>
       {secondary.length > 0 && !(space === "client" && moduleKey === "profile") && <details className="workspace-secondary" open={secondary.some((item) => item.key === moduleKey)}><summary>{space === "client" ? t("Mon compte") : t("Dans cette rubrique")}</summary><nav aria-label={t("Navigation secondaire")}>{secondary.map((item) => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined}>{t(navigationLabel(space, item))}</Link>)}</nav></details>}
@@ -101,12 +102,12 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
       {(parent === "profile" || parent === "public-profile") && <ProductHelp professional={space === "pro"} />}
     </main>
     <nav className="workspace-mobile-nav" aria-label={t("Navigation mobile")}>
-      {mobileItems.map((item) => <Link className={item.key === parent ? "active" : ""} href={workspaceHref(space, item.key)} key={item.key}><span>{item.icon}</span><small>{t(navigationLabel(space, item))}</small></Link>)}
+      {mobileItems.map((item) => <Link className={item.key === parent ? "active" : ""} href={workspaceHref(space, item.key)} key={item.key}><span className="inbox-icon">{item.icon}<MenuUnreadBadge moduleKey={item.key}/></span><small>{t(navigationLabel(space, item))}</small></Link>)}
       {space !== "client" && moreItems.length > 0 && <button type="button" className={moreOpen || !mobileItems.some(item => item.key === parent) ? "active" : ""} aria-haspopup="dialog" aria-expanded={moreOpen} aria-controls="workspace-more-menu" onClick={() => { moreDialog.current?.showModal(); setMoreOpen(true); }}><span aria-hidden>•••</span><small>{t("Plus")}</small></button>}
     </nav>
     <dialog ref={moreDialog} id="workspace-more-menu" className="workspace-more-menu" aria-labelledby="workspace-more-title" onClose={() => setMoreOpen(false)} onClick={event => { if (event.target === event.currentTarget) moreDialog.current?.close(); }}>
       <div className="workspace-more-content"><header><div><h2 id="workspace-more-title">{t("Plus")}</h2><p>{t(definition.label)}</p></div><button type="button" autoFocus aria-label={t("Fermer le menu")} onClick={() => moreDialog.current?.close()}>✕</button></header>
-      <nav aria-label={t("Autres rubriques")}>{moreItems.map(item => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined} onClick={() => moreDialog.current?.close()}><span aria-hidden>{item.icon}</span><span>{t(navigationLabel(space, item))}</span><span aria-hidden>›</span></Link>)}</nav>
+      <nav aria-label={t("Autres rubriques")}>{moreItems.map(item => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined} onClick={() => moreDialog.current?.close()}><span className="inbox-icon">{item.icon}<MenuUnreadBadge moduleKey={item.key}/></span><span>{t(navigationLabel(space, item))}</span><span aria-hidden>›</span></Link>)}</nav>
       {space === "commercial" && <nav aria-label="Changer d’espace"><Link href="/" onClick={() => moreDialog.current?.close()}>Découvrir le feed</Link>{availableSpaces.filter(key => key !== "commercial").map(key => <Link key={key} href={workspaceHref(key)} onClick={() => moreDialog.current?.close()}>{t(workspaceSpaces[key].label)}</Link>)}</nav>}
       <button className="workspace-more-signout" type="button" onClick={() => { moreDialog.current?.close(); void signOut(); }}>{t("Se déconnecter")}</button></div>
     </dialog>

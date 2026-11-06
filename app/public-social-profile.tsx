@@ -251,7 +251,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     {tab === "services" && <section className={styles.serviceList} aria-label="Prestations">
       {profile.services.length ? profile.services.map(service => <article className={styles.serviceCard} key={service.id}>
-        <div><h2><Link href={`/service/${encodeURIComponent(service.id)}`}>{service.title}</Link></h2>{service.description && <p>{service.description}</p>}<small>{service.durationMinutes} min · {formatMoney(service.priceAmount, service.currency)}</small></div>
+        <div><h2><Link href={bookingHref(service.id)} onClick={openBooking}>{service.title}</Link></h2>{service.description && <p>{service.description}</p>}<small>{service.durationMinutes} min · {formatMoney(service.priceAmount, service.currency)}</small></div>
         <div className={styles.serviceActions}><Link href={`/service/${encodeURIComponent(service.id)}`}>Détails</Link><Link href={bookingHref(service.id)} onClick={openBooking}>Réserver</Link></div>
       </article>) : <p className={styles.empty}>Aucune prestation active n’est publiée pour le moment.</p>}
     </section>}

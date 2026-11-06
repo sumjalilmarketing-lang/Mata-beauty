@@ -42,7 +42,7 @@ export function AddressAutocomplete({ defaultAddress, defaultPlaceId, defaultLat
 }
 
 export function ProviderMap({name,address,latitude,longitude,origin}:{name:string;address?:string|null;latitude?:number|null;longitude?:number|null;origin?:GeoPoint|null}){
-  if(latitude==null||longitude==null||!validGeoPoint({latitude,longitude}))return <div className="map-unavailable"><strong>Localisation non publiée</strong><p>Le professionnel communiquera l’adresse exacte pendant la réservation.</p></div>;
+  if(latitude==null||longitude==null||!validGeoPoint({latitude,longitude}))return <div className="map-unavailable"><strong>{address?.trim()?"Position sur la carte indisponible":"Localisation non publiée"}</strong><p>{address?.trim()?`Adresse publiée : ${address}. Les coordonnées GPS ne sont pas encore renseignées.`:"Le professionnel communiquera l’adresse exacte pendant la réservation."}</p></div>;
   const destination={latitude,longitude};const browserKey=process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY;const directions=googleDirectionsUrl(destination,origin??undefined);
   return <section className="provider-map" aria-label={`Carte de ${name}`}>
     {browserKey?<iframe title={`Localisation de ${name}`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={`https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(browserKey)}&q=${latitude},${longitude}&zoom=15`}/>:<div className="map-fallback"><span>⌖</span><strong>{address||name}</strong><small>La carte intégrée est momentanément indisponible. Vous pouvez ouvrir l’itinéraire.</small></div>}
