@@ -37,8 +37,11 @@ jobs:
           package-manager-cache: false
       - run: npm install --global pnpm@11.25.0
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      # Ubuntu runners already include Chrome. Verify it explicitly rather than
+      # waiting on apt/browser downloads before the regression tests can start.
+      - run: command -v google-chrome && google-chrome --version
       - run: pnpm test:e2e --project=desktop --project=mobile-390 tests/e2e/staff-audit.spec.ts tests/e2e/client-finance-audit.spec.ts tests/e2e/salon-pro-audit.spec.ts tests/e2e/workspace-inventory.spec.ts
         env:
           MATA_E2E_COLLABORATOR_ACCESS_ENABLED: 'true'
+          MATA_PLAYWRIGHT_CHROMIUM_PATH: /usr/bin/google-chrome
 
