@@ -1,4 +1,5 @@
 "use client";
+import { ServiceDurationInput } from "./service-duration-input";
 import { ServiceReferenceField } from "./service-reference-field";
 import { serviceReference } from "@/lib/domain/service-reference";
 
@@ -54,7 +55,7 @@ export function ServiceEditor({ service, catalog, userId, businessId, activityCu
     {editing && <form onSubmit={event => void persist(event)}>
       <ServiceReferenceField catalog={catalog} defaultValue={service.service_id} disabled={busy}/>
       <label>Nom de votre prestation<input name="title" defaultValue={service.title} required minLength={2} maxLength={120} disabled={busy} /></label>
-      <label>Durée (minutes)<input name="duration" type="number" inputMode="numeric" defaultValue={service.duration_minutes} required min={15} max={720} step={1} disabled={busy} /></label>
+      <ServiceDurationInput name="duration" defaultValue={service.duration_minutes} disabled={busy} />
       <label>Prix ({currency})<input key={currency} name="price" type="number" inputMode="numeric" defaultValue={currencyChanged ? "" : service.price_amount} required min={0} max={10000000} step={1} disabled={busy} /></label>
       <label>Acompte prévu (%)<input name="depositPercentage" type="number" inputMode="numeric" defaultValue={service.deposit_percentage ?? 0} required min={0} max={60} step={1} disabled={busy} /></label>
       <p>0 % : sans acompte. Un taux de 20 à 30 % convient aux prestations courtes ; jusqu’à 60 % pour les prestations longues ou coûteuses. Ce réglage prépare le paiement en ligne : aucun acompte n’est actuellement encaissé.</p>

@@ -1,4 +1,5 @@
 "use client";
+import { ServiceDurationInput } from "./service-duration-input";
 import { TariffPhotoImport } from "./tariff-photo-import";
 import { ServiceReferenceField } from "./service-reference-field";
 import { serviceReference } from "@/lib/domain/service-reference";
@@ -608,7 +609,7 @@ export function LiveDashboard({
               <h3 className="wide">Ajouter une prestation</h3>
               <ServiceReferenceField catalog={baseServices}/>
               <label>Nom de votre prestation<input name="title" required minLength={2} maxLength={120} placeholder="Ex. : Tresses personnalisées" /></label>
-              <label>Durée au choix (minutes)<input name="durationMinutes" type="number" inputMode="numeric" required min={15} max={720} step={1} aria-describedby="service-duration-help" /><small id="service-duration-help">De 15 à 720 minutes, à la minute près.</small></label>
+              <ServiceDurationInput name="durationMinutes" />
               <label>Prix ({providerProfile?.currency ?? "devise à définir"})<input name="priceAmount" type="number" required min={0} step={1} disabled={!activityLocationReady(providerProfile)} /></label>
               <button className="primary-button" type="submit" disabled={!activityLocationReady(providerProfile) || savingService}>{savingService ? "Enregistrement…" : "Ajouter la prestation"}</button>{!activityLocationReady(providerProfile) && <p className="wide" role="status">Pour activer le prix et valider, enregistrez les réglages de votre activité juste au-dessus. Le nom et la durée restent dans ce formulaire.</p>}
             </form></>}
