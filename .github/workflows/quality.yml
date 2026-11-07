@@ -65,3 +65,27 @@ jobs:
           MATA_E2E_COLLABORATOR_ACCESS_ENABLED: 'true'
           MATA_PLAYWRIGHT_CHROMIUM_PATH: /usr/bin/google-chrome
 
+  studio-webkit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm install --global pnpm@11.25.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps webkit
+      - run: pnpm test:e2e --project=mobile-webkit tests/e2e/studio-publishing.spec.ts --grep "video (mov|mp4|avi|mkv),"
+        env:
+          MATA_E2E_COLLABORATOR_ACCESS_ENABLED: 'true'
+      - name: Retain WebKit failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: studio-webkit-failure
+          path: test-results/
+          retention-days: 7

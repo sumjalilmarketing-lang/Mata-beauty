@@ -4,6 +4,7 @@ import { auditBusiness, auditCategory, auditService } from './fixtures/provider-
 import { fileURLToPath } from 'node:url';
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
 const tusHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'Location,Upload-Offset,Upload-Length,Tus-Resumable', 'Tus-Resumable': '1.0.0' };
+test.beforeEach(async ({ page }) => { page.on('requestfailed', request => console.log('STUDIO_REQUEST_FAILURE', request.method(), new URL(request.url()).pathname, request.failure()?.errorText)); });
 test.afterEach(async ({ page }, info) => { if (info.status !== info.expectedStatus) console.log('STUDIO_FAILURE_STATE', (await page.locator('#video-publisher').innerText().catch(() => 'panel unavailable')).slice(-2500)); });
 const video = fileURLToPath(new URL('./fixtures/studio-long.mp4', import.meta.url));
 
@@ -16,15 +17,9 @@ async function openStudio(page: Page, path = '/pro/videos') {
 for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, service and hashtags remain together with no duration cap or navigation`, async ({ page, context }) => {
   test.setTimeout(120000);
   const session = await qaLogin(context, 'provider');
+  if (format === 'mov' || format === 'mp4') await page.route('**/video-converter/**', route => route.abort('failed'));
   let published: Record<string, unknown> | null = null;
   const savedPublication = () => published;
-  let uploaded = 0;
-  await page.route(`${api}/storage/v1/upload/resumable**`, route => {
-    if (route.request().method() === 'OPTIONS') return route.fulfill({status:204,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*','Access-Control-Allow-Methods':'POST,PATCH,HEAD,OPTIONS'}});
-    if (route.request().method() === 'POST') return route.fulfill({ status: 201, headers: { ...tusHeaders, Location: `${api}/storage/v1/upload/resumable/fixture`, 'Tus-Resumable': '1.0.0', 'Upload-Offset': '0' } });
-    if (route.request().method() === 'PATCH') { uploaded += route.request().postDataBuffer()?.length ?? 0; return route.fulfill({ status: 204, headers: { ...tusHeaders, 'Tus-Resumable': '1.0.0', 'Upload-Offset': String(uploaded) } }); }
-    return route.fulfill({ status: 200, headers: { ...tusHeaders, 'Upload-Offset': String(uploaded) } });
-  });
   await page.route(`${api}/storage/v1/object/provider-social-media/**`, route => route.fulfill({ json: { Key: 'fixture' } }));
   await page.route(`${api}/storage/v1/object/sign/provider-social-media/**`, route => route.fulfill({ json: { signedURL: '/object/sign/provider-social-media/fixture?token=synthetic' } }));
   await page.route(`${api}/rest/v1/rpc/create_provider_video_post`, route => { published = route.request().postDataJSON(); return route.fulfill({ json: published!.target_post_id }); });
@@ -53,12 +48,18 @@ for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, servic
   await panel.getByLabel('Hashtags', { exact: true }).fill('#tresses #dakar');
   await panel.locator('select[name=serviceId]').selectOption(auditService);
   await panel.locator('input[name=consent]').check();
+  const transfer = page.waitForResponse(response => response.request().method() === 'POST' && response.url() === `${api}/storage/v1/upload/resumable`);
   await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
+  const transferResponse = await transfer;
+  const location = (await transferResponse.allHeaders()).location;
   await expect.poll(() => published?.target_duration_seconds, { timeout: 90000 }).toBeGreaterThan(format === 'mp4' ? 90 : 0);
-  if (format !== 'mp4') expect(String(savedPublication()?.target_video_path)).toMatch(/video[.]mp4$/);
+  expect(String(savedPublication()?.target_video_path)).toMatch(format === 'mov' ? /video[.]mov$/ : /video[.]mp4$/);
   expect(savedPublication()?.target_hashtags).toEqual(['#tresses', '#dakar']);
   expect(String(savedPublication()?.target_video_path)).toContain(session.user.id);
-  expect(uploaded).toBeGreaterThan(0);
+  const transferred = await page.request.head(location);
+  const receivedBytes = Number(transferred.headers()["upload-offset"]);
+  expect(receivedBytes).toBeGreaterThan(0);
+  expect(receivedBytes).toBe(Number(transferred.headers()["upload-length"]));
   await expect(page.getByText('Vidéo longue', { exact: true })).toBeVisible();
   expect(page.url()).toBe(start);
 });
