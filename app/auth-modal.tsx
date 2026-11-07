@@ -19,7 +19,7 @@ import { getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supaba
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from "@/lib/domain/international";
 
 const authSchema = z.object({
-  displayName: z.string().trim().max(80).optional(),
+  displayName: z.string().trim().max(80, "Le nom complet doit contenir au maximum 80 caractères.").optional(),
   countryCode: z.union([z.literal(""), z.string().regex(/^[A-Z]{2}$/)]).optional(),
   region: z.string().trim().max(120).optional(),
   city: z.string().trim().max(120).optional(),
@@ -287,7 +287,8 @@ export function AuthModal({
         {phoneAvailable && method === "whatsapp" && (mode === "login" || mode === "register") ? <PhoneAuth key={mode} registering={mode === "register"} locale={locale} onVerified={completeAuthentication} onBusyChange={setPhoneBusy} /> : <form onSubmit={(event) => void handleSubmit(submit, () => setFeedback(""))(event)} noValidate>
           {mode === "register" && (
             <label>
-              {t("Nom complet")}<input autoComplete="name" {...register("displayName")} />
+              {t("Nom complet")}<input autoComplete="name" maxLength={80} aria-invalid={Boolean(errors.displayName)} aria-describedby={errors.displayName ? "auth-name-error" : undefined} {...register("displayName")} />
+              {errors.displayName && <small id="auth-name-error" className="field-error" role="alert">{t(errors.displayName.message ?? "")}</small>}
             </label>
           )}
           {mode === "register" && <>

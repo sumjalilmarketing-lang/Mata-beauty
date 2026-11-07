@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { bookingVideo } from "./fixtures/booking-video";
+import { startRuntimeAudit, finishRuntimeAudit } from "./helpers/runtime-audit";
+
+test.beforeEach(async ({ page }) => { await startRuntimeAudit(page); });
+test.afterEach(async ({ page }, info) => { await finishRuntimeAudit(page, info); });
 
 // Keep route fixtures deterministic across WebKit and Chromium; these tests
 // exercise application flows rather than the separately tested PWA worker.
@@ -29,9 +33,6 @@ test.beforeEach(async ({ page }) => {
   await page.route(`${testSupabaseOrigin}/rest/v1/promotions**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.route(`${testSupabaseOrigin}/rest/v1/rpc/**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: route.request().url().includes("get_available_slots") ? "[]" : "null" }));
   page.on("pageerror", (error) => { throw error; });
-  page.on("console", (message) => {
-    if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());
-  });
 });
 
 test("legacy Explorer URLs return to Inspiration and keep the selected search", async ({ page }) => {
@@ -67,6 +68,7 @@ test("registration requires explicit legal consent", async ({ page }) => {
 
 test("international registration sends the selected country, locale, phone and location to Auth", async ({ page }) => {
   let signupMetadata: Record<string, unknown> | null = null;
+  await page.route("**/api/auth/providers", route => route.fulfill({ json: { google: true, whatsapp: true } }));
   await page.route(`${testSupabaseOrigin}/auth/v1/signup**`, async route => {
     const payload = route.request().postDataJSON() as { data?: Record<string, unknown>; email?: string };
     signupMetadata = payload.data ?? null;
@@ -400,12 +402,21 @@ test("a protected destination survives the authentication handoff", async ({ pag
 });
 
 test("password recovery does not require the old password", async ({ page }) => {
+  let recovered = false;
+  await page.route(`${testSupabaseOrigin}/auth/v1/recover**`, route => {
+    expect(route.request().postDataJSON().email).toBe("client@example.com");
+    expect(new URL(route.request().url()).searchParams.get("redirect_to")).toBe(`${testAppOrigin}/auth/update-password`);
+    recovered = true;
+    return route.fulfill({ status: 200, json: {} });
+  });
   await page.goto("/?auth=reset");
   await expect(page.getByRole("heading", { name: "Mot de passe oublié" })).toBeVisible();
   await page.getByLabel("Adresse e-mail").fill("client@example.com");
   const recoveryRequest = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith("/recover"));
   await page.getByRole("button", { name: "Envoyer le lien" }).click();
   await recoveryRequest;
+  await expect.poll(() => recovered).toBe(true);
+  await expect(page.locator(".auth-feedback")).toContainText("vous recevrez un lien de réinitialisation");
 });
 
 test("invalid OAuth callbacks fail closed without an open redirect", async ({ page }) => {

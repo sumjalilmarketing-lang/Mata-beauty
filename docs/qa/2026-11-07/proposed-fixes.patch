@@ -1,0 +1,313 @@
+--- a/app/auth-modal.tsx
++++ b/app/auth-modal.tsx
+@@ -19,7 +19,7 @@
+ import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from "@/lib/domain/international";
+ 
+ const authSchema = z.object({
+-  displayName: z.string().trim().max(80).optional(),
++  displayName: z.string().trim().max(80, "Le nom complet doit contenir au maximum 80 caractères.").optional(),
+   countryCode: z.union([z.literal(""), z.string().regex(/^[A-Z]{2}$/)]).optional(),
+   region: z.string().trim().max(120).optional(),
+   city: z.string().trim().max(120).optional(),
+@@ -287,7 +287,8 @@
+         {phoneAvailable && method === "whatsapp" && (mode === "login" || mode === "register") ? <PhoneAuth key={mode} registering={mode === "register"} locale={locale} onVerified={completeAuthentication} onBusyChange={setPhoneBusy} /> : <form onSubmit={(event) => void handleSubmit(submit, () => setFeedback(""))(event)} noValidate>
+           {mode === "register" && (
+             <label>
+-              {t("Nom complet")}<input autoComplete="name" {...register("displayName")} />
++              {t("Nom complet")}<input autoComplete="name" maxLength={80} aria-invalid={Boolean(errors.displayName)} aria-describedby={errors.displayName ? "auth-name-error" : undefined} {...register("displayName")} />
++              {errors.displayName && <small id="auth-name-error" className="field-error" role="alert">{t(errors.displayName.message ?? "")}</small>}
+             </label>
+           )}
+           {mode === "register" && <>
+--- a/app/admin/hr/[[...module]]/page.tsx
++++ b/app/admin/hr/[[...module]]/page.tsx
+@@ -1,2 +1,3 @@
++import { notFound } from "next/navigation";
+ import {WorkspaceRoute}from "../../../workspace-route";
+-export default async function HrPage({params}:{params:Promise<{module?:string[]}>}){const {module=[]}=await params;return <WorkspaceRoute space="hr" moduleKey={module[0]??"dashboard"}/>;}
++export default async function HrPage({params}:{params:Promise<{module?:string[]}>}){const {module=[]}=await params; if (module.length > 1) notFound();return <WorkspaceRoute space="hr" moduleKey={module[0]??"dashboard"}/>;}
+--- a/app/app/[[...module]]/page.tsx
++++ b/app/app/[[...module]]/page.tsx
+@@ -1,9 +1,10 @@
++import { notFound } from "next/navigation";
+ import { WorkspaceRoute } from "../../workspace-route";
+ import { MataBeautyApp } from "../../mata-beauty-app";
+ import { redirect } from "next/navigation";
+ type SearchParams = Record<string, string | string[] | undefined>;
+ export default async function ClientWorkspace({ params, searchParams }: { params: Promise<{ module?: string[] }>; searchParams?: Promise<SearchParams> }) {
+-  const { module = [] } = await params;
++  const { module = [] } = await params; if (module.length > 1) notFound();
+   if (module[0] === "settings") redirect("/app/profile?edit=1");
+   if (module[0] === "social-profile") redirect("/app/profile");
+   if (module[0] === "discover") {
+--- a/app/commercial/[[...module]]/page.tsx
++++ b/app/commercial/[[...module]]/page.tsx
+@@ -1,7 +1,8 @@
++import { notFound } from "next/navigation";
+ import { redirect } from "next/navigation";
+ import { WorkspaceRoute } from "../../workspace-route";
+ export default async function CommercialWorkspace({ params,searchParams }: { params: Promise<{module?:string[]}>;searchParams:Promise<{dossier?:string}> }) {
+-  const {module=[]}=await params;
++  const {module=[]}=await params; if (module.length > 1) notFound();
+   const {dossier}=await searchParams;
+   if (!module.length && typeof dossier === "string" && /^[0-9a-f-]{36}$/i.test(dossier)) redirect(`/commercial/dossiers?dossier=${encodeURIComponent(dossier)}`);
+   return <WorkspaceRoute space="commercial" moduleKey={module[0] ?? "dashboard"} />;
+--- a/app/finance/[[...module]]/page.tsx
++++ b/app/finance/[[...module]]/page.tsx
+@@ -1,2 +1,3 @@
++import { notFound } from "next/navigation";
+ import { WorkspaceRoute } from "../../workspace-route";
+-export default async function FinanceWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; return <WorkspaceRoute space="finance" moduleKey={module[0] ?? "dashboard"} />; }
++export default async function FinanceWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; if (module.length > 1) notFound(); return <WorkspaceRoute space="finance" moduleKey={module[0] ?? "dashboard"} />; }
+--- a/app/moderation/[[...module]]/page.tsx
++++ b/app/moderation/[[...module]]/page.tsx
+@@ -1,2 +1,3 @@
++import { notFound } from "next/navigation";
+ import { WorkspaceRoute } from "../../workspace-route";
+-export default async function ModerationWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; return <WorkspaceRoute space="moderation" moduleKey={module[0] ?? "dashboard"} />; }
++export default async function ModerationWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; if (module.length > 1) notFound(); return <WorkspaceRoute space="moderation" moduleKey={module[0] ?? "dashboard"} />; }
+--- a/app/onboarding/[[...module]]/page.tsx
++++ b/app/onboarding/[[...module]]/page.tsx
+@@ -1,2 +1,3 @@
++import { notFound } from "next/navigation";
+ import { WorkspaceRoute } from "../../workspace-route";
+-export default async function OnboardingWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; return <WorkspaceRoute space="onboarding" moduleKey={module[0] ?? "dashboard"} />; }
++export default async function OnboardingWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; if (module.length > 1) notFound(); return <WorkspaceRoute space="onboarding" moduleKey={module[0] ?? "dashboard"} />; }
+--- a/app/operations/[[...module]]/page.tsx
++++ b/app/operations/[[...module]]/page.tsx
+@@ -1,2 +1,3 @@
++import { notFound } from "next/navigation";
+ import { WorkspaceRoute } from "../../workspace-route";
+-export default async function OperationsWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; return <WorkspaceRoute space="operations" moduleKey={module[0] ?? "dashboard"} />; }
++export default async function OperationsWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; if (module.length > 1) notFound(); return <WorkspaceRoute space="operations" moduleKey={module[0] ?? "dashboard"} />; }
+--- a/app/pro/[[...module]]/page.tsx
++++ b/app/pro/[[...module]]/page.tsx
+@@ -1,2 +1,3 @@
++import { notFound } from "next/navigation";
+ import { WorkspaceRoute } from "../../workspace-route";
+-export default async function ProWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; return <WorkspaceRoute space="pro" moduleKey={module[0] ?? "dashboard"} />; }
++export default async function ProWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; if (module.length > 1) notFound(); return <WorkspaceRoute space="pro" moduleKey={module[0] ?? "dashboard"} />; }
+--- a/app/salon/[[...module]]/page.tsx
++++ b/app/salon/[[...module]]/page.tsx
+@@ -1,2 +1,3 @@
++import { notFound } from "next/navigation";
+ import { WorkspaceRoute } from "../../workspace-route";
+-export default async function SalonWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; return <WorkspaceRoute space="salon" moduleKey={module[0] ?? "dashboard"} />; }
++export default async function SalonWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; if (module.length > 1) notFound(); return <WorkspaceRoute space="salon" moduleKey={module[0] ?? "dashboard"} />; }
+--- a/app/staff/[[...module]]/page.tsx
++++ b/app/staff/[[...module]]/page.tsx
+@@ -1,2 +1,3 @@
++import { notFound } from "next/navigation";
+ import { WorkspaceRoute } from "../../workspace-route";
+-export default async function StaffWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; return <WorkspaceRoute space="staff" moduleKey={module[0] ?? "dashboard"} />; }
++export default async function StaffWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; if (module.length > 1) notFound(); return <WorkspaceRoute space="staff" moduleKey={module[0] ?? "dashboard"} />; }
+--- a/app/support-agent/[[...module]]/page.tsx
++++ b/app/support-agent/[[...module]]/page.tsx
+@@ -1,2 +1,3 @@
++import { notFound } from "next/navigation";
+ import { WorkspaceRoute } from "../../workspace-route";
+-export default async function SupportWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; return <WorkspaceRoute space="support" moduleKey={module[0] ?? "dashboard"} />; }
++export default async function SupportWorkspace({ params }: { params: Promise<{ module?: string[] }> }) { const { module = [] } = await params; if (module.length > 1) notFound(); return <WorkspaceRoute space="support" moduleKey={module[0] ?? "dashboard"} />; }
+--- a/app/auth/workspace/route.ts
++++ b/app/auth/workspace/route.ts
+@@ -14,7 +14,8 @@
+     const { data, error } = await client.auth.getUser();
+     if (error || !data.user) return go("/?connexion=requise&returnTo=%2Fauth%2Fworkspace");
+     const profile = await client.rpc("get_my_private_profile");
+-    if (profile.error || !profile.data || profile.data.is_suspended || profile.data.account_status !== "active") {
++    if (profile.error || !profile.data) return go("/?auth_error=workspace_unavailable");
++    if (profile.data.is_suspended || profile.data.account_status !== "active") {
+       return go("/?auth_error=account_suspended");
+     }
+     if (profile.data.role !== "admin") return go("/app/profile");
+--- a/app/salon-control-center.tsx
++++ b/app/salon-control-center.tsx
+@@ -53,6 +53,8 @@
+   const [reviews, setReviews] = useState<Review[]>([]);
+   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+   const [feedback, setFeedback] = useState("");
++  const closurePending = useRef(false), mediaPending = useRef(false);
++  const [savingClosure, setSavingClosure] = useState(false), [savingMedia, setSavingMedia] = useState(false);
+   const [bookingRefreshError, setBookingRefreshError] = useState("");
+   const [savingService, setSavingService] = useState(false);
+   const servicePending = useRef(false);
+@@ -168,7 +170,14 @@
+ 
+ 
+   async function saveHours(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!business) return; const supabase = getSupabaseBrowserClient(); if (!supabase) return; const form = event.currentTarget; const values = new FormData(form); const rows = days.map((_, weekday) => { const closed = values.get(`closed-${weekday}`) === "on"; return { business_id: business.id, weekday, is_closed: closed, opens_at: closed ? null : String(values.get(`open-${weekday}`) || "09:00"), closes_at: closed ? null : String(values.get(`close-${weekday}`) || "18:00") }; }); const validation = validateWeeklyBusinessHours(rows); if (validation) { setFeedback(validation); return; } const { error } = await supabase.from("business_hours").upsert(rows, { onConflict: "business_id,weekday" }); setFeedback(error ? publicErrorMessage(error, "Horaires non enregistrés.") : "Horaires enregistrés."); if (!error) await load(); }
+-  async function addClosure(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!business) return; const supabase = getSupabaseBrowserClient(); if (!supabase) return; const form = event.currentTarget; const values = new FormData(form); try { const startsAt = localDateTimeInputToInstant(String(values.get("startsAt") ?? ""), timezone, "start"); const endsAt = localDateTimeInputToInstant(String(values.get("endsAt") ?? ""), timezone, "end"); if (endsAt <= startsAt) { setFeedback("La fin de fermeture doit suivre son début dans le fuseau du salon."); return; } const { error } = await supabase.from("business_closures").insert({ business_id: business.id, starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(), reason: nullable(values, "reason") }); setFeedback(error ? publicErrorMessage(error, "Fermeture non enregistrée.") : "Fermeture exceptionnelle ajoutée."); if (!error) { form.reset(); await load(); } } catch (error) { setFeedback(publicErrorMessage(error, "Vérifiez les horaires dans le fuseau du salon.")); } }
++  async function addClosure(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault(); if (closurePending.current) return;
++    closurePending.current = true; setSavingClosure(true);
++    try { await addClosureUnlocked(event); }
++    catch { setFeedback("Enregistrement non confirmé. Actualisez avant de réessayer."); }
++    finally { closurePending.current = false; setSavingClosure(false); }
++  }
++  async function addClosureUnlocked(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!business) return; const supabase = getSupabaseBrowserClient(); if (!supabase) return; const form = event.currentTarget; const values = new FormData(form); try { const startsAt = localDateTimeInputToInstant(String(values.get("startsAt") ?? ""), timezone, "start"); const endsAt = localDateTimeInputToInstant(String(values.get("endsAt") ?? ""), timezone, "end"); if (endsAt <= startsAt) { setFeedback("La fin de fermeture doit suivre son début dans le fuseau du salon."); return; } const { error } = await supabase.from("business_closures").insert({ business_id: business.id, starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(), reason: nullable(values, "reason") }); setFeedback(error ? publicErrorMessage(error, "Fermeture non enregistrée.") : "Fermeture exceptionnelle ajoutée."); if (!error) { form.reset(); await load(); } } catch (error) { setFeedback(publicErrorMessage(error, "Vérifiez les horaires dans le fuseau du salon.")); } }
+   async function removeClosure(id: string) {
+     if (!business) return; const supabase = getSupabaseBrowserClient(); if (!supabase) return;
+     const { data, error } = await supabase.from("business_closures").delete().eq("id", id).eq("business_id", business.id).select("id").maybeSingle();
+@@ -176,6 +185,13 @@
+   }
+ 
+   async function uploadMedia(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault(); if (mediaPending.current) return;
++    mediaPending.current = true; setSavingMedia(true);
++    try { await uploadMediaUnlocked(event); }
++    catch { setFeedback("Enregistrement non confirmé. Actualisez avant de réessayer."); }
++    finally { mediaPending.current = false; setSavingMedia(false); }
++  }
++  async function uploadMediaUnlocked(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault(); if (!business) return;
+     const form = event.currentTarget, values = new FormData(form), file = values.get("file"), mediaType = String(values.get("mediaType"));
+     if (!(file instanceof File) || !file.size) return;
+@@ -209,9 +225,9 @@
+ 
+   if (module.key === "team") return <section className="workspace-content">{salonPicker}<TeamManagement key={business.id} businessId={business.id} ownerId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />{feedback && <p role="status">{feedback}</p>}</section>;
+ 
+-  if (module.key === "agenda") return <section className="workspace-content">{salonPicker}<TeamAgenda businessId={business.id} timeZone={timezone} /><SalonHero title="Agenda du salon" description="Horaires réguliers, fermetures exceptionnelles et rendez-vous réels." />{feedback && <p className="salon-feedback" role="status">{feedback}</p>}<div className="salon-two-columns"><article className="workspace-panel salon-panel"><h3>Horaires d’ouverture</h3><form onSubmit={(event) => void saveHours(event)}>{days.map((day, weekday) => { const current = hours.find((item) => item.weekday === weekday); return <div className="hours-row" key={day}><strong>{day}</strong><input aria-label={`Ouverture ${day}`} name={`open-${weekday}`} type="time" defaultValue={current?.opens_at?.slice(0, 5) ?? "09:00"} /><input aria-label={`Fermeture ${day}`} name={`close-${weekday}`} type="time" defaultValue={current?.closes_at?.slice(0, 5) ?? "18:00"} /><label><input name={`closed-${weekday}`} type="checkbox" defaultChecked={current?.is_closed ?? weekday === 0} /> Fermé</label></div>; })}<button className="salon-primary">Enregistrer les horaires</button></form></article><article className="workspace-panel salon-panel"><h3>Fermetures exceptionnelles</h3><form className="salon-form" onSubmit={(event) => void addClosure(event)}><label>Début<input name="startsAt" type="datetime-local" required /></label><label>Fin<input name="endsAt" type="datetime-local" required /></label><label className="wide">Motif<input name="reason" maxLength={240} /></label><button className="salon-primary">Ajouter</button></form><div className="salon-list">{closures.map((item) => <div key={item.id}><div><strong>{item.reason || "Fermeture"}</strong><small>{date(item.starts_at, timezone)} → {date(item.ends_at, timezone)}</small></div><button onClick={() => void removeClosure(item.id)}>Retirer</button></div>)}</div></article></div></section>;
+-
+-  if (module.key === "portfolio") return <section className="workspace-content">{salonPicker}<SalonHero title="Galerie du salon" description="Logo, couverture et réalisations contrôlés par type et par taille." />{feedback && <p className="salon-feedback" role="status">{feedback}</p>}<article className="workspace-panel salon-panel"><form className="salon-form" onSubmit={(event) => void uploadMedia(event)}><label>Type<select name="mediaType"><option value="logo">Logo</option><option value="cover">Couverture</option><option value="gallery">Galerie</option></select></label><label className="wide">Image<input name="file" type="file" accept="image/jpeg,image/png,image/webp" required /></label><button className="salon-primary">Envoyer l’image</button></form><div className="salon-media-grid">{media.map((item) => { const url = getSupabaseBrowserClient()?.storage.from("business-media").getPublicUrl(item.storage_path).data.publicUrl ?? ""; return <article key={item.id}>{url && <Image src={url} alt={`${item.media_type} du salon`} width={360} height={220} unoptimized />}<span>{item.media_type}</span><button onClick={() => void removeMedia(item)}>Retirer</button></article>; })}</div></article></section>;
++  if (module.key === "agenda") return <section className="workspace-content">{salonPicker}<TeamAgenda businessId={business.id} timeZone={timezone} /><SalonHero title="Agenda du salon" description="Horaires réguliers, fermetures exceptionnelles et rendez-vous réels." />{feedback && <p className="salon-feedback" role="status">{feedback}</p>}<div className="salon-two-columns"><article className="workspace-panel salon-panel"><h3>Horaires d’ouverture</h3><form onSubmit={(event) => void saveHours(event)}>{days.map((day, weekday) => { const current = hours.find((item) => item.weekday === weekday); return <div className="hours-row" key={day}><strong>{day}</strong><input aria-label={`Ouverture ${day}`} name={`open-${weekday}`} type="time" defaultValue={current?.opens_at?.slice(0, 5) ?? "09:00"} /><input aria-label={`Fermeture ${day}`} name={`close-${weekday}`} type="time" defaultValue={current?.closes_at?.slice(0, 5) ?? "18:00"} /><label><input name={`closed-${weekday}`} type="checkbox" defaultChecked={current?.is_closed ?? weekday === 0} /> Fermé</label></div>; })}<button className="salon-primary">Enregistrer les horaires</button></form></article><article className="workspace-panel salon-panel"><h3>Fermetures exceptionnelles</h3><form className="salon-form" onSubmit={(event) => void addClosure(event)}><label>Début<input name="startsAt" type="datetime-local" required /></label><label>Fin<input name="endsAt" type="datetime-local" required /></label><label className="wide">Motif<input name="reason" maxLength={240} /></label><button className="salon-primary" disabled={savingClosure}>{savingClosure ? "Enregistrement…" : "Ajouter"}</button></form><div className="salon-list">{closures.map((item) => <div key={item.id}><div><strong>{item.reason || "Fermeture"}</strong><small>{date(item.starts_at, timezone)} → {date(item.ends_at, timezone)}</small></div><button onClick={() => void removeClosure(item.id)}>Retirer</button></div>)}</div></article></div></section>;
++
++  if (module.key === "portfolio") return <section className="workspace-content">{salonPicker}<SalonHero title="Galerie du salon" description="Logo, couverture et réalisations contrôlés par type et par taille." />{feedback && <p className="salon-feedback" role="status">{feedback}</p>}<article className="workspace-panel salon-panel"><form className="salon-form" onSubmit={(event) => void uploadMedia(event)}><label>Type<select name="mediaType"><option value="logo">Logo</option><option value="cover">Couverture</option><option value="gallery">Galerie</option></select></label><label className="wide">Image<input name="file" type="file" accept="image/jpeg,image/png,image/webp" required /></label><button className="salon-primary" disabled={savingMedia}>{savingMedia ? "Envoi…" : "Envoyer l’image"}</button></form><div className="salon-media-grid">{media.map((item) => { const url = getSupabaseBrowserClient()?.storage.from("business-media").getPublicUrl(item.storage_path).data.publicUrl ?? ""; return <article key={item.id}>{url && <Image src={url} alt={`${item.media_type} du salon`} width={360} height={220} unoptimized />}<span>{item.media_type}</span><button onClick={() => void removeMedia(item)}>Retirer</button></article>; })}</div></article></section>;
+ 
+   if (module.key === "reviews") return <section className="workspace-content"><ProviderReviewBookings key={business.id} providerId={userId} businessId={business.id} />{salonPicker}<SalonHero title="Avis du salon" description="Avis issus de rendez-vous terminés, visibles sans données privées de la cliente." /><article className="workspace-panel salon-panel"><div className="salon-list">{reviews.map((review) => <div key={review.id}><div><strong>{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</strong><small>{review.comment || "Avis sans commentaire"} · {new Date(review.created_at).toLocaleDateString("fr-FR")}</small>{review.provider_reply && <small>Réponse : {review.provider_reply}</small>}</div></div>)}{reviews.length === 0 && <p>Aucun avis reçu pour le moment.</p>}</div></article></section>;
+ 
+--- a/app/client-control-center.tsx
++++ b/app/client-control-center.tsx
+@@ -161,7 +161,16 @@
+   }
+   async function savePreferences(event:FormEvent<HTMLFormElement>){event.preventDefault();const supabase=getSupabaseBrowserClient();if(!supabase)return;const v=new FormData(event.currentTarget);const row={profile_id:userId,favorite_categories:String(v.get("categories")??"").split(',').map(x=>x.trim()).filter(Boolean),preferred_styles:String(v.get("styles")??"").split(',').map(x=>x.trim()).filter(Boolean),budget_min:Number(v.get("budgetMin"))||null,budget_max:Number(v.get("budgetMax"))||null,radius_km:Number(v.get("radius"))||15,location_mode:String(v.get("locationMode")),personalization_enabled:v.get("personalization")==="on",updated_at:new Date().toISOString()};const {error}=await supabase.from("profile_preferences").upsert(row);setNotice(error?publicErrorMessage(error,"Les préférences n’ont pas pu être enregistrées."):"Préférences enregistrées.");}
+   async function savePrivacy(){const supabase=getSupabaseBrowserClient();if(!supabase)return;const {error}=await supabase.from("profile_privacy_settings").upsert({...privacy,profile_id:userId,updated_at:new Date().toISOString()});setNotice(error?publicErrorMessage(error,"Les réglages de confidentialité n’ont pas pu être enregistrés."):"Confidentialité enregistrée.");}
+-  async function createTicket(event:FormEvent<HTMLFormElement>){event.preventDefault();const supabase=getSupabaseBrowserClient();if(!supabase)return;const form=event.currentTarget;const v=new FormData(form);const launchCategory=String(v.get("category"));const enriched={requester_id:userId,subject:String(v.get("subject")),category:launchCategory,launch_category:launchCategory};let {error}=await supabase.from("support_tickets").insert(enriched);if(error?.code==="PGRST204")({error}=await supabase.from("support_tickets").insert({requester_id:userId,subject:String(v.get("subject")),category:launchCategory}));setNotice(error?publicErrorMessage(error,"La demande n’a pas pu être envoyée."):"Demande envoyée au support.");if(!error){form.reset();await load();}}
++  const ticketPending = useRef(false);
++  const [savingTicket, setSavingTicket] = useState(false);
++  async function createTicket(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault(); if (ticketPending.current) return;
++    ticketPending.current = true; setSavingTicket(true);
++    try { await createTicketUnlocked(event); }
++    catch { setNotice("Enregistrement non confirmé. Actualisez avant de réessayer."); }
++    finally { ticketPending.current = false; setSavingTicket(false); }
++  }
++  async function createTicketUnlocked(event:FormEvent<HTMLFormElement>){event.preventDefault();const supabase=getSupabaseBrowserClient();if(!supabase)return;const form=event.currentTarget;const v=new FormData(form);const launchCategory=String(v.get("category"));const enriched={requester_id:userId,subject:String(v.get("subject")),category:launchCategory,launch_category:launchCategory};let {error}=await supabase.from("support_tickets").insert(enriched);if(error?.code==="PGRST204")({error}=await supabase.from("support_tickets").insert({requester_id:userId,subject:String(v.get("subject")),category:launchCategory}));setNotice(error?publicErrorMessage(error,"La demande n’a pas pu être envoyée."):"Demande envoyée au support.");if(!error){form.reset();await load();}}
+   async function requestDeletion(){if(!window.confirm(t("Demander la suppression du compte ? Cette demande sera vérifiée avant toute action irréversible.")))return;const reason=window.prompt(t("Motif facultatif"));if(reason===null)return;const supabase=getSupabaseBrowserClient();if(!supabase)return;const {error}=await supabase.rpc("request_account_deletion",{target_reason:reason});setNotice(error?publicErrorMessage(error,"La demande de suppression n’a pas pu être enregistrée."):"Demande enregistrée. Aucune donnée n’est supprimée immédiatement.");}
+ 
+   if(section === "reviews") return <section className="client-control-center" id="client-reviews">
+@@ -181,7 +190,7 @@
+     {section === "settings" && identity && <article className="panel" id="edit-client-profile"><div className="panel-heading"><div><h2>{t("Identité")}</h2><p>{t("Les coordonnées privées ne sont jamais affichées publiquement.")}</p></div></div><div className="client-photo-editor">{identity.avatar_url ? <Image src={identity.avatar_url} alt="Photo de profil actuelle" width={88} height={88} unoptimized /> : <span className="client-photo-initials" aria-label="Initiales du profil">{initials}</span>}<label className="client-photo-picker">{uploadingAvatar ? "Enregistrement de la photo…" : "Changer ma photo de profil"}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploadingAvatar} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value="";if(file)void uploadAvatar(file);}} /></label><small>JPG, PNG ou WebP · 4 Mo maximum</small></div><form className="dashboard-form" onSubmit={e=>void saveIdentity(e)}><label>{t("Prénom")}<input name="firstName" autoComplete="given-name" maxLength={100} required defaultValue={identity.first_name??""}/></label><label>{t("Nom")}<input name="lastName" autoComplete="family-name" maxLength={100} required defaultValue={identity.last_name??""}/></label><label>{t("Nom d’utilisateur")}<input name="username" autoComplete="username" title="3 à 30 lettres, chiffres ou traits de soulignement, sans espace." required pattern="[A-Za-z0-9_]{3,30}" defaultValue={identity.username??""}/></label><PhoneInput label={t("Téléphone")} defaultValue={identity.phone} defaultCountry={identity.country_code}/><label>{t("Pays")}<select name="countryCode" required defaultValue={identity.country_code??""}><option value="">{t("Choisir un pays")}</option>{SUPPORTED_COUNTRIES.map(country => <option key={country.code} value={country.code}>{new Intl.DisplayNames([locale], { type: "region" }).of(country.code) ?? country.name}</option>)}</select></label><label>{t("Région / État")}<input name="region" maxLength={120} defaultValue={identity.region??""}/></label><label>{t("Ville")}<input name="city" autoComplete="address-level2" defaultValue={identity.city??""}/></label><label>{t("Quartier")}<input name="neighborhood" defaultValue={identity.neighborhood??""}/></label><label>{t("Langue")}<select name="language" defaultValue={identity.locale?.split("-")[0]??"fr"}>{SUPPORTED_LANGUAGES.map(language => <option key={language.code} value={language.code}>{language.label}</option>)}</select></label><label className="wide">{t("Bio")}<textarea name="bio" maxLength={280} defaultValue={identity.bio??""}/></label><button className="primary-button" disabled={savingIdentity}>{savingIdentity ? "Enregistrement…" : t("Enregistrer")}</button></form></article>}
+     {section === "settings" && <article className="panel" id="beauty-preferences"><div className="panel-heading"><div><h2>{t("Préférences beauté")}</h2><p>{t("Utilisées uniquement pour personnaliser le feed lorsque vous l’autorisez.")}</p></div></div><form className="dashboard-form" onSubmit={e=>void savePreferences(e)}><label className="wide">{t("Catégories favorites")}<input name="categories" defaultValue={preferences.favorite_categories.join(', ')}/></label><label className="wide">{t("Styles préférés")}<input name="styles" defaultValue={preferences.preferred_styles.join(', ')}/></label><label>{t("Budget minimum")}<input name="budgetMin" type="number" min="0" defaultValue={preferences.budget_min}/></label><label>{t("Budget maximum")}<input name="budgetMax" type="number" min="0" defaultValue={preferences.budget_max}/></label><label>{t("Rayon (km)")}<input name="radius" type="number" min="1" max="200" defaultValue={preferences.radius_km}/></label><label>{t("Lieu")}<select name="locationMode" defaultValue={preferences.location_mode}><option value="both">{t("Salon ou domicile")}</option><option value="salon">{t("Salon")}</option><option value="mobile">{t("Domicile")}</option></select></label><label className="wide legal-consent"><input name="personalization" type="checkbox" defaultChecked={preferences.personalization_enabled}/><span>{t("Activer les recommandations personnalisées")}</span></label><button className="primary-button">{t("Enregistrer")}</button></form></article>}
+     {section === "payments" && <article className="panel" id="client-payments"><div className="panel-heading"><div><h2>{t("Mes paiements")}</h2><p>{t("Historique privé lié à vos réservations.")}</p></div></div>{paymentsState === "loading" ? <p role="status">Chargement des paiements…</p> : paymentsState === "error" ? <div role="alert"><p>Les paiements n’ont pas pu être chargés.</p><button type="button" onClick={() => void load()}>Réessayer</button></div> : payments.length?payments.map(p=><div className="control-list-row" key={p.id}><div><strong>{p.bookings?.provider_services?.title??t("Prestation beauté")}</strong><small>{new Date(p.created_at).toLocaleDateString(locale)} · {p.payment_method.replaceAll('_',' ')}</small>{(p.is_test || p.provider === "mock" || p.payment_status === "simulated_paid") && <small>Paiement de test · aucun argent réel</small>}<code>{p.provider_reference??p.id.slice(0,12)}</code></div><b>{p.amount.toLocaleString(locale)} {p.currency}<small>{t(paymentLabels[p.payment_status]??p.payment_status)}</small></b></div>):<div className="compact-empty">{t("Aucun paiement enregistré.")}</div>}</article>}
+-    {section === "support" && <article className="panel" id="client-support"><div className="panel-heading"><div><h2>{t("Aide et support")}</h2><p>{t("Une demande privée suivie par l’équipe Mata Beauty.")}</p></div></div><form className="collection-form" onSubmit={e=>void createTicket(e)}><label>{t("Catégorie")}<select name="category"><option value="signup">{t("Inscription")}</option><option value="profile">{t("Profil")}</option><option value="publication">{t("Publication")}</option><option value="booking">{t("Réservation")}</option><option value="payment">{t("Paiement")}</option><option value="bug">{t("Bug")}</option><option value="other">{t("Autre")}</option></select></label><label>{t("Objet (obligatoire)")}<input name="subject" required minLength={3} maxLength={160} placeholder={t("Décrivez brièvement votre demande")}/></label><button>{t("Envoyer")}</button></form>{ticketsState === "loading" && <p role="status">Chargement des demandes…</p>}{ticketsState === "error" && <div role="alert"><p>Les demandes de support n’ont pas pu être chargées.</p><button type="button" onClick={() => void load()}>Réessayer</button></div>}{tickets.map(ticket=><div className="control-list-row" key={ticket.id}><button onClick={()=>setSelectedTicket(ticket.id)}>{ticket.subject}</button><span>{ticket.status}</span></div>)}{selectedTicket && <SupportThread key={selectedTicket} ticketId={selectedTicket} onChange={load}/>}</article>}
++    {section === "support" && <article className="panel" id="client-support"><div className="panel-heading"><div><h2>{t("Aide et support")}</h2><p>{t("Une demande privée suivie par l’équipe Mata Beauty.")}</p></div></div><form className="collection-form" onSubmit={e=>void createTicket(e)}><label>{t("Catégorie")}<select name="category"><option value="signup">{t("Inscription")}</option><option value="profile">{t("Profil")}</option><option value="publication">{t("Publication")}</option><option value="booking">{t("Réservation")}</option><option value="payment">{t("Paiement")}</option><option value="bug">{t("Bug")}</option><option value="other">{t("Autre")}</option></select></label><label>{t("Objet (obligatoire)")}<input name="subject" required minLength={3} maxLength={160} placeholder={t("Décrivez brièvement votre demande")}/></label><button disabled={savingTicket}>{t(savingTicket ? "Envoi…" : "Envoyer")}</button></form>{ticketsState === "loading" && <p role="status">Chargement des demandes…</p>}{ticketsState === "error" && <div role="alert"><p>Les demandes de support n’ont pas pu être chargées.</p><button type="button" onClick={() => void load()}>Réessayer</button></div>}{tickets.map(ticket=><div className="control-list-row" key={ticket.id}><button onClick={()=>setSelectedTicket(ticket.id)}>{ticket.subject}</button><span>{ticket.status}</span></div>)}{selectedTicket && <SupportThread key={selectedTicket} ticketId={selectedTicket} onChange={load}/>}</article>}
+     {section === "settings" && <article className="panel" id="privacy-settings"><div className="panel-heading"><div><h2>{t("Confidentialité et compte")}</h2><p>{t("Vos paiements, réservations, messages et tickets restent toujours privés.")}</p></div></div><div className="privacy-grid"><label>{t("Visibilité du profil")}<select value={privacy.profile_visibility} onChange={e=>setPrivacy({...privacy,profile_visibility:e.target.value})}><option value="limited">{t("Limitée")}</option><option value="public">{t("Publique")}</option></select></label>{([['show_collections',t("Afficher mes collections")],['show_follows',t("Afficher mes abonnements")],['allow_personalized_recommendations',t("Recommandations personnalisées")],['allow_marketing_email',t("Emails commerciaux")],['allow_promotional_notifications',t("Notifications promotionnelles")]] as const).map(([key,label])=><label className="legal-consent" key={key}><input type="checkbox" checked={privacy[key]} onChange={e=>setPrivacy({...privacy,[key]:e.target.checked})}/><span>{t(label)}</span></label>)}</div><div className="privacy-actions"><button className="primary-button" onClick={()=>void savePrivacy()}>{t("Enregistrer")}</button><Link href="/app/application">{t("Ma candidature professionnelle")}</Link><button className="danger-button" onClick={()=>void requestDeletion()}>{t("Demander la suppression du compte")}</button></div></article>}
+   </section>;
+ }
+--- a/app/mata-beauty-app.tsx
++++ b/app/mata-beauty-app.tsx
+@@ -1073,9 +1073,21 @@
+ function BookingMicroFeedback({ bookingId }: { bookingId: string }) {
+   const locale = useApplicationLocale();
+   const t = (text: string) => bookingText(text, locale);
+-  const [sent, setSent] = useState(false);
+-  async function answer(response: "yes" | "no") { const client=getSupabaseBrowserClient(); if(!client)return; const user=await client.auth.getUser(); if(!user.data.user)return; const {error}=await client.from("micro_feedback").insert({profile_id:user.data.user.id,context:"booking",response,booking_id:bookingId}); if(!error)setSent(true); }
+-  return <aside className="micro-feedback"><strong>{t("Votre réservation a-t-elle été simple ?")}</strong>{sent ? <small>{t("Merci pour votre retour.")}</small> : <div><button onClick={() => void answer("yes")}>{t("👍 Oui")}</button><button onClick={() => void answer("no")}>{t("👎 Non")}</button></div>}</aside>;
++  const [sent, setSent] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
++  const pending = useRef(false);
++  async function answer(response: "yes" | "no") {
++    if (pending.current) return;
++    pending.current = true; setBusy(true); setError("");
++    try {
++      const client = getSupabaseBrowserClient(); if (!client) throw Error("unavailable");
++      const auth = await client.auth.getUser(); if (auth.error || !auth.data.user) throw Error("unauthorized");
++      const result = await client.from("micro_feedback").insert({profile_id:auth.data.user.id,context:"booking",response,booking_id:bookingId}).abortSignal(AbortSignal.timeout(12_000));
++      if (result.error) throw result.error;
++      setSent(true);
++    } catch { setError("Votre retour n’a pas pu être enregistré. Réessayez."); }
++    finally { pending.current = false; setBusy(false); }
++  }
++  return <aside className="micro-feedback"><strong>{t("Votre réservation a-t-elle été simple ?")}</strong>{sent ? <small>{t("Merci pour votre retour.")}</small> : <div><button disabled={busy} onClick={() => void answer("yes")}>{t("👍 Oui")}</button><button disabled={busy} onClick={() => void answer("no")}>{t("👎 Non")}</button></div>}{error && <p role="alert">{t(error)}</p>}</aside>;
+ }
+ 
+ function BottomNav({ authenticated, active, onFeed, onAccount }: { authenticated: boolean; active: "inspiration"; onFeed: () => void; onAccount: (page: "bookings" | "messages" | "profile") => void }) {
+--- a/app/social-feed.tsx
++++ b/app/social-feed.tsx
+@@ -595,11 +595,23 @@
+     cards.current = [];
+   }, []);
+ 
+-  async function toggle(kind: "like" | "save", post: FeedPost) {
++  const socialPending = useRef(new Set<string>());
++  const [socialBusy, setSocialBusy] = useState(new Set<string>());
++  async function runSocialAction(key: string, action: () => Promise<void>) {
++    if (socialPending.current.has(key)) return;
++    socialPending.current.add(key); setSocialBusy(new Set(socialPending.current));
++    try { await action(); }
++    catch { setFeedback(t("Cette action n’a pas pu être enregistrée.")); }
++    finally { socialPending.current.delete(key); setSocialBusy(new Set(socialPending.current)); }
++  }
++  async function toggle(kind: "like" | "save", post: FeedPost) {
++    await runSocialAction(`${kind}:${post.id}`, () => toggleUnlocked(kind, post));
++  }
++  async function toggleUnlocked(kind: "like" | "save", post: FeedPost) {
+     if (!authenticated) { onRequireAuth(); return; }
+     const supabase = getSupabaseBrowserClient();
+     if (!supabase) return;
+-    const { data, error } = await supabase.rpc(kind === "like" ? "toggle_post_like" : "toggle_post_save", { target_post_id: post.id });
++    const { data, error } = await supabase.rpc(kind === "like" ? "toggle_post_like" : "toggle_post_save", { target_post_id: post.id }).abortSignal(AbortSignal.timeout(12_000));
+     if (error || !data) { setFeedback(t("Cette action n’a pas pu être enregistrée.")); return; }
+     const result = data as { active: boolean; count: number };
+     if (result.active) videoTopics(`${post.serviceTitle ?? ""} ${post.caption} ${post.hashtags.join(" ")}`).forEach(topic => interests.current.add(topic));
+@@ -609,11 +621,12 @@
+     setFeedback(kind === "like" ? (result.active ? t("Vidéo aimée.") : t("J’aime retiré.")) : (result.active ? t("Ajoutée à Mes inspirations.") : t("Retirée de Mes inspirations.")));
+   }
+ 
+-  async function follow(post: FeedPost) {
++  async function follow(post: FeedPost) { await runSocialAction(`follow:${post.authorId}`, () => followUnlocked(post)); }
++  async function followUnlocked(post: FeedPost) {
+     if (!authenticated) { onRequireAuth(); return; }
+     const supabase = getSupabaseBrowserClient();
+     if (!supabase) return;
+-    const { data, error } = await supabase.rpc("toggle_follow_provider_from_post", { target_provider_id: post.authorId, target_source_post_id: post.id });
++    const { data, error } = await supabase.rpc("toggle_follow_provider_from_post", { target_provider_id: post.authorId, target_source_post_id: post.id }).abortSignal(AbortSignal.timeout(12_000));
+     if (error) { setFeedback(t("L’abonnement n’a pas pu être modifié.")); return; }
+     setFollowed((current) => { const next = new Set(current); if (data) next.add(post.authorId); else next.delete(post.authorId); return next; });
+     setFeedback(data ? `${t("Vous suivez")} ${post.businessName}.` : `${t("Vous ne suivez plus")} ${post.businessName}.`);
+@@ -890,12 +903,12 @@
+       {post.postType === "video" && !videoErrors.has(post.id) && <><button className="play-toggle" aria-label={t(pausedPosts.has(post.id) ? t("Lire la vidéo") : t("Mettre la vidéo en pause"))} onClick={() => { const next = new Set(pausedPosts); const video = videos.current[index]; if (next.has(post.id)) { next.delete(post.id); void video?.play().catch(() => undefined); } else { next.add(post.id); video?.pause(); } setPausedPosts(next); }}>{pausedPosts.has(post.id) && index===activeIndex ? "▶" : ""}</button><button className="sound-toggle" aria-label={t(muted ? t("Activer le son") : t("Couper le son"))} onClick={() => setMuted((value) => !value)}>{muted ? "♩×" : "♩"}</button></>}
+       <aside className="social-actions" aria-label={t("Interactions de la publication")}>
+         <button className="creator-orb" aria-label={`${t("Profil de")} ${post.businessName}`} onClick={() => void openProvider(post)}>{post.avatarUrl ? <Image src={post.avatarUrl} alt="" width={50} height={50} unoptimized /> : post.businessName.slice(0,2).toUpperCase()}</button>
+-        <button disabled={authPending} aria-pressed={liked.has(post.id)} className={liked.has(post.id) ? "active" : ""} aria-label={t("J’aime")} onClick={() => void toggle("like",post)}>♥</button>
++        <button disabled={authPending || socialBusy.has(`like:${post.id}`)} aria-pressed={liked.has(post.id)} className={liked.has(post.id) ? "active" : ""} aria-label={t("J’aime")} onClick={() => void toggle("like",post)}>♥</button>
+         <button disabled={authPending} aria-label={t("Commentaires")} onClick={() => void openComments(post)}>◌</button>
+         <button disabled={authPending} aria-label={t("Partager")} onClick={() => void share(post)}>↗</button>
+         <details className="feed-options"><summary aria-label={t("Plus d’options")}>•••</summary><div>
+-          <button disabled={authPending} aria-pressed={followed.has(post.authorId)} onClick={() => void follow(post)}>{t(followed.has(post.authorId) ? t("Se désabonner") : t("Suivre"))}</button>
+-          <button disabled={authPending} aria-pressed={saved.has(post.id)} onClick={() => void toggle("save",post)}>{t(saved.has(post.id) ? t("Retirer des inspirations") : t("Enregistrer"))}</button>
++          <button disabled={authPending || socialBusy.has(`follow:${post.authorId}`)} aria-pressed={followed.has(post.authorId)} onClick={() => void follow(post)}>{t(followed.has(post.authorId) ? t("Se désabonner") : t("Suivre"))}</button>
++          <button disabled={authPending || socialBusy.has(`save:${post.id}`)} aria-pressed={saved.has(post.id)} onClick={() => void toggle("save",post)}>{t(saved.has(post.id) ? t("Retirer des inspirations") : t("Enregistrer"))}</button>
+           <button disabled={authPending} onClick={() => void report(post)}>{t("Signaler")}</button>
+         </div></details>
+       </aside>
+--- a/app/booking-feedback.tsx
++++ b/app/booking-feedback.tsx
+@@ -44,7 +44,7 @@
+         const token = session?.data.session?.access_token;
+         if (!token)
+             throw Error();
+-        const response = await fetch("/api/bookings/reviews", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ bookingId, type: direction, rating: Number(form.get("rating")), comment: String(form.get("comment") ?? ""), criteria: form.getAll("criteria"), visibility: direction === "provider_to_client" ? String(form.get("visibility")) : "public" }) });
++        const response = await fetch("/api/bookings/reviews", { signal: AbortSignal.timeout(15_000), method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ bookingId, type: direction, rating: Number(form.get("rating")), comment: String(form.get("comment") ?? ""), criteria: form.getAll("criteria"), visibility: direction === "provider_to_client" ? String(form.get("visibility")) : "public" }) });
+         if (!response.ok)
+             throw Error();
+         setOwn(true);
+--- a/app/booking-reschedule.tsx
++++ b/app/booking-reschedule.tsx
+@@ -14,7 +14,7 @@
+         const api = getSupabaseBrowserClient();
+         if (!api)
+             throw Error();
+-        const result = await api.rpc("reschedule_owned_booking", { target_booking_id: bookingId, target_starts_at: start.toISOString() });
++        const result = await api.rpc("reschedule_owned_booking", { target_booking_id: bookingId, target_starts_at: start.toISOString() }).abortSignal(AbortSignal.timeout(15_000));
+         if (result.error)
+             throw Error();
+         await onSaved();

@@ -1,9 +1,10 @@
+import { notFound } from "next/navigation";
 import { WorkspaceRoute } from "../../workspace-route";
 import { MataBeautyApp } from "../../mata-beauty-app";
 import { redirect } from "next/navigation";
 type SearchParams = Record<string, string | string[] | undefined>;
 export default async function ClientWorkspace({ params, searchParams }: { params: Promise<{ module?: string[] }>; searchParams?: Promise<SearchParams> }) {
-  const { module = [] } = await params;
+  const { module = [] } = await params; if (module.length > 1) notFound();
   if (module[0] === "settings") redirect("/app/profile?edit=1");
   if (module[0] === "social-profile") redirect("/app/profile");
   if (module[0] === "discover") {

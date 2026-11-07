@@ -14,7 +14,8 @@ export async function GET(request: Request) {
     const { data, error } = await client.auth.getUser();
     if (error || !data.user) return go("/?connexion=requise&returnTo=%2Fauth%2Fworkspace");
     const profile = await client.rpc("get_my_private_profile");
-    if (profile.error || !profile.data || profile.data.is_suspended || profile.data.account_status !== "active") {
+    if (profile.error || !profile.data) return go("/?auth_error=workspace_unavailable");
+    if (profile.data.is_suspended || profile.data.account_status !== "active") {
       return go("/?auth_error=account_suspended");
     }
     if (profile.data.role !== "admin") return go("/app/profile");
