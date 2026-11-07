@@ -595,11 +595,23 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     cards.current = [];
   }, []);
 
+  const socialPending = useRef(new Set<string>());
+  const [socialBusy, setSocialBusy] = useState(new Set<string>());
+  async function runSocialAction(key: string, action: () => Promise<void>) {
+    if (socialPending.current.has(key)) return;
+    socialPending.current.add(key); setSocialBusy(new Set(socialPending.current));
+    try { await action(); }
+    catch { setFeedback(t("Cette action n’a pas pu être enregistrée.")); }
+    finally { socialPending.current.delete(key); setSocialBusy(new Set(socialPending.current)); }
+  }
   async function toggle(kind: "like" | "save", post: FeedPost) {
+    await runSocialAction(`${kind}:${post.id}`, () => toggleUnlocked(kind, post));
+  }
+  async function toggleUnlocked(kind: "like" | "save", post: FeedPost) {
     if (!authenticated) { onRequireAuth(); return; }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { data, error } = await supabase.rpc(kind === "like" ? "toggle_post_like" : "toggle_post_save", { target_post_id: post.id });
+    const { data, error } = await supabase.rpc(kind === "like" ? "toggle_post_like" : "toggle_post_save", { target_post_id: post.id }).abortSignal(AbortSignal.timeout(12_000));
     if (error || !data) { setFeedback(t("Cette action n’a pas pu être enregistrée.")); return; }
     const result = data as { active: boolean; count: number };
     if (result.active) videoTopics(`${post.serviceTitle ?? ""} ${post.caption} ${post.hashtags.join(" ")}`).forEach(topic => interests.current.add(topic));
@@ -609,11 +621,12 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     setFeedback(kind === "like" ? (result.active ? t("Vidéo aimée.") : t("J’aime retiré.")) : (result.active ? t("Ajoutée à Mes inspirations.") : t("Retirée de Mes inspirations.")));
   }
 
-  async function follow(post: FeedPost) {
+  async function follow(post: FeedPost) { await runSocialAction(`follow:${post.authorId}`, () => followUnlocked(post)); }
+  async function followUnlocked(post: FeedPost) {
     if (!authenticated) { onRequireAuth(); return; }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { data, error } = await supabase.rpc("toggle_follow_provider_from_post", { target_provider_id: post.authorId, target_source_post_id: post.id });
+    const { data, error } = await supabase.rpc("toggle_follow_provider_from_post", { target_provider_id: post.authorId, target_source_post_id: post.id }).abortSignal(AbortSignal.timeout(12_000));
     if (error) { setFeedback(t("L’abonnement n’a pas pu être modifié.")); return; }
     setFollowed((current) => { const next = new Set(current); if (data) next.add(post.authorId); else next.delete(post.authorId); return next; });
     setFeedback(data ? `${t("Vous suivez")} ${post.businessName}.` : `${t("Vous ne suivez plus")} ${post.businessName}.`);
@@ -890,12 +903,12 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       {post.postType === "video" && !videoErrors.has(post.id) && <><button className="play-toggle" aria-label={t(pausedPosts.has(post.id) ? t("Lire la vidéo") : t("Mettre la vidéo en pause"))} onClick={() => { const next = new Set(pausedPosts); const video = videos.current[index]; if (next.has(post.id)) { next.delete(post.id); void video?.play().catch(() => undefined); } else { next.add(post.id); video?.pause(); } setPausedPosts(next); }}>{pausedPosts.has(post.id) && index===activeIndex ? "▶" : ""}</button><button className="sound-toggle" aria-label={t(muted ? t("Activer le son") : t("Couper le son"))} onClick={() => setMuted((value) => !value)}>{muted ? "♩×" : "♩"}</button></>}
       <aside className="social-actions" aria-label={t("Interactions de la publication")}>
         <button className="creator-orb" aria-label={`${t("Profil de")} ${post.businessName}`} onClick={() => void openProvider(post)}>{post.avatarUrl ? <Image src={post.avatarUrl} alt="" width={50} height={50} unoptimized /> : post.businessName.slice(0,2).toUpperCase()}</button>
-        <button disabled={authPending} aria-pressed={liked.has(post.id)} className={liked.has(post.id) ? "active" : ""} aria-label={t("J’aime")} onClick={() => void toggle("like",post)}>♥</button>
+        <button disabled={authPending || socialBusy.has(`like:${post.id}`)} aria-pressed={liked.has(post.id)} className={liked.has(post.id) ? "active" : ""} aria-label={t("J’aime")} onClick={() => void toggle("like",post)}>♥</button>
         <button disabled={authPending} aria-label={t("Commentaires")} onClick={() => void openComments(post)}>◌</button>
         <button disabled={authPending} aria-label={t("Partager")} onClick={() => void share(post)}>↗</button>
         <details className="feed-options"><summary aria-label={t("Plus d’options")}>•••</summary><div>
-          <button disabled={authPending} aria-pressed={followed.has(post.authorId)} onClick={() => void follow(post)}>{t(followed.has(post.authorId) ? t("Se désabonner") : t("Suivre"))}</button>
-          <button disabled={authPending} aria-pressed={saved.has(post.id)} onClick={() => void toggle("save",post)}>{t(saved.has(post.id) ? t("Retirer des inspirations") : t("Enregistrer"))}</button>
+          <button disabled={authPending || socialBusy.has(`follow:${post.authorId}`)} aria-pressed={followed.has(post.authorId)} onClick={() => void follow(post)}>{t(followed.has(post.authorId) ? t("Se désabonner") : t("Suivre"))}</button>
+          <button disabled={authPending || socialBusy.has(`save:${post.id}`)} aria-pressed={saved.has(post.id)} onClick={() => void toggle("save",post)}>{t(saved.has(post.id) ? t("Retirer des inspirations") : t("Enregistrer"))}</button>
           <button disabled={authPending} onClick={() => void report(post)}>{t("Signaler")}</button>
         </div></details>
       </aside>

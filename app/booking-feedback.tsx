@@ -44,14 +44,15 @@ export function BookingFeedback({ bookingId, direction }: {
         const token = session?.data.session?.access_token;
         if (!token)
             throw Error();
-        const response = await fetch("/api/bookings/reviews", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ bookingId, type: direction, rating: Number(form.get("rating")), comment: String(form.get("comment") ?? ""), criteria: form.getAll("criteria"), visibility: direction === "provider_to_client" ? String(form.get("visibility")) : "public" }) });
+        const response = await fetch("/api/bookings/reviews", { signal: AbortSignal.timeout(15_000), method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ bookingId, type: direction, rating: Number(form.get("rating")), comment: String(form.get("comment") ?? ""), criteria: form.getAll("criteria"), visibility: direction === "provider_to_client" ? String(form.get("visibility")) : "public" }) });
         if (!response.ok)
             throw Error();
         setOwn(true);
         setAttempt(value => value + 1);
     }
-    catch {
-        setError("Avis non enregistré : vérifiez votre accès et réessayez.");
+    catch (error) {
+        const uncertain = error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name);
+        setError(uncertain ? "Enregistrement de l’avis non confirmé. Actualisez les avis avant de réessayer." : "Avis non enregistré : vérifiez votre accès et réessayez.");
     }
     finally {
         setBusy(false);

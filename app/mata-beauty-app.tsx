@@ -1073,9 +1073,21 @@ function BookingSuccess({ provider, service, confirmation, onClose }: { provider
 function BookingMicroFeedback({ bookingId }: { bookingId: string }) {
   const locale = useApplicationLocale();
   const t = (text: string) => bookingText(text, locale);
-  const [sent, setSent] = useState(false);
-  async function answer(response: "yes" | "no") { const client=getSupabaseBrowserClient(); if(!client)return; const user=await client.auth.getUser(); if(!user.data.user)return; const {error}=await client.from("micro_feedback").insert({profile_id:user.data.user.id,context:"booking",response,booking_id:bookingId}); if(!error)setSent(true); }
-  return <aside className="micro-feedback"><strong>{t("Votre réservation a-t-elle été simple ?")}</strong>{sent ? <small>{t("Merci pour votre retour.")}</small> : <div><button onClick={() => void answer("yes")}>{t("👍 Oui")}</button><button onClick={() => void answer("no")}>{t("👎 Non")}</button></div>}</aside>;
+  const [sent, setSent] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const pending = useRef(false);
+  async function answer(response: "yes" | "no") {
+    if (pending.current) return;
+    pending.current = true; setBusy(true); setError("");
+    try {
+      const client = getSupabaseBrowserClient(); if (!client) throw Error("unavailable");
+      const auth = await client.auth.getUser(); if (auth.error || !auth.data.user) throw Error("unauthorized");
+      const result = await client.from("micro_feedback").insert({profile_id:auth.data.user.id,context:"booking",response,booking_id:bookingId}).abortSignal(AbortSignal.timeout(12_000));
+      if (result.error) throw result.error;
+      setSent(true);
+    } catch { setError("Votre retour n’a pas pu être enregistré. Réessayez."); }
+    finally { pending.current = false; setBusy(false); }
+  }
+  return <aside className="micro-feedback"><strong>{t("Votre réservation a-t-elle été simple ?")}</strong>{sent ? <small>{t("Merci pour votre retour.")}</small> : <div><button disabled={busy} onClick={() => void answer("yes")}>{t("👍 Oui")}</button><button disabled={busy} onClick={() => void answer("no")}>{t("👎 Non")}</button></div>}{error && <p role="alert">{t(error)}</p>}</aside>;
 }
 
 function BottomNav({ authenticated, active, onFeed, onAccount }: { authenticated: boolean; active: "inspiration"; onFeed: () => void; onAccount: (page: "bookings" | "messages" | "profile") => void }) {

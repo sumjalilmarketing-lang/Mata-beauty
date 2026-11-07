@@ -46,7 +46,8 @@ test('QA-B03: pending review request expires and preserves the comment', async (
   await page.getByLabel('Votre commentaire').fill('Commentaire conservé après délai.');
   try {
     await page.getByRole('button', { name: 'Publier mon avis', exact: true }).click();
-    await expect(page.getByRole('alert').filter({ hasText: 'Avis non enregistré' })).toBeVisible({ timeout: 18_000 });
+    await expect(page.getByRole('alert').filter({ hasText: 'Enregistrement de l’avis non confirmé' })).toBeVisible({ timeout: 18_000 });
+    await expect(page.getByRole('button', { name: 'Réessayer les avis', exact: true })).toBeVisible();
     await expect(page.getByLabel('Votre commentaire')).toHaveValue('Commentaire conservé après délai.');
     await expect(page.getByRole('button', { name: 'Publier mon avis', exact: true })).toBeEnabled();
   } finally { release(); }

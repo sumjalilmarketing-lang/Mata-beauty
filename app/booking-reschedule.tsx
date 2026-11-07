@@ -14,13 +14,13 @@ export function BookingReschedule({ bookingId, timeZone, onSaved }: {
         const api = getSupabaseBrowserClient();
         if (!api)
             throw Error();
-        const result = await api.rpc("reschedule_owned_booking", { target_booking_id: bookingId, target_starts_at: start.toISOString() });
+        const result = await api.rpc("reschedule_owned_booking", { target_booking_id: bookingId, target_starts_at: start.toISOString() }).abortSignal(AbortSignal.timeout(15_000));
         if (result.error)
             throw Error();
         await onSaved();
     }
     catch {
-        setError("Déplacement refusé : vérifiez le créneau disponible et vos droits.");
+        setError("Déplacement non confirmé : actualisez l’agenda avant de réessayer.");
     }
     finally {
         setBusy(false);
