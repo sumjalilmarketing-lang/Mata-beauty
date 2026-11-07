@@ -71,8 +71,7 @@ test('finance : après mot de passe, le responsable rejoint son département',as
 test('client : une photo sans ligne modifiée ne produit pas de faux succès',async({page,context})=>{
  await login(context,'client');
  let updates=0;
- await page.route(`${api}/storage/v1/object/avatars/**`,route=>route.fulfill({json:{Key:'avatars/synthetic.png'}}));
- await page.route(`${api}/rest/v1/profiles**`,route=>{if(route.request().method()!=='PATCH')return route.fallback();updates++;return route.fulfill({json:null});});
+ await page.route('**/api/media/images',route=>{expect(route.request().method()).toBe('POST');expect(route.request().headers().authorization).toMatch(/^Bearer /);expect(route.request().postData()).toContain('avatar');updates++;return route.fulfill({status:503,json:{error:{code:'save_failed',message:'Enregistrement non confirmé.'}}});});
  await page.goto('/app/profile?edit=1');
  await page.getByLabel('Changer ma photo de profil',{exact:true}).setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64')});
  await expect(page.getByText('La photo n’a pas pu être enregistrée. Réessayez.',{exact:true})).toBeVisible();

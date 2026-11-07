@@ -68,5 +68,19 @@ describe("resolveSocialProfileVideoMedia", () => {
       thumbnailPath: "owner/legacy/cover.jpg",
     });
   });
+  it("résout les anciennes lignes URL avec les deux buckets privés historiques", () => {
+    const video = `https://storage.example/storage/v1/object/public/social-videos/${videoPath}`;
+    const thumbnail = `https://storage.example/storage/v1/object/public/social-thumbnails/${coverPath}`;
+    expect(resolveSocialProfileVideoMedia({ videoUrl: video, thumbnailUrl: thumbnail,
+      mediaItems: [{ media_type: "video", bucket_id: "social-videos", storage_path: video, thumbnail_path: thumbnail }],
+    })).toEqual({ videoBucket: "social-videos", videoPath, thumbnailBucket: "social-thumbnails", thumbnailPath: coverPath });
+  });
+
+  it("ne transforme pas une URL de miniature d’un autre bucket en chemin autorisé", () => {
+    expect(resolveSocialProfileVideoMedia({ videoUrl: null, thumbnailUrl: null,
+      mediaItems: [{ ...media, thumbnail_path: "https://storage.example/storage/v1/object/sign/provider-documents/private.pdf" }],
+    })).toEqual({ videoBucket: "provider-social-media", videoPath, thumbnailBucket: null, thumbnailPath: null });
+  });
+
 });
 

@@ -73,9 +73,7 @@ test('WhatsApp recipient accepts once and opens the staff space without OTP or o
 
 test('uploaded salon logo is propagated through the controlled branding operation',async({page,context})=>{
   await login(context,'provider');let branded=false;
-  await page.route(`${api}/storage/v1/object/business-media/**`,route=>route.fulfill({json:{Key:'fixture-logo',Id:syntheticId(920)}}));
-  await page.route(`${api}/rest/v1/business_media**`,route=>route.fulfill({json:route.request().method()==='POST'?null:[]}));
-  await page.route(`${api}/rest/v1/rpc/set_salon_brand_image`,route=>{const body=route.request().postDataJSON();expect(body.target_business_id).toBe(auditBusiness);expect(body.target_kind).toBe('logo');expect(body.target_url).toContain('/business-media/'+auditBusiness+'/logo-');branded=true;return route.fulfill({json:auditBusiness});});
+  await page.route('**/api/media/images',route=>{const body=route.request().postData()??'';expect(route.request().headers().authorization).toMatch(/^Bearer /);expect(body).toContain('salon-logo');expect(body).toContain(auditBusiness);branded=true;return route.fulfill({json:{ok:true,url:`${api}/storage/v1/object/public/business-media/${auditBusiness}/salon-logo-fixture.webp`}});});
   await page.goto('/salon/portfolio');
   await page.getByLabel('Image',{exact:true}).setInputFiles({name:'logo.png',mimeType:'image/png',buffer:Buffer.from('synthetic image payload for UI test')});
   await page.getByRole('button',{name:'Envoyer l’image',exact:true}).click();

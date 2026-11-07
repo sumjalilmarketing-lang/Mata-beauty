@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { resolveSocialProfileVideoMedia } from "@/lib/profiles/social-profile-video-media";
+import { isSocialMediaBucket, resolveSocialProfileVideoMedia } from "@/lib/profiles/social-profile-video-media";
 
 const headers = { "Cache-Control": "no-store, max-age=0", "X-Content-Type-Options": "nosniff" };
 type MediaItem = { bucket_id: string; storage_path: string; media_type: string; thumbnail_path: string | null };
@@ -47,7 +47,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       videoUrl: "",
       thumbnailUrl: null,
     };
-    if (media.videoBucket === "provider-social-media" && media.videoPath) {
+    if (isSocialMediaBucket(media.videoBucket) && media.videoBucket && media.videoPath) {
       const { data: signed, error: signingError } = await client.storage.from(media.videoBucket).createSignedUrl(media.videoPath, 3600);
       if (signingError || !signed?.signedUrl) return Response.json({ error: "unavailable" }, { status: 503, headers });
       response.videoUrl = signed.signedUrl;
@@ -55,7 +55,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       response.videoUrl = safeHttpUrl(data.video_url) ?? "";
       if (!response.videoUrl) return Response.json({ error: "unavailable" }, { status: 503, headers });
     }
-    if (media.thumbnailBucket === "provider-social-media" && media.thumbnailPath) {
+    if (isSocialMediaBucket(media.thumbnailBucket) && media.thumbnailBucket && media.thumbnailPath) {
       const { data: signed } = await client.storage.from(media.thumbnailBucket).createSignedUrl(media.thumbnailPath, 3600);
       response.thumbnailUrl = signed?.signedUrl ?? null;
     } else {

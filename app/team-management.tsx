@@ -1,4 +1,5 @@
 "use client";
+import { uploadProfileImage } from "@/lib/media/image-upload-client";
 import { teamAccessLabel, acceptedInvitationMember } from "@/lib/domain/team-access-status";
 import "./team-management-layout.css";
 import { TeamPhoto, useTeamPhotos } from "./team-photos";
@@ -321,8 +322,8 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget);
     const file = form.get("photo");
-    if (file instanceof File && file.size && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 12 * 1024 * 1024)) {
-      setMessage("Photo JPEG, PNG ou WebP, 12 Mo maximum."); return;
+    if (file instanceof File && file.size && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 4 * 1024 * 1024)) {
+      setMessage("Photo JPEG, PNG ou WebP, 4 Mo maximum."); return;
     }
     await mutate(async () => {
       const result = await api().rpc("save_team_member", { target_business_id: businessId, target_member_id: selected?.id ?? savedMemberId.current, member: {
@@ -332,12 +333,7 @@ export function TeamManagement({ businessId, ownerId, collaboratorAccessEnabled 
       if (result.error) throw result.error;
       savedMemberId.current = result.data as string;
       if (file instanceof File && file.size) {
-        const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-        const path = `${businessId}/employee-${result.data}-${crypto.randomUUID()}.${extension}`;
-        const upload = await api().storage.from("business-media").upload(path, file, { contentType: file.type, upsert: false });
-        if (upload.error) throw upload.error;
-        const update = await api().from("collaborators").update({ avatar_url: api().storage.from("business-media").getPublicUrl(path).data.publicUrl }).eq("id", result.data as string).eq("business_id", businessId).select("id").maybeSingle();
-        if (update.error || !update.data) { await api().storage.from("business-media").remove([path]); throw update.error ?? new Error("La photo du collaborateur n’a pas pu être enregistrée. Actualisez l’équipe."); }
+        await uploadProfileImage(file, "collaborator-avatar", { businessId, collaboratorId: result.data as string });
       }
       savedMemberId.current = null; setEditing(false);
     }, "Fiche enregistrée. Vérifiez ses horaires et les rendez-vous existants ci-dessous.");

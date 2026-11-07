@@ -1,4 +1,5 @@
 "use client";
+import { uploadProfileImage } from "@/lib/media/image-upload-client";
 import { PhoneInput } from "./phone-input";
 
 import Link from "next/link";
@@ -97,21 +98,16 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
   }
   async function uploadPhoto(file: File | undefined) {
     if (!file || !file.size || photoBusy) return;
-    if (! ["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
-      setNotice("Choisissez une photo JPG, PNG ou WebP de 5 Mo maximum."); return;
+    if (! ["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 4 * 1024 * 1024) {
+      setNotice("Choisissez une photo JPG, PNG ou WebP de 4 Mo maximum."); return;
     }
     const client = getSupabaseBrowserClient(); if (!client) return;
     setPhotoBusy(true); setNotice("");
-    const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const path = `${userId}/avatar-${crypto.randomUUID()}.${extension}`;
-    const upload = await client.storage.from("avatars").upload(path, file, { contentType: file.type, upsert: false });
-    if (upload.error) { setNotice(publicErrorMessage(upload.error, "La photo n’a pas pu être envoyée.")); setPhotoBusy(false); return; }
-    const url = client.storage.from("avatars").getPublicUrl(path).data.publicUrl;
-    const { error } = await client.from("profiles").update({ avatar_url: url }).eq("id", userId);
-    if (error) {
-      await client.storage.from("avatars").remove([path]);
-      setNotice(publicErrorMessage(error, "La photo n’a pas pu être enregistrée."));
-    } else { setAvatarUrl(url); setNotice("Photo du profil professionnel mise à jour."); }
+    try {
+      const url = await uploadProfileImage(file, "avatar");
+      setAvatarUrl(url); setNotice("Photo du profil professionnel mise à jour.");
+      window.dispatchEvent(new Event("mata-profile-updated"));
+    } catch { setNotice("La photo n’a pas pu être enregistrée. Réessayez."); }
     setPhotoBusy(false);
   }
   function useCurrentLocation() {
@@ -144,7 +140,7 @@ export function ProfessionalApplication({ userId }: { userId: string }) {
       {!candidate && <form className="dashboard-form" onSubmit={event => void start(event)}><label>Nom de votre activité<input name="businessName" minLength={2} maxLength={120} required /></label><button disabled={busy}>Commencer mon dossier</button></form>}
     </article>
     {candidate && <>
-      {editable && <article className="panel professional-onboarding-panel"><div className="professional-panel-heading"><div><span className="professional-step">ÉTAPE 2 SUR 4</span><h2>Présentez votre activité</h2><p>Choisissez votre structure, puis complétez les informations affichées sur votre profil.</p></div><strong>{candidate.onboarding_progress}%</strong></div><div className="professional-progress-track" role="progressbar" aria-label="Profil professionnel complété" aria-valuemin={0} aria-valuemax={100} aria-valuenow={candidate.onboarding_progress}><span style={{ width: `${candidate.onboarding_progress}%` }} /></div><div className="professional-photo-row"><div className="professional-photo">{avatarUrl ? <Image src={avatarUrl} alt="Photo du profil professionnel" width={88} height={88} unoptimized /> : <span aria-hidden>MB</span>}</div><label className="professional-photo-button">{photoBusy ? "Envoi…" : "Ajouter une photo"}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={photoBusy} onChange={event => { void uploadPhoto(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} /></label><small>La photo utilise l’avatar public de votre compte. JPG, PNG ou WebP · 5 Mo maximum.</small></div><h2>Informations professionnelles</h2><form ref={applicationForm} className="dashboard-form" onSubmit={event => void save(event)}>
+      {editable && <article className="panel professional-onboarding-panel"><div className="professional-panel-heading"><div><span className="professional-step">ÉTAPE 2 SUR 4</span><h2>Présentez votre activité</h2><p>Choisissez votre structure, puis complétez les informations affichées sur votre profil.</p></div><strong>{candidate.onboarding_progress}%</strong></div><div className="professional-progress-track" role="progressbar" aria-label="Profil professionnel complété" aria-valuemin={0} aria-valuemax={100} aria-valuenow={candidate.onboarding_progress}><span style={{ width: `${candidate.onboarding_progress}%` }} /></div><div className="professional-photo-row"><div className="professional-photo">{avatarUrl ? <Image src={avatarUrl} alt="Photo du profil professionnel" width={88} height={88} unoptimized /> : <span aria-hidden>MB</span>}</div><label className="professional-photo-button">{photoBusy ? "Envoi…" : "Ajouter une photo"}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={photoBusy} onChange={event => { void uploadPhoto(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} /></label><small>La photo utilise l’avatar public de votre compte. JPG, PNG ou WebP · 4 Mo maximum.</small></div><h2>Informations professionnelles</h2><form ref={applicationForm} className="dashboard-form" onSubmit={event => void save(event)}>
         <label>Nom de votre activité<input name="businessName" defaultValue={candidate.business_name} minLength={2} maxLength={120} required /></label>
         <label>Votre structure<select name="activity" defaultValue={candidate.activity_type || "independent"}><option value="independent">Professionnel indépendant</option><option value="salon">Salon de beauté</option><option value="barber_shop">Barber shop</option><option value="hairdresser">Coiffure</option><option value="makeup_artist">Maquillage</option><option value="nail_artist">Onglerie</option><option value="esthetician">Esthétique</option><option value="care_specialist">Soins</option><option value="other">Autre activité</option></select><small>Le salon reste une organisation rattachée à votre compte professionnel, pas un compte séparé.</small></label>
         <label className="wide">Présentation<textarea name="bio" minLength={40} maxLength={2000} defaultValue={candidate.bio ?? ""} required /></label>

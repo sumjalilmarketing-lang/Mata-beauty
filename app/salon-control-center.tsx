@@ -1,4 +1,5 @@
 "use client";
+import { uploadProfileImage } from "@/lib/media/image-upload-client";
 import { ServiceDurationInput } from "./service-duration-input";
 import { TariffPhotoImport } from "./tariff-photo-import";
 import { ServiceReferenceField } from "./service-reference-field";
@@ -174,7 +175,16 @@ export function SalonControlCenter({ module, userId, collaboratorAccessEnabled =
     setFeedback(error || !data ? "La fermeture n’a pas pu être retirée. Actualisez la liste." : "Fermeture retirée."); if (!error && data) await load();
   }
 
-  async function uploadMedia(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!business) return; const supabase = getSupabaseBrowserClient(); if (!supabase) return; const form = event.currentTarget; const values = new FormData(form); const file = values.get("file"); const mediaType = String(values.get("mediaType")); if (!(file instanceof File) || !file.size) return; if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 12 * 1024 * 1024) { setFeedback("Image JPEG, PNG ou WebP de 12 Mo maximum requise."); return; } const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg"; const path = `${business.id}/${mediaType}-${crypto.randomUUID()}.${extension}`; const upload = await supabase.storage.from("business-media").upload(path, file, { contentType: file.type, cacheControl: "31536000", upsert: false }); if (upload.error) { setFeedback(publicErrorMessage(upload.error, "Envoi impossible.")); return; } const publicUrl = supabase.storage.from("business-media").getPublicUrl(path).data.publicUrl; const row = await supabase.from("business_media").insert({ business_id: business.id, storage_path: path, media_type: mediaType, sort_order: media.length }); if (!row.error && mediaType !== "gallery") { const published = await supabase.rpc("set_salon_brand_image", { target_business_id: business.id, target_kind: mediaType, target_url: publicUrl }); if (published.error || !published.data) { setFeedback("Image enregistrée dans le portfolio, mais le logo ou la couverture n’a pas pu être mis à jour."); await load(); return; } } if (row.error) { await supabase.storage.from("business-media").remove([path]); setFeedback("Le média n’a pas pu être enregistré."); } else { setFeedback("Média du salon mis à jour."); form.reset(); await load(); } }
+  async function uploadMedia(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!business) return;
+    const form = event.currentTarget, values = new FormData(form), file = values.get("file"), mediaType = String(values.get("mediaType"));
+    if (!(file instanceof File) || !file.size) return;
+    if (!["logo", "cover", "gallery"].includes(mediaType) || !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 4 * 1024 * 1024) { setFeedback("Image JPEG, PNG ou WebP de 4 Mo maximum requise."); return; }
+    try {
+      await uploadProfileImage(file, mediaType === "logo" ? "salon-logo" : mediaType === "cover" ? "salon-cover" : "salon-gallery", { businessId: business.id, sortOrder: media.length });
+      setFeedback("Média du salon mis à jour."); form.reset(); await load();
+    } catch { setFeedback("Enregistrement non confirmé. Actualisez avant de réessayer."); }
+  }
   async function removeMedia(item: Media) {
     if (!business) return; const supabase = getSupabaseBrowserClient(); if (!supabase) return;
     const url = supabase.storage.from("business-media").getPublicUrl(item.storage_path).data.publicUrl;

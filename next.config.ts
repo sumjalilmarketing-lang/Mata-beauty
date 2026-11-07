@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { contentSecurityPolicy } from "./lib/security/content-security-policy";
 
 const nextConfig: NextConfig = {
   ...(process.env.MATA_E2E_NEXT_DIST_DIR ? { distDir: process.env.MATA_E2E_NEXT_DIST_DIR } : {}),
@@ -20,14 +21,6 @@ const nextConfig: NextConfig = {
     ];
   },
   async headers() {
-    const developmentEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
-    const upgradeInsecureRequests = process.env.NODE_ENV === "production" && !process.env.MATA_E2E_NEXT_DIST_DIR
-      ? "; upgrade-insecure-requests"
-      : "";
-    const configuredSupabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin : null;
-    const documentFrameSource = configuredSupabaseOrigin ? `${configuredSupabaseOrigin}/storage/v1/object/sign/provider-documents/` : "'none'";
-    const mapFrameSource = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY ? " https://www.google.com" : "";
-    const supabaseConnectSource = configuredSupabaseOrigin ? ` ${configuredSupabaseOrigin}` : "";
     const noIndexHeaders = ["/app/:path*", "/admin/:path*", "/commercial/:path*", "/auth/:path*", "/finance/:path*", "/moderation/:path*", "/onboarding/:path*", "/operations/:path*", "/pro/:path*", "/salon/:path*", "/staff/:path*", "/support-agent/:path*"].map(source => ({
       source,
       headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
@@ -39,7 +32,10 @@ const nextConfig: NextConfig = {
         { key: "X-Frame-Options", value: "DENY" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), payment=()" },
-        { key: "Content-Security-Policy", value: `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; frame-src ${documentFrameSource}${mapFrameSource}; object-src 'none'; form-action 'self' https://app.paydunya.com; img-src 'self' data: blob: https:; media-src 'self' blob: https://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; worker-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${developmentEval}; connect-src 'self'${supabaseConnectSource} https://*.supabase.co wss://*.supabase.co https://app.paydunya.com${upgradeInsecureRequests}` },
+        { key: "Content-Security-Policy", value: contentSecurityPolicy(process.env) },
+        // Static public HTML keeps its current enforcement until a hash-based
+        // policy can be validated. This stricter candidate reports in browsers.
+        { key: "Content-Security-Policy-Report-Only", value: contentSecurityPolicy(process.env, undefined, true) },
       ],
     }, {
       source: "/images/categories/:path*",

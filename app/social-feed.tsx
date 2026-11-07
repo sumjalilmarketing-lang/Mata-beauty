@@ -77,7 +77,7 @@ async function usableSignedUrl(bucketId: string, storagePath: string) {
 }
 
 async function resolvePrivateMedia(row: SocialFeedRow): Promise<SocialFeedRow | null> {
-  const privateItems = (row.media_items ?? []).filter((item) => item.bucket_id === "provider-social-media");
+  const privateItems = (row.media_items ?? []).filter((item) => ["provider-social-media", "social-videos", "social-thumbnails"].includes(item.bucket_id));
   const privateVideo = postUsesVideoMedia(row.post_type, privateItems.map((item) => item.media_type));
   if (privateVideo) {
     const result = await fetchPublicPostVideoResult(row.id);

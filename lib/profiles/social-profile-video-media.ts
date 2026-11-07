@@ -7,6 +7,10 @@ export type SocialProfileMediaItem = {
 
 type StorageObject = { bucket: string; path: string };
 
+export function isSocialMediaBucket(bucket: string | null): boolean {
+  return bucket !== null && ["provider-social-media", "social-videos", "social-thumbnails"].includes(bucket);
+}
+
 export type ResolvedSocialProfileVideo = {
   videoBucket: string | null;
   videoPath: string | null;
@@ -42,7 +46,12 @@ export function resolveSocialProfileVideoMedia(input: {
   thumbnailUrl: string | null;
   mediaItems: SocialProfileMediaItem[] | null;
 }): ResolvedSocialProfileVideo {
-  const videos = (input.mediaItems ?? []).filter(item => item.media_type === "video");
+  const videos = (input.mediaItems ?? []).filter(item => item.media_type === "video").flatMap(item => {
+    // Early Studio rows stored full URLs instead of object names.
+    const storedVideo = storageObjectFromUrl(item.storage_path);
+    if (storedVideo && storedVideo.bucket !== item.bucket_id) return [];
+    return [{ ...item, storage_path: storedVideo?.path ?? item.storage_path }];
+  });
   const urlVideo = storageObjectFromUrl(input.videoUrl);
   const matchedVideo = urlVideo
     ? videos.find(item => item.bucket_id === urlVideo.bucket && item.storage_path === urlVideo.path)
@@ -51,15 +60,19 @@ export function resolveSocialProfileVideoMedia(input: {
   const directThumbnail = storageObjectFromUrl(input.thumbnailUrl);
 
   if (video) {
-    const attachedThumbnail = video.thumbnail_path;
-    const matchingDirectThumbnail = directThumbnail && directThumbnail.bucket === video.bucket_id
+    const thumbnailBucket = video.bucket_id === "social-videos" ? "social-thumbnails" : video.bucket_id;
+    const attachedUrl = storageObjectFromUrl(video.thumbnail_path);
+    const attachedThumbnail = video.thumbnail_path
+      ? attachedUrl?.bucket === thumbnailBucket ? attachedUrl.path : attachedUrl ? null : video.thumbnail_path
+      : null;
+    const matchingDirectThumbnail = directThumbnail && directThumbnail.bucket === thumbnailBucket
       && (!attachedThumbnail || directThumbnail.path === attachedThumbnail)
       ? directThumbnail
       : null;
     return {
       videoBucket: video.bucket_id,
       videoPath: video.storage_path,
-      thumbnailBucket: attachedThumbnail ? video.bucket_id : matchingDirectThumbnail?.bucket ?? null,
+      thumbnailBucket: attachedThumbnail ? thumbnailBucket : matchingDirectThumbnail?.bucket ?? null,
       thumbnailPath: attachedThumbnail ?? matchingDirectThumbnail?.path ?? null,
     };
   }

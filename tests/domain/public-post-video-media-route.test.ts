@@ -94,4 +94,18 @@ describe("public post video URL renewal", () => {
     expect(response.status).toBe(503);
     expect(mocks.createClient).not.toHaveBeenCalled();
   });
+  it("renews historical video and thumbnail URLs through their private buckets", async () => {
+    const db = clientFor({ data: {
+      video_url: `https://storage.example/storage/v1/object/public/social-videos/${videoPath}`,
+      thumbnail_url: `https://storage.example/storage/v1/object/public/social-thumbnails/${thumbnailPath}`,
+      post_type: "video", media_items: [],
+    } });
+    const response = await request();
+    expect(response.status).toBe(200);
+    expect(db.storageFrom).toHaveBeenNthCalledWith(1, "social-videos");
+    expect(db.storageFrom).toHaveBeenNthCalledWith(2, "social-thumbnails");
+    expect(db.createSignedUrl).toHaveBeenNthCalledWith(1, videoPath, 3600);
+    expect(db.createSignedUrl).toHaveBeenNthCalledWith(2, thumbnailPath, 3600);
+  });
+
 });

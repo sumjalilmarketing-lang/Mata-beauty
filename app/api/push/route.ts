@@ -1,5 +1,6 @@
 import { authenticatedSupabase } from "@/lib/payments/server";
 import { allowedPushEndpoint, pushSubscriptionInput } from "@/lib/push/policy";
+import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 export async function GET(request: Request) {
@@ -16,9 +17,9 @@ export async function POST(request: Request) {
   const auth = await authenticatedSupabase(request);
   if (!auth) return reply({ error: "Connexion requise." }, 401);
   if (!process.env.PUSH_VAPID_PUBLIC_KEY || !process.env.PUSH_VAPID_PRIVATE_KEY) return reply({ error: "Activation bientôt disponible." }, 503);
-  if (Number(request.headers.get("content-length")) > 5000) return reply({ error: "Requête trop longue." }, 413);
   let body: unknown;
-  try { body = await request.json(); } catch { return reply({ error: "Requête invalide." }, 400); }
+  try { body = JSON.parse(await readBoundedText(request, 5000)); }
+  catch (error) { return reply({ error: error instanceof BodyTooLargeError ? "Requête trop longue." : "Requête invalide." }, error instanceof BodyTooLargeError ? 413 : 400); }
   const input = pushSubscriptionInput.safeParse(body);
   if (!input.success) return reply({ error: "Abonnement invalide." }, 400);
   const result = await auth.client.rpc("register_web_push", { subscription_endpoint: input.data.endpoint, subscription_keys: input.data.keys, wants_sound: input.data.sound });
@@ -30,7 +31,8 @@ export async function DELETE(request: Request) {
   const auth = await authenticatedSupabase(request);
   if (!auth) return reply({ error: "Connexion requise." }, 401);
   let endpoint: unknown;
-  try { endpoint = (await request.json())?.endpoint; } catch { return reply({ error: "Requête invalide." }, 400); }
+  try { endpoint = JSON.parse(await readBoundedText(request, 5000))?.endpoint; }
+  catch (error) { return reply({ error: error instanceof BodyTooLargeError ? "Requête trop longue." : "Requête invalide." }, error instanceof BodyTooLargeError ? 413 : 400); }
   if (typeof endpoint !== "string" || !allowedPushEndpoint(endpoint)) return reply({ error: "Abonnement invalide." }, 400);
   // Owner RLS plus FK cascade also cancels pending deliveries for this device.
   const result = await auth.client.from("web_push_subscriptions").delete().eq("profile_id", auth.user.id).eq("endpoint", endpoint);
