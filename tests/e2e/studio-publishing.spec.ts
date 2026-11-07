@@ -37,6 +37,18 @@ for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, servic
   const start = page.url();
   const panel = page.locator('#video-publisher');
   await panel.getByLabel('Choisir une photo ou une vidéo', { exact: true }).setInputFiles(format === 'mp4' ? video : fileURLToPath(new URL(`./fixtures/studio-formats.${format}`, import.meta.url)));
+  const preview = panel.getByLabel('Aperçu de votre vidéo', { exact: true });
+  await expect(preview).toBeVisible({ timeout: 90000 });
+  await expect.poll(() => preview.evaluate((element: HTMLVideoElement) => element.readyState), { timeout: 15000 }).toBeGreaterThanOrEqual(2);
+  const visibleFrame = await preview.evaluate((element: HTMLVideoElement) => {
+    const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(element, 0, 0, 32, 32);
+    const pixels = context.getImageData(0, 0, 32, 32).data;
+    return Array.from(pixels).some((value, index) => index % 4 !== 3 && value > 20);
+  });
+  // The long-duration MP4 fixture intentionally contains black frames.
+  if (format !== 'mp4') expect(visibleFrame, 'Preview must show a decoded frame before publication').toBe(true);
   await panel.getByLabel('Légende', { exact: true }).fill('Réalisation longue depuis le Studio');
   await panel.getByLabel('Hashtags', { exact: true }).fill('#tresses #dakar');
   await panel.locator('select[name=serviceId]').selectOption(auditService);
@@ -135,5 +147,29 @@ test('an inactive service is refused before video transfer for public publicatio
   await panel.locator('input[name=consent]').check();
   await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('Choisissez une prestation active');
+  expect(transfers).toBe(0);
+});
+
+test('preview preparation failure can be retried without losing fields or uploading', async ({ page, context }) => {
+  test.setTimeout(120000);
+  await qaLogin(context, 'provider');
+  let transfers = 0;
+  await page.route(`${api}/storage/v1/upload/resumable**`, route => { transfers++; return route.abort(); });
+  await page.route('**/video-converter/ffmpeg-core.wasm', route => route.fulfill({ status: 503, body: 'synthetic preparation failure' }));
+  await openStudio(page);
+  const panel = page.locator('#video-publisher');
+  await panel.getByLabel('Légende', { exact: true }).fill('Ma légende reste ici');
+  await panel.locator('select[name=serviceId]').selectOption(auditService);
+  await panel.getByLabel('Choisir une photo ou une vidéo', { exact: true }).setInputFiles(fileURLToPath(new URL('./fixtures/studio-formats.avi', import.meta.url)));
+  const retry = panel.getByRole('button', { name: 'Réessayer la préparation de l’aperçu', exact: true });
+  await expect(retry).toBeVisible({ timeout: 30000 });
+  await expect(panel.getByRole('button', { name: 'Publier la vidéo', exact: true })).toBeDisabled();
+  await expect(panel.getByLabel('Légende', { exact: true })).toHaveValue('Ma légende reste ici');
+  await page.unroute('**/video-converter/ffmpeg-core.wasm');
+  await retry.click();
+  await expect(panel.getByLabel('Aperçu de votre vidéo', { exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(panel.getByLabel('Aperçu de votre vidéo', { exact: true })).toHaveAttribute('poster', /^blob:/);
+  await expect(panel.locator('select[name=serviceId]')).toHaveValue(auditService);
+  await expect(panel.getByLabel('Légende', { exact: true })).toHaveValue('Ma légende reste ici');
   expect(transfers).toBe(0);
 });
