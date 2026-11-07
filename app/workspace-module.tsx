@@ -171,7 +171,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (space === "staff" && module.key === "dashboard") return <StaffAgenda view="dashboard" canManage={staffCanManageBookings} />;
   if (space === "staff" && module.key === "services") return <StaffServices />;
   if (space === "salon" && module.key !== "videos") return <SalonControlCenter module={module} userId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />;
-  if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;
+  if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio salon={space === "salon"} userId={userId} providerApproved={providerApproved} />;
   if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
   if (space === "client" && module.key === "profile") return <ClientProfile userId={userId} />;
   if (space === "client" && module.key === "application") return <ProfessionalApplication userId={userId} />;

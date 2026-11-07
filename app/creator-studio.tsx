@@ -20,7 +20,7 @@ const tabs: Array<{ key: StudioTab; label: string }> = [
   { key: "scheduled", label: "Publications programmées" }, { key: "statistics", label: "Statistiques" },
 ];
 
-export function CreatorStudio({ userId, providerApproved, initialTab = "create" }: { userId: string; providerApproved: boolean; initialTab?: StudioTab }) {
+export function CreatorStudio({ userId, providerApproved, initialTab = "create", salon = false }: { salon?: boolean; userId: string; providerApproved: boolean; initialTab?: StudioTab }) {
   const [active, setActive] = useState<StudioTab>(initialTab);
   const [createType, setCreateType] = useState<"video" | "photo" | "before_after">("video");
   const picker = useRef<HTMLInputElement>(null);
@@ -35,7 +35,7 @@ export function CreatorStudio({ userId, providerApproved, initialTab = "create" 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setState("loading");
-    const { data, error } = await supabase.from("posts").select("id,post_type,title,caption,status,thumbnail_url,view_count,like_count,comment_count,published_at,created_at").eq("author_id", userId).is("deleted_at", null).neq("status", "deleted").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("posts").select("id,post_type,title,caption,status,thumbnail_url,view_count,like_count,comment_count,published_at,created_at").eq("author_id", userId).is("deleted_at", null).neq("status", "deleted").order("created_at", { ascending: false }).abortSignal(AbortSignal.timeout(15000));
     if (error) { setState("error"); return; }
     const rows = await Promise.all(((data ?? []) as CreatorPost[]).map(async (post) => {
       if (!post.thumbnail_url?.includes("/provider-social-media/")) return post;
@@ -82,7 +82,7 @@ export function CreatorStudio({ userId, providerApproved, initialTab = "create" 
     <nav className="studio-tabs" aria-label="Navigation Studio">{tabs.map((tab) => <button className={active === tab.key ? "active" : ""} key={tab.key} onClick={() => setActive(tab.key)}>{tab.label}</button>)}</nav>
     {feedback && <p className="dashboard-feedback" role="status">{feedback}</p>}
     {firstPublicationFeedback && <aside className="panel studio-feedback"><strong>Le Studio était-il facile à utiliser ?</strong><div><button onClick={() => void answerStudioFeedback("yes")}>👍 Oui</button><button onClick={() => void answerStudioFeedback("no")}>👎 Non</button></div></aside>}
-    {active === "create" && <VideoPublisher key={selectionVersion} initialFiles={initialFiles} userId={userId} providerApproved={providerApproved} initialContentType={createType} onPublished={async (postType) => {
+    {active === "create" && <VideoPublisher salon={salon} key={selectionVersion} initialFiles={initialFiles} userId={userId} providerApproved={providerApproved} initialContentType={createType} onPublished={async (postType) => {
       await load();
       setInitialFiles([]);
       setCreateType("video");
