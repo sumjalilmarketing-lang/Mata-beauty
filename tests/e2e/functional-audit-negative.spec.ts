@@ -41,8 +41,12 @@ for (const [role, path] of [
 
 test('QA-N02: server profile outage is not labelled account suspension', async ({ page, context }) => {
   await qaLogin(context, 'client', true);
+  const redirect = await context.request.get('/auth/workspace', { maxRedirects: 0 });
+  expect(redirect.status()).toBe(303);
+  expect(redirect.headers().location).toContain('auth_error=workspace_unavailable');
   await page.goto('/auth/workspace');
-  await expect(page).toHaveURL(/auth_error=workspace_unavailable/);
+  // The app consumes and removes auth_error from the URL after showing it.
+  await expect(page.getByText('Votre espace est momentanément indisponible. Réessayez dans quelques instants.', { exact: true })).toBeVisible();
   await expect(page.getByText('Ce compte est suspendu.', { exact: true })).toHaveCount(0);
 });
 
