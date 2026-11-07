@@ -48,12 +48,15 @@ test('salon invites by phone and prepares a WhatsApp draft without requiring ema
     created=true; return route.fulfill({ status:201,json:{ok:true,invitationId:syntheticId(910),inviteUrl:new URL('/salon/invitation/accept#token='+token,page.url()).toString()} });
   });
   await page.goto('/salon/team');
+  await page.locator('#team-invite-panel > summary').click();
   await expect(page.getByLabel('E-mail',{exact:true})).toHaveCount(0);
-  await page.getByLabel('Numéro WhatsApp avec indicatif',{exact:true}).fill('+221 77 000 00 99');
+  await page.getByLabel('Numéro WhatsApp du collaborateur',{exact:true}).fill('+221 77 000 00 99');
   await page.getByRole('button',{name:'Créer l’invitation WhatsApp',exact:true}).click();
   const share=page.getByRole('link',{name:'Partager sur WhatsApp',exact:true});
   await expect(share).toBeVisible();
   const href=new URL((await share.getAttribute('href'))!);expect(href.pathname).toBe('/221770000099');expect(href.searchParams.get('text')).toContain('#token='+token);
+  expect(created).toBe(true);
+  await page.getByText('Suivi des invitations',{exact:true}).click();
   await page.getByRole('button',{name:'Confirmer l’accès de Équipier de recette',exact:true}).click();
   await expect(page.getByText('Accès de l’équipier confirmé.',{exact:true})).toBeVisible();expect(approved).toBe(true);
 });
