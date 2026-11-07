@@ -173,3 +173,17 @@ test('activation cannot bypass missing salon hours',async({page,context})=>{
  await expect(panel.getByRole('status')).toContainText('Ajoutez les horaires');
  expect(writes).toBe(0);
 });
+
+test('unreadable preview explains recovery and preserves text when media is replaced',async({page,context})=>{
+ await qaLogin(context,'provider');
+ await openStudio(page);
+ const panel=page.locator('#video-publisher');
+ await panel.getByLabel('Légende',{exact:true}).fill('Texte conservé');
+ await panel.getByLabel('Choisir une photo ou une vidéo',{exact:true}).setInputFiles(video);
+ await panel.getByLabel('Aperçu de votre vidéo',{exact:true}).dispatchEvent('error');
+ await expect(panel.getByRole('alert')).toContainText('MP4 (H.264)');
+ await expect(panel.getByRole('button',{name:'Publier la vidéo',exact:true})).toBeDisabled();
+ await panel.getByLabel('Choisir une photo ou une vidéo',{exact:true}).setInputFiles(video);
+ await expect(panel.getByRole('alert')).toHaveCount(0);
+ await expect(panel.getByLabel('Légende',{exact:true})).toHaveValue('Texte conservé');
+});
