@@ -14,3 +14,7 @@
 .workspace-layout .video-publisher-panel :focus-visible{outline:3px solid #a51c62;outline-offset:3px}
 
 .workspace-layout .video-publisher-panel fieldset.composer-details{border:0;padding:0;margin:0}
+.workspace-layout .video-publisher-panel .studio-inline-service{padding:1rem;margin-bottom:1rem;border:1px solid #b69aa9;border-radius:1rem;background:#fff7fb;color:#30212a}
+.workspace-layout .video-publisher-panel .studio-inline-service fieldset{display:grid;gap:1rem;border:0;padding:0;min-width:0}
+.workspace-layout .video-publisher-panel .studio-inline-service label{display:grid;gap:.5rem;min-width:0}
+.workspace-layout .video-publisher-panel .studio-inline-service :is(input,select){width:100%;min-width:0}

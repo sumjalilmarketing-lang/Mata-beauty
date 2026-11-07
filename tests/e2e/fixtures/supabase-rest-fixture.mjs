@@ -22,8 +22,8 @@ export function createSupabaseFixtureServer(port) {
     ? {
       "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Methods": "GET, HEAD, POST, PATCH, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "accept, accept-profile, apikey, authorization, content-type, content-profile, prefer, range, x-client-info, x-supabase-api-version, x-upsert",
-      "Access-Control-Expose-Headers": "content-range, range, x-total-count",
+      "Access-Control-Allow-Headers": "accept, accept-profile, apikey, authorization, content-type, content-profile, prefer, range, x-client-info, x-supabase-api-version, x-upsert, upload-length, upload-offset, upload-metadata, tus-resumable, upload-concat, upload-defer-length, x-http-method-override",
+      "Access-Control-Expose-Headers": "content-range, range, x-total-count, location, upload-offset, tus-resumable, upload-length",
       "Access-Control-Max-Age": "600",
       Vary: "Origin",
     }
