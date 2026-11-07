@@ -1,0 +1,32 @@
+.feedback { color: #30242e; display: grid; gap: 1rem; }
+.composer { border: 1px solid #d9c3d1; border-radius: 20px; padding: 1rem; background: #fff; }
+.composer > summary { cursor: pointer; color: #80114c; font-weight: 700; padding: .5rem; }
+.form { display: grid; gap: 1.25rem; margin-top: 1.25rem; }
+.rating, .criteria { border: 0; padding: 0; margin: 0; min-width: 0; }
+.rating legend, .criteria legend { font-weight: 700; margin-bottom: .65rem; }
+.stars { display: flex; gap: .25rem; width: fit-content; }
+.starChoice { position: relative; display: grid; place-items: center; width: 48px; height: 52px; cursor: pointer; border-radius: 10px; }
+.starChoice input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.starChoice span { font-size: 2.6rem; line-height: 1; color: #b2a7ae; pointer-events: none; }
+.stars:has(input:checked) .starChoice span { color: #a46700; }
+.starChoice:has(input:checked) ~ .starChoice span { color: #b2a7ae; }
+.starChoice:has(input:focus-visible) { outline: 3px solid #80114c; outline-offset: 2px; }
+.starChoice:has(input:disabled) { opacity: .6; }
+.rating small, .notice { color: #695963; font-size: .875rem; }
+.comment { display: grid; gap: .5rem; font-weight: 600; }
+.comment textarea, .comment select { box-sizing: border-box; width: 100%; border: 1px solid #aa8a9f; border-radius: 14px; padding: .9rem; background: #fff; color: #30242e; font: inherit; }
+.comment textarea { resize: vertical; min-height: 110px; }
+.comment textarea::placeholder { color: #73636c; }
+.criteria label { display: inline-flex; align-items: center; gap: .5rem; padding: .6rem .8rem; border: 1px solid #d9c3d1; border-radius: 999px; margin: .2rem; font-size: .9rem; }
+.criteria input { accent-color: #80114c; width: 18px; height: 18px; }
+.submit { background: #80114c; color: #fff; border: 0; border-radius: 14px; min-height: 48px; padding: .9rem 1.25rem; font: inherit; font-weight: 700; cursor: pointer; }
+.submit:disabled { opacity: .65; cursor: wait; }
+.card { padding: 1.25rem; border: 1px solid #e3d1dc; border-radius: 18px; background: linear-gradient(140deg, #fff, #fff4fa); box-shadow: 0 4px 18px #6b174509; }
+.card header { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap; align-items: center; }
+.visibility { font-size: .75rem; color: #695963; }
+.displayRating { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; margin-top: .75rem; }
+.displayRating > span { font-size: 1.6rem; letter-spacing: .1em; }
+.filled { color: #a46700; }
+.empty { color: #b2a7ae; }
+.card p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; margin: .6rem 0 0; }
+.success { color: #23633e; font-weight: 600; }
