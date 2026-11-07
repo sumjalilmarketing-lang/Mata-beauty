@@ -1,5 +1,7 @@
 # Mata Beauty — audit fonctionnel du 7 novembre 2026
 
+Les résultats navigateur actualisés et les limites de couverture figurent dans la description de la PR https://github.com/sumjalilmarketing-lang/Mata-beauty/pull/41 et ses artefacts CI. Ce README conserve le point de départ local pour rendre la démarche reproductible.
+
 Version publiée auditée : `86d5d0190faa809f9467e5ef058479116e336e91`.
 La copie locale initiale `2a25e188` possède exactement le même arbre Git `014e2075485e7ca08eb57e021ec5e9a155ae18f6`.
 Aucune modification de production. Aucun compte, ticket, fermeture, image ou paiement réel créé pendant cet audit.
@@ -18,7 +20,7 @@ MATA_E2E_COLLABORATOR_ACCESS_ENABLED=true MATA_PLAYWRIGHT_CHROMIUM_PATH=/usr/bin
 
 `test-e2e.mjs` démarre Next.js et une fixture HTTP isolée, avec des identifiants fictifs, puis arrête les serveurs. Il ne valide pas les signatures Auth réelles, RLS, la délivrabilité email/WhatsApp, Google OAuth réel, les paiements réels, ni les notifications sur téléphone physique.
 
-## Résultats observés
+## Résultats initiaux locaux avant la recette GitHub
 
 - Inventaire AST : 291 sources app/lib, 32 pages et 45 handlers route, 707 interactions, 70 formulaires, 380 champs, 295 expressions de navigation, 571 accès fetch/from/rpc. Un appel `from` n'est pas forcément une requête envoyée.
 - 52 candidats automatiques « bouton sans type/onClick » doivent être interprétés avec leur formulaire parent : ce ne sont pas 52 anomalies.

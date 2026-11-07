@@ -84,7 +84,7 @@ for (const [role, seed] of cases) test(`internal links: ${role} ${seed}`, async 
         }
         // CSS-translated Super Admin drawer links have boxes but are outside
         // the viewport. Open the real drawer instead of force-clicking them.
-        const box = await anchor.boundingBox();
+        const box = await anchor.isVisible() ? await anchor.boundingBox() : null;
         const viewport = page.viewportSize();
         if (box && viewport && (box.x + box.width <= 0 || box.x >= viewport.width)) {
           const adminMenu = page.getByRole('button', { name: 'Ouvrir le menu', exact: true });
