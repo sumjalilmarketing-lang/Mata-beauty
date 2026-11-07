@@ -445,7 +445,7 @@ for (const status of [400, 401, 403, 500]) test(`QA-B01: booking micro-feedback 
   let failed = true;
   await page.route(`${api}/rest/v1/micro_feedback**`, route => route.fulfill(failed ? { status, json: { message: 'Synthetic failure' } } : { status: 201, json: null }));
   await page.goto('/'); await openFirstFeedBooking(page);
-  await page.getByRole('button', { name: '10:00', exact: true }).click();
+  await page.getByRole('button', { name: /^10:00(?:\s|$)/ }).click();
   await page.getByRole('button', { name: /Confirmer.*10.*000/ }).click();
   await signIn(page, 'client-microfeedback@example.test');
   await expect(page.getByText('Votre rendez-vous est créé', { exact: true })).toBeVisible();
@@ -486,7 +486,7 @@ test('signup, email confirmation notice, login, catalogue and booking confirmati
   await signIn(page, 'qa-signup@example.test');
   await expectAuthenticatedSession(page);
   await page.goto('/'); await openFirstFeedBooking(page);
-  await page.getByRole('button', { name: '10:00', exact: true }).click();
+  await page.getByRole('button', { name: /^10:00(?:\s|$)/ }).click();
   await page.getByRole('button', { name: /Confirmer.*10.*000/ }).click();
   await expect(page.getByText('Votre rendez-vous est créé', { exact: true })).toBeVisible();
   expect(state.bookingCreated).toBe(true);

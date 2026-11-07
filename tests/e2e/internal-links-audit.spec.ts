@@ -76,10 +76,17 @@ for (const [role, seed] of cases) test(`internal links: ${role} ${seed}`, async 
         expect(check.status(), `${source} → ${raw}`).toBeLessThan(400);
         checkedTargets.set(target.href, { status: check.status(), finalUrl: check.url() });
         await page.goto(source);
-        const anchor = page.locator(`a[href=${JSON.stringify(raw)}]`).filter({ visible: true }).first();
+        const selector = `a[href=${JSON.stringify(raw)}]`;
+        let anchor = page.locator(selector).filter({ visible: true }).first();
         if (!await anchor.isVisible()) {
           const menu = page.getByRole('button', { name: 'Plus', exact: true });
           if (await menu.count() && await menu.isVisible()) await menu.click();
+        }
+        const openMore = page.locator('#workspace-more-menu[open]');
+        if (await openMore.count()) {
+          const modalAnchor = openMore.locator(selector).filter({ visible: true }).first();
+          if (await modalAnchor.isVisible()) anchor = modalAnchor;
+          else await openMore.getByRole('button', { name: 'Fermer le menu', exact: true }).click();
         }
         let destination = page;
         if (await anchor.isVisible()) {

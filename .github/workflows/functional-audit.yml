@@ -11,7 +11,11 @@ concurrency:
 jobs:
   functional-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        spec: [booking-audit, public-flows, internal-links-audit, functional-audit-negative, reviews-resilience-audit, server-routing-audit]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -24,7 +28,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: command -v google-chrome && google-chrome --version
       - name: Run audit acceptance and regression tests
-        run: pnpm test:e2e --project=desktop --project=mobile-390 tests/e2e/functional-audit-negative.spec.ts tests/e2e/internal-links-audit.spec.ts tests/e2e/reviews-resilience-audit.spec.ts tests/e2e/server-routing-audit.spec.ts tests/e2e/booking-audit.spec.ts tests/e2e/public-flows.spec.ts --reporter=list,json
+        run: pnpm test:e2e --project=desktop --project=mobile-390 tests/e2e/${{ matrix.spec }}.spec.ts --reporter=list,json
         env:
           MATA_E2E_COLLABORATOR_ACCESS_ENABLED: 'true'
           MATA_PLAYWRIGHT_CHROMIUM_PATH: /usr/bin/google-chrome
@@ -33,7 +37,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: functional-audit-results
+          name: functional-audit-${{ matrix.spec }}-results
           path: |
             outputs/functional-results.json
             test-results/

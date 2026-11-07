@@ -1,12 +1,47 @@
 import { expect, type ConsoleMessage, type Page, type TestInfo } from '@playwright/test';
 
 type CspEvent = { disposition: string; effectiveDirective: string; blockedURI: string; documentURI: string };
-type Observation = { reportOnlyConsole: string[]; unexpectedConsole: string[]; pageErrors: string[] };
+type Observation = { reportOnlyConsole: string[]; unexpectedConsole: string[]; pageErrors: string[]; fixtureCspAdapters: { url: string; originalPolicy: string }[] };
 const observations = new WeakMap<Page, Observation>();
 
 export async function startRuntimeAudit(page: Page) {
-  const state: Observation = { reportOnlyConsole: [], unexpectedConsole: [], pageErrors: [] };
+  const state: Observation = { reportOnlyConsole: [], unexpectedConsole: [], pageErrors: [], fixtureCspAdapters: [] };
   observations.set(page, state);
+  const fixture = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
+  if (!fixture || new URL(fixture).hostname !== '127.0.0.1') throw new Error('Runtime audit requires local isolated fixtures');
+  const wsOrigin = fixture.replace(/^http/, 'ws');
+  // Functional fixture parity: production permits wss://*.supabase.co, whereas
+  // the local HTTP fixture needs its own ws origin. Preserve every other CSP
+  // directive and retain the original header. Exact production CSP is tested
+  // separately by csp-workspaces.spec.ts without this adapter.
+  await page.route('**/*', async route => {
+    const request = route.request();
+    if (!request.isNavigationRequest() || request.resourceType() !== 'document' || new URL(request.url()).hostname !== '127.0.0.1') return route.fallback();
+    const response = await route.fetch({ maxRedirects: 0 });
+    const headers = response.headers();
+    for (const key of ['content-security-policy', 'content-security-policy-report-only']) {
+      const original = headers[key];
+      if (original) {
+        state.fixtureCspAdapters.push({ url: request.url(), originalPolicy: original });
+        headers[key] = original.replace(/(^|;\s*)connect-src\s+([^;]+)/, (_, prefix: string, sources: string) => `${prefix}connect-src ${sources} ${wsOrigin}`);
+      }
+    }
+    await route.fulfill({ response, headers });
+  });
+  await page.routeWebSocket(`${wsOrigin}/realtime/v1/**`, socket => {
+    socket.onMessage(message => {
+      const frame = JSON.parse(message.toString()) as Record<string, unknown> | unknown[];
+      const array = Array.isArray(frame);
+      const event = array ? frame[3] : frame.event;
+      if (!['phx_join', 'phx_leave', 'heartbeat'].includes(String(event))) return;
+      const payload = (array ? frame[4] : frame.payload) as { config?: { postgres_changes?: Record<string, unknown>[] } } | undefined;
+      const filters = payload?.config?.postgres_changes ?? [];
+      const reply = { status: 'ok', response: event === 'phx_join' ? { postgres_changes: filters.map((filter, id) => ({ ...filter, id: id + 1 })) } : {} };
+      socket.send(JSON.stringify(array
+        ? [frame[0], frame[1], frame[2], 'phx_reply', reply]
+        : { join_ref: frame.join_ref, ref: frame.ref, topic: frame.topic, event: 'phx_reply', payload: reply }));
+    });
+  });
   await page.addInitScript(() => {
     const target = window as typeof window & { __qaCspEvents?: CspEvent[] };
     target.__qaCspEvents = [];
