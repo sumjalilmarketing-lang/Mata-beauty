@@ -16,6 +16,7 @@ async function openStudio(page: Page, path = '/pro/videos') {
 for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, service and hashtags remain together with no duration cap or navigation`, async ({ page, context }) => {
   test.setTimeout(120000);
   const session = await qaLogin(context, 'provider');
+  if (format === 'mov' || format === 'mp4') await page.route('**/video-converter/**', route => route.abort('failed'));
   let published: Record<string, unknown> | null = null;
   const savedPublication = () => published;
   let uploaded = 0;
@@ -55,7 +56,7 @@ for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, servic
   await panel.locator('input[name=consent]').check();
   await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
   await expect.poll(() => published?.target_duration_seconds, { timeout: 90000 }).toBeGreaterThan(format === 'mp4' ? 90 : 0);
-  if (format !== 'mp4') expect(String(savedPublication()?.target_video_path)).toMatch(/video[.]mp4$/);
+  expect(String(savedPublication()?.target_video_path)).toMatch(format === 'mov' ? /video[.]mov$/ : /video[.]mp4$/);
   expect(savedPublication()?.target_hashtags).toEqual(['#tresses', '#dakar']);
   expect(String(savedPublication()?.target_video_path)).toContain(session.user.id);
   expect(uploaded).toBeGreaterThan(0);

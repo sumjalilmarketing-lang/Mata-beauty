@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { inspectStudioVideo, type StudioVideoInspection } from "./video-inspection-client";
+import { nativePortableVideo } from "./native-video-client";
 import { StudioUploadError } from "./video-upload-client";
 
 type Preparation = { source: File; file?: File; url?: string; poster?: string; media?: StudioVideoInspection; busy: boolean; message: string };
@@ -26,19 +27,29 @@ export function useStudioVideoPreview(source: File | undefined) {
       if (!live) return;
       setResult({ source, busy: true, message: "Préparation de l’aperçu vidéo…" });
       try {
-        const { convertStudioVideo } = await import("./video-conversion-client");
+        let file = await nativePortableVideo(source, abort.signal);
         if (!live) return;
-        const file = await convertStudioVideo(source, message => {
-          if (live) setResult({ source, busy: true, message });
-        }, abort.signal);
+        let media: StudioVideoInspection | undefined;
+        if (file) {
+          try { media = await inspectStudioVideo(file, abort.signal); }
+          catch (error) { if (abort.signal.aborted) throw error; file = null; }
+        }
         if (!live) return;
-        const media = await inspectStudioVideo(file, abort.signal);
+        if (!file) {
+          const { convertStudioVideo } = await import("./video-conversion-client");
+          if (!live) return;
+          file = await convertStudioVideo(source, message => {
+            if (live) setResult({ source, busy: true, message });
+          }, abort.signal);
+        }
+        if (!live) return;
+        media ??= await inspectStudioVideo(file, abort.signal);
         if (!live) return;
         url = URL.createObjectURL(file);
         poster = URL.createObjectURL(media.thumbnail);
         setResult({ source, file, url, poster, media, busy: false, message: "Aperçu prêt. Vous pouvez lire la vidéo avant de publier." });
       } catch (error) {
-        if (live) setResult({ source, busy: false, message: error instanceof StudioUploadError ? error.message : "L’aperçu n’a pas pu être préparé. Votre vidéo et vos champs sont conservés ; réessayez." });
+        if (live) setResult({ source, busy: false, message: abort.signal.aborted ? "Préparation annulée. Votre vidéo et vos champs sont conservés." : error instanceof StudioUploadError ? error.message : "L’aperçu n’a pas pu être préparé. Votre vidéo et vos champs sont conservés ; réessayez." });
       }
     })();
     return () => {
