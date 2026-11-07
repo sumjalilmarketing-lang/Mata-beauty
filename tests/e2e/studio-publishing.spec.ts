@@ -94,3 +94,41 @@ test('creates and associates a service in the selected salon without losing publ
   await expect(panel.getByLabel('Légende', { exact: true })).toHaveValue('Ne pas perdre ma publication');
   expect(page.url()).toBe(start);
 });
+
+for (const mode of ['lost-response', 'verification-unavailable']) test(`a possibly saved video is never deleted or submitted twice: ${mode}`, async ({ page, context }) => {
+  await qaLogin(context, 'provider');
+  let removed = 0, calls = 0;
+  await page.route(`${api}/storage/v1/upload/resumable**`, route => {
+    const body = route.request().postDataBuffer();
+    return route.fulfill({ status: 201, headers: { Location: `${api}/storage/v1/upload/resumable/fixture`, 'Tus-Resumable': '1.0.0', 'Upload-Offset': String(body?.length ?? 0) } });
+  });
+  await page.route(`${api}/storage/v1/object/provider-social-media/**`, route => { if (route.request().method() === 'DELETE') removed++; return route.fulfill({ json: { Key: 'fixture' } }); });
+  await page.route(`${api}/storage/v1/object/**`, route => { if (route.request().method() === 'DELETE') removed++; return route.fulfill({ json: [] }); });
+  await page.route(`${api}/rest/v1/rpc/create_provider_video_post`, route => { calls++; return mode === 'lost-response' ? route.abort('failed') : route.fulfill({ json: route.request().postDataJSON().target_post_id }); });
+  await openStudio(page);
+  const panel = page.locator('#video-publisher');
+  await panel.getByLabel('Choisir une photo ou une vidéo', { exact: true }).setInputFiles(video);
+  await panel.getByLabel('Légende', { exact: true }).fill('Publication à vérifier');
+  await panel.locator('select[name=serviceId]').selectOption(auditService);
+  await panel.locator('input[name=consent]').check();
+  await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
+  await expect(panel.getByRole('button', { name: 'Actualiser le Studio', exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Publier la vidéo', exact: true })).toBeDisabled();
+  expect(calls).toBe(1); expect(removed).toBe(0);
+  await expect(panel.getByLabel('Légende', { exact: true })).toHaveValue('Publication à vérifier');
+});
+
+test('an inactive service is refused before video transfer for public publication', async ({ page, context }) => {
+  await qaLogin(context, 'provider');
+  let transfers = 0;
+  await page.route(`${api}/storage/v1/upload/resumable**`, route => { transfers++; return route.abort(); });
+  await page.route(`${api}/rest/v1/provider_services**`, route => route.fulfill({ json: [{ id: auditService, title: 'Prestation en brouillon', is_active: false, duration_minutes: 60, price_amount: 10000, currency: 'XOF', services: null }] }));
+  await openStudio(page);
+  const panel = page.locator('#video-publisher');
+  await panel.getByLabel('Choisir une photo ou une vidéo', { exact: true }).setInputFiles(video);
+  await panel.locator('select[name=serviceId]').selectOption(auditService);
+  await panel.locator('input[name=consent]').check();
+  await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
+  await expect(panel.getByRole('status')).toContainText('Choisissez une prestation active');
+  expect(transfers).toBe(0);
+});

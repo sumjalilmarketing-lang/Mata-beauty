@@ -13,7 +13,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { validatePublishedVideoDelivery, type PublishedVideoRecord } from "@/lib/domain/video-delivery";
 
-type ProviderService = { id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
+type ProviderService = { is_active: boolean; id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
 type PublishStatus = "draft" | "scheduled" | "published";
 type ContentType = "video" | "photo" | "before_after" | "promotion" | "availability";
 
@@ -117,7 +117,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount,currency,services(categories(name))").eq("provider_id", userId).is("archived_at", null).order("title").abortSignal(AbortSignal.timeout(15000)).then(({ data, error }) => { if (error) setServicesError("Les prestations sont indisponibles. Actualisez le Studio pour réessayer."); else setServices((data ?? []) as unknown as ProviderService[]); });
+    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount,currency,is_active,services(categories(name))").eq("provider_id", userId).is("archived_at", null).order("title").abortSignal(AbortSignal.timeout(15000)).then(({ data, error }) => { if (error) setServicesError("Les prestations sont indisponibles. Actualisez le Studio pour réessayer."); else setServices((data ?? []) as unknown as ProviderService[]); });
   }, [userId]);
 
   useEffect(() => () => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); }, [previewUrls]);
@@ -147,6 +147,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
     if (selectedType !== "video" && selectedType !== "before_after" && files.length > 10) { setFeedback("Un carrousel contient au maximum 10 images."); return; }
     if (status === "published" && !consent) { setFeedback("Confirmez le consentement de la personne filmée."); return; }
     if (status !== "draft" && !selectedServiceId) { setFeedback("Associez une prestation avant de publier ou programmer."); return; }
+    if (status !== "draft" && !services.find(service => service.id === selectedServiceId)?.is_active) { setFeedback("Choisissez une prestation active pour publier. Vous pouvez conserver cette vidéo en brouillon."); return; }
     if (status === "scheduled" && !scheduledValue) { setFeedback("Choisissez une date de publication."); return; }
 
     publishPending.current = true;
@@ -235,7 +236,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
         if (mediaPaths.length) await supabase.storage.from("provider-social-media").remove(mediaPaths);
       }
       const uncertain = publicationRequested && !persisted && !(caught && typeof caught === "object" && "code" in caught && typeof caught.code === "string" && caught.code.length > 0);
-      setPublicationUnconfirmed(uncertain);
+      setPublicationUnconfirmed(uncertain || persisted);
       setFeedback(caught instanceof StudioUploadError ? caught.message : uncertain ? "Publication non confirmée. Actualisez le Studio pour vérifier vos publications avant de réessayer." : publicErrorMessage(caught, persisted ? "La vidéo est enregistrée, mais sa visibilité n’a pas pu être confirmée. Actualisez le Studio avant de réessayer." : "La publication a échoué. Vérifiez le fichier et réessayez."));
     } finally { publishPending.current = false; setPhase("idle"); }
   }
@@ -274,7 +275,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
       {contentType === "promotion" && <><label>Remise (%)<input name="discount" type="number" min="1" max="90" required /></label><label>Fin de l’offre<input name="promotionEndsAt" type="datetime-local" required /></label><label>Places disponibles<input name="promotionSlots" type="number" min="1" max="10000" required /></label></>}
       {servicesError && <p role="alert">{servicesError}</p>}
       <button type="button" disabled={phase !== "idle"} onClick={() => setCreatingService(true)}>＋ Ajouter une prestation dans le Studio</button>
-      <label>Catégorie et prestation<select name="serviceId" value={serviceId} onChange={event => setServiceId(event.target.value)}><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title} · {service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</option>)}</select></label>
+      <label>Catégorie et prestation<select name="serviceId" value={serviceId} onChange={event => setServiceId(event.target.value)}><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title}{!service.is_active ? " (inactive · brouillon uniquement)" : ""} · {service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</option>)}</select></label>
       <details className="wide publisher-options"><summary>Options de publication</summary>
       <label>Visibilité<select name="visibility" defaultValue="public"><option value="public">Tout le monde</option><option value="followers">Abonnés</option></select></label>
       {contentType === "video" && <label>Couverture personnalisée<input name="thumbnail" type="file" accept="image/jpeg,image/png,image/webp" /></label>}<label>Publication<select name="status" defaultValue={providerApproved ? "published" : "draft"}><option value="draft">Brouillon</option><option value="scheduled" disabled={!providerApproved}>Programmer</option><option value="published" disabled={!providerApproved}>Publier maintenant</option></select></label>

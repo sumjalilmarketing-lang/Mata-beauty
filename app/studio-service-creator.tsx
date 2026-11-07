@@ -6,7 +6,7 @@ import { activityLocationReady, serviceDetailsError } from "@/lib/domain/service
 import { serviceReference } from "@/lib/domain/service-reference";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 
-type Service = { id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
+type Service = { is_active: boolean; id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
 type Context = { id?: string; name?: string; currency: string | null; country_code: string | null; timezone: string | null };
 
 export function StudioServiceCreator({ userId, salon, providerApproved, onCreated, onCancel }: { userId: string; salon: boolean; providerApproved: boolean; onCreated: (service: Service) => void; onCancel: () => void }) {
@@ -53,7 +53,7 @@ export function StudioServiceCreator({ userId, salon, providerApproved, onCreate
     pending.current = true; setBusy(true); setMessage("");
     try {
       const payload = { provider_id: userId, business_id: salon ? context.id : null, service_id: details.serviceId, title: details.title, duration_minutes: details.durationMinutes, price_amount: details.priceAmount, currency: context.currency, is_active: providerApproved, status: providerApproved ? "published" : "draft" };
-      const { data, error } = await client.from("provider_services").insert(payload).select("id,title,duration_minutes,price_amount,currency,services(categories(name))").abortSignal(AbortSignal.timeout(20000)).single();
+      const { data, error } = await client.from("provider_services").insert(payload).select("id,title,duration_minutes,price_amount,currency,is_active,services(categories(name))").abortSignal(AbortSignal.timeout(20000)).single();
       if (error) throw error;
       if (!data) throw new Error("Enregistrement non confirmé.");
       onCreated(data as unknown as Service);
