@@ -12,6 +12,8 @@ it('removes duration typmods/caps and preserves dependent views, ACLs and invoke
    create view social_feed with(security_invoker=true) as select * from posts;
    create view launch_social_feed with(security_invoker=true) as select * from social_feed;
    grant select on social_feed,launch_social_feed to anon,authenticated;
+   create table comment_likes(post_id integer); alter table comment_likes enable row level security;
+   create policy comment_likes_read on comment_likes for select to authenticated using(exists(select 1 from social_feed f where f.id=comment_likes.post_id));
    create function create_video_post(target_duration_seconds numeric,target_aspect_ratio numeric) returns numeric language plpgsql as $$ begin if target_duration_seconds not between 1 and 90 or target_aspect_ratio not between 0.4 and 1.8 then raise exception 'invalid'; end if;return target_duration_seconds; end $$;
    revoke all on function create_video_post(numeric,numeric) from public; grant execute on function create_video_post(numeric,numeric) to authenticated;
   `);
@@ -21,6 +23,9 @@ it('removes duration typmods/caps and preserves dependent views, ACLs and invoke
   expect((await db.query('select create_video_post(20000,2.4) as duration')).rows).toEqual([{duration:'20000'}]);
   const grants=await db.query("select has_table_privilege('anon','social_feed','select') as feed, has_table_privilege('anon','launch_social_feed','select') as launch, has_function_privilege('anon','create_video_post(numeric,numeric)','execute') as rpc");
   expect(grants.rows).toEqual([{feed:true,launch:true,rpc:false}]);
+  const policies=await db.query<{polname:string,polpermissive:boolean,polcmd:string}>("select polname,polpermissive,polcmd from pg_policy where polrelid='comment_likes'::regclass");
+  expect(policies.rows).toEqual([{polname:'comment_likes_read',polpermissive:true,polcmd:'r'}]);
+  expect((await db.query<{relrowsecurity:boolean}>("select relrowsecurity from pg_class where oid='comment_likes'::regclass")).rows).toEqual([{relrowsecurity:true}]);
   const views=await db.query<{reloptions:string[]}>( "select reloptions from pg_class where oid in ('social_feed'::regclass,'launch_social_feed'::regclass)");
   for(const row of views.rows)expect(row.reloptions).toEqual(['security_invoker=true']);
   for(const duration of ['0','-1',"'NaN'::numeric","'Infinity'::numeric"]) {
