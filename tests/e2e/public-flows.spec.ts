@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { bookingVideo } from "./fixtures/booking-video";
+import { startRuntimeAudit, finishRuntimeAudit } from "./helpers/runtime-audit";
+
+test.beforeEach(async ({ page }) => { await startRuntimeAudit(page); });
+test.afterEach(async ({ page }, info) => { await finishRuntimeAudit(page, info); });
 
 // Keep route fixtures deterministic across WebKit and Chromium; these tests
 // exercise application flows rather than the separately tested PWA worker.
@@ -29,9 +33,6 @@ test.beforeEach(async ({ page }) => {
   await page.route(`${testSupabaseOrigin}/rest/v1/promotions**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.route(`${testSupabaseOrigin}/rest/v1/rpc/**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: route.request().url().includes("get_available_slots") ? "[]" : "null" }));
   page.on("pageerror", (error) => { throw error; });
-  page.on("console", (message) => {
-    if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());
-  });
 });
 
 test("legacy Explorer URLs return to Inspiration and keep the selected search", async ({ page }) => {

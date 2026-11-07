@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { bookingVideo } from "./fixtures/booking-video";
+import { startRuntimeAudit, finishRuntimeAudit } from "./helpers/runtime-audit";
+
+test.beforeEach(async ({ page }) => { await startRuntimeAudit(page); });
+test.afterEach(async ({ page }, info) => { await finishRuntimeAudit(page, info); });
 import { syntheticSession } from "./fixtures/department-workspaces.mjs";
 
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN ?? "https://audit.supabase.co";
@@ -222,9 +226,6 @@ async function openFirstFeedBooking(page: Page) {
 test.describe("audit chronométré de réservation", () => {
   test.beforeEach(async ({ page }) => {
     page.on("pageerror", (error) => { throw error; });
-    page.on("console", (message) => {
-      if (message.type() === "error" && !message.text().includes("Failed to load resource")) throw new Error(message.text());
-    });
   });
 
   for (const percentage of [30, 60]) test(`affiche l’acompte prévu ${percentage}% avant confirmation sans encaissement`, async ({ page }, testInfo) => {

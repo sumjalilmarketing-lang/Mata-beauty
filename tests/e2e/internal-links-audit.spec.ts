@@ -1,6 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { qaLogin } from './helpers/qa-session';
 
+// Fail a blocked click explicitly instead of consuming the entire crawl budget.
+test.use({ actionTimeout: 10_000, navigationTimeout: 15_000 });
+
 type LinkEvidence = { source: string; href: string; action: string; finalUrl?: string; status?: number };
 const cases = [
   ['anonymous', '/'], ['client', '/app/profile'], ['provider', '/pro'], ['provider', '/salon'],
