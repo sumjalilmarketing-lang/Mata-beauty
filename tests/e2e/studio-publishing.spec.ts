@@ -4,6 +4,7 @@ import { auditBusiness, auditCategory, auditService } from './fixtures/provider-
 import { fileURLToPath } from 'node:url';
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
 const tusHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'Location,Upload-Offset,Upload-Length,Tus-Resumable', 'Tus-Resumable': '1.0.0' };
+test.beforeEach(async ({ page }) => { page.on('requestfailed', request => console.log('STUDIO_REQUEST_FAILURE', request.method(), new URL(request.url()).pathname, request.failure()?.errorText)); });
 test.afterEach(async ({ page }, info) => { if (info.status !== info.expectedStatus) console.log('STUDIO_FAILURE_STATE', (await page.locator('#video-publisher').innerText().catch(() => 'panel unavailable')).slice(-2500)); });
 const video = fileURLToPath(new URL('./fixtures/studio-long.mp4', import.meta.url));
 
@@ -21,7 +22,7 @@ for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, servic
   const savedPublication = () => published;
   let uploaded = 0;
   await page.route(`${api}/storage/v1/upload/resumable**`, route => {
-    if (route.request().method() === 'OPTIONS') return route.fulfill({status:204,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*','Access-Control-Allow-Methods':'POST,PATCH,HEAD,OPTIONS'}});
+    if (route.request().method() === 'OPTIONS') return route.fulfill({status:204,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization,apikey,content-type,x-upsert,tus-resumable,upload-length,upload-metadata,upload-offset,x-http-method-override,cache-control','Access-Control-Allow-Methods':'POST,PATCH,HEAD,OPTIONS'}});
     if (route.request().method() === 'POST') return route.fulfill({ status: 201, headers: { ...tusHeaders, Location: `${api}/storage/v1/upload/resumable/fixture`, 'Tus-Resumable': '1.0.0', 'Upload-Offset': '0' } });
     if (route.request().method() === 'PATCH') { uploaded += route.request().postDataBuffer()?.length ?? 0; return route.fulfill({ status: 204, headers: { ...tusHeaders, 'Tus-Resumable': '1.0.0', 'Upload-Offset': String(uploaded) } }); }
     return route.fulfill({ status: 200, headers: { ...tusHeaders, 'Upload-Offset': String(uploaded) } });

@@ -82,3 +82,10 @@ jobs:
       - run: pnpm test:e2e --project=mobile-webkit tests/e2e/studio-publishing.spec.ts --grep "video (mov|mp4|avi|mkv),"
         env:
           MATA_E2E_COLLABORATOR_ACCESS_ENABLED: 'true'
+      - name: Retain WebKit failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: studio-webkit-failure
+          path: test-results/
+          retention-days: 7
