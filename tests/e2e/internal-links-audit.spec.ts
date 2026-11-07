@@ -52,6 +52,7 @@ for (const [role, seed] of cases) test(`internal links: ${role} ${seed}`, async 
         if (target.origin !== base.origin) continue;
         expect(target.href, `${source}: invalid identifier`).not.toMatch(/\/(undefined|null)(?:[/?#]|$)/);
         if (target.hash && target.pathname === new URL(source).pathname && target.search === new URL(source).search) {
+          await page.goto(source);
           const hash = decodeURIComponent(target.hash.slice(1));
           if (hash) expect(await page.evaluate(id => Boolean(document.getElementById(id) || document.getElementsByName(id).length), hash), `${source} → ${raw}`).toBe(true);
           evidence.push({ source, href: raw, action: 'fragment target checked' });
@@ -72,7 +73,7 @@ for (const [role, seed] of cases) test(`internal links: ${role} ${seed}`, async 
         expect(check.status(), `${source} → ${raw}`).toBeLessThan(400);
         checkedTargets.set(target.href, { status: check.status(), finalUrl: check.url() });
         await page.goto(source);
-        const anchor = page.locator(`a[href=${JSON.stringify(raw)}]`).first();
+        const anchor = page.locator(`a[href=${JSON.stringify(raw)}]`).filter({ visible: true }).first();
         if (!await anchor.isVisible()) {
           const menu = page.getByRole('button', { name: 'Plus', exact: true });
           if (await menu.count() && await menu.isVisible()) await menu.click();

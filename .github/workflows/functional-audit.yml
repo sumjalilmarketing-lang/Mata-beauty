@@ -24,7 +24,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: command -v google-chrome && google-chrome --version
       - name: Run audit acceptance and regression tests
-        run: pnpm test:e2e --project=desktop --project=mobile-390 tests/e2e/functional-audit-negative.spec.ts tests/e2e/internal-links-audit.spec.ts tests/e2e/reviews-resilience-audit.spec.ts tests/e2e/server-routing-audit.spec.ts tests/e2e/booking-audit.spec.ts tests/e2e/public-flows.spec.ts
+        run: pnpm test:e2e --project=desktop --project=mobile-390 tests/e2e/functional-audit-negative.spec.ts tests/e2e/internal-links-audit.spec.ts tests/e2e/reviews-resilience-audit.spec.ts tests/e2e/server-routing-audit.spec.ts tests/e2e/booking-audit.spec.ts tests/e2e/public-flows.spec.ts --reporter=list,json
         env:
           MATA_E2E_COLLABORATOR_ACCESS_ENABLED: 'true'
           MATA_PLAYWRIGHT_CHROMIUM_PATH: /usr/bin/google-chrome
+          PLAYWRIGHT_JSON_OUTPUT_NAME: outputs/functional-results.json
+      - name: Retain audit results including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: functional-audit-results
+          path: |
+            outputs/functional-results.json
+            test-results/
+          retention-days: 7
+          if-no-files-found: warn
