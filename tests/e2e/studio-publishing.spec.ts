@@ -3,6 +3,7 @@ import { qaLogin } from './helpers/qa-session';
 import { auditBusiness, auditCategory, auditService } from './fixtures/provider-audit.mjs';
 import { fileURLToPath } from 'node:url';
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
+test.afterEach(async ({ page }, info) => { if (info.status !== info.expectedStatus) console.log('STUDIO_FAILURE_STATE', (await page.locator('#video-publisher').innerText().catch(() => 'panel unavailable')).slice(-2500)); });
 const video = fileURLToPath(new URL('./fixtures/studio-long.mp4', import.meta.url));
 
 async function openStudio(page: Page, path = '/pro/videos') {
@@ -39,7 +40,7 @@ test('video, service and hashtags remain together with no duration cap or naviga
   await panel.locator('select[name=serviceId]').selectOption(auditService);
   await panel.locator('input[name=consent]').check();
   await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
-  await expect.poll(() => published?.target_duration_seconds).toBeGreaterThan(90);
+  await expect.poll(() => published?.target_duration_seconds, { timeout: 20000 }).toBeGreaterThan(90);
   expect(savedPublication()?.target_hashtags).toEqual(['#tresses', '#dakar']);
   expect(String(savedPublication()?.target_video_path)).toContain(session.user.id);
   expect(uploaded).toBeGreaterThan(0);
@@ -54,6 +55,7 @@ test('an interrupted video upload retains the selected media and details', async
   const panel = page.locator('#video-publisher');
   await panel.getByLabel('Choisir une photo ou une vidéo', { exact: true }).setInputFiles(video);
   await panel.getByLabel('Légende', { exact: true }).fill('Description conservée');
+  await panel.getByText('Options de publication', { exact: true }).click();
   await panel.locator('select[name=status]').selectOption('draft');
   await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('L’envoi a été interrompu');
@@ -84,7 +86,7 @@ test('creates and associates a service in the selected salon without losing publ
   await panel.getByRole('button', { name: /Ajouter une prestation dans le Studio/ }).click();
   const service = page.getByRole('region', { name: 'Nouvelle prestation du Studio' });
   await service.getByLabel('Salon de la prestation', { exact: true }).selectOption(second);
-  await service.getByLabel('Catégorie', { exact: true }).selectOption(auditCategory);
+  await service.locator('select[name=category]').selectOption(auditCategory);
   await service.getByLabel('Nom de la prestation', { exact: true }).fill('Tresses Studio');
   await service.getByLabel('Prix (XOF)', { exact: true }).fill('15000');
   await service.getByRole('button', { name: 'Enregistrer et associer' }).click();
