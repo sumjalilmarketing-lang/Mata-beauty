@@ -82,6 +82,14 @@ for (const [role, seed] of cases) test(`internal links: ${role} ${seed}`, async 
           const menu = page.getByRole('button', { name: 'Plus', exact: true });
           if (await menu.count() && await menu.isVisible()) await menu.click();
         }
+        // CSS-translated Super Admin drawer links have boxes but are outside
+        // the viewport. Open the real drawer instead of force-clicking them.
+        const box = await anchor.boundingBox();
+        const viewport = page.viewportSize();
+        if (box && viewport && (box.x + box.width <= 0 || box.x >= viewport.width)) {
+          const adminMenu = page.getByRole('button', { name: 'Ouvrir le menu', exact: true });
+          if (await adminMenu.count() && await adminMenu.isVisible()) await adminMenu.click();
+        }
         const openMore = page.locator('#workspace-more-menu[open]');
         if (await openMore.count()) {
           const modalAnchor = openMore.locator(selector).filter({ visible: true }).first();

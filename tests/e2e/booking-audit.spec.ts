@@ -469,7 +469,7 @@ test('signup, email confirmation notice, login, catalogue and booking confirmati
     registrations++;
     return json(route, { user: { id: clientId, email: data.email, aud: 'authenticated', role: 'authenticated', user_metadata: data.data, identities: [] }, session: null });
   });
-  await page.goto('/?connexion=requise');
+  await page.goto('/?connexion=requise&returnTo=%2Fapp%2Fprofile');
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: 'Créer un compte', exact: true }).click();
   await dialog.getByLabel('Nom complet', { exact: true }).fill('Compte Audit');
@@ -499,7 +499,7 @@ test('signup, email confirmation notice, login, catalogue and booking confirmati
 for (const action of ['like', 'save', 'follow'] as const) test(`QA-B02: ${action} prevents concurrent toggles`, async ({ page }) => {
   const state: AuditState = { bookingCreated: false, currentRole: 'client', selectedSlot: '' };
   await mockSupabase(page, state);
-  await page.goto('/?connexion=requise');
+  await page.goto('/?connexion=requise&returnTo=%2Fapp%2Fprofile');
   await signIn(page, `client-${action}@example.test`);
   await expectAuthenticatedSession(page);
   let requests = 0, release!: () => void;

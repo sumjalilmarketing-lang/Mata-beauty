@@ -68,6 +68,7 @@ test("registration requires explicit legal consent", async ({ page }) => {
 
 test("international registration sends the selected country, locale, phone and location to Auth", async ({ page }) => {
   let signupMetadata: Record<string, unknown> | null = null;
+  await page.route("**/api/auth/providers", route => route.fulfill({ json: { google: true, whatsapp: true } }));
   await page.route(`${testSupabaseOrigin}/auth/v1/signup**`, async route => {
     const payload = route.request().postDataJSON() as { data?: Record<string, unknown>; email?: string };
     signupMetadata = payload.data ?? null;
