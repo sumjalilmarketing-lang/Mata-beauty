@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
+import styles from "./booking-feedback.module.css";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 type Review = {
     id: string;
@@ -55,5 +56,28 @@ export function BookingFeedback({ bookingId, direction }: {
     finally {
         setBusy(false);
     } }
-    return <section aria-label="Évaluation du rendez-vous">{!ready && !error && <p role="status">Chargement des avis…</p>}{error && <div role="alert"><p>{error}</p><button type="button" onClick={() => setAttempt(value => value + 1)}>Réessayer les avis</button></div>}{own ? <div role="status"><p>Votre évaluation est enregistrée.</p>{reviews.filter(review => review.type === direction).map(review => <p key={review.id}>{review.rating} / 5 · {review.comment || "Sans commentaire"}{review.visibility === "internal" ? " · Interne au salon" : " · Avis public après dévoilement"}</p>)}</div> : ready && <details><summary>{direction === "client_to_provider" ? "Évaluer cette prestation" : "Évaluer ce client"}</summary><p>Les avis publics sont dévoilés après les deux évaluations ou après 48 heures. Les commentaires internes restent réservés au salon.</p><form className="dashboard-form" onSubmit={submit}><label>Note<select name="rating" defaultValue="5">{[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n} / 5</option>)}</select></label><fieldset><legend>Critères</legend>{(direction === "client_to_provider" ? [["quality", "Qualité"], ["welcome", "Accueil"], ["punctuality", "Ponctualité"]] : [["punctuality", "Ponctualité"], ["respect", "Respect"], ["behaviour", "Comportement"]]).map(([value, label]) => <label key={value}><input type="checkbox" name="criteria" value={value}/>{label}</label>)}</fieldset><label>Commentaire<textarea name="comment" maxLength={2000}/></label>{direction === "provider_to_client" && <label>Visibilité<select name="visibility" defaultValue="internal"><option value="internal">Interne au salon</option><option value="public">Public après dévoilement</option></select></label>}<button disabled={busy}>{busy ? "Enregistrement…" : "Envoyer mon évaluation"}</button></form></details>}{reviews.filter(r => r.type !== direction).map(r => <p key={r.id}>Avis reçu : {r.rating} / 5 · {r.comment ?? "Sans commentaire"}{r.visibility === "internal" ? " · Interne" : ""}</p>)}</section>;
+    return <section className={styles.feedback} aria-label="Évaluation du rendez-vous">
+        {!ready && !error && <p role="status">Chargement des avis…</p>}
+        {error && <div role="alert"><p>{error}</p><button type="button" onClick={() => setAttempt(value => value + 1)}>Réessayer les avis</button></div>}
+        {own ? <div role="status"><p className={styles.success}>Votre évaluation est enregistrée.</p>{reviews.filter(review => review.type === direction).map(review => <ReviewCard key={review.id} review={review} title="Votre avis" />)}</div> : ready && <details className={styles.composer}>
+            <summary>{direction === "client_to_provider" ? "Donner mon avis" : "Évaluer ce client"}</summary>
+            <form className={styles.form} onSubmit={submit}>
+                <fieldset className={styles.rating}><legend>Quelle note souhaitez-vous donner ?</legend><div className={styles.stars}>{[1, 2, 3, 4, 5].map(n => <label className={styles.starChoice} key={n}><input required type="radio" name="rating" value={n} disabled={busy} aria-label={`${n} ${n === 1 ? "étoile" : "étoiles"}`} /><span aria-hidden="true">★</span></label>)}</div><small>Choisissez de 1 à 5 étoiles.</small></fieldset>
+                <label className={styles.comment}>Votre commentaire<textarea name="comment" maxLength={2000} rows={4} placeholder="Partagez votre expérience…" disabled={busy} /></label>
+                <fieldset className={styles.criteria}><legend>Ce que vous avez apprécié</legend>{(direction === "client_to_provider" ? [["quality", "Qualité"], ["welcome", "Accueil"], ["punctuality", "Ponctualité"]] : [["punctuality", "Ponctualité"], ["respect", "Respect"], ["behaviour", "Comportement"]]).map(([value, label]) => <label key={value}><input type="checkbox" name="criteria" value={value} disabled={busy}/>{label}</label>)}</fieldset>
+                {direction === "provider_to_client" && <label className={styles.comment}>Visibilité<select name="visibility" defaultValue="internal" disabled={busy}><option value="internal">Interne au salon</option><option value="public">Public après dévoilement</option></select></label>}
+                <p className={styles.notice}>Les avis publics sont dévoilés après les deux évaluations ou après 48 heures. Les commentaires internes restent privés.</p>
+                <button className={styles.submit} disabled={busy}>{busy ? "Enregistrement…" : "Publier mon avis"}</button>
+            </form>
+        </details>}
+        {reviews.filter(r => r.type !== direction).map(r => <ReviewCard key={r.id} review={r} title="Avis reçu" />)}
+    </section>;
+}
+
+function ReviewCard({ review, title }: { review: Review; title: string }) {
+    return <article className={styles.card}>
+        <header><strong>{title}</strong><span className={styles.visibility}>{review.visibility === "internal" ? "Privé · Salon" : "Avis après prestation"}</span></header>
+        <div className={styles.displayRating} aria-label={`${review.rating} sur 5 étoiles`}><span aria-hidden="true">{[1, 2, 3, 4, 5].map(n => <span className={n <= review.rating ? styles.filled : styles.empty} key={n}>★</span>)}</span><strong>{review.rating}/5</strong></div>
+        <p>{review.comment || "Sans commentaire"}</p>
+    </article>;
 }
