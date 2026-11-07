@@ -1,8 +1,10 @@
-export function mediaSelectionError(files: Array<{ type: string; size: number }>): string | null {
+import { isVideoFile } from "./video-formats";
+
+export function mediaSelectionError(files: Array<{ type: string; size: number; name?: string }>): string | null {
   if (!files.length) return "Choisissez une photo ou une vidéo.";
-  const videos = files.filter(file => file.type.startsWith("video/"));
+  const videos = files.filter(isVideoFile);
   if (videos.length && files.length !== 1) return "Choisissez une seule vidéo, ou plusieurs photos sans vidéo.";
-  if (videos.length) return !["video/mp4", "video/webm", "video/quicktime"].includes(videos[0].type) ? "Vidéo acceptée : MP4, WebM ou MOV." : videos[0].size > 100 * 1024 * 1024 ? "La vidéo dépasse 100 Mo." : null;
+  if (videos.length) return videos[0].size > 100 * 1024 * 1024 ? "La vidéo dépasse 100 Mo." : null;
   if (files.length > 10) return "Choisissez au maximum 10 photos.";
   if (files.some(file => !["image/jpeg", "image/png", "image/webp"].includes(file.type))) return "Photo acceptée : JPEG, PNG ou WebP. Exportez les autres formats en JPEG.";
   return files.some(file => file.size > 12 * 1024 * 1024) ? "Chaque photo doit faire au maximum 12 Mo." : null;

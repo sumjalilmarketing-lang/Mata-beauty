@@ -13,7 +13,8 @@ async function openStudio(page: Page, path = '/pro/videos') {
   await expect(page.getByRole('heading', { name: 'Montrez votre talent' })).toBeVisible();
 }
 
-test('video, service and hashtags remain together with no duration cap or navigation', async ({ page, context }) => {
+for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, service and hashtags remain together with no duration cap or navigation`, async ({ page, context }) => {
+  test.setTimeout(120000);
   const session = await qaLogin(context, 'provider');
   let published: Record<string, unknown> | null = null;
   const savedPublication = () => published;
@@ -35,13 +36,14 @@ test('video, service and hashtags remain together with no duration cap or naviga
   });
   const start = page.url();
   const panel = page.locator('#video-publisher');
-  await panel.getByLabel('Choisir une photo ou une vidéo', { exact: true }).setInputFiles(video);
+  await panel.getByLabel('Choisir une photo ou une vidéo', { exact: true }).setInputFiles(format === 'mp4' ? video : fileURLToPath(new URL(`./fixtures/studio-formats.${format}`, import.meta.url)));
   await panel.getByLabel('Légende', { exact: true }).fill('Réalisation longue depuis le Studio');
   await panel.getByLabel('Hashtags', { exact: true }).fill('#tresses #dakar');
   await panel.locator('select[name=serviceId]').selectOption(auditService);
   await panel.locator('input[name=consent]').check();
   await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
-  await expect.poll(() => published?.target_duration_seconds, { timeout: 20000 }).toBeGreaterThan(90);
+  await expect.poll(() => published?.target_duration_seconds, { timeout: 90000 }).toBeGreaterThan(format === 'mp4' ? 90 : 0);
+  if (format !== 'mp4') expect(String(savedPublication()?.target_video_path)).toMatch(/video[.]mp4$/);
   expect(savedPublication()?.target_hashtags).toEqual(['#tresses', '#dakar']);
   expect(String(savedPublication()?.target_video_path)).toContain(session.user.id);
   expect(uploaded).toBeGreaterThan(0);

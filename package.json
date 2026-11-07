@@ -6,9 +6,9 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "node scripts/prepare-ocr.mjs && next dev",
-    "build": "node scripts/prepare-ocr.mjs && next build",
-    "build:sites": "vinext build",
+    "dev": "node scripts/prepare-ocr.mjs && node scripts/prepare-video-converter.mjs && next dev",
+    "build": "node scripts/prepare-ocr.mjs && node scripts/prepare-video-converter.mjs && next build",
+    "build:sites": "node scripts/prepare-video-converter.mjs && vinext build",
     "start": "next start",
     "preview:test": "node scripts/local-preview.mjs",
     "typecheck": "tsc --noEmit",
@@ -18,11 +18,13 @@
     "test:social:remote": "node scripts/verify-social-remote.mjs",
     "test:profile:remote": "node scripts/verify-client-profile-remote.mjs",
     "test:messaging:ui:remote": "playwright test --config playwright.remote.config.ts",
-    "test:e2e": "node scripts/test-e2e.mjs",
+    "test:e2e": "node scripts/prepare-video-converter.mjs && node scripts/test-e2e.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern work --ignore-pattern outputs --ignore-pattern .codex-worktrees/**",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@ffmpeg/core": "0.12.10",
+    "@ffmpeg/ffmpeg": "0.12.15",
     "@hookform/resolvers": "^5.4.0",
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "^2.111.0",

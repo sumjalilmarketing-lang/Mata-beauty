@@ -10,3 +10,14 @@ it("keeps portrait and landscape crops inside the original image at every pan bo
  const r=cropRectangle(w,h,ratio,zoom,x,y); expect(r.x).toBeGreaterThanOrEqual(0); expect(r.y).toBeGreaterThanOrEqual(0); expect(r.x+r.width).toBeLessThanOrEqual(w+.00001); expect(r.y+r.height).toBeLessThanOrEqual(h+.00001); expect(r.width/r.height).toBeCloseTo(ratio);
  }
 });
+
+it("accepts phone and legacy videos with missing or generic MIME without weakening image validation", () => {
+ for (const name of ["camera.MOV", "clip.avi", "clip.mkv", "clip.3gp", "clip.m4v", "clip.mts", "clip.wmv"]) {
+  for (const type of ["", "application/octet-stream", "video/x-custom"]) {
+   expect(mediaSelectionError([{name,type,size:1000}])).toBeNull();
+   expect(mediaSelectionError([{name,type,size:101*1024*1024}])).toContain("100 Mo");
+   expect(mediaSelectionError([{name,type,size:1000},{type:"image/jpeg",size:1000}])).not.toBeNull();
+  }
+ }
+ for (const file of [{name:"photo.heic",type:"",size:1000},{name:"fake.mov",type:"application/pdf",size:1000}]) expect(mediaSelectionError([file])).not.toBeNull();
+});
