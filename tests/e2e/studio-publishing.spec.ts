@@ -135,3 +135,41 @@ test('an inactive service is refused before video transfer for public publicatio
   await expect(panel.getByRole('status')).toContainText('Choisissez une prestation active');
   expect(transfers).toBe(0);
 });
+
+test('activates an owned inactive service in Studio without losing the caption',async({page,context})=>{
+ await qaLogin(context,'provider');
+ await page.route(`${api}/rest/v1/provider_services**`,route=>{
+  if(route.request().method()==='PATCH'){
+   expect(route.request().postDataJSON()).toEqual({is_active:true,status:'published'});
+   return route.fulfill({json:{id:auditService,is_active:true}});
+  }
+  return route.fulfill({json:[{id:auditService,business_id:auditBusiness,title:'Tresses',is_active:false,duration_minutes:60,price_amount:10000,currency:'XOF',services:null}]});
+ });
+ await page.route(`${api}/rest/v1/businesses**`,route=>route.fulfill({json:{id:auditBusiness,status:'approved',is_active:true,country_code:'SN',timezone:'Africa/Dakar',currency:'XOF'}}));
+ await page.route(`${api}/rest/v1/business_hours**`,route=>route.fulfill({json:[{weekday:1,is_closed:false,opens_at:'09:00',closes_at:'18:00'}]}));
+ await openStudio(page);
+ const panel=page.locator('#video-publisher');
+ await panel.getByLabel('Légende',{exact:true}).fill('Ma vidéo conservée');
+ await panel.locator('select[name=serviceId]').selectOption(auditService);
+ await panel.getByRole('button',{name:'Activer cette prestation',exact:true}).click();
+ await expect(panel.getByRole('status')).toContainText('Prestation activée');
+ await expect(panel.getByRole('button',{name:'Activer cette prestation',exact:true})).toHaveCount(0);
+ await expect(panel.getByLabel('Légende',{exact:true})).toHaveValue('Ma vidéo conservée');
+});
+
+test('activation cannot bypass missing salon hours',async({page,context})=>{
+ await qaLogin(context,'provider');
+ let writes=0;
+ await page.route(`${api}/rest/v1/provider_services**`,route=>{
+  if(route.request().method()==='PATCH')writes++;
+  return route.fulfill({json:[{id:auditService,business_id:auditBusiness,title:'Tresses',is_active:false,duration_minutes:60,price_amount:10000,currency:'XOF',services:null}]});
+ });
+ await page.route(`${api}/rest/v1/businesses**`,route=>route.fulfill({json:{id:auditBusiness,status:'approved',is_active:true,country_code:'SN',timezone:'Africa/Dakar',currency:'XOF'}}));
+ await page.route(`${api}/rest/v1/business_hours**`,route=>route.fulfill({json:[]}));
+ await openStudio(page);
+ const panel=page.locator('#video-publisher');
+ await panel.locator('select[name=serviceId]').selectOption(auditService);
+ await panel.getByRole('button',{name:'Activer cette prestation',exact:true}).click();
+ await expect(panel.getByRole('status')).toContainText('Ajoutez les horaires');
+ expect(writes).toBe(0);
+});
