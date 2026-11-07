@@ -402,12 +402,21 @@ test("a protected destination survives the authentication handoff", async ({ pag
 });
 
 test("password recovery does not require the old password", async ({ page }) => {
+  let recovered = false;
+  await page.route(`${testSupabaseOrigin}/auth/v1/recover**`, route => {
+    expect(route.request().postDataJSON().email).toBe("client@example.com");
+    expect(new URL(route.request().url()).searchParams.get("redirect_to")).toBe(`${testAppOrigin}/auth/update-password`);
+    recovered = true;
+    return route.fulfill({ status: 200, json: {} });
+  });
   await page.goto("/?auth=reset");
   await expect(page.getByRole("heading", { name: "Mot de passe oublié" })).toBeVisible();
   await page.getByLabel("Adresse e-mail").fill("client@example.com");
   const recoveryRequest = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith("/recover"));
   await page.getByRole("button", { name: "Envoyer le lien" }).click();
   await recoveryRequest;
+  await expect.poll(() => recovered).toBe(true);
+  await expect(page.locator(".auth-feedback")).toContainText("vous recevrez un lien de réinitialisation");
 });
 
 test("invalid OAuth callbacks fail closed without an open redirect", async ({ page }) => {
