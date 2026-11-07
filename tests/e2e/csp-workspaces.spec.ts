@@ -34,3 +34,13 @@ test("public static HTML keeps a non-blocking CSP rollout", async ({ page }) => 
   expect(candidate).not.toContain("'unsafe-inline'");
   expect(enforced).not.toContain("'nonce-");
 });
+
+for (const path of ["/admin", "/app/social-profile", "/auth/update-password", "/salon/invitation/accept"]) {
+  test(`prerendered ${path} keeps compatible script headers`, async ({ page }) => {
+    const response = await page.goto(path);
+    const enforced = response?.headers()["content-security-policy"]?.split(";").find(value => value.trim().startsWith("script-src")) ?? "";
+    expect(enforced).toContain("'unsafe-inline'");
+    expect(enforced).not.toContain("'nonce-");
+    await expect(page.locator("body")).toBeVisible();
+  });
+}

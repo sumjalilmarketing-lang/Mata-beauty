@@ -22,9 +22,16 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("workspace CSP without changing public static rendering", () => {
   it("requires workspace HTML and never selects static assets, APIs or RSC payloads", () => {
-    for (const path of ["/app", "/staff/profile", "/pro", "/salon", "/auth/update-password", "/finance"]) expect(usesWorkspaceNonce(path, "text/html")).toBe(true);
+    for (const path of ["/app", "/staff/profile", "/pro", "/salon", "/admin/accounts", "/finance"]) expect(usesWorkspaceNonce(path, "text/html")).toBe(true);
     for (const path of ["/", "/conseils/test", "/api/push", "/staff/manifest.webmanifest", "/professional/salon"]) expect(usesWorkspaceNonce(path, "text/html")).toBe(false);
     expect(usesWorkspaceNonce("/app/profile", "text/x-component")).toBe(false);
+  });
+  it("excludes prerendered workspace entry documents, including trailing slashes", () => {
+    for (const path of ["/admin", "/app/social-profile", "/auth/update-password", "/salon/invitation/accept"]) {
+      expect(usesWorkspaceNonce(path, "text/html")).toBe(false);
+      expect(usesWorkspaceNonce(path + "/", "text/html")).toBe(false);
+    }
+    expect(usesWorkspaceNonce("/staff/profile/", "text/html")).toBe(true);
   });
   it("removes inline script allowance under a nonce while preserving OCR, media and backend origins", () => {
     const policy = contentSecurityPolicy(environment, "dGVzdC1ub25jZQ==");

@@ -6,9 +6,14 @@ type CspEnvironment = Readonly<{
 }>;
 
 export function usesWorkspaceNonce(pathname: string, accept: string | null): boolean {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  // These entry documents are prerendered and cannot carry a request nonce.
+  // Keep their existing script policy until a static hash policy is available.
+  const staticEntries = ["/admin", "/app/social-profile", "/auth/update-password", "/salon/invitation/accept"];
   return Boolean(accept?.includes("text/html"))
-    && /^\/(app|pro|salon|staff|admin|commercial|finance|support-agent|moderation|operations|onboarding|auth)(\/|$)/.test(pathname)
-    && !/\.[a-z0-9]+$/i.test(pathname);
+    && !staticEntries.includes(path)
+    && /^\/(app|pro|salon|staff|admin|commercial|finance|support-agent|moderation|operations|onboarding|auth)(\/|$)/.test(path)
+    && !/\.[a-z0-9]+$/i.test(path);
 }
 
 /** Nonces are reserved for already-dynamic workspace HTML, not cached SSG pages. */
