@@ -3,6 +3,7 @@ import { qaLogin } from './helpers/qa-session';
 import { auditBusiness, auditCategory, auditService } from './fixtures/provider-audit.mjs';
 import { fileURLToPath } from 'node:url';
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
+const tusHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'Location,Upload-Offset,Upload-Length,Tus-Resumable', 'Tus-Resumable': '1.0.0' };
 test.afterEach(async ({ page }, info) => { if (info.status !== info.expectedStatus) console.log('STUDIO_FAILURE_STATE', (await page.locator('#video-publisher').innerText().catch(() => 'panel unavailable')).slice(-2500)); });
 const video = fileURLToPath(new URL('./fixtures/studio-long.mp4', import.meta.url));
 
@@ -19,9 +20,9 @@ test('video, service and hashtags remain together with no duration cap or naviga
   let uploaded = 0;
   await page.route(`${api}/storage/v1/upload/resumable**`, route => {
     if (route.request().method() === 'OPTIONS') return route.fulfill({status:204,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*','Access-Control-Allow-Methods':'POST,PATCH,HEAD,OPTIONS'}});
-    if (route.request().method() === 'POST') return route.fulfill({ status: 201, headers: { Location: `${api}/storage/v1/upload/resumable/fixture`, 'Tus-Resumable': '1.0.0', 'Upload-Offset': '0' } });
-    if (route.request().method() === 'PATCH') { uploaded += route.request().postDataBuffer()?.length ?? 0; return route.fulfill({ status: 204, headers: { 'Tus-Resumable': '1.0.0', 'Upload-Offset': String(uploaded) } }); }
-    return route.fulfill({ status: 200, headers: { 'Upload-Offset': String(uploaded) } });
+    if (route.request().method() === 'POST') return route.fulfill({ status: 201, headers: { ...tusHeaders, Location: `${api}/storage/v1/upload/resumable/fixture`, 'Tus-Resumable': '1.0.0', 'Upload-Offset': '0' } });
+    if (route.request().method() === 'PATCH') { uploaded += route.request().postDataBuffer()?.length ?? 0; return route.fulfill({ status: 204, headers: { ...tusHeaders, 'Tus-Resumable': '1.0.0', 'Upload-Offset': String(uploaded) } }); }
+    return route.fulfill({ status: 200, headers: { ...tusHeaders, 'Upload-Offset': String(uploaded) } });
   });
   await page.route(`${api}/storage/v1/object/provider-social-media/**`, route => route.fulfill({ json: { Key: 'fixture' } }));
   await page.route(`${api}/storage/v1/object/sign/provider-social-media/**`, route => route.fulfill({ json: { signedURL: '/object/sign/provider-social-media/fixture?token=synthetic' } }));
@@ -102,7 +103,7 @@ for (const mode of ['lost-response', 'verification-unavailable']) test(`a possib
   let removed = 0, calls = 0;
   await page.route(`${api}/storage/v1/upload/resumable**`, route => {
     const body = route.request().postDataBuffer();
-    return route.fulfill({ status: 201, headers: { Location: `${api}/storage/v1/upload/resumable/fixture`, 'Tus-Resumable': '1.0.0', 'Upload-Offset': String(body?.length ?? 0) } });
+    return route.fulfill({ status: 201, headers: { ...tusHeaders, Location: `${api}/storage/v1/upload/resumable/fixture`, 'Tus-Resumable': '1.0.0', 'Upload-Offset': String(body?.length ?? 0) } });
   });
   await page.route(`${api}/storage/v1/object/provider-social-media/**`, route => { if (route.request().method() === 'DELETE') removed++; return route.fulfill({ json: { Key: 'fixture' } }); });
   await page.route(`${api}/storage/v1/object/**`, route => { if (route.request().method() === 'DELETE') removed++; return route.fulfill({ json: [] }); });
