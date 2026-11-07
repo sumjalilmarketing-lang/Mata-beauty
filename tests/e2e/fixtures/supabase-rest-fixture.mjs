@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {handleDepartmentFixture} from "./department-workspaces.mjs";
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
@@ -13,6 +14,7 @@ function respond(response, status, body, headers = {}) {
 }
 
 export function createSupabaseFixtureServer(port) {
+  const uploads = new Map();
   return createServer(async(request, response) => {
   const url = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
   const testPort = Number(process.env.MATA_PLAYWRIGHT_PORT ?? 3160);
@@ -33,6 +35,33 @@ export function createSupabaseFixtureServer(port) {
     response.writeHead(204, corsHeaders);
     response.end();
     return;
+  }
+  // Receive actual bytes over HTTP: browser route interception cannot reliably
+  // expose Blob PATCH bodies in every engine (notably WebKit).
+  if (url.pathname.startsWith("/storage/v1/upload/resumable")) {
+    const headers = { "Tus-Resumable": "1.0.0" };
+    if (request.method === "POST") {
+      const length = Number(request.headers["upload-length"]);
+      if (!Number.isSafeInteger(length) || length <= 0 || length > 100 * 1024 * 1024) return send(400, { message: "Invalid fixture length" }, headers);
+      const id = randomUUID();
+      let offset = 0;
+      for await (const chunk of request) offset += chunk.length;
+      if (offset > length) return send(400, { message: "Invalid fixture body" }, headers);
+      uploads.set(id, { length, offset });
+      return send(201, null, { ...headers, Location: `http://127.0.0.1:${port}/storage/v1/upload/resumable/${id}`, "Upload-Offset": String(offset) });
+    }
+    const upload = uploads.get(url.pathname.split("/").pop());
+    if (!upload) return send(404, { message: "Unknown fixture upload" }, headers);
+    if (request.method === "HEAD") return send(200, null, { ...headers, "Upload-Length": String(upload.length), "Upload-Offset": String(upload.offset) });
+    if (request.method === "PATCH") {
+      if (Number(request.headers["upload-offset"]) !== upload.offset) return send(409, null, headers);
+      let received = 0;
+      for await (const chunk of request) received += chunk.length;
+      if (upload.offset + received > upload.length) return send(400, null, headers);
+      upload.offset += received;
+      return send(204, null, { ...headers, "Upload-Offset": String(upload.offset) });
+    }
+    return send(405, null, headers);
   }
   if(await handleDepartmentFixture(request,response,send))return;
   // The own-profile loader uses a server credential, so scope its synthetic
