@@ -1,5 +1,7 @@
 "use client";
 
+import { isVideoFile, STUDIO_MEDIA_ACCEPT } from "@/lib/domain/video-formats";
+
 import { StudioServiceCreator } from "./studio-service-creator";
 import { StudioUploadError, uploadStudioVideo } from "@/lib/media/video-upload-client";
 import { PhotoCropper } from "./photo-cropper";
@@ -17,7 +19,6 @@ type ProviderService = { is_active: boolean; id: string; title: string; duration
 type PublishStatus = "draft" | "scheduled" | "published";
 type ContentType = "video" | "photo" | "before_after" | "promotion" | "availability";
 
-const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
@@ -73,20 +74,27 @@ async function resolveVideoDuration(video: HTMLVideoElement) {
 
 async function inspectAndCreateThumbnail(file: File) {
   const url = URL.createObjectURL(file);
+  const video = document.createElement("video");
   try {
-    const video = document.createElement("video");
     video.preload = "auto";
     video.muted = true;
     video.playsInline = true;
-    video.src = url;
     await new Promise<void>((resolve, reject) => {
       const timeout = window.setTimeout(() => { video.onloadeddata = null; video.onerror = null; reject(new StudioUploadError("La préparation prend trop de temps. Essayez une version MP4 de la vidéo.")); }, 20000);
       video.onloadeddata = () => { window.clearTimeout(timeout); resolve(); };
-      video.onerror = () => { window.clearTimeout(timeout); reject(new StudioUploadError("Ce format vidéo ne peut pas être lu sur cet appareil. Essayez une version MP4.")); };
+      video.onerror = () => { window.clearTimeout(timeout); reject(new StudioUploadError("La vidéo ne peut pas être décodée sur cet appareil.")); };
+      video.src = url;
+      video.load();
     });
     const duration = await resolveVideoDuration(video);
     if (!Number.isFinite(duration) || duration <= 0) throw new StudioUploadError("La vidéo ne contient pas de durée lisible. Essayez une version MP4.");
     if (!video.videoWidth || !video.videoHeight) throw new StudioUploadError("Dimensions vidéo invalides.");
+    await new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(() => reject(new StudioUploadError("La miniature prend trop de temps. Réessayez.")), 10000);
+      video.onseeked = () => { window.clearTimeout(timer); resolve(); };
+      video.onerror = () => { window.clearTimeout(timer); reject(new StudioUploadError("La miniature ne peut pas être préparée.")); };
+      video.currentTime = Math.min(0.1, duration / 2);
+    });
     const canvas = document.createElement("canvas");
     canvas.width = 540;
     canvas.height = Math.round(canvas.width * video.videoHeight / video.videoWidth);
@@ -94,13 +102,15 @@ async function inspectAndCreateThumbnail(file: File) {
     const thumbnail = await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new StudioUploadError("Miniature impossible à créer.")), "image/jpeg", 0.84));
     return { duration, aspectRatio: video.videoWidth / video.videoHeight, thumbnail };
   } finally {
+    video.onloadeddata = null; video.onerror = null; video.onseeked = null;
+    video.removeAttribute("src"); video.load();
     URL.revokeObjectURL(url);
   }
 }
 
 export function VideoPublisher({ userId, providerApproved, onPublished, initialContentType = "video", initialFiles = [], salon = false }: { salon?: boolean; userId: string; providerApproved: boolean; onPublished: (postType: ContentType) => Promise<void>; initialContentType?: ContentType; initialFiles?: File[] }) {
   const [services, setServices] = useState<ProviderService[]>([]);
-  const [phase, setPhase] = useState<"idle" | "analysing" | "uploading" | "publishing">("idle");
+  const [phase, setPhase] = useState<"idle" | "analysing" | "converting" | "uploading" | "publishing">("idle");
   const [feedback, setFeedback] = useState("");
   const [contentType, setContentType] = useState<ContentType>(initialContentType);
   const [selectedFiles, setSelectedFiles] = useState<File[]>(initialFiles);
@@ -113,6 +123,8 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
   const [previewUrls, setPreviewUrls] = useState<string[]>(() => initialFiles.map(file => URL.createObjectURL(file)));
   const mediaInput = useRef<HTMLInputElement>(null);
   const publishPending = useRef(false);
+  const conversion = useRef<AbortController | null>(null);
+  useEffect(() => () => conversion.current?.abort(), []);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -132,14 +144,14 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
     const files = selectedFiles;
     const selectionError = mediaSelectionError(files);
     if (selectionError) { setFeedback(selectionError); return; }
-    const file = files[0];
+    let file = files[0];
     const status = String(values.get("status")) as PublishStatus;
     const selectedServiceId = String(values.get("serviceId") ?? "");
     const consent = values.get("consent") === "on";
     const scheduledValue = String(values.get("scheduledFor") ?? "");
     const customThumbnail = values.get("thumbnail");
     if (!file) { setFeedback(selectedType === "video" ? "Choisissez une vidéo." : "Choisissez au moins une image."); return; }
-    if (selectedType === "video" && !VIDEO_TYPES.has(file.type)) { setFeedback("Format accepté : MP4, WebM ou MOV."); return; }
+    if (selectedType === "video" && !isVideoFile(file)) { setFeedback("Choisissez un fichier vidéo."); return; }
     if (selectedType === "video" && file.size > MAX_VIDEO_BYTES) { setFeedback("La vidéo dépasse 100 Mo."); return; }
     if (selectedType === "video" && customThumbnail instanceof File && customThumbnail.size > 0 && (!IMAGE_TYPES.has(customThumbnail.type) || customThumbnail.size > 5 * 1024 * 1024)) { setFeedback("Miniature acceptée : JPEG, PNG ou WebP, 5 Mo maximum."); return; }
     if (selectedType !== "video" && files.some((item) => !IMAGE_TYPES.has(item.type) || item.size > MAX_IMAGE_BYTES)) { setFeedback("Images acceptées : JPEG, PNG ou WebP, 12 Mo maximum chacune."); return; }
@@ -160,8 +172,17 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
       setFeedback("");
       let error: { message: string } | null = null;
       if (selectedType === "video") {
+        setPhase("converting");
+        setFeedback("Préparation de votre vidéo… Gardez le Studio ouvert.");
+        const { convertStudioVideo } = await import("@/lib/media/video-conversion-client");
+        conversion.current = new AbortController();
+        try { file = await convertStudioVideo(file, message => setFeedback(message), conversion.current.signal); }
+        finally { conversion.current = null; }
         setPhase("analysing");
         const media = await inspectAndCreateThumbnail(file);
+        setSelectedFiles([file]);
+        setPreviewUrls([URL.createObjectURL(file)]);
+        setFeedback("");
         const thumbnailBlob = customThumbnail instanceof File && customThumbnail.size > 0 ? customThumbnail : media.thumbnail;
         const thumbnailMime = customThumbnail instanceof File && customThumbnail.size > 0 ? customThumbnail.type : "image/jpeg";
         const extension = file.type === "video/webm" ? "webm" : file.type === "video/quicktime" ? "mov" : "mp4";
@@ -242,21 +263,22 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
   }
 
   const idleLabel = contentType === "video" ? "Publier la vidéo" : "Publier le contenu";
-  const busyLabel = phase === "analysing" ? "Analyse de la vidéo…" : phase === "uploading" ? "Envoi sécurisé…" : phase === "publishing" ? "Publication…" : idleLabel;
+  const busyLabel = phase === "converting" ? "Préparation vidéo…" : phase === "analysing" ? "Analyse de la vidéo…" : phase === "uploading" ? "Envoi sécurisé…" : phase === "publishing" ? "Publication…" : idleLabel;
   const progressValue = phase === "uploading" ? uploadedPercent : phase === "publishing" ? 100 : 0;
   return <article className="panel video-publisher-panel" id="video-publisher">
     <div className="panel-heading"><div><h2>Montrez votre talent</h2><p>Choisissez un média, associez une prestation et publiez depuis votre téléphone.</p></div><span className="role-pill">Tout dans votre Studio</span></div>
+    {phase === "converting" && <button type="button" onClick={() => conversion.current?.abort()}>Annuler la préparation</button>}
     {creatingService && <StudioServiceCreator userId={userId} salon={salon} providerApproved={providerApproved} onCancel={() => setCreatingService(false)} onCreated={service => { setServices(current => [...current, service]); setServiceId(service.id); setCreatingService(false); setFeedback("Prestation ajoutée et associée à votre publication."); }} />}
     <form className="dashboard-form video-publisher-form" onSubmit={(event) => void publish(event)}>
       <input type="hidden" name="contentType" value={contentType} />
       <div className="wide composer-media">
-        <input ref={mediaInput} aria-label="Choisir une photo ou une vidéo" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" disabled={phase !== "idle"} multiple onChange={event => {
+        <input ref={mediaInput} aria-label="Choisir une photo ou une vidéo" type="file" accept={STUDIO_MEDIA_ACCEPT} disabled={phase !== "idle"} multiple onChange={event => {
           const files = Array.from(event.target.files ?? []); if (!files.length) return;
           const error = mediaSelectionError(files); if (error) { setFeedback(error); event.target.value = ""; return; }
           setSelectedFiles(files); setPreviewUrls(files.map(file => URL.createObjectURL(file))); setCropping(null); setFeedback("");
-          setContentType(files[0].type.startsWith("video/") ? "video" : ["before_after", "promotion", "availability"].includes(contentType) ? contentType : "photo");
+          setContentType(isVideoFile(files[0]) ? "video" : ["before_after", "promotion", "availability"].includes(contentType) ? contentType : "photo");
         }} />
-        {previewUrls.length === 0 ? <p>Choisissez une vidéo sans limite de durée (100 Mo maximum par fichier) ou jusqu’à 10 photos.</p> : <div className="composer-previews">{previewUrls.map((url, index) => <div key={url}>{contentType === "video" ? <video src={url} controls playsInline aria-label="Aperçu de votre vidéo" /> : <><Image src={url} alt={`Photo ${index + 1}`} width={500} height={650} unoptimized /><button type="button" onClick={() => setCropping(index)}>Recadrer la photo {index + 1}</button></>}</div>)}</div>}
+        {previewUrls.length === 0 ? <p>Formats de téléphone et autres formats vidéo : conversion automatique si nécessaire. Choisissez une vidéo sans limite de durée (100 Mo maximum par fichier) ou jusqu’à 10 photos.</p> : <div className="composer-previews">{previewUrls.map((url, index) => <div key={url}>{contentType === "video" ? <video src={url} controls playsInline aria-label="Aperçu de votre vidéo" onError={() => setFeedback("L’aperçu de ce format sera préparé automatiquement lors de la publication.")} /> : <><Image src={url} alt={`Photo ${index + 1}`} width={500} height={650} unoptimized /><button type="button" onClick={() => setCropping(index)}>Recadrer la photo {index + 1}</button></>}</div>)}</div>}
         {cropping !== null && selectedFiles[cropping] && <PhotoCropper key={previewUrls[cropping]} file={selectedFiles[cropping]} onCancel={() => setCropping(null)} onApply={file => {
           if (file.size > MAX_IMAGE_BYTES) { setFeedback("Le recadrage dépasse 12 Mo. Choisissez un cadrage plus petit."); setCropping(null); return; }
           const files = selectedFiles.map((old, index) => index === cropping ? file : old);

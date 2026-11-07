@@ -1,5 +1,7 @@
 "use client";
 
+import { isVideoFile, STUDIO_MEDIA_ACCEPT } from "@/lib/domain/video-formats";
+
 import Image from "next/image";
 import { mediaSelectionError } from "@/lib/domain/media-composer";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -78,7 +80,7 @@ export function CreatorStudio({ userId, providerApproved, initialTab = "create",
 
   return <section className="creator-studio">
     <header className="studio-hero"><div><span>STUDIO MATA BEAUTY</span><h2>Photo ou vidéo ?</h2><p>Choisissez votre média, préparez votre publication et partagez votre talent.</p></div><button type="button" onClick={() => picker.current?.click()}>＋ Créer</button></header>
-    <input ref={picker} hidden aria-label="Importer une photo ou une vidéo" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" multiple onChange={event => { const files = Array.from(event.target.files ?? []); if (!files.length) return; const error = mediaSelectionError(files); if (error) { setFeedback(error); event.target.value = ""; return; } setInitialFiles(files); setCreateType(files[0].type.startsWith("video/") ? "video" : "photo"); setSelectionVersion(value => value + 1); setActive("create"); setFeedback(""); event.target.value = ""; }} />
+    <input ref={picker} hidden aria-label="Importer une photo ou une vidéo" type="file" accept={STUDIO_MEDIA_ACCEPT} multiple onChange={event => { const files = Array.from(event.target.files ?? []); if (!files.length) return; const error = mediaSelectionError(files); if (error) { setFeedback(error); event.target.value = ""; return; } setInitialFiles(files); setCreateType(isVideoFile(files[0]) ? "video" : "photo"); setSelectionVersion(value => value + 1); setActive("create"); setFeedback(""); event.target.value = ""; }} />
     <nav className="studio-tabs" aria-label="Navigation Studio">{tabs.map((tab) => <button className={active === tab.key ? "active" : ""} key={tab.key} onClick={() => setActive(tab.key)}>{tab.label}</button>)}</nav>
     {feedback && <p className="dashboard-feedback" role="status">{feedback}</p>}
     {firstPublicationFeedback && <aside className="panel studio-feedback"><strong>Le Studio était-il facile à utiliser ?</strong><div><button onClick={() => void answerStudioFeedback("yes")}>👍 Oui</button><button onClick={() => void answerStudioFeedback("no")}>👎 Non</button></div></aside>}
