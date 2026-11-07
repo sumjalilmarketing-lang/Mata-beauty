@@ -1,5 +1,7 @@
 "use client";
 
+import { activityLocationReady } from "@/lib/domain/service-creation";
+import { hasPublishedBusinessHours } from "@/lib/domain/business-hours";
 import { StudioServiceCreator } from "./studio-service-creator";
 import { StudioUploadError, uploadStudioVideo } from "@/lib/media/video-upload-client";
 import { PhotoCropper } from "./photo-cropper";
@@ -13,7 +15,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { validatePublishedVideoDelivery, type PublishedVideoRecord } from "@/lib/domain/video-delivery";
 
-type ProviderService = { is_active: boolean; id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
+type ProviderService = { business_id?: string | null; is_active: boolean; id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
 type PublishStatus = "draft" | "scheduled" | "published";
 type ContentType = "video" | "photo" | "before_after" | "promotion" | "availability";
 
@@ -78,11 +80,12 @@ async function inspectAndCreateThumbnail(file: File) {
     video.preload = "auto";
     video.muted = true;
     video.playsInline = true;
-    video.src = url;
     await new Promise<void>((resolve, reject) => {
       const timeout = window.setTimeout(() => { video.onloadeddata = null; video.onerror = null; reject(new StudioUploadError("La préparation prend trop de temps. Essayez une version MP4 de la vidéo.")); }, 20000);
       video.onloadeddata = () => { window.clearTimeout(timeout); resolve(); };
       video.onerror = () => { window.clearTimeout(timeout); reject(new StudioUploadError("Ce format vidéo ne peut pas être lu sur cet appareil. Essayez une version MP4.")); };
+      video.src = url;
+      video.load();
     });
     const duration = await resolveVideoDuration(video);
     if (!Number.isFinite(duration) || duration <= 0) throw new StudioUploadError("La vidéo ne contient pas de durée lisible. Essayez une version MP4.");
@@ -104,6 +107,9 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
   const [feedback, setFeedback] = useState("");
   const [contentType, setContentType] = useState<ContentType>(initialContentType);
   const [selectedFiles, setSelectedFiles] = useState<File[]>(initialFiles);
+  const [activatingService, setActivatingService] = useState(false);
+  const activationPending = useRef(false);
+  const [previewError, setPreviewError] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [creatingService, setCreatingService] = useState(false);
   const [servicesError, setServicesError] = useState("");
@@ -117,15 +123,44 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount,currency,is_active,services(categories(name))").eq("provider_id", userId).is("archived_at", null).order("title").abortSignal(AbortSignal.timeout(15000)).then(({ data, error }) => { if (error) setServicesError("Les prestations sont indisponibles. Actualisez le Studio pour réessayer."); else setServices((data ?? []) as unknown as ProviderService[]); });
+    void supabase.from("provider_services").select("id,business_id,title,duration_minutes,price_amount,currency,is_active,services(categories(name))").eq("provider_id", userId).is("archived_at", null).order("title").abortSignal(AbortSignal.timeout(15000)).then(({ data, error }) => { if (error) setServicesError("Les prestations sont indisponibles. Actualisez le Studio pour réessayer."); else setServices((data ?? []) as unknown as ProviderService[]); });
   }, [userId]);
+
+  async function activateSelectedService() {
+    if (activationPending.current || phase !== "idle") return;
+    const selected = services.find(service => service.id === serviceId);
+    const api = getSupabaseBrowserClient();
+    if (!api || !selected || selected.is_active) return;
+    activationPending.current = true; setActivatingService(true); setFeedback("");
+    try {
+      if (!providerApproved) throw new StudioUploadError("Votre profil doit être approuvé avant d’activer une prestation.");
+      if (selected.business_id) {
+        const business = await api.from("businesses").select("id,status,is_active,country_code,timezone,currency").eq("id", selected.business_id).eq("owner_id",userId).is("archived_at",null).abortSignal(AbortSignal.timeout(12000)).single();
+        if (business.error) throw business.error;
+        if (business.data.status !== "approved" || !business.data.is_active) throw new StudioUploadError("Le salon doit être validé avant d’activer cette prestation.");
+        if (!activityLocationReady(business.data)) throw new StudioUploadError("Renseignez le pays, la devise et le fuseau horaire du salon avant l’activation.");
+        const hours = await api.from("business_hours").select("weekday,is_closed,opens_at,closes_at").eq("business_id",selected.business_id).abortSignal(AbortSignal.timeout(12000));
+        if (hours.error) throw hours.error;
+        if (!hasPublishedBusinessHours(hours.data ?? [])) throw new StudioUploadError("Ajoutez les horaires d’ouverture du salon avant d’activer cette prestation.");
+      } else {
+        const profile = await api.from("provider_profiles").select("country_code,timezone,currency").eq("profile_id",userId).abortSignal(AbortSignal.timeout(12000)).single();
+        if(profile.error) throw profile.error;
+        if(!activityLocationReady(profile.data)) throw new StudioUploadError("Complétez le pays, la devise et le fuseau horaire de votre activité.");
+      }
+      const result = await api.from("provider_services").update({is_active:true,status:"published"}).eq("id",selected.id).eq("provider_id",userId).is("archived_at",null).select("id,is_active").abortSignal(AbortSignal.timeout(12000)).single();
+      if(result.error || !result.data?.is_active) throw result.error ?? new Error("Activation non confirmée");
+      setServices(current => current.map(service => service.id===selected.id ? {...service,is_active:true} : service));
+      setFeedback("Prestation activée. Vous pouvez publier votre vidéo.");
+    } catch(error) { setFeedback(error instanceof StudioUploadError ? error.message : "Activation non confirmée. Réessayez après avoir vérifié votre connexion."); }
+    finally { activationPending.current=false;setActivatingService(false); }
+  }
 
   useEffect(() => () => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); }, [previewUrls]);
   async function publish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
     if (!supabase) { setFeedback("Connexion indisponible. Actualisez le Studio pour réessayer."); return; }
-    if (phase !== "idle" || publishPending.current || publicationUnconfirmed || creatingService) return;
+    if (phase !== "idle" || publishPending.current || publicationUnconfirmed || creatingService || activationPending.current) return;
     const form = event.currentTarget;
     const values = new FormData(form);
     const selectedType = String(values.get("contentType") ?? "video") as ContentType;
@@ -253,14 +288,15 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
         <input ref={mediaInput} aria-label="Choisir une photo ou une vidéo" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" disabled={phase !== "idle"} multiple onChange={event => {
           const files = Array.from(event.target.files ?? []); if (!files.length) return;
           const error = mediaSelectionError(files); if (error) { setFeedback(error); event.target.value = ""; return; }
-          setSelectedFiles(files); setPreviewUrls(files.map(file => URL.createObjectURL(file))); setCropping(null); setFeedback("");
+          setSelectedFiles(files); setPreviewUrls(files.map(file => URL.createObjectURL(file))); setCropping(null); setFeedback(""); setPreviewError("");
           setContentType(files[0].type.startsWith("video/") ? "video" : ["before_after", "promotion", "availability"].includes(contentType) ? contentType : "photo");
         }} />
-        {previewUrls.length === 0 ? <p>Choisissez une vidéo sans limite de durée (100 Mo maximum par fichier) ou jusqu’à 10 photos.</p> : <div className="composer-previews">{previewUrls.map((url, index) => <div key={url}>{contentType === "video" ? <video src={url} controls playsInline aria-label="Aperçu de votre vidéo" /> : <><Image src={url} alt={`Photo ${index + 1}`} width={500} height={650} unoptimized /><button type="button" onClick={() => setCropping(index)}>Recadrer la photo {index + 1}</button></>}</div>)}</div>}
+        {previewUrls.length === 0 ? <p>Choisissez une vidéo sans limite de durée (100 Mo maximum par fichier) ou jusqu’à 10 photos.</p> : <div className="composer-previews">{previewUrls.map((url, index) => <div key={url}>{contentType === "video" ? <video src={url} controls playsInline preload="metadata" onError={() => setPreviewError("Cet appareil ne peut pas lire ce fichier. Réexportez la vidéo en MP4 (H.264), puis choisissez-la à nouveau. Votre légende et votre prestation seront conservées.")} aria-label="Aperçu de votre vidéo" /> : <><Image src={url} alt={`Photo ${index + 1}`} width={500} height={650} unoptimized /><button type="button" onClick={() => setCropping(index)}>Recadrer la photo {index + 1}</button></>}</div>)}</div>}
+        {previewError && <p role="alert">{previewError}</p>}
         {cropping !== null && selectedFiles[cropping] && <PhotoCropper key={previewUrls[cropping]} file={selectedFiles[cropping]} onCancel={() => setCropping(null)} onApply={file => {
           if (file.size > MAX_IMAGE_BYTES) { setFeedback("Le recadrage dépasse 12 Mo. Choisissez un cadrage plus petit."); setCropping(null); return; }
           const files = selectedFiles.map((old, index) => index === cropping ? file : old);
-          setSelectedFiles(files); setPreviewUrls(files.map(item => URL.createObjectURL(item))); setCropping(null); setFeedback("");
+          setSelectedFiles(files); setPreviewUrls(files.map(item => URL.createObjectURL(item))); setCropping(null); setFeedback(""); setPreviewError("");
         }} />}
         {selectedFiles.length > 0 && contentType !== "video" && <details><summary>Autres formats photo</summary><label>Format<select value={contentType} onChange={event => setContentType(event.target.value as ContentType)}><option value="photo">Photo / carrousel</option><option value="before_after">Avant / Après (2 photos)</option><option value="promotion">Promotion</option><option value="availability">Disponibilité immédiate</option></select></label></details>}
         <div className="composer-actions"><button type="button" disabled={phase !== "idle"} onClick={() => mediaInput.current?.click()}>{selectedFiles.length ? "Changer les médias" : "＋ Choisir une photo ou une vidéo"}</button></div>
@@ -276,6 +312,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
       {servicesError && <p role="alert">{servicesError}</p>}
       <button type="button" disabled={phase !== "idle"} onClick={() => setCreatingService(true)}>＋ Ajouter une prestation dans le Studio</button>
       <label>Catégorie et prestation<select name="serviceId" value={serviceId} onChange={event => setServiceId(event.target.value)}><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title}{!service.is_active ? " (inactive · brouillon uniquement)" : ""} · {service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</option>)}</select></label>
+      {services.find(service => service.id===serviceId && !service.is_active) && <aside className="wide publisher-notice"><p>Cette prestation est inactive. Activez-la ici pour pouvoir publier une vidéo réservable.</p><button type="button" disabled={activatingService || phase !== "idle"} onClick={() => void activateSelectedService()}>{activatingService ? "Activation…" : "Activer cette prestation"}</button></aside>}
       <details className="wide publisher-options"><summary>Options de publication</summary>
       <label>Visibilité<select name="visibility" defaultValue="public"><option value="public">Tout le monde</option><option value="followers">Abonnés</option></select></label>
       {contentType === "video" && <label>Couverture personnalisée<input name="thumbnail" type="file" accept="image/jpeg,image/png,image/webp" /></label>}<label>Publication<select name="status" defaultValue={providerApproved ? "published" : "draft"}><option value="draft">Brouillon</option><option value="scheduled" disabled={!providerApproved}>Programmer</option><option value="published" disabled={!providerApproved}>Publier maintenant</option></select></label>
@@ -286,7 +323,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
       {!providerApproved && <p className="wide publisher-notice">Votre profil doit être approuvé avant une publication publique. Le brouillon reste disponible.</p>}
 
       {phase !== "idle" && <label className="wide upload-progress">Progression de la publication<progress max="100" value={progressValue} /><span>{progressValue}% · {busyLabel}</span></label>}
-      <button className="primary-button" type="submit" disabled={phase !== "idle" || !selectedFiles.length || cropping !== null || creatingService || publicationUnconfirmed}>{busyLabel}</button>
+      <button className="primary-button" type="submit" disabled={phase !== "idle" || !selectedFiles.length || cropping !== null || creatingService || publicationUnconfirmed || activatingService || Boolean(previewError)}>{busyLabel}</button>
       </fieldset>
       {publicationUnconfirmed && <button type="button" onClick={() => window.location.reload()}>Actualiser le Studio</button>}
       {feedback && <p className="wide dashboard-feedback" role="status">{feedback}</p>}
