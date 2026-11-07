@@ -434,3 +434,83 @@ test.describe("audit chronométré de réservation", () => {
     await expect(page.getByRole("dialog", { name: "Réserver" }).getByRole("alert")).toHaveCount(0);
   });
 });
+
+// Acceptance cases added by the functional audit. Failures are kept visible.
+for (const status of [400, 401, 403, 500]) test(`QA-B01: booking micro-feedback reports HTTP ${status} and permits retry`, async ({ page }) => {
+  const state: AuditState = { bookingCreated: false, currentRole: 'client', selectedSlot: '' };
+  await mockSupabase(page, state);
+  let failed = true;
+  await page.route(`${api}/rest/v1/micro_feedback**`, route => route.fulfill(failed ? { status, json: { message: 'Synthetic failure' } } : { status: 201, json: null }));
+  await page.goto('/'); await openFirstFeedBooking(page);
+  await page.getByRole('button', { name: '10:00', exact: true }).click();
+  await page.getByRole('button', { name: /Confirmer.*10.*000/ }).click();
+  await signIn(page, 'client-microfeedback@example.test');
+  await expect(page.getByText('Votre rendez-vous est créé', { exact: true })).toBeVisible();
+  const feedback = page.locator('.micro-feedback');
+  await feedback.getByRole('button', { name: '👍 Oui', exact: true }).click();
+  await expect(feedback.getByRole('alert')).toContainText('Votre retour n’a pas pu être enregistré');
+  await expect(feedback.getByText('Merci pour votre retour.', { exact: true })).toHaveCount(0);
+  failed = false;
+  await feedback.getByRole('button', { name: '👍 Oui', exact: true }).click();
+  await expect(feedback.getByText('Merci pour votre retour.', { exact: true })).toBeVisible();
+});
+
+test('signup, email confirmation notice, login, catalogue and booking confirmation', async ({ page }) => {
+  const state: AuditState = { bookingCreated: false, currentRole: 'client', selectedSlot: '' };
+  await mockSupabase(page, state);
+  let registrations = 0;
+  await page.route(`${api}/auth/v1/signup**`, route => {
+    const data = route.request().postDataJSON();
+    expect(data.email).toBe('qa-signup@example.test');
+    expect(data.data.country_code).toBe('SN');
+    registrations++;
+    return json(route, { user: { id: clientId, email: data.email, aud: 'authenticated', role: 'authenticated', user_metadata: data.data, identities: [] }, session: null });
+  });
+  await page.goto('/?connexion=requise');
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Créer un compte', exact: true }).click();
+  await dialog.getByLabel('Nom complet', { exact: true }).fill('Compte Audit');
+  await dialog.getByLabel('Pays de résidence', { exact: true }).selectOption('SN');
+  await dialog.locator('input[name=email]').fill('qa-signup@example.test');
+  await dialog.locator('input[name=password]').fill('Synthetic-Password-2026!');
+  await dialog.locator('input[name=confirmation]').fill('Synthetic-Password-2026!');
+  await dialog.locator('input[name=acceptLegal]').check();
+  await dialog.getByRole('button', { name: 'Créer le compte', exact: true }).click();
+  await expect(dialog.locator('.auth-feedback')).toContainText(/e-mail|messagerie|mail/i);
+  expect(registrations).toBe(1);
+  // Auth email delivery/verification is simulated; no real email is sent.
+  await dialog.getByRole('button', { name: 'Déjà inscrit ? Se connecter', exact: true }).click();
+  await signIn(page, 'qa-signup@example.test');
+  await expectAuthenticatedSession(page);
+  await page.goto('/'); await openFirstFeedBooking(page);
+  await page.getByRole('button', { name: '10:00', exact: true }).click();
+  await page.getByRole('button', { name: /Confirmer.*10.*000/ }).click();
+  await expect(page.getByText('Votre rendez-vous est créé', { exact: true })).toBeVisible();
+  expect(state.bookingCreated).toBe(true);
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Réserver', exact: true })).toHaveCount(0);
+  await page.goto('/app/bookings');
+  await expect(page).toHaveURL(/\/app\/bookings$/);
+});
+
+for (const action of ['like', 'save', 'follow'] as const) test(`QA-B02: ${action} prevents concurrent toggles`, async ({ page }) => {
+  const state: AuditState = { bookingCreated: false, currentRole: 'client', selectedSlot: '' };
+  await mockSupabase(page, state);
+  await page.goto('/?connexion=requise');
+  await signIn(page, `client-${action}@example.test`);
+  await expectAuthenticatedSession(page);
+  let requests = 0, release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const rpc = action === 'like' ? 'toggle_post_like' : action === 'save' ? 'toggle_post_save' : 'toggle_follow_provider_from_post';
+  await page.route(`${api}/rest/v1/rpc/${rpc}`, async route => {
+    requests++; await pending;
+    await json(route, action === 'follow' ? true : { active: true, count: 1 });
+  });
+  await page.goto('/');
+  const card = page.locator('.social-video-card').first();
+  await expect(card).toBeVisible();
+  if (action !== 'like') await card.locator('.feed-options summary').click();
+  const button = card.getByRole('button', { name: action === 'like' ? 'J’aime' : action === 'save' ? 'Enregistrer' : 'Suivre', exact: true });
+  try { await button.click(); await expect.poll(() => requests).toBe(1); await expect(button).toBeDisabled(); }
+  finally { release(); }
+});
