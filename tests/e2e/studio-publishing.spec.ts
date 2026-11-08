@@ -4,7 +4,10 @@ import { auditBusiness, auditCategory, auditService } from './fixtures/provider-
 import { fileURLToPath } from 'node:url';
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
 const tusHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'Location,Upload-Offset,Upload-Length,Tus-Resumable', 'Tus-Resumable': '1.0.0' };
-test.beforeEach(async ({ page }) => { page.on('requestfailed', request => console.log('STUDIO_REQUEST_FAILURE', request.method(), new URL(request.url()).pathname, request.failure()?.errorText)); });
+test.beforeEach(async ({ page }) => {
+  // UI fixture only: real byte decoding and attestation are tested separately.
+  await page.route('**/api/studio/validate-video', route => route.fulfill({ json: { ok: true } }));
+  page.on('requestfailed', request => console.log('STUDIO_REQUEST_FAILURE', request.method(), new URL(request.url()).pathname, request.failure()?.errorText)); });
 test.afterEach(async ({ page }, info) => { if (info.status !== info.expectedStatus) console.log('STUDIO_FAILURE_STATE', (await page.locator('#video-publisher').innerText().catch(() => 'panel unavailable')).slice(-2500)); });
 const video = fileURLToPath(new URL('./fixtures/studio-long.mp4', import.meta.url));
 

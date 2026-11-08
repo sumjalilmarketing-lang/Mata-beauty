@@ -14,3 +14,4 @@ allowBuilds:
   workerd: true
   ljharb-monorepo-symlink-test: false
   tesseract.js: false
+  ffmpeg-static: true

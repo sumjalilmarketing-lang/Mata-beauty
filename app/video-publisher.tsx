@@ -4,7 +4,7 @@ import { isVideoFile, STUDIO_MEDIA_ACCEPT } from "@/lib/domain/video-formats";
 
 import { useStudioVideoPreview } from "@/lib/media/use-studio-video-preview";
 import { StudioServiceCreator } from "./studio-service-creator";
-import { StudioUploadError, uploadStudioVideo } from "@/lib/media/video-upload-client";
+import { StudioUploadError, uploadStudioVideo, validateStudioUpload } from "@/lib/media/video-upload-client";
 import { PhotoCropper } from "./photo-cropper";
 import { mediaSelectionError } from "@/lib/domain/media-composer";
 import { formatServiceMoney } from "@/lib/domain/service-money";
@@ -125,6 +125,9 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
         const videoUrl = supabase.storage.from("provider-social-media").getPublicUrl(videoPath).data.publicUrl;
         const thumbnailUrl = supabase.storage.from("provider-social-media").getPublicUrl(thumbnailPath).data.publicUrl;
         setPhase("publishing");
+        setFeedback("Vérification de votre vidéo… Gardez le Studio ouvert.");
+        await validateStudioUpload(postId, videoPath, thumbnailPath);
+        setFeedback("");
         publicationRequested = true;
         const publication = await supabase.rpc("create_provider_video_post", {
           target_post_id: postId, target_title: String(values.get("title") ?? "").trim(), target_caption: String(values.get("caption") ?? "").trim(),
