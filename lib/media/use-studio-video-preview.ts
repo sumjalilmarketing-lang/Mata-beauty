@@ -3,23 +3,28 @@
 import { useEffect, useRef, useState } from "react";
 import { inspectStudioVideo, type StudioVideoInspection } from "./video-inspection-client";
 import { nativePortableVideo } from "./native-video-client";
+import { prepareStudioVideo, type PreparedStudioVideo } from "./video-preparation-client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { StudioUploadError } from "./video-upload-client";
 
-type Preparation = { source: File; file?: File; url?: string; poster?: string; media?: StudioVideoInspection; busy: boolean; message: string };
+type Preparation = { source: File; file?: File; url?: string; poster?: string; media?: StudioVideoInspection; prepared?: PreparedStudioVideo; busy: boolean; message: string };
 
 /** Prepare before displaying: a selected phone container may not be browser-readable. */
 export function useStudioVideoPreview(source: File | undefined) {
   const [result, setResult] = useState<Preparation | null>(null);
   const [attempt, setAttempt] = useState(0);
   const controller = useRef<AbortController | null>(null);
+  const preservePrepared = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (!source) {
       const clear = setTimeout(() => setResult(null), 0);
       return () => clearTimeout(clear);
     }
+    preservePrepared.current = null;
     let live = true;
     let url: string | undefined;
     let poster: string | undefined;
+    let lease: { media: PreparedStudioVideo; preserve: boolean } | undefined;
     const abort = new AbortController();
     controller.current = abort;
     void (async () => {
@@ -36,11 +41,15 @@ export function useStudioVideoPreview(source: File | undefined) {
         }
         if (!live) return;
         if (!file) {
-          const { convertStudioVideo } = await import("./video-conversion-client");
-          if (!live) return;
-          file = await convertStudioVideo(source, message => {
+          const prepared = await prepareStudioVideo(source, message => {
             if (live) setResult({ source, busy: true, message });
           }, abort.signal);
+          lease = { media: prepared, preserve: false };
+          if (!live) { void getSupabaseBrowserClient()?.storage.from("provider-social-media").remove([prepared.videoPath]).catch(() => undefined); return; }
+          preservePrepared.current = () => { if (live && lease) lease.preserve = true; };
+          poster = URL.createObjectURL(prepared.thumbnail);
+          setResult({ source, file: source, url: prepared.previewUrl, poster, media: prepared, prepared, busy: false, message: "Aperçu prêt. Vous pouvez lire la vidéo avant de publier." });
+          return;
         }
         if (!live) return;
         media ??= await inspectStudioVideo(file, abort.signal);
@@ -58,6 +67,7 @@ export function useStudioVideoPreview(source: File | undefined) {
       if (controller.current === abort) controller.current = null;
       if (url) URL.revokeObjectURL(url);
       if (poster) URL.revokeObjectURL(poster);
+      if (lease && !lease.preserve) void getSupabaseBrowserClient()?.storage.from("provider-social-media").remove([lease.media.videoPath]).catch(() => undefined);
     };
   }, [source, attempt]);
   const current = source && result?.source === source ? result : null;
@@ -66,6 +76,8 @@ export function useStudioVideoPreview(source: File | undefined) {
     url: current?.url,
     poster: current?.poster,
     media: current?.media,
+    prepared: current?.prepared,
+    preservePrepared: () => preservePrepared.current?.(),
     busy: Boolean(source && (!current || current.busy)),
     message: source ? current?.message ?? "Préparation de l’aperçu vidéo…" : "",
     cancel: () => controller.current?.abort(),

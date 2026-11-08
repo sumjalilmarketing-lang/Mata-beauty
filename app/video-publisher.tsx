@@ -112,14 +112,14 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
         if (!media) throw new StudioUploadError("Préparez l’aperçu avant de publier.");
         const thumbnailBlob = customThumbnail instanceof File && customThumbnail.size > 0 ? customThumbnail : media.thumbnail;
         const thumbnailMime = customThumbnail instanceof File && customThumbnail.size > 0 ? customThumbnail.type : "image/jpeg";
-        const extension = file.type === "video/webm" ? "webm" : file.type === "video/quicktime" ? "mov" : "mp4";
+        const extension = videoPreview.prepared ? "mp4" : file.type === "video/webm" ? "webm" : file.type === "video/quicktime" ? "mov" : "mp4";
         const thumbnailExtension = thumbnailMime === "image/png" ? "png" : thumbnailMime === "image/webp" ? "webp" : "jpg";
-        const postId = crypto.randomUUID();
+        const postId = videoPreview.prepared?.postId ?? crypto.randomUUID();
         videoPath = `${userId}/${postId}/video.${extension}`;
         thumbnailPath = `${userId}/${postId}/thumbnail.${thumbnailExtension}`;
         setPhase("uploading");
         setUploadedPercent(0);
-        await uploadStudioVideo(file, videoPath, setUploadedPercent);
+        if (!videoPreview.prepared) await uploadStudioVideo(file, videoPath, setUploadedPercent);
         const thumbnailUpload = await supabase.storage.from("provider-social-media").upload(thumbnailPath, thumbnailBlob, { contentType: thumbnailMime, cacheControl: "31536000", upsert: false });
         if (thumbnailUpload.error) throw thumbnailUpload.error;
         const videoUrl = supabase.storage.from("provider-social-media").getPublicUrl(videoPath).data.publicUrl;
@@ -128,6 +128,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
         setFeedback("Vérification de votre vidéo… Gardez le Studio ouvert.");
         await validateStudioUpload(postId, videoPath, thumbnailPath);
         setFeedback("");
+        videoPreview.preservePrepared();
         publicationRequested = true;
         const publication = await supabase.rpc("create_provider_video_post", {
           target_post_id: postId, target_title: String(values.get("title") ?? "").trim(), target_caption: String(values.get("caption") ?? "").trim(),
@@ -187,6 +188,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
         if (mediaPaths.length) await supabase.storage.from("provider-social-media").remove(mediaPaths);
       }
       const uncertain = publicationRequested && !persisted && !(caught && typeof caught === "object" && "code" in caught && typeof caught.code === "string" && caught.code.length > 0);
+      if (videoPreview.prepared && !persisted && !uncertain) videoPreview.fail();
       setPublicationUnconfirmed(uncertain || persisted);
       setFeedback(caught instanceof StudioUploadError ? caught.message : uncertain ? "Publication non confirmée. Actualisez le Studio pour vérifier vos publications avant de réessayer." : publicErrorMessage(caught, persisted ? "La vidéo est enregistrée, mais sa visibilité n’a pas pu être confirmée. Actualisez le Studio avant de réessayer." : "La publication a échoué. Vérifiez le fichier et réessayez."));
     } finally { publishPending.current = false; setPhase("idle"); }

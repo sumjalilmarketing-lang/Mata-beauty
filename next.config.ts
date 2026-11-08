@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   ...(process.env.MATA_E2E_TSCONFIG ? { typescript: { tsconfigPath: process.env.MATA_E2E_TSCONFIG } } : {}),
   poweredByHeader: false,
   serverExternalPackages: ["ffmpeg-static"],
-  outputFileTracingIncludes: { "/api/studio/validate-video": ["./node_modules/ffmpeg-static/ffmpeg"] },
+  outputFileTracingIncludes: { "/api/studio/validate-video": ["./node_modules/ffmpeg-static/ffmpeg"], "/api/studio/prepare-video": ["./node_modules/ffmpeg-static/ffmpeg"] },
   allowedDevOrigins: ["localhost", "127.0.0.1"],
   turbopack: { root: process.cwd() },
   env: {

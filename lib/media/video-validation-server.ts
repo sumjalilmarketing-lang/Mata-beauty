@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import ffmpegPath from "ffmpeg-static";
@@ -78,4 +78,31 @@ export async function readBoundedMedia(response: Response, limit: number) {
     }
     return Buffer.concat(chunks, size);
   } finally { reader.releaseLock(); }
+}
+
+/** Full server transcode, never a playlist or a network-backed input. */
+export async function normalizeStudioVideo(bytes: Uint8Array) {
+  if (!bytes.length || bytes.length > MAX_STUDIO_VIDEO_BYTES) throw new InvalidStudioMedia("Vidéo vide ou supérieure à 100 Mo.");
+  const dir = await mkdtemp(join(tmpdir(), "mata-prepare-"));
+  const options = inputOptions.map(value => value === "mov,matroska,webm" ? "mov,matroska,webm,avi,mpeg,mpegts,asf,flv,ogg,hevc,h264,mxf" : value);
+  try {
+    const input = join(dir, "input"), output = join(dir, "video.mp4"), cover = join(dir, "cover.jpg");
+    await writeFile(input, bytes, { mode: 0o600 });
+    await run(["-v", "error", "-xerror", ...options, "-i", input, "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn",
+      "-c:v", "libx264", "-threads", "1", "-preset", "ultrafast", "-crf", "20", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-pix_fmt", "yuv420p",
+      "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-fs", String(MAX_STUDIO_VIDEO_BYTES + 1024 * 1024), output], 180_000);
+    const video = await readFile(output);
+    if (video.length > MAX_STUDIO_VIDEO_BYTES) throw new InvalidStudioMedia("Après préparation, la vidéo dépasse 100 Mo.");
+    const probe = await run([...inputOptions, "-i", output], 15_000, true);
+    const dimensions = probe.stderr.split("\n").find(line => /Stream #.*Video:/.test(line))?.match(/\b(\d{2,5})x(\d{2,5})\b/);
+    const time = probe.stderr.match(/Duration: (\d+):(\d+):([\d.]+)/);
+    if (!dimensions || !time) throw new InvalidStudioMedia("Métadonnées de la vidéo illisibles.");
+    const duration = Number(time[1]) * 3600 + Number(time[2]) * 60 + Number(time[3]);
+    const aspectRatio = Number(dimensions[1]) / Number(dimensions[2]);
+    if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(aspectRatio) || aspectRatio <= 0) throw new InvalidStudioMedia("Métadonnées de la vidéo invalides.");
+    await run(["-v", "error", ...inputOptions, "-i", output, "-map", "0:v:0", "-frames:v", "1", "-vf", "scale=540:960:force_original_aspect_ratio=decrease", "-threads", "1", cover], 15_000);
+    const thumbnail = await readFile(cover);
+    await validateThumbnailBytes(thumbnail);
+    return { video, thumbnail, duration, aspectRatio };
+  } finally { await rm(dir, { recursive: true, force: true }); }
 }
