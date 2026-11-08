@@ -18,7 +18,7 @@ export async function analyticsSessionHash(key: string): Promise<string | null> 
 // Metrics are optional: storage restrictions, transport failures and page exits
 // must never become failures of a booking, profile navigation or media playback.
 export async function recordSessionMetric(
-  client: SupabaseClient,
+  _client: SupabaseClient,
   name: MetricName,
   parameters: Record<string, unknown>,
   sessionKey = "mata-feed-session",
@@ -44,8 +44,13 @@ export async function recordSessionMetric(
       });
       return !response.ok || controller.signal.aborted ? failed : { ok: true, data: null };
     }
-    const { data, error } = await client.rpc(name, { ...parameters, target_session_hash: hash }).abortSignal(controller.signal);
-    return error || controller.signal.aborted ? failed : { ok: true, data };
+    const response = await fetch("/api/analytics/social-metric", {
+      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+      body: JSON.stringify({ ...parameters, target_session_hash: hash, kind: name }), signal: controller.signal,
+    });
+    if (!response.ok || controller.signal.aborted) return failed;
+    const result: { data?: unknown } = await response.json();
+    return controller.signal.aborted ? failed : { ok: true, data: result.data ?? null };
   } catch { return failed; }
   finally { clearTimeout(timeout); parentSignal?.removeEventListener("abort", abort); unsubscribe(); }
 }

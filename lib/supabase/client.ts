@@ -22,6 +22,7 @@ export function getSupabaseBrowserClient() {
   const configuration = getSupabaseConfiguration();
   if (!configuration.configured) return null;
   browserClient ??= createBrowserClient(configuration.url, configuration.anonKey, {
+    cookieOptions: { path: "/", sameSite: "lax", secure: typeof window !== "undefined" && window.location?.protocol === "https:" },
     auth: {
       autoRefreshToken: true,
       detectSessionInUrl: true,

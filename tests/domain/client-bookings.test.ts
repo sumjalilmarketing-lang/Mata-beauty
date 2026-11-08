@@ -95,3 +95,9 @@ describe("client booking groups", () => {
   });
 });
 
+
+it("shows confirmed ongoing bookings before a later appointment", () => {
+ const current=booking({id:"current",startsAt:"2026-10-17T11:30:00Z",endsAt:"2026-10-17T12:30:00Z"});
+ const result=groupClientBookings([booking({id:"later"}),current],now)[0];
+ expect(result.activeCount).toBe(2); expect(result.nextBooking?.id).toBe("current");
+});

@@ -102,10 +102,10 @@ describe("optional product analytics", () => {
   it("cancels in-flight telemetry when the page exits", async () => {
     let notifyStarted!: () => void;
     const started = new Promise<void>(resolve => { notifyStarted = resolve; });
-    const rpc = vi.fn(() => ({ abortSignal: (signal: AbortSignal) => new Promise((_, reject) => {
-      signal.addEventListener("abort", () => reject(new Error("Aborted")), { once: true });
-      notifyStarted();
-    }) }));
+    const rpc = vi.fn();
+    vi.mocked(fetch).mockImplementation((_url, options) => new Promise((_, reject) => {
+      options?.signal?.addEventListener("abort", () => reject(new Error("Aborted")), { once: true }); notifyStarted();
+    }));
     const controller = new AbortController();
     const pending = recordSessionMetric({ rpc } as unknown as SupabaseClient, "record_video_view", {}, "test", controller.signal);
     await started;
@@ -117,10 +117,10 @@ describe("optional product analytics", () => {
     vi.useFakeTimers();
     let notifyStarted!: () => void;
     const started = new Promise<void>(resolve => { notifyStarted = resolve; });
-    const rpc = vi.fn(() => ({ abortSignal: (signal: AbortSignal) => new Promise((_, reject) => {
-      signal.addEventListener("abort", () => reject(new Error("Timed out")), { once: true });
-      notifyStarted();
-    }) }));
+    const rpc = vi.fn();
+    vi.mocked(fetch).mockImplementation((_url, options) => new Promise((_, reject) => {
+      options?.signal?.addEventListener("abort", () => reject(new Error("Timed out")), { once: true }); notifyStarted();
+    }));
     const pending = recordSessionMetric({ rpc } as unknown as SupabaseClient, "record_video_view", {});
     await started;
     await vi.advanceTimersByTimeAsync(5000);
@@ -133,4 +133,10 @@ describe("optional product analytics", () => {
     expect(readBrowserStorage("localStorage", "mata-theme")).toBeNull();
     expect(writeBrowserStorage("localStorage", "mata-theme", "dark")).toBe(false);
   });
+});
+
+it("preserves the server share count without exposing direct anonymous RPC access", async () => {
+ vi.mocked(fetch).mockResolvedValue(Response.json({data:42})); const rpc=vi.fn();
+ await expect(recordSessionMetric({rpc} as unknown as SupabaseClient,"record_post_share",{target_post_id:"post"})).resolves.toEqual({ok:true,data:42});
+ expect(rpc).not.toHaveBeenCalled(); expect(fetch).toHaveBeenCalledWith("/api/analytics/social-metric",expect.objectContaining({credentials:"same-origin"}));
 });

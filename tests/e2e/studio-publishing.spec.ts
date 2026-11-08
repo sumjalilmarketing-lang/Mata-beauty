@@ -74,7 +74,7 @@ for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, servic
   expect(page.url()).toBe(start);
 });
 
-test('an interrupted video upload retains the selected media and details', async ({ page, context }) => {
+test('an expired upload session is distinguished from network failure and preserves details', async ({ page, context }) => {
   await qaLogin(context, 'provider');
   await page.route(`${api}/storage/v1/upload/resumable**`, route => route.fulfill({ status: 401, json: { message: 'synthetic expired session' } }));
   await openStudio(page);
@@ -84,7 +84,7 @@ test('an interrupted video upload retains the selected media and details', async
   await panel.getByText('Options de publication', { exact: true }).click();
   await panel.locator('select[name=status]').selectOption('draft');
   await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
-  await expect(panel.getByRole('status')).toContainText('L’envoi a été interrompu');
+  await expect(panel.getByRole('status')).toContainText('Votre session a expiré');
   await expect(panel.getByLabel('Légende', { exact: true })).toHaveValue('Description conservée');
   await expect(panel.locator('video')).toHaveCount(1);
   await expect(panel.getByRole('button', { name: 'Publier la vidéo', exact: true })).toBeEnabled();

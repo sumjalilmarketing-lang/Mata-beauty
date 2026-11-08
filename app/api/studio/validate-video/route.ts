@@ -3,6 +3,7 @@ import { authenticatedSupabase, consumeRateLimit, hasTrustedOrigin, jsonError, s
 import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 import { InvalidStudioMedia, MAX_STUDIO_VIDEO_BYTES, readBoundedMedia, validateThumbnailBytes, validateVideoBytes } from "@/lib/media/video-validation-server";
 
+import { logStudioFailure } from "@/lib/media/studio-logging";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 const schema = z.object({ postId: z.uuid(), videoPath: z.string().max(180), thumbnailPath: z.string().max(180) }).strict();
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
     if (error instanceof InvalidStudioMedia) return jsonError(error.message, 422, "invalid_media");
     if (error instanceof BodyTooLargeError) return jsonError("Requête trop volumineuse.", 413, "body_too_large");
     if (error instanceof SyntaxError) return jsonError("Requête invalide.", 400, "invalid_request");
+    logStudioFailure("validate-video", error);
     return jsonError("Vérification vidéo indisponible. Votre sélection est conservée ; réessayez.", 503, "validation_unavailable");
   }
 }

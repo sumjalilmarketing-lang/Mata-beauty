@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { privateMetadata } from "@/lib/metadata/private";
 import type { Metadata } from "next";
 export const metadata: Metadata = {
