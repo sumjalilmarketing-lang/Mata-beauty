@@ -50,6 +50,12 @@ describe("workspace navigation", () => {
       expect(new Set(keys).size).toBe(keys.length);
     }
   });
+
+  it("centralizes catalog management in the Salon workspace", () => {
+    expect(workspaceSpaces.pro.modules.some((item) => item.key === "services")).toBe(false);
+    expect(workspaceSpaces.salon.modules.some((item) => item.key === "services")).toBe(true);
+    expect(workspaceSpaces.salon.modules.find((item) => item.key === "services")?.label).toBe("Prestations");
+  });
 });
 
 

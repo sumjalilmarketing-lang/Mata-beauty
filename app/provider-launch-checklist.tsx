@@ -27,8 +27,8 @@ export function ProviderLaunchChecklist({ userId }: { userId: string }) {
 
   const items = useMemo(() => [
     ["Compléter mon profil", checklist.photo && checklist.description, "/pro/public-profile"],
-    ["Créer une prestation", checklist.services > 0, "/pro/services"],
-    ["Définir mes tarifs", checklist.prices > 0, "/pro/services"],
+    ["Gérer les prestations dans l’espace Salon", checklist.services > 0, "/salon/services"],
+    ["Définir les tarifs dans l’espace Salon", checklist.prices > 0, "/salon/services"],
     ["Configurer mes disponibilités", checklist.availability, "/pro/agenda"],
     ["Publier ma première réalisation", checklist.video, "/pro/videos"],
   ] as Array<[string, boolean, string]>, [checklist]);

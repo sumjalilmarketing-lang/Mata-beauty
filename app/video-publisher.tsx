@@ -5,7 +5,6 @@ import { studioServiceIsPublic } from "@/lib/domain/studio-booking";
 import { isVideoFile, STUDIO_MEDIA_ACCEPT } from "@/lib/domain/video-formats";
 
 import { useStudioVideoPreview } from "@/lib/media/use-studio-video-preview";
-import { StudioServiceCreator } from "./studio-service-creator";
 import { StudioUploadError, uploadStudioVideo, validateStudioUpload } from "@/lib/media/video-upload-client";
 import { PhotoCropper } from "./photo-cropper";
 import { mediaSelectionError } from "@/lib/domain/media-composer";
@@ -14,6 +13,7 @@ import "./media-composer.css";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { validatePublishedVideoDelivery, type PublishedVideoRecord } from "@/lib/domain/video-delivery";
@@ -46,14 +46,13 @@ async function verifyPublishedVideo(postId: string, serviceId: string, videoPath
   }
 }
 
-export function VideoPublisher({ userId, providerApproved, onPublished, initialContentType = "video", initialFiles = [], salon = false }: { salon?: boolean; userId: string; providerApproved: boolean; onPublished: (postType: ContentType) => Promise<void>; initialContentType?: ContentType; initialFiles?: File[] }) {
+export function VideoPublisher({ userId, providerApproved, onPublished, initialContentType = "video", initialFiles = [] }: { userId: string; providerApproved: boolean; onPublished: (postType: ContentType) => Promise<void>; initialContentType?: ContentType; initialFiles?: File[] }) {
   const [services, setServices] = useState<ProviderService[]>([]);
   const [phase, setPhase] = useState<"idle" | "analysing" | "uploading" | "publishing">("idle");
   const [feedback, setFeedback] = useState("");
   const [contentType, setContentType] = useState<ContentType>(initialContentType);
   const [selectedFiles, setSelectedFiles] = useState<File[]>(initialFiles);
   const [serviceId, setServiceId] = useState("");
-  const [creatingService, setCreatingService] = useState(false);
   const [servicesError, setServicesError] = useState("");
   const [publicationUnconfirmed, setPublicationUnconfirmed] = useState(false);
   const [uploadedPercent, setUploadedPercent] = useState(0);
@@ -74,7 +73,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
     if (!supabase) { setFeedback("Connexion indisponible. Actualisez le Studio pour réessayer."); return; }
-    if (phase !== "idle" || publishPending.current || publicationUnconfirmed || creatingService) return;
+    if (phase !== "idle" || publishPending.current || publicationUnconfirmed) return;
     const form = event.currentTarget;
     const values = new FormData(form);
     const selectedType = String(values.get("contentType") ?? "video") as ContentType;
@@ -97,7 +96,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
     if (selectedType !== "video" && selectedType !== "before_after" && files.length > 10) { setFeedback("Un carrousel contient au maximum 10 images."); return; }
     if (status === "published" && !consent) { setFeedback("Confirmez le consentement de la personne filmée."); return; }
     if (status !== "draft" && !selectedServiceId) { setFeedback("Associez une prestation avant de publier ou programmer."); return; }
-    if (status !== "draft" && !studioServiceIsPublic(services.find(service => service.id === selectedServiceId))) { setFeedback("Choisissez une prestation active et publiée pour permettre la réservation. Publiez la prestation depuis votre catalogue ou conservez la vidéo en brouillon."); return; }
+    if (status !== "draft" && !studioServiceIsPublic(services.find(service => service.id === selectedServiceId))) { setFeedback("Choisissez une prestation active et publiée depuis l’espace Salon, ou conservez la vidéo en brouillon."); return; }
     if (status === "scheduled" && !scheduledValue) { setFeedback("Choisissez une date de publication."); return; }
 
     publishPending.current = true;
@@ -201,9 +200,8 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
   const busyLabel = phase === "analysing" ? "Analyse de la vidéo…" : phase === "uploading" ? "Envoi sécurisé…" : phase === "publishing" ? "Publication…" : idleLabel;
   const progressValue = phase === "uploading" ? uploadedPercent : phase === "publishing" ? 100 : 0;
   return <article className="panel video-publisher-panel" id="video-publisher">
-    <div className="panel-heading"><div><h2>Montrez votre talent</h2><p>Choisissez un média, associez une prestation et publiez depuis votre téléphone.</p></div><span className="role-pill">Tout dans votre Studio</span></div>
+    <div className="panel-heading"><div><h2>Montrez votre talent</h2><p>Choisissez un média, associez une prestation et publiez depuis votre téléphone.</p></div><span className="role-pill">Studio de publication</span></div>
     {videoPreview.busy && <button type="button" onClick={videoPreview.cancel}>Annuler la préparation</button>}
-    {creatingService && <StudioServiceCreator userId={userId} salon={salon} providerApproved={providerApproved} onCancel={() => setCreatingService(false)} onCreated={service => { setServices(current => [...current, service]); setServiceId(service.id); setCreatingService(false); setFeedback("Prestation ajoutée et associée à votre publication."); }} />}
     <form className="dashboard-form video-publisher-form" onSubmit={(event) => void publish(event)}>
       <input type="hidden" name="contentType" value={contentType} />
       <div className="wide composer-media">
@@ -231,7 +229,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
       {contentType === "availability" && <label>Créneau disponible<input name="availableAt" type="datetime-local" required /></label>}
       {contentType === "promotion" && <><label>Remise (%)<input name="discount" type="number" min="1" max="90" required /></label><label>Fin de l’offre<input name="promotionEndsAt" type="datetime-local" required /></label><label>Places disponibles<input name="promotionSlots" type="number" min="1" max="10000" required /></label></>}
       {servicesError && <p role="alert">{servicesError}</p>}
-      <button type="button" disabled={phase !== "idle"} onClick={() => setCreatingService(true)}>＋ Ajouter une prestation dans le Studio</button>
+      <p className="wide"><Link href="/salon/services">Gérer les prestations dans l’espace Salon</Link></p>
       <label>Catégorie et prestation<select name="serviceId" value={serviceId} onChange={event => setServiceId(event.target.value)}><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title}{!studioServiceIsPublic(service) ? " (non publiée · brouillon uniquement)" : ""} · {service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</option>)}</select></label>
       <details className="wide publisher-options"><summary>Options de publication</summary>
       <label>Visibilité<select name="visibility" defaultValue="public"><option value="public">Tout le monde</option><option value="followers">Abonnés</option></select></label>
@@ -245,7 +243,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
       {!feedback && videoPreview.message && <p className="wide dashboard-feedback" role="status">{videoPreview.message}</p>}
       {contentType === "video" && selectedFiles.length > 0 && !videoPreview.busy && !videoPreview.file && <button type="button" onClick={videoPreview.retry}>Réessayer la préparation de l’aperçu</button>}
       {phase !== "idle" && <label className="wide upload-progress">Progression de la publication<progress max="100" value={progressValue} /><span>{progressValue}% · {busyLabel}</span></label>}
-      <button className="primary-button" type="submit" disabled={phase !== "idle" || videoPreview.busy || (contentType === "video" && !videoPreview.file) || !selectedFiles.length || cropping !== null || creatingService || publicationUnconfirmed}>{busyLabel}</button>
+      <button className="primary-button" type="submit" disabled={phase !== "idle" || videoPreview.busy || (contentType === "video" && !videoPreview.file) || !selectedFiles.length || cropping !== null || publicationUnconfirmed}>{busyLabel}</button>
       </fieldset>
       {publicationUnconfirmed && <button type="button" onClick={() => window.location.reload()}>Actualiser le Studio</button>}
       {feedback && <p className="wide dashboard-feedback" role="status">{feedback}</p>}

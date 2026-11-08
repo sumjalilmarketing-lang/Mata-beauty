@@ -20,3 +20,17 @@ test('inspect the staged blob, reject credentials, conflicts and private env fil
     git(['rm', '--cached', '.env']); writeFileSync(join(cwd, '.env.example'), 'X='); git(['add', '.env.example']); assert.equal(check().status, 0);
   } finally { rmSync(cwd, { recursive: true, force: true }); }
 });
+
+test('the full-tree scan safely skips tracked files deleted in the worktree', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'mata-quality-deleted-'));
+  const git = args => execFileSync('git', args, { cwd, stdio: 'pipe' });
+  try {
+    git(['init']);
+    writeFileSync(join(cwd, 'removed.tsx'), 'safe\n');
+    git(['add', 'removed.tsx']);
+    rmSync(join(cwd, 'removed.tsx'));
+    const result = spawnSync(process.execPath, [script, '--all'], { cwd, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Hygiene passed/);
+  } finally { rmSync(cwd, { recursive: true, force: true }); }
+});

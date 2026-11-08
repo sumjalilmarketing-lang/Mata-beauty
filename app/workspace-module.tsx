@@ -78,7 +78,7 @@ const refunds: ResourceDefinition = { table: "refunds", select: "id,payment_id,a
 
 export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabaseUrl, supabaseAnonKey, userId, canManageCrmAssignments = false, isSuperAdmin=false, canReadFinance=false, canDecideRefunds=false, canManageSupport=false, providerApproved, staffCanReply, staffCanManageBookings, collaboratorAccessEnabled = false }: { space: WorkspaceSpaceKey; module: WorkspaceModule; allowedModuleKeys: string[]; supabaseUrl: string; supabaseAnonKey: string; userId: string; canManageCrmAssignments?: boolean; isSuperAdmin?:boolean; canReadFinance?:boolean; canDecideRefunds?:boolean; canManageSupport?:boolean; providerApproved: boolean; staffCanReply: boolean; staffCanManageBookings: boolean; collaboratorAccessEnabled?: boolean }) {
   configureSupabaseBrowserClient({ url: supabaseUrl, anonKey: supabaseAnonKey });
-  const focused = (space === "pro" && ["dashboard", "services", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
+  const focused = (space === "pro" && ["dashboard", "public-profile", "statistics", "bookings", "notifications"].includes(module.key)) || (space === "client" && ["bookings", "notifications"].includes(module.key));
   const supportInbox = (space === "support" && ["dashboard", "tickets", "unassigned", "mine", "priority", "escalations"].includes(module.key)) || (space === "operations" && module.key === "support") || (space === "admin" && module.key === "escalations");
   const moderationInbox = (space === "moderation" && ["dashboard", "reports"].includes(module.key)) || (space === "operations" && module.key === "moderation");
   const crmView = space === "commercial" && ["dashboard","crm","follow-ups"].includes(module.key);
@@ -171,7 +171,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (space === "staff" && module.key === "dashboard") return <StaffAgenda view="dashboard" canManage={staffCanManageBookings} />;
   if (space === "staff" && module.key === "services") return <StaffServices />;
   if (space === "salon" && module.key !== "videos") return <SalonControlCenter module={module} userId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />;
-  if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio salon={space === "salon"} userId={userId} providerApproved={providerApproved} />;
+  if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;
   if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
   if (space === "client" && module.key === "profile") return <ClientProfile userId={userId} />;
   if (space === "client" && module.key === "application") return <ProfessionalApplication userId={userId} />;

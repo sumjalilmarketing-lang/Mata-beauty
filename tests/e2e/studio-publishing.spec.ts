@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import sharp from 'sharp';
 import { qaLogin, qaSession } from './helpers/qa-session';
-import { auditBusiness, auditCategory, auditService } from './fixtures/provider-audit.mjs';
+import { auditService } from './fixtures/provider-audit.mjs';
 import { fileURLToPath } from 'node:url';
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
 const tusHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'Location,Upload-Offset,Upload-Length,Tus-Resumable', 'Tus-Resumable': '1.0.0' };
@@ -18,8 +18,8 @@ test.beforeEach(async ({ page }) => {
 test.afterEach(async ({ page }, info) => { if (info.status !== info.expectedStatus) console.log('STUDIO_FAILURE_STATE', (await page.locator('#video-publisher').innerText().catch(() => 'panel unavailable')).slice(-2500)); });
 const video = fileURLToPath(new URL('./fixtures/studio-long.mp4', import.meta.url));
 
-async function openStudio(page: Page, path = '/pro/videos') {
-  await page.route(`${api}/rest/v1/posts**`, route => route.fulfill({ json: [] }));
+async function openStudio(page: Page, path = '/pro/videos', posts: unknown[] = []) {
+  await page.route(`${api}/rest/v1/posts**`, route => route.fulfill({ json: posts }));
   await page.goto(path);
   await expect(page.getByRole('heading', { name: 'Montrez votre talent' })).toBeVisible();
 }
@@ -90,37 +90,41 @@ test('an expired upload session is distinguished from network failure and preser
   await expect(panel.getByRole('button', { name: 'Publier la vidéo', exact: true })).toBeEnabled();
 });
 
-test('creates and associates a service in the selected salon without losing publication fields', async ({ page, context }) => {
-  const session = await qaLogin(context, 'provider');
-  const second = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000999';
-  await page.route(`${api}/rest/v1/businesses**`, route => route.fulfill({ json: [
-    { id: auditBusiness, name: 'Premier salon', currency: 'XOF', country_code: 'SN', timezone: 'Africa/Dakar' },
-    { id: second, name: 'Deuxième salon', currency: 'XOF', country_code: 'SN', timezone: 'Africa/Dakar' },
-  ] }));
-  let created = 0;
-  await page.route(`${api}/rest/v1/provider_services**`, async route => {
-    if (route.request().method() !== 'POST') return route.fulfill({ json: [] });
-    created++;
-    const body = route.request().postDataJSON();
-    expect(body.provider_id).toBe(session.user.id); expect(body.business_id).toBe(second); expect(body.currency).toBe('XOF');
-    await route.fulfill({ json: { id: auditService, title: body.title, duration_minutes: body.duration_minutes, price_amount: body.price_amount, currency: body.currency, is_active: true, status: 'published', archived_at: null, services: null } });
-  });
-  await openStudio(page, '/salon/videos');
-  const start = page.url();
+test('le Studio renvoie la gestion des prestations vers l’espace Salon', async ({ page, context }) => {
+  await qaLogin(context, 'provider');
+  await openStudio(page, '/pro/videos');
   const panel = page.locator('#video-publisher');
-  await panel.getByLabel('Légende', { exact: true }).fill('Ne pas perdre ma publication');
-  await panel.getByRole('button', { name: /Ajouter une prestation dans le Studio/ }).click();
-  const service = page.getByRole('region', { name: 'Nouvelle prestation du Studio' });
-  await service.getByLabel('Salon de la prestation', { exact: true }).selectOption(second);
-  await service.locator('select[name=category]').selectOption(auditCategory);
-  await service.getByLabel('Nom de la prestation', { exact: true }).fill('Tresses Studio');
-  await service.getByLabel('Prix (XOF)', { exact: true }).fill('15000');
-  await service.getByRole('button', { name: 'Publier et associer' }).click();
-  await expect(service).toHaveCount(0);
-  expect(created).toBe(1);
-  await expect(panel.locator('select[name=serviceId]')).toHaveValue(auditService);
-  await expect(panel.getByLabel('Légende', { exact: true })).toHaveValue('Ne pas perdre ma publication');
-  expect(page.url()).toBe(start);
+  await expect(panel.getByRole('button', { name: /Ajouter une prestation dans le Studio/ })).toHaveCount(0);
+  const catalogLink = panel.getByRole('link', { name: 'Gérer les prestations dans l’espace Salon' });
+  await expect(catalogLink).toHaveAttribute('href', '/salon/services');
+  await catalogLink.click();
+  await expect(page).toHaveURL(/\/salon\/services$/);
+  await expect(page.getByRole('heading', { name: 'Prestations', exact: true })).toBeVisible();
+});
+
+test('une prestation non publiée se valide depuis Salon, jamais depuis le Studio', async ({ page, context }) => {
+  await qaLogin(context, 'provider');
+  await openStudio(page, '/pro/videos', [{
+    id: '11111111-1111-4111-8111-111111111111',
+    post_type: 'video',
+    title: 'Publication liée à une prestation en brouillon',
+    caption: '',
+    status: 'published',
+    thumbnail_url: null,
+    view_count: 0,
+    like_count: 0,
+    comment_count: 0,
+    published_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    post_services: [{
+      is_primary: true,
+      provider_services: { id: auditService, status: 'draft', is_active: false, archived_at: null },
+    }],
+  }]);
+  await page.getByRole('button', { name: 'Mes vidéos', exact: true }).click();
+  const post = page.locator('.studio-post-grid article').filter({ hasText: 'Publication liée à une prestation en brouillon' });
+  await expect(post.getByRole('link', { name: 'Vérifier et publier la prestation dans l’espace Salon' })).toHaveAttribute('href', '/salon/services');
+  await expect(post.getByRole('button', { name: /Publier la prestation/ })).toHaveCount(0);
 });
 
 for (const mode of ['lost-response', 'verification-unavailable']) test(`a possibly saved video is never deleted or submitted twice: ${mode}`, async ({ page, context }) => {

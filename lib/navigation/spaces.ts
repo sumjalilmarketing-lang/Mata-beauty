@@ -44,12 +44,11 @@ const clientModules = [
 ] as const;
 
 const proModules = [
-  module("team", "Mon équipe", "◎", "Pilotage", "Collaborateurs, prestations autorisées, horaires et affectations.", { resource: "collaborators" }),
+  module("team", "Mon équipe", "◎", "Pilotage", "Collaborateurs, horaires et affectations.", { resource: "collaborators" }),
   module("dashboard", "Accueil", "⌂", "Pilotage", "Rendez-vous du jour, demandes, messages, revenus et alertes.", { primary: true }),
   module("agenda", "Agenda", "□", "Pilotage", "Disponibilités, absences et calendrier professionnel.", { primary: true, resource: "bookings" }),
   module("bookings", "Rendez-vous", "▣", "Pilotage", "Demandes, confirmations, rendez-vous en cours et historique.", { primary: true, resource: "bookings" }),
   module("messages", "Messages", "✉", "Relations", "Conversations avec vos clientes.", { primary: true, resource: "messages" }),
-  module("services", "Prestations", "≡", "Offre", "Tarifs, durées, options, acompte et disponibilité.", { primary: true, resource: "services" }),
   module("videos", "Studio", "▶", "Contenu", "Publications, création, brouillons, programmation et statistiques.", { resource: "videos" }),
   module("portfolio", "Portfolio", "◇", "Contenu", "Réalisations visibles sur votre profil public."),
   module("clients", "Clientes", "◎", "Relations", "Clientes ayant une relation réelle avec votre activité.", { resource: "profiles" }),
@@ -258,7 +257,7 @@ export function workspaceHref(space: WorkspaceSpaceKey, moduleKey = "dashboard")
 
 export const simpleNavigation = {
   client: ["feed", "bookings", "messages", "profile"],
-  pro: ["dashboard", "videos", "services", "team", "agenda", "messages", "revenue", "public-profile"],
+  pro: ["dashboard", "videos", "team", "agenda", "messages", "revenue", "public-profile"],
 } as const;
 
 export function navigationLabel(space: WorkspaceSpaceKey, item: WorkspaceModule) {
