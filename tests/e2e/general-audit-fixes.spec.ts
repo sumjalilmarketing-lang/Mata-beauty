@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { bookingVideo } from "./fixtures/booking-video";
 import { qaLogin } from "./helpers/qa-session";
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
 const metrics = {users_total:10,users_today:0,users_week:0,clients_active:0,providers_active:0,providers_pending:0,salons_active:0,bookings_today:0,bookings_week:0,bookings_confirmed:0,bookings_cancelled:0,gross_revenue:0,commissions:0,payments_pending:0,payouts_pending:0,disputes_open:0,reports_open:0,tickets_open:0,average_order:0,financial_by_currency:[]};
@@ -73,4 +74,22 @@ test("an existing colleague review hides the second submission form while conten
  await page.goto("/pro/reviews");await page.getByText(/Avis partagé.*Consulter les avis/).click();
  await expect(page.getByText("Une évaluation a déjà été enregistrée pour ce rendez-vous par votre équipe.",{exact:true})).toBeVisible();
  await expect(page.getByRole("radio")).toHaveCount(0);await expect(page.getByRole("button",{name:"Publier mon avis"})).toHaveCount(0);
+});
+
+test('a public video with no public service stays visible without booking actions', async ({ page }) => {
+  const id = '10000000-0000-4000-8000-000000000099';
+  let availabilityRequests = 0;
+  const post = { id, author_id: '20000000-0000-4000-8000-000000000099', post_type: 'video', caption: 'Vidéo publiée sans prestation réservable', business_name: 'Créateur public', city: 'Dakar', published_at: new Date().toISOString(), video_url: '/synthetic-discovery.mp4', thumbnail_url: null, duration_seconds: 20, view_count: 0, like_count: 0, comment_count: 0, save_count: 0, share_count: 0, provider_service_id: null, service_title: null, duration_minutes: null, price_amount: null, currency: null, hashtags: [] };
+  await page.route(`${api}/rest/v1/social_feed**`, route => route.fulfill({ json: new URL(route.request().url()).searchParams.get('select') === 'id' ? [{ id }] : [post] }));
+  await page.route(`${api}/rest/v1/rpc/get_available_slots**`, route => { availabilityRequests++; return route.fulfill({ json: [] }); });
+  await page.route('**/api/public/social-posts/*/media', route => route.fulfill({ json: { videoUrl: 'https://audit.supabase.co/storage/discovery.mp4', thumbnailUrl: null } }));
+  await page.route('https://audit.supabase.co/storage/**', route => route.fulfill({ status: 200, contentType: 'video/mp4', body: bookingVideo }));
+  await page.goto('/');
+  const card = page.locator('.social-video-card');
+  await expect(card).toHaveCount(1);
+  await expect(card).toHaveAttribute('data-post-id', id);
+  await expect(card.locator('video')).toHaveAttribute('src', /discovery\.mp4/);
+  await expect(card.getByRole('button', { name: 'Réserver', exact: true })).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Voir les disponibilités', exact: true })).toHaveCount(0);
+  expect(availabilityRequests).toBe(0);
 });
