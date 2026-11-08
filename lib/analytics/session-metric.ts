@@ -34,6 +34,16 @@ export async function recordSessionMetric(
   const timeout = setTimeout(abort, 5000);
   parentSignal?.addEventListener("abort", abort, { once: true });
   try {
+    if (name === "record_product_event") {
+      const response = await fetch("/api/analytics/product-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ ...parameters, target_session_hash: hash }),
+        signal: controller.signal,
+      });
+      return !response.ok || controller.signal.aborted ? failed : { ok: true, data: null };
+    }
     const { data, error } = await client.rpc(name, { ...parameters, target_session_hash: hash }).abortSignal(controller.signal);
     return error || controller.signal.aborted ? failed : { ok: true, data };
   } catch { return failed; }

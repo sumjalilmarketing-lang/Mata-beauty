@@ -33,3 +33,16 @@ export async function uploadStudioVideo(file: File, path: string, onProgress: (p
     upload.start();
   });
 }
+
+/** Only metadata crosses this endpoint; the server reads the private uploaded bytes. */
+export async function validateStudioUpload(postId: string, videoPath: string, thumbnailPath: string) {
+  const client = getSupabaseBrowserClient();
+  const session = await client?.auth.getSession();
+  if (!session?.data.session) throw new StudioUploadError("Votre session a expiré. Reconnectez-vous.");
+  const response = await fetch("/api/studio/validate-video", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.data.session.access_token}` },
+    body: JSON.stringify({ postId, videoPath, thumbnailPath }), signal: AbortSignal.timeout(285000),
+  });
+  const result = await response.json();
+  if (!response.ok || result.ok !== true) throw new StudioUploadError(result.error?.message || "La vérification vidéo a échoué. Réessayez.");
+}

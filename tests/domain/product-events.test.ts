@@ -9,6 +9,7 @@ beforeEach(() => {
   const values = new Map<string, string>();
   const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) };
   vi.stubGlobal("window", Object.assign(new EventTarget(), { sessionStorage: storage, localStorage: storage }));
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
   setAnalyticsChoice("accepted");
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
@@ -20,6 +21,7 @@ describe("optional product analytics", () => {
     await expect(recordProductEvent({ rpc } as unknown as SupabaseClient, "search")).resolves.toBe(false);
     expect(window.sessionStorage.getItem("mata-analytics-session")).toBeNull();
     expect(rpc).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("expires old consent and fails closed on malformed or future choices", () => {
@@ -32,9 +34,10 @@ describe("optional product analytics", () => {
   it("withdraws consent, clears identifiers and aborts in-flight telemetry", async () => {
     let started!: () => void;
     const ready = new Promise<void>(resolve => { started = resolve; });
-    const rpc = vi.fn(() => ({ abortSignal: (signal: AbortSignal) => new Promise((_, reject) => {
-      signal.addEventListener("abort", () => reject(new Error("Withdrawn")), { once: true }); started();
-    }) }));
+    const rpc = vi.fn();
+    vi.mocked(fetch).mockImplementation((_url, options) => new Promise((_, reject) => {
+      options?.signal?.addEventListener("abort", () => reject(new Error("Withdrawn")), { once: true }); started();
+    }));
     const pending = recordProductEvent({ rpc } as unknown as SupabaseClient, "search");
     await ready;
     setAnalyticsChoice("rejected");
@@ -43,8 +46,10 @@ describe("optional product analytics", () => {
     expect(window.sessionStorage.getItem("mata-analytics-session")).toBeNull();
     expect(window.sessionStorage.getItem("mata-feed-session")).toBeNull();
     rpc.mockClear();
+    vi.mocked(fetch).mockClear();
     await recordProductEvent({ rpc } as unknown as SupabaseClient, "search");
     expect(rpc).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("disables measurement for this page if the choice cannot be saved", () => {
@@ -58,10 +63,12 @@ describe("optional product analytics", () => {
     const rpc = vi.fn();
     await expect(recordProductEvent({ rpc } as unknown as SupabaseClient, "booking_started")).resolves.toBe(false);
     expect(rpc).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("does not propagate a failed analytics request to the user action", async () => {
-    const rpc = vi.fn(() => { throw new Error("Analytics unavailable"); });
+    const rpc = vi.fn();
+    vi.mocked(fetch).mockRejectedValue(new Error("Analytics unavailable"));
     await expect(recordProductEvent({ rpc } as unknown as SupabaseClient, "booking_started")).resolves.toBe(false);
   });
 
@@ -72,15 +79,15 @@ describe("optional product analytics", () => {
   });
 
   it("sends a reusable hashed session and only scalar product properties", async () => {
-    const abortSignal = vi.fn().mockResolvedValue({ data: null, error: null });
-    const rpc = vi.fn(() => ({ abortSignal }));
-    const client = { rpc } as unknown as SupabaseClient;
+    const client = { rpc: vi.fn() } as unknown as SupabaseClient;
     await expect(recordProductEvent(client, "search", { count: 2, nested: { ignored: true } })).resolves.toBe(true);
-    const first = rpc.mock.calls[0] as unknown as [string, { target_session_hash: string; target_properties: Record<string, unknown> }];
-    expect(first[1].target_session_hash).toMatch(/^[a-f0-9]{64}$/);
-    expect(first[1].target_properties).toEqual({ count: 2 });
+    expect(fetch).toHaveBeenCalledWith("/api/analytics/product-event", expect.objectContaining({ credentials: "same-origin", method: "POST" }));
+    const first = JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string) as { target_session_hash: string; target_properties: Record<string, unknown> };
+    expect(first.target_session_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(first.target_properties).toEqual({ count: 2 });
     await recordProductEvent(client, "search");
-    expect((rpc.mock.calls[1] as unknown as [string, { target_session_hash: string }])[1].target_session_hash).toBe(first[1].target_session_hash);
+    const second = JSON.parse(vi.mocked(fetch).mock.calls[1][1]?.body as string) as { target_session_hash: string };
+    expect(second.target_session_hash).toBe(first.target_session_hash);
   });
 
   it("does not start a request after its page has exited", async () => {
@@ -89,6 +96,7 @@ describe("optional product analytics", () => {
     controller.abort();
     await expect(recordSessionMetric({ rpc } as unknown as SupabaseClient, "record_video_view", {}, "test", controller.signal)).resolves.toEqual({ ok: false, data: null });
     expect(rpc).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("cancels in-flight telemetry when the page exits", async () => {
