@@ -18,7 +18,7 @@ import { feedPrice, publicProfessionalName } from "@/lib/domain/feed-presentatio
 import { applicationText } from "@/lib/domain/application-copy";
 import { applicationLocale } from "@/lib/domain/booking-copy";
 import { createVideoRefreshQueue, reloadVideoSource, playFeedVideo, feedVideoPreload } from "@/lib/domain/video-recovery";
-import { fetchPublicPostVideoResult, postUsesVideoMedia } from "@/lib/domain/public-post-video-media";
+import { deferPrivateVideoUntilActive, fetchPublicPostVideoResult, postUsesVideoMedia } from "@/lib/domain/public-post-video-media";
 import "./inspiration-search.css";
 
 type FeedPost = {
@@ -78,10 +78,11 @@ async function usableSignedUrl(bucketId: string, storagePath: string) {
   return data.signedUrl;
 }
 
-async function resolvePrivateMedia(row: SocialFeedRow): Promise<SocialFeedRow | null> {
+async function resolvePrivateMedia(row: SocialFeedRow, deferPrivateVideo = false): Promise<SocialFeedRow | null> {
   const privateItems = (row.media_items ?? []).filter((item) => ["provider-social-media", "social-videos", "social-thumbnails"].includes(item.bucket_id));
   const privateVideo = postUsesVideoMedia(row.post_type, privateItems.map((item) => item.media_type));
   if (privateVideo) {
+    if (deferPrivateVideo) return deferPrivateVideoUntilActive(row);
     const result = await fetchPublicPostVideoResult(row.id);
     if (result.status === "not_found") return null;
     const media = result.status === "ready" ? result.media : null;
@@ -313,7 +314,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE).abortSignal(signal);
     if (signal.aborted || generation !== loadGeneration.current) return;
     if (error) { setState("error"); return; }
-    const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
+    const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row, true)));
     if (signal.aborted || generation !== loadGeneration.current) return;
     const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
     if (authenticated) {
@@ -366,7 +367,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       const { data, error } = await query.abortSignal(signal);
       if (signal.aborted || generation !== loadGeneration.current) return;
       if (error) { setFeedback("La suite des inspirations n’a pas pu être chargée. Actualisez pour réessayer."); return; }
-      const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row)));
+      const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row, true)));
       if (signal.aborted || generation !== loadGeneration.current) return;
       const mapped = resolved.filter((row): row is SocialFeedRow => Boolean(row)).map(mapFeedPost);
       setPosts(current => [...current, ...discoverFeed(mapped.filter(item => !current.some(existing => existing.id === item.id)).map(post => ({ ...post, specialtyAffinity: videoInterestAffinity(`${post.serviceTitle ?? ""} ${post.caption} ${post.hashtags.join(" ")}`, interests.current) })))]);
@@ -538,9 +539,8 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
 
   useEffect(() => {
     const post = visiblePosts[activeIndex];
-    if (!post || post.postType !== "video" || post.videoUrl || videoErrors.has(post.id) || autoRenewedVideos.current.has(post.id)) return;
+    if (!post || post.postType !== "video" || post.videoUrl || videoErrors.has(post.id)) return;
     // A missing signed URL is a recoverable preparation state, not a playback failure.
-    autoRenewedVideos.current.add(post.id);
     void retryVideo(post);
   }, [activeIndex, posts, retryVideo, videoErrors, visiblePosts]);
 

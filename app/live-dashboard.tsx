@@ -510,9 +510,10 @@ export function LiveDashboard({
     if (invalid) { setFeedback(invalid); return; }
     servicePending.current = true; setSavingService(true); setFeedback("");
     try {
-      const { error } = await supabase.from("provider_services").insert({ provider_id: userId, service_id: details.serviceId, title: details.title, duration_minutes: details.durationMinutes, price_amount: details.priceAmount, currency: providerProfile.currency });
+      const { data, error } = await supabase.from("provider_services").insert({ provider_id: userId, service_id: details.serviceId, title: details.title, duration_minutes: details.durationMinutes, price_amount: details.priceAmount, currency: providerProfile.currency }).select("id,business_id,service_id,title,description,price_amount,duration_minutes,currency,deposit_percentage,is_active,archived_at,updated_at").single();
       if (error) throw error;
-      form.reset(); setFeedback("Prestation ajoutée."); await load();
+      setOwnServices((current) => [...current, data as EditableService].sort((left, right) => left.title.localeCompare(right.title)));
+      form.reset(); setFeedback("Prestation ajoutée et confirmée dans votre catalogue."); await load();
     } catch (error) { setFeedback(publicErrorMessage(error, "La prestation n’a pas été créée. Vos champs sont conservés ; vérifiez les réglages et réessayez.")); }
     finally { servicePending.current = false; setSavingService(false); }
   }
@@ -611,7 +612,7 @@ export function LiveDashboard({
               <label>Nom de votre prestation<input name="title" required minLength={2} maxLength={120} placeholder="Ex. : Tresses personnalisées" /></label>
               <ServiceDurationInput name="durationMinutes" />
               <label>Prix ({providerProfile?.currency ?? "devise à définir"})<input name="priceAmount" type="number" required min={0} step={1} disabled={!activityLocationReady(providerProfile)} /></label>
-              <button className="primary-button" type="submit" disabled={!activityLocationReady(providerProfile) || savingService}>{savingService ? "Enregistrement…" : "Ajouter la prestation"}</button>{!activityLocationReady(providerProfile) && <p className="wide" role="status">Pour activer le prix et valider, enregistrez les réglages de votre activité juste au-dessus. Le nom et la durée restent dans ce formulaire.</p>}
+              <button className="primary-button" type="submit" disabled={!activityLocationReady(providerProfile) || !baseServices.length || savingService}>{savingService ? "Enregistrement…" : "Ajouter la prestation"}</button>{!activityLocationReady(providerProfile) && <p className="wide" role="status">Avant l’enregistrement, choisissez et enregistrez le pays, le fuseau horaire et la devise dans « Pays, horaires et devise de votre activité », juste au-dessus.</p>}{baseServices.length === 0 && <p className="wide" role="alert">Le catalogue des catégories est indisponible. Actualisez la page ; si le problème persiste, l’administrateur doit rétablir le catalogue avant la création de prestations.</p>}
             </form></>}
           </article>}
           </>

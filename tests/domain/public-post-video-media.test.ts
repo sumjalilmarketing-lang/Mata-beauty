@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchPublicPostVideoMedia, fetchPublicPostVideoResult, postUsesVideoMedia } from "@/lib/domain/public-post-video-media";
+import { deferPrivateVideoUntilActive, fetchPublicPostVideoMedia, fetchPublicPostVideoResult, postUsesVideoMedia } from "@/lib/domain/public-post-video-media";
 
 const postId = "d0dde438-b0c5-463a-bcd7-99e606dca7ef";
 
@@ -9,6 +9,18 @@ describe("fetchPublicPostVideoMedia", () => {
     expect(postUsesVideoMedia("before_after", ["before", "after"])).toBe(false);
     expect(postUsesVideoMedia("video", ["video"])).toBe(true);
     expect(postUsesVideoMedia(undefined, [])).toBe(true);
+  });
+
+  it("defers signed private video URLs until the video becomes active", () => {
+    const row = { post_type: "video", video_url: "https://private.example/video", thumbnail_url: "https://private.example/poster", media_urls: ["https://private.example/video"], media_items: [{ bucket_id: "social-videos", media_type: "video" }] };
+    expect(deferPrivateVideoUntilActive(row)).toMatchObject({ video_url: "", thumbnail_url: null, media_urls: [] });
+  });
+
+  it("defers unclassified videos and keeps photo media unchanged", () => {
+    const unclassifiedVideo = { video_url: "https://private.example/video", thumbnail_url: null, media_items: [] };
+    const photoRow = { post_type: "photo", video_url: "https://private.example/photo", thumbnail_url: null, media_items: [{ bucket_id: "provider-social-media", media_type: "photo" }] };
+    expect(deferPrivateVideoUntilActive(unclassifiedVideo)).toMatchObject({ video_url: "", thumbnail_url: null, media_urls: [] });
+    expect(deferPrivateVideoUntilActive(photoRow)).toBe(photoRow);
   });
 
   it("distinguishes a withdrawn publication from a recoverable outage", async () => {
