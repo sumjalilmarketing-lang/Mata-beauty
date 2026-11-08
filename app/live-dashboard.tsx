@@ -1,21 +1,15 @@
 "use client";
-import { ServiceDurationInput } from "./service-duration-input";
-import { TariffPhotoImport } from "./tariff-photo-import";
-import { ServiceReferenceField } from "./service-reference-field";
-import { serviceReference } from "@/lib/domain/service-reference";
 import { PhoneInput } from "./phone-input";
 import { BookingReschedule } from "./booking-reschedule";
 import { BookingFeedback } from "./booking-feedback";
 
 import Link from "next/link";
-import { ServiceEditor, type EditableService } from "./service-editor";
 import { ActivityLocationSettings } from "./activity-location-settings";
-import { activityLocationReady, serviceDetailsError } from "@/lib/domain/service-creation";
 import Image from "next/image";
-import { formatServiceMoney } from "@/lib/domain/service-money";
 import { bookingTimeZone } from "@/lib/domain/booking-time-zone";
+import { formatServiceMoney } from "@/lib/domain/service-money";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { canTransitionBooking, type BookingStatus } from "@/lib/domain/booking";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
@@ -96,11 +90,6 @@ type PendingProviderRow = {
   status: ProviderStatus;
   created_at: string;
 };
-type BaseServiceRow = {
-  id: string;
-  name: string;
-};
-
 const providerStatusLabels: Record<ProviderStatus, string> = {
   draft: "Brouillon",
   pending_review: "En cours de validation",
@@ -136,14 +125,10 @@ export function LiveDashboard({
   const [businessTimeZones, setBusinessTimeZones] = useState<Record<string, string | null>>({});
   const [clientProfile, setClientProfile] = useState<ClientAccountRow | null>(null);
   const [pendingProviders, setPendingProviders] = useState<PendingProviderRow[]>([]);
-  const [ownServices, setOwnServices] = useState<EditableService[]>([]);
-  const [baseServices, setBaseServices] = useState<BaseServiceRow[]>([]);
   const [adminMetrics, setAdminMetrics] = useState({ users: 0, providersPending: 0, reportsOpen: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [savingService, setSavingService] = useState(false);
-  const servicePending = useRef(false);
   const [messageBooking, setMessageBooking] = useState<{ id: string; serviceTitle: string } | null>(null);
   const [pendingCancellation, setPendingCancellation] = useState<ClientBookingItem | null>(null);
 
@@ -317,24 +302,18 @@ export function LiveDashboard({
 
         if (role === "provider") {
           const businessIds = [...new Set(mappedBookings.map((booking) => booking.provider_services?.business_id).filter((id): id is string => Boolean(id)))];
-          const [profileResult, serviceResult, ownResult, businessResult] = await Promise.all([
+          const [profileResult, businessResult] = await Promise.all([
             supabase
               .from("provider_profiles")
               .select("profile_id,business_name,bio,city,country_code,region,timezone,currency,service_mode,status,activity_type,years_experience,base_address,languages,cancellation_policy,onboarding_progress")
               .eq("profile_id", userId)
               .maybeSingle(),
-            supabase.from("services").select("id,name").eq("is_active", true).order("name"),
-            supabase.from("provider_services").select("id,business_id,service_id,title,description,price_amount,duration_minutes,currency,deposit_percentage,is_active,archived_at,updated_at").eq("provider_id", userId).is("archived_at", null).order("title"),
             businessIds.length ? supabase.from("businesses").select("id,timezone").in("id", businessIds) : Promise.resolve({ data: [], error: null }),
           ]);
           if (profileResult.error) throw profileResult.error;
-          if (serviceResult.error) throw serviceResult.error;
           if (businessResult.error) throw businessResult.error;
           setBusinessTimeZones(Object.fromEntries((businessResult.data ?? []).map((business: { id: string; timezone: string | null }) => [business.id, business.timezone])));
           setProviderProfile(profileResult.data as ProviderProfileRow | null);
-          setBaseServices((serviceResult.data ?? []) as BaseServiceRow[]);
-          if (ownResult.error) throw ownResult.error;
-          setOwnServices(ownResult.data ?? []);
         }
       }
       const { data: notificationData, error: notificationError } = await supabase
@@ -497,27 +476,6 @@ export function LiveDashboard({
     }
   }
 
-  async function addProviderService(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (servicePending.current) return;
-    if (!activityLocationReady(providerProfile)) { setFeedback("Enregistrez le pays, le fuseau horaire et la devise dans le bloc juste au-dessus du formulaire."); return; }
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !providerProfile?.currency) return;
-    const form = event.currentTarget;
-    const values = new FormData(form);
-    const details = { serviceId: serviceReference(values.get("serviceId"), baseServices), title: String(values.get("title") ?? "").trim(), durationMinutes: Number(values.get("durationMinutes")), priceAmount: Number(values.get("priceAmount")) };
-    const invalid = serviceDetailsError(details);
-    if (invalid) { setFeedback(invalid); return; }
-    servicePending.current = true; setSavingService(true); setFeedback("");
-    try {
-      const { data, error } = await supabase.from("provider_services").insert({ provider_id: userId, service_id: details.serviceId, title: details.title, duration_minutes: details.durationMinutes, price_amount: details.priceAmount, currency: providerProfile.currency }).select("id,business_id,service_id,title,description,price_amount,duration_minutes,currency,deposit_percentage,is_active,archived_at,updated_at").single();
-      if (error) throw error;
-      setOwnServices((current) => [...current, data as EditableService].sort((left, right) => left.title.localeCompare(right.title)));
-      form.reset(); setFeedback("Prestation ajoutée et confirmée dans votre catalogue."); await load();
-    } catch (error) { setFeedback(publicErrorMessage(error, "La prestation n’a pas été créée. Vos champs sont conservés ; vérifiez les réglages et réessayez.")); }
-    finally { servicePending.current = false; setSavingService(false); }
-  }
-
   async function moderateProvider(profileId: string, decision: "approved" | "rejected") {
     const action = decision === "approved" ? "approuver" : "refuser";
     if (!window.confirm(`Confirmer : ${action} ce profil prestataire ?`)) return;
@@ -588,9 +546,9 @@ export function LiveDashboard({
           {!moduleKey && <ReferralCard type="provider" />}
           {!moduleKey && <VideoPublisher userId={userId} providerApproved={providerProfile.status === "approved"} onPublished={load} />}
           {show("statistics") && <SocialDashboard role="provider" userId={userId} />}
-          {show("public-profile", "services") && <article className="panel onboarding-panel">
+          {show("public-profile") && <article className="panel onboarding-panel">
             {show("public-profile") && <><div className="panel-heading">
-              <div><h2>Profil professionnel</h2>{providerProfile.status === "pending_review" && <p>Votre demande est en cours de validation. Vous pouvez préparer vos prestations, vos disponibilités et vos brouillons.</p>}<Link href="/salon/profile">Informations de mon salon</Link><p className={`provider-state ${providerProfile.status}`}>{providerStatusLabels[providerProfile.status]}</p><label>Progression {providerProfile.onboarding_progress} %<progress value={providerProfile.onboarding_progress} max="100" /></label></div>
+              <div><h2>Profil professionnel</h2>{providerProfile.status === "pending_review" && <p>Votre demande est en cours de validation. Vous pouvez compléter votre profil et préparer vos brouillons.</p>}<Link href="/salon/profile">Informations de mon salon</Link><p className={`provider-state ${providerProfile.status}`}>{providerStatusLabels[providerProfile.status]}</p><label>Progression {providerProfile.onboarding_progress} %<progress value={providerProfile.onboarding_progress} max="100" /></label></div>
               {["draft", "rejected"].includes(providerProfile.status) && <button className="outline-button" disabled={providerProfile.onboarding_progress < 100} onClick={() => void submitProviderForReview()}>Envoyer pour validation</button>}
             </div>
             <form className="dashboard-form" onSubmit={(event) => void saveProviderProfile(event)}>
@@ -605,15 +563,9 @@ export function LiveDashboard({
               <label className="wide">Politique d’annulation (20 caractères minimum)<textarea name="cancellationPolicy" rows={3} defaultValue={providerProfile.cancellation_policy ?? ""} /></label>
               <button className="primary-button" type="submit">Enregistrer le profil</button>
             </form>
+            <p className="workspace-panel-note">La gestion du catalogue, des tarifs, des durées et des disponibilités se fait dans l’espace Salon.</p><Link className="primary-button" href="/salon/services">Gérer les prestations dans l’espace Salon</Link>
+            <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />
             <ProviderLogoEditor userId={userId} /><ProfessionalDocuments providerId={userId} /></>}
-            {show("services") && <><h2>Mes prestations</h2>{!loading && !ownServices.length && <p>Créez votre première prestation.</p>}{ownServices.map((service) => <ServiceEditor key={service.id} service={service} catalog={baseServices} userId={userId} businessId={service.business_id ?? undefined} activityCurrency={service.business_id ? null : providerProfile?.currency ?? null} onSaved={value => setOwnServices(current => current.map(item => item.id === value.id ? value : item))} onRemoved={id => { setOwnServices(current => current.filter(item => item.id !== id)); setFeedback("Prestation supprimée du catalogue. Les réservations existantes sont conservées."); }} />)}<Link href="/pro/videos">Retour au Studio</Link>{providerProfile && <ActivityLocationSettings value={providerProfile} onSaved={value => setProviderProfile(current => current ? { ...current, ...value } : current)} />}<TariffPhotoImport userId={userId} currency={providerProfile && activityLocationReady(providerProfile) ? providerProfile.currency : null} catalog={baseServices} onSaved={load}/><form className="dashboard-form service-form" onSubmit={(event) => void addProviderService(event)}>
-              <h3 className="wide">Ajouter une prestation</h3>
-              <ServiceReferenceField catalog={baseServices}/>
-              <label>Nom de votre prestation<input name="title" required minLength={2} maxLength={120} placeholder="Ex. : Tresses personnalisées" /></label>
-              <ServiceDurationInput name="durationMinutes" />
-              <label>Prix ({providerProfile?.currency ?? "devise à définir"})<input name="priceAmount" type="number" required min={0} step={1} disabled={!activityLocationReady(providerProfile)} /></label>
-              <button className="primary-button" type="submit" disabled={!activityLocationReady(providerProfile) || !baseServices.length || savingService}>{savingService ? "Enregistrement…" : "Ajouter la prestation"}</button>{!activityLocationReady(providerProfile) && <p className="wide" role="status">Avant l’enregistrement, choisissez et enregistrez le pays, le fuseau horaire et la devise dans « Pays, horaires et devise de votre activité », juste au-dessus.</p>}{baseServices.length === 0 && <p className="wide" role="alert">Le catalogue des catégories est indisponible. Actualisez la page ; si le problème persiste, l’administrateur doit rétablir le catalogue avant la création de prestations.</p>}
-            </form></>}
           </article>}
           </>
         )}

@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 const all = process.argv.includes('--all');
 const git = args => execFileSync('git', args, { maxBuffer: 32 * 1024 * 1024 });
 const paths = git(all ? ['ls-files', '-z'] : ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']).toString().split('\0').filter(Boolean);
 const issues = [];
 for (const path of paths) {
+  if (all && !existsSync(path)) continue;
   if (/(^|\/)\.env(?:\.|$)/.test(path) && !/\.(example|sample|template)$/.test(path)) {
     issues.push(`${path}: private environment file`); continue;
   }

@@ -3,13 +3,14 @@
 import { isVideoFile, STUDIO_MEDIA_ACCEPT } from "@/lib/domain/video-formats";
 
 import Image from "next/image";
+import Link from "next/link";
 import { mediaSelectionError } from "@/lib/domain/media-composer";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { SocialDashboard } from "./social-dashboard";
 import { VideoPublisher } from "./video-publisher";
 import { statusLabel } from "@/lib/ui/status-label";
-import { studioServiceCanPublish, studioServiceIsPublic, type StudioBookingService } from "@/lib/domain/studio-booking";
+import { studioServiceIsPublic, type StudioBookingService } from "@/lib/domain/studio-booking";
 
 type StudioTab = "create" | "videos" | "photos" | "before_after" | "drafts" | "scheduled" | "statistics";
 type CreatorPost = {
@@ -24,7 +25,7 @@ const tabs: Array<{ key: StudioTab; label: string }> = [
   { key: "scheduled", label: "Publications programmées" }, { key: "statistics", label: "Statistiques" },
 ];
 
-export function CreatorStudio({ userId, providerApproved, initialTab = "create", salon = false }: { salon?: boolean; userId: string; providerApproved: boolean; initialTab?: StudioTab }) {
+export function CreatorStudio({ userId, providerApproved, initialTab = "create" }: { userId: string; providerApproved: boolean; initialTab?: StudioTab }) {
   const [active, setActive] = useState<StudioTab>(initialTab);
   const [createType, setCreateType] = useState<"video" | "photo" | "before_after">("video");
   const picker = useRef<HTMLInputElement>(null);
@@ -34,8 +35,6 @@ export function CreatorStudio({ userId, providerApproved, initialTab = "create",
   const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [feedback, setFeedback] = useState("");
   const [firstPublicationFeedback, setFirstPublicationFeedback] = useState(false);
-  const [publishingService, setPublishingService] = useState<string | null>(null);
-  const servicePending = useRef(false);
 
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
@@ -54,23 +53,6 @@ export function CreatorStudio({ userId, providerApproved, initialTab = "create",
   }, [userId]);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
-
-  async function publishLinkedService(service: StudioBookingService) {
-    if (servicePending.current || !providerApproved || !studioServiceCanPublish(service)) return;
-    const client = getSupabaseBrowserClient();
-    if (!client) return;
-    servicePending.current = true; setPublishingService(service.id); setFeedback("");
-    try {
-      const result = await client.rpc("set_owned_service_status", { target_service_id: service.id, next_status: "published" }).abortSignal(AbortSignal.timeout(15000));
-      if (result.error) throw result.error;
-      const check = await client.from("provider_services").select("id,status,is_active,archived_at").eq("id", service.id).abortSignal(AbortSignal.timeout(15000)).single();
-      if (check.error || !studioServiceIsPublic(check.data)) throw new Error("Publication non confirmée");
-      window.dispatchEvent(new Event("mata:feed:invalidate"));
-      await load();
-      setFeedback("Prestation publiée. La réservation utilise vos horaires et disponibilités configurés.");
-    } catch { setFeedback("Publication de la prestation non confirmée. Actualisez le Studio pour vérifier son statut avant de réessayer."); }
-    finally { servicePending.current = false; setPublishingService(null); }
-  }
 
   async function manage(postId: string, action: "hide" | "archive" | "delete" | "republish") {
     if (action === "delete" && !window.confirm("Supprimer cette publication ? Cette action la retire du Studio et du feed.")) return;
@@ -104,9 +86,7 @@ export function CreatorStudio({ userId, providerApproved, initialTab = "create",
     const relation = post.post_services?.find(link => link.is_primary)?.provider_services;
     const service = Array.isArray(relation) ? relation[0] : relation;
     if (!service || studioServiceIsPublic(service)) return null;
-    return <div><p>La vidéo est visible. La prestation associée n’est pas réservable publiquement.</p>{providerApproved && studioServiceCanPublish(service)
-      ? <button type="button" disabled={publishingService !== null} onClick={() => void publishLinkedService(service)}>{publishingService === service.id ? "Publication…" : "Publier la prestation pour permettre la réservation"}</button>
-      : <a href={salon ? "/salon/services" : "/pro/services"}>Vérifier la prestation et les disponibilités</a>}</div>;
+    return <div><p>La vidéo est visible. La prestation associée n’est pas réservable publiquement.</p><Link href="/salon/services">Vérifier et publier la prestation dans l’espace Salon</Link></div>;
   }
 
   return <section className="creator-studio">
@@ -115,7 +95,7 @@ export function CreatorStudio({ userId, providerApproved, initialTab = "create",
     <nav className="studio-tabs" aria-label="Navigation Studio">{tabs.map((tab) => <button className={active === tab.key ? "active" : ""} key={tab.key} onClick={() => setActive(tab.key)}>{tab.label}</button>)}</nav>
     {feedback && <p className="dashboard-feedback" role="status">{feedback}</p>}
     {firstPublicationFeedback && <aside className="panel studio-feedback"><strong>Le Studio était-il facile à utiliser ?</strong><div><button onClick={() => void answerStudioFeedback("yes")}>👍 Oui</button><button onClick={() => void answerStudioFeedback("no")}>👎 Non</button></div></aside>}
-    {active === "create" && <VideoPublisher salon={salon} key={selectionVersion} initialFiles={initialFiles} userId={userId} providerApproved={providerApproved} initialContentType={createType} onPublished={async (postType) => {
+    {active === "create" && <VideoPublisher key={selectionVersion} initialFiles={initialFiles} userId={userId} providerApproved={providerApproved} initialContentType={createType} onPublished={async (postType) => {
       await load();
       setInitialFiles([]);
       setCreateType("video");

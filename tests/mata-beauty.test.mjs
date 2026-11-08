@@ -67,7 +67,9 @@ test("provider moderation and the PWA shell remain protected", async () => {
   assert.match(notifications, /insert into public\.notifications/);
   assert.match(manifest, /display: "standalone"/);
   assert.match(worker, /\/offline/);
-  assert.doesNotMatch(worker, /supabase|auth|api/);
+  assert.match(worker, /url\.origin !== self\.location\.origin/);
+  assert.match(worker, /fetch\(event\.request, \{ cache: "no-store" \}\)/);
+  assert.doesNotMatch(worker, /fetch\([^)]*https:\/\//);
 });
 
 test("the commercial launch layer is measurable, curated, RLS-protected, and honest", async () => {
@@ -149,8 +151,9 @@ test("the admin login keeps readable colors on its white surface", async () => {
 });
 
 test("the Super Admin control center is protected by RBAC and audited RPCs", async () => {
-  const [migration, adminPage, adminApp] = await Promise.all([
+  const [migration, bookingEnforcement, adminPage, adminApp] = await Promise.all([
     readFile(new URL("supabase/migrations/20260725233000_super_admin_control_center.sql", root), "utf8"),
+    readFile(new URL("supabase/migrations/20261104230907_enforce_configured_booking_notice.sql", root), "utf8"),
     readFile(new URL("app/admin/page.tsx", root), "utf8"),
     readFile(new URL("app/super-admin.tsx", root), "utf8"),
   ]);
@@ -176,10 +179,12 @@ test("the Super Admin control center is protected by RBAC and audited RPCs", asy
   }
   assert.match(adminApp, /admin_update_setting/);
   assert.match(adminApp, /settings\.update/);
-  assert.match(adminApp, /id="booking-minimum-notice"[^>]*disabled readOnly/);
+  assert.match(adminApp, /id="booking-minimum-notice"[^>]*disabled=\{!canUpdate\}/);
   assert.match(adminApp, /id="booking-cancellation-window"[^>]*disabled readOnly/);
-  assert.match(adminApp, /Lecture seule : ces valeurs ne sont pas encore appliquées par les contrôles serveur de réservation/);
-  assert.doesNotMatch(adminApp, /onClick=\{\(\) => setSettingToSave\("booking"\)\}/);
+  assert.match(bookingEnforcement, /function booking_private\.minimum_booking_notice/);
+  assert.match(bookingEnforcement, /create trigger bookings_enforce_minimum_notice/);
+  assert.match(bookingEnforcement, /slot_start>=now\(\)\+make_interval\(mins=>booking_private\.minimum_booking_notice\(\)\)/);
+  assert.match(adminApp, /onClick=\{\(\) => setSettingToSave\("booking"\)\}/);
 });
 
 test("the social video layer is server-counted, attributable, storage-isolated, and protected by RLS", async () => {
@@ -403,7 +408,8 @@ test("private workspaces expose only functional controls and safe errors", async
     readFile(new URL("app/super-admin.tsx", root), "utf8"),
     readFile(new URL("lib/ui/public-error.ts", root), "utf8"),
   ]);
-  assert.match(shell, /role="search" onSubmit=\{search\}/);
+  assert.match(shell, /className="workspace-space-picker"/);
+  assert.match(shell, /workspaceHref\(space, item\.key\)/);
   assert.match(shell, /workspaceHref\(space, notificationsModule\.key\)/);
   assert.doesNotMatch(moduleView, /Fonction non connectée/);
   assert.match(moduleView, /Données momentanément indisponibles/);
@@ -422,7 +428,7 @@ test("private workspaces expose only functional controls and safe errors", async
 });
 
 test("salon workspace is connected, archived safely and protected by RLS", async () => {
-  const [center, route, migration, collaboratorMigration, team, teamApi, paymentUi] = await Promise.all([
+  const [center, route, migration, collaboratorMigration, team, teamApi, paymentUi, imageServer] = await Promise.all([
     readFile(new URL("app/salon-control-center.tsx", root), "utf8"),
     readFile(new URL("app/workspace-route.tsx", root), "utf8"),
     readFile(new URL("supabase/migrations/20260815210000_salon_production_workflows.sql", root), "utf8"),
@@ -430,6 +436,7 @@ test("salon workspace is connected, archived safely and protected by RLS", async
     readFile(new URL("app/team-management.tsx", root), "utf8"),
     readFile(new URL("app/api/salon/team/route.ts", root), "utf8"),
     readFile(new URL("app/mata-beauty-app.tsx", root), "utf8"),
+    readFile(new URL("lib/media/image-upload-server.ts", root), "utf8"),
   ]);
   for (const table of ["businesses", "business_hours", "business_closures", "business_media", "provider_services", "bookings"]) assert.match(center, new RegExp(`from\\(\\"${table}\\"\\)`));
   assert.match(center, /collaboratorAccessEnabled \? "collaborators_public" : "collaborators"/);
@@ -438,7 +445,9 @@ test("salon workspace is connected, archived safely and protected by RLS", async
   assert.match(collaboratorMigration, /create policy "messages participant or authorized salon staff insert"/);
   assert.match(collaboratorMigration, /interval '48 hours'/);
   assert.match(center, /archive_owned_business/);
-  assert.match(center, /12 \* 1024 \* 1024/);
+  assert.match(center, /uploadProfileImage\(file, mediaType/);
+  assert.match(imageServer, /readLogoUpload\(request\)/);
+  assert.match(imageServer, /Image invalide ou trop volumineuse \(4 Mo maximum\)/);
   assert.match(center, /image\/jpeg/);
   assert.match(route, /salonWorkflows/);
   assert.match(migration, /alter table public\.business_media enable row level security/);
@@ -461,7 +470,7 @@ test("professional and salon workspace keeps production integrations explicit an
   assert.match(center, /200 rendez-vous les plus récents/);
   assert.match(center, /navigator\.geolocation\.getCurrentPosition/);
   assert.match(center, /Les deux doivent être renseignées ensemble/);
-  assert.match(application, /avatars"\)\.upload/);
+  assert.match(application, /uploadProfileImage\(file, "avatar"\)/);
   assert.match(application, /L’accès professionnel sera activé après approbation/);
   assert.match(shell, /workspace-\$\{space\}/);
 });
@@ -617,8 +626,13 @@ test("provider approval accepts trusted server and authorized admin paths", asyn
 });
 
 test("content security policy permits local blob previews in Studio", async () => {
-  const config = await readFile(new URL("next.config.ts", root), "utf8");
-  assert.match(config, /img-src 'self' data: blob: https:/);
-  assert.match(config, /media-src 'self' blob: https:\/\/\*\.supabase\.co/);
+  const [config, policyModule] = await Promise.all([
+    readFile(new URL("next.config.ts", root), "utf8"),
+    import("../lib/security/content-security-policy.ts"),
+  ]);
+  assert.match(config, /contentSecurityPolicy\(process\.env\)/);
+  const policy = policyModule.contentSecurityPolicy({ NODE_ENV: "production", NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co" });
+  assert.match(policy, /img-src 'self' data: blob: https:/);
+  assert.match(policy, /media-src 'self' blob: https:\/\/\*\.supabase\.co/);
 });
 

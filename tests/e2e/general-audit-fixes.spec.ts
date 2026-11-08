@@ -150,21 +150,18 @@ test('feed profile share, likes and comments work without a booking catalogue en
   await expect(page).toHaveURL(/\/professional\/coiffeuse-publique$/);
 });
 
-test('Studio publishes a linked draft service only after the owner requests it', async ({ page, context }) => {
+test('Studio directs linked draft service publishing to the Salon workspace', async ({ page, context }) => {
   await qaLogin(context, 'provider');
-  let published = false;
-  let calls = 0;
-  const service = () => ({ id: auditService, title: 'Prestation du Studio', duration_minutes: 60, price_amount: 10000, currency: 'XOF', services: null, status: published ? 'published' : 'draft', is_active: published, archived_at: null });
-  await page.route(`${api}/rest/v1/posts**`, route => route.fulfill({ json: [{ id: '10000000-0000-4000-8000-000000000097', post_type: 'video', title: 'Vidéo existante', caption: '', status: 'published', thumbnail_url: null, view_count: 0, like_count: 0, comment_count: 0, created_at: new Date().toISOString(), published_at: new Date().toISOString(), post_services: [{ is_primary: true, provider_services: service() }] }] }));
-  await page.route(`${api}/rest/v1/provider_services**`, route => route.fulfill({ json: new URL(route.request().url()).searchParams.has('id') ? service() : [service()] }));
-  await page.route(`${api}/rest/v1/rpc/set_owned_service_status`, route => { calls++; expect(route.request().postDataJSON()).toEqual({ target_service_id: auditService, next_status: 'published' }); published = true; return route.fulfill({ json: null }); });
+  let statusChanges = 0;
+  const service = { id: auditService, title: 'Prestation du Studio', duration_minutes: 60, price_amount: 10000, currency: 'XOF', services: null, status: 'draft', is_active: false, archived_at: null };
+  await page.route(`${api}/rest/v1/posts**`, route => route.fulfill({ json: [{ id: '10000000-0000-4000-8000-000000000097', post_type: 'video', title: 'Vidéo existante', caption: '', status: 'published', thumbnail_url: null, view_count: 0, like_count: 0, comment_count: 0, created_at: new Date().toISOString(), published_at: new Date().toISOString(), post_services: [{ is_primary: true, provider_services: service }] }] }));
+  await page.route(`${api}/rest/v1/provider_services**`, route => route.fulfill({ json: new URL(route.request().url()).searchParams.has('id') ? service : [service] }));
+  await page.route(`${api}/rest/v1/rpc/set_owned_service_status`, route => { statusChanges++; return route.fulfill({ json: null }); });
   await page.goto('/pro/videos');
   await page.getByRole('button', { name: 'Mes vidéos', exact: true }).click();
-  const action = page.getByRole('button', { name: 'Publier la prestation pour permettre la réservation', exact: true });
-  await expect(action).toBeVisible();
-  expect(calls).toBe(0);
-  await action.click();
-  await expect(page.getByRole('status').filter({ hasText: 'Prestation publiée.' })).toBeVisible();
-  await expect(action).toHaveCount(0);
-  expect(calls).toBe(1);
+  await expect(page.getByText('La vidéo est visible. La prestation associée n’est pas réservable publiquement.')).toBeVisible();
+  const salonLink = page.getByRole('link', { name: 'Vérifier et publier la prestation dans l’espace Salon', exact: true });
+  await expect(salonLink).toHaveAttribute('href', '/salon/services');
+  await expect(page.getByRole('button', { name: 'Publier la prestation pour permettre la réservation', exact: true })).toHaveCount(0);
+  expect(statusChanges).toBe(0);
 });

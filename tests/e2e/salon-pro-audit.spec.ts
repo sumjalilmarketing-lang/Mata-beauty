@@ -1,6 +1,6 @@
 import {expect,test,type BrowserContext} from '@playwright/test';
 import {syntheticSession} from './fixtures/department-workspaces.mjs';
-import {auditBusiness,auditService,auditBooking,auditMedia,auditCategory} from './fixtures/provider-audit.mjs';
+import {auditBusiness,auditService,auditBooking,auditMedia} from './fixtures/provider-audit.mjs';
 const api=process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
 async function login(context:BrowserContext,role='provider'){const session=syntheticSession(role);await context.addCookies([{name:'sb-127-auth-token',value:'base64-'+Buffer.from(JSON.stringify(session)).toString('base64url'),domain:'127.0.0.1',path:'/',httpOnly:false,sameSite:'Lax'}]);}
 
@@ -18,28 +18,16 @@ test('salon : réservation sous statut attendu et périmètre du salon',async({p
  saved=true;await page.getByRole('button',{name:'Confirmer',exact:true}).click();await expect(page.getByText('Réservation mise à jour.',{exact:true})).toBeVisible();
 });
 
-test('pro : crée une prestation avec une catégorie et confirme sa persistance',async({page,context})=>{
- await login(context);let payload:Record<string,unknown>|undefined;
- await page.route(`${api}/rest/v1/provider_services**`,route=>{
-  if(route.request().method()!=='POST')return route.fallback();
-  payload=route.request().postDataJSON() as Record<string,unknown>;
-  expect(payload.provider_id).toBe(syntheticSession('provider').user.id);
-  expect(payload.service_id).toBe(auditCategory);
-  expect(payload.currency).toBe('XOF');
-  return route.fulfill({json:{id:'aaaaaaaa-aaaa-4aaa-8aaa-000000000508',business_id:null,service_id:auditCategory,title:'Nouvelle prestation de recette',description:null,duration_minutes:60,price_amount:15000,currency:'XOF',deposit_percentage:0,is_active:true,archived_at:null,updated_at:'2026-11-08T12:00:00Z'}});
- });
+test('pro : les prestations sont gérées dans Salon et l’ancien lien y redirige',async({page,context})=>{
+ await login(context);
+ await page.goto('/pro/public-profile');
+ await expect(page.getByRole('navigation',{name:'Navigation Espace professionnel'}).getByRole('link',{name:/prestations/i})).toHaveCount(0);
+ await expect(page.getByRole('link',{name:'Gérer les prestations dans l’espace Salon'})).toHaveAttribute('href','/salon/services');
  await page.goto('/pro/services');
- const form=page.locator('form.service-form');
- await expect(form.getByRole('button',{name:'Ajouter la prestation',exact:true})).toBeEnabled();
- await expect(form.getByLabel('Catégorie de prestation')).toHaveAttribute('required','');
- await form.getByLabel('Catégorie de prestation').selectOption(auditCategory);
- await form.getByLabel('Nom de votre prestation').fill('Nouvelle prestation de recette');
- await form.getByLabel('Heures',{exact:true}).fill('1');
- await form.getByLabel('Minutes',{exact:true}).fill('0');
- await form.getByLabel('Prix (XOF)').fill('15000');
- await form.getByRole('button',{name:'Ajouter la prestation',exact:true}).click();
- await expect(page.getByText('Prestation ajoutée et confirmée dans votre catalogue.',{exact:true})).toBeVisible();
- expect(payload).toMatchObject({service_id:auditCategory,title:'Nouvelle prestation de recette',duration_minutes:60,price_amount:15000,currency:'XOF'});
+ await expect(page).toHaveURL(/\/salon\/services$/);
+ await expect(page.getByRole('heading',{name:'Prestations',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Ajouter la prestation',exact:true})).toBeVisible();
+ await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
 
 test('salon : modifier une prestation exige une ligne, puis conserve le taux d’acompte',async({page,context})=>{
@@ -47,6 +35,54 @@ test('salon : modifier une prestation exige une ligne, puis conserve le taux d�
  await page.route(`${api}/rest/v1/provider_services**`,route=>{if(route.request().method()!=='PATCH')return route.fallback();const params=new URL(route.request().url()).searchParams;expect(params.get('business_id')).toBe('eq.'+auditBusiness);expect(params.get('provider_id')).toBe('eq.'+syntheticSession('provider').user.id);const data=route.request().postDataJSON();expect(data.deposit_percentage).toBe(60);return route.fulfill({json:success?{id:auditService,business_id:auditBusiness,service_id:'aaaaaaaa-aaaa-4aaa-8aaa-000000000503',title:data.title,description:null,duration_minutes:60,price_amount:10000,currency:'XOF',deposit_percentage:60,is_active:true,archived_at:null,updated_at:'2026-11-03T13:00:00Z'}:null});});
  await page.goto('/salon/services');const editor=page.getByRole('region',{name:'Prestation Prestation de recette'});await editor.getByRole('button',{name:'Modifier',exact:true}).click();await editor.getByLabel('Acompte prévu (%)').fill('60');await editor.getByRole('button',{name:'Enregistrer les modifications',exact:true}).click();await expect(editor.getByText(/Cette prestation a changé/)).toBeVisible();
  success=true;await editor.getByRole('button',{name:'Enregistrer les modifications',exact:true}).click();await expect(editor.getByText(/Prestation modifiée/)).toBeVisible();await editor.getByRole('button',{name:'Modifier',exact:true}).click();await expect(editor.getByLabel('Acompte prévu (%)')).toHaveValue('60');
+});
+
+test('salon : retirer une prestation l’archive sans supprimer son historique de réservations',async({page,context})=>{
+ await login(context);let payload:Record<string,unknown>|undefined,bookingWrites=0,serviceDeletes=0;
+ await page.route(`${api}/rest/v1/provider_services**`,route=>{
+  if(route.request().method()==='DELETE'){serviceDeletes++;return route.fulfill({json:[]});}
+  if(route.request().method()!=='PATCH')return route.fallback();
+  const params=new URL(route.request().url()).searchParams;
+  expect(params.get('business_id')).toBe('eq.'+auditBusiness);
+  expect(params.get('provider_id')).toBe('eq.'+syntheticSession('provider').user.id);
+  payload=route.request().postDataJSON() as Record<string,unknown>;
+  return route.fulfill({json:{id:auditService}});
+ });
+ await page.route(`${api}/rest/v1/bookings**`,route=>{if(['PATCH','POST','DELETE'].includes(route.request().method()))bookingWrites++;return route.fallback();});
+ await page.goto('/salon/services');
+ const editor=page.getByRole('region',{name:'Prestation Prestation de recette'});
+ await editor.getByRole('button',{name:'Supprimer',exact:true}).click();
+ await editor.getByRole('button',{name:'Oui, supprimer la prestation',exact:true}).click();
+ await expect(page.getByText('Prestation supprimée du catalogue. Les réservations existantes sont conservées.',{exact:true})).toBeVisible();
+ await expect(editor).toHaveCount(0);
+ expect(payload).toMatchObject({is_active:false});
+ expect(typeof payload?.archived_at).toBe('string');
+ expect(serviceDeletes).toBe(0);
+ expect(bookingWrites).toBe(0);
+});
+
+test('salon : activer et désactiver une prestation utilise ses horaires publiés',async({page,context})=>{
+ await login(context);let active=true,version=0;
+ const service=()=>({id:auditService,business_id:auditBusiness,service_id:'aaaaaaaa-aaaa-4aaa-8aaa-000000000503',title:'Prestation de recette',description:null,duration_minutes:60,price_amount:10000,currency:'XOF',deposit_percentage:30,is_active:active,archived_at:null,updated_at:`2026-11-03T12:00:${String(version).padStart(2,'0')}Z`});
+ await page.route(`${api}/rest/v1/business_hours**`,route=>route.fulfill({json:Array.from({length:7},(_,weekday)=>({id:`hours-${weekday}`,business_id:auditBusiness,weekday,opens_at:'09:00:00',closes_at:'18:00:00',is_closed:false}))}));
+ await page.route(`${api}/rest/v1/provider_services**`,route=>{
+  if(route.request().method()==='GET')return route.fulfill({json:[service()]});
+  if(route.request().method()!=='PATCH')return route.fallback();
+  const params=new URL(route.request().url()).searchParams;
+  expect(params.get('business_id')).toBe('eq.'+auditBusiness);
+  expect(params.get('provider_id')).toBe('eq.'+syntheticSession('provider').user.id);
+  const body=route.request().postDataJSON() as {is_active:boolean};
+  active=body.is_active;version++;
+  return route.fulfill({json:{id:auditService}});
+ });
+ await page.goto('/salon/services');
+ const serviceRow=page.locator('.salon-list > section').filter({hasText:'Prestation de recette'});
+ await serviceRow.getByRole('button',{name:'Désactiver',exact:true}).click();
+ await expect(page.getByText('Prestation mise à jour.',{exact:true})).toBeVisible();
+ await expect(serviceRow.getByRole('button',{name:'Activer',exact:true})).toBeVisible();
+ await serviceRow.getByRole('button',{name:'Activer',exact:true}).click();
+ await expect(page.getByText('Prestation mise à jour.',{exact:true})).toBeVisible();
+ await expect(serviceRow.getByRole('button',{name:'Désactiver',exact:true})).toBeVisible();
 });
 
 test('salon : la visibilité et le profil ne sont confirmés que si enregistrés',async({page,context})=>{
@@ -69,7 +105,8 @@ test('salon : panne de chargement distincte d’un salon vide et reprise',async(
 
 test('pro et salon : navigation et menu Plus, client refusé aux espaces professionnels',async({page,context})=>{
  await login(context);
- for(const path of ['/pro','/pro/services','/pro/settings','/pro/agenda','/pro/team','/salon','/salon/services','/salon/agenda','/salon/team','/salon/settings','/salon/reviews','/salon/statistics']){await page.goto(path);expect(page.url()).toContain(path);await expect(page.getByRole('heading',{name:'Cette page n’existe pas'})).toHaveCount(0);}
+ for(const path of ['/pro','/pro/settings','/pro/agenda','/pro/team','/salon','/salon/services','/salon/agenda','/salon/team','/salon/settings','/salon/reviews','/salon/statistics']){await page.goto(path);expect(page.url()).toContain(path);await expect(page.getByRole('heading',{name:'Cette page n’existe pas'})).toHaveCount(0);}
+ await page.goto('/pro/services');await expect(page).toHaveURL(/\/salon\/services$/);
  if((page.viewportSize()?.width??1280)<768){await page.getByRole('button',{name:'Plus',exact:true}).click();await expect(page.getByRole('dialog',{name:'Plus',exact:true})).toBeVisible();await expect(page.getByRole('dialog').getByRole('link',{name:/Paramètres/})).toBeVisible();}
  await context.clearCookies();await login(context,'client');await page.goto('/pro/services');await expect(page).not.toHaveURL(/\/pro\/services$/);await page.goto('/salon/team');await expect(page).not.toHaveURL(/\/salon\/team$/);
 });

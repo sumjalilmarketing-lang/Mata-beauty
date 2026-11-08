@@ -178,6 +178,15 @@ test("primary mobile navigation keeps comfortable touch targets", async ({ page 
 });
 
 test("Inspiration swipes vertically with one active player, filters and an eight-item batch", async ({ page }) => {
+  const signedPosts: string[] = [];
+  await page.route("**/api/public/social-posts/*/media", (route) => {
+    const postId = new URL(route.request().url()).pathname.split("/").at(-2);
+    if (postId) signedPosts.push(postId);
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      videoUrl: "https://audit.supabase.co/storage/v1/object/sign/provider-social-media/audit.mp4",
+      thumbnailUrl: null,
+    }) });
+  });
   await page.addInitScript(() => {
     window.addEventListener("error", (event) => {
       if (event.target instanceof HTMLVideoElement && (event.isTrusted || window.localStorage.getItem("suppress-test-media-errors") === "true")) event.stopImmediatePropagation();
@@ -224,7 +233,12 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   const feed = page.locator(".social-feed");
   await expect(page.locator(".social-video-card")).toHaveCount(3, { timeout: 15_000 });
   expect(requestedBatches).toContain("8");
-  await expect(page.locator(".social-video-card").nth(1).locator("video")).toHaveAttribute("preload", "auto");
+  await expect(page.locator(".social-video-card").first().locator("video")).toBeAttached();
+  await expect.poll(() => signedPosts).toContain("66666666-6666-4666-8666-666666666666");
+  // Private Storage URLs are intentionally signed only when a post becomes active.
+  await expect(page.locator(".social-video-card").nth(1).locator("video")).toHaveCount(0);
+  await expect(page.locator(".social-video-card").nth(1).getByRole("status")).toContainText("Vidéo en attente de chargement");
+  expect(signedPosts).not.toContain("77777777-7777-4777-8777-777777777777");
   await page.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" }); document.dispatchEvent(new Event("visibilitychange")); });
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(0);
   await page.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" }); document.dispatchEvent(new Event("visibilitychange")); });
@@ -244,7 +258,10 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await page.getByRole("button", { name: "Activer le son" }).first().click();
   await expect(page.getByRole("button", { name: "Couper le son" }).first()).toBeVisible();
   await feed.evaluate((node) => node.scrollTo({ top: node.clientHeight, behavior: "auto" }));
-  await page.locator(".social-video-card video").nth(1).dispatchEvent("canplay");
+  const secondVideo = page.locator(".social-video-card").nth(1).locator("video");
+  await expect(secondVideo).toBeAttached();
+  await expect.poll(() => signedPosts).toContain("77777777-7777-4777-8777-777777777777");
+  await secondVideo.dispatchEvent("canplay");
   await expect.poll(() => page.locator('video[data-playing="true"]').count()).toBe(1);
   await expect(page.locator(".social-video-card").first().locator("video")).toHaveCount(0);
   await expect(page.locator(".social-video-card").first().locator(".video-poster-placeholder")).toHaveCount(1);

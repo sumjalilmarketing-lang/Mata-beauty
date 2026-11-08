@@ -210,7 +210,22 @@ test.afterAll(async () => {
   expect.soft(browserNetworkErrors, `Erreurs réseau: ${browserNetworkErrors.join(" | ")}`).toEqual([]);
 });
 
-test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page, request }) => {
+test("la gestion des prestations est retirée de l’espace professionnel et passe par Salon", async ({ page }) => {
+  await preparePage(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Publier une vidéo" }).click();
+  await page.getByLabel("Adresse e-mail").fill(providerEmail);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await page.waitForURL(/\/pro/);
+  const navigation = page.getByRole("navigation", { name: "Navigation Espace professionnel" });
+  await expect(navigation.getByRole("link", { name: /prestations/i })).toHaveCount(0);
+  await page.goto("/pro/services");
+  await expect(page).toHaveURL(/\/salon\/services$/);
+  await expect(page.getByRole("navigation", { name: "Navigation Espace salon" })).toBeVisible();
+});
+
+test("le prestataire publie une vidéo MP4 réelle depuis Studio avec une prestation existante", async ({ page, request }) => {
   test.setTimeout(300_000);
   await preparePage(page);
   await page.goto("/");
@@ -219,22 +234,6 @@ test("le prestataire publie une vidéo MP4 réelle depuis Studio", async ({ page
   await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await page.waitForURL(/\/pro/);
-  await expect(page.getByRole("navigation", { name: "Navigation Espace professionnel" }).getByRole("link")).toHaveText(["⌂Dashboard", "▶Studio", "≡Prestations", "□Agenda", "✉Messages", "¤Revenus", "○Profil"]);
-  await page.goto("/pro/services");
-  await expect(page.locator('.service-form select[name="serviceId"]')).toBeVisible();
-  await page.locator('.service-form select[name="serviceId"]').selectOption({ index: 1 });
-  await page.getByLabel("Nom affiché").fill(`Prestation simple ${run}`);
-  await page.getByLabel("Durée (minutes)").fill("60");
-  await page.getByLabel("Prix (FCFA)").fill("12000");
-  await page.getByRole("button", { name: "Ajouter la prestation" }).click();
-  await expect(page.getByText("Prestation ajoutée.")).toBeVisible();
-  await expect(page.locator(".control-list-row").filter({ hasText: `Prestation simple ${run}` })).toBeVisible();
-  await page.goto("/pro/agenda");
-  await page.locator('select[name="day"]').selectOption(String((new Date(Date.now() + 86400000).getUTCDay() + 1) % 7));
-  await page.getByRole("button", { name: "Ajouter un horaire" }).click();
-  await expect(page.getByText("Disponibilités enregistrées.")).toBeVisible();
-  await page.goto("/pro/revenue");
-  await expect(page.getByText("Vos revenus apparaîtront ici après vos premières prestations.")).toBeVisible();
   await page.goto("/pro/videos");
   const fixture = await request.get("https://samplelib.com/mp4/sample-5s-360p.mp4");
   expect(fixture.ok()).toBeTruthy();
