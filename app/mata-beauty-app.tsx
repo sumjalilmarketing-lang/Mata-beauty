@@ -533,20 +533,8 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     window.location.assign(provider.businessSlug ? "/salons/" + encodeURIComponent(provider.businessSlug) : "/professional/" + encodeURIComponent(provider.profileId));
   }
 
-  async function openSocialProvider(authorId: string) {
-    const provider = catalog.find((item) => item.profileId === authorId);
-    if (provider) { viewProvider(provider); return; }
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setNotice("Ouverture du profil…");
-    try {
-      const [item] = await fetchPublishedProviders(supabase, authorId);
-      if (!item) { setNotice("Ce profil n’est pas disponible actuellement."); return; }
-      const resolved = { ...item, initials: item.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() };
-      setCatalog((current) => current.some((entry) => entry.id === resolved.id) ? current : [...current, resolved]);
-      setNotice("");
-      viewProvider(resolved);
-    } catch { setNotice("Le profil n’a pas pu être chargé. Réessayez."); }
+  function openSocialProvider(authorId: string) {
+    window.location.assign("/professional/" + encodeURIComponent(authorId));
   }
 
   function bookSocialService(authorId: string, service: ProviderService, sourcePostId: string) {

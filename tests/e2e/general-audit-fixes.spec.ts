@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { bookingVideo } from "./fixtures/booking-video";
+import { auditService } from "./fixtures/provider-audit.mjs";
 import { qaLogin } from "./helpers/qa-session";
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
 const metrics = {users_total:10,users_today:0,users_week:0,clients_active:0,providers_active:0,providers_pending:0,salons_active:0,bookings_today:0,bookings_week:0,bookings_confirmed:0,bookings_cancelled:0,gross_revenue:0,commissions:0,payments_pending:0,payouts_pending:0,disputes_open:0,reports_open:0,tickets_open:0,average_order:0,financial_by_currency:[]};
@@ -76,10 +77,10 @@ test("an existing colleague review hides the second submission form while conten
  await expect(page.getByRole("radio")).toHaveCount(0);await expect(page.getByRole("button",{name:"Publier mon avis"})).toHaveCount(0);
 });
 
-test('a public video with no public service stays visible without booking actions', async ({ page }) => {
+test('a public video without a public service opens the profile and service selection', async ({ page }) => {
   const id = '10000000-0000-4000-8000-000000000099';
   let availabilityRequests = 0;
-  const post = { id, author_id: '20000000-0000-4000-8000-000000000099', post_type: 'video', caption: 'Vidéo publiée sans prestation réservable', business_name: 'Créateur public', city: 'Dakar', published_at: new Date().toISOString(), video_url: '/synthetic-discovery.mp4', thumbnail_url: null, duration_seconds: 20, view_count: 0, like_count: 0, comment_count: 0, save_count: 0, share_count: 0, provider_service_id: null, service_title: null, duration_minutes: null, price_amount: null, currency: null, hashtags: [] };
+  const post = { id, author_id: '20000000-0000-4000-8000-000000000099', post_type: 'video', caption: 'Vidéo publiée sans prestation réservable', business_name: 'Créateur public', slug: 'createur-public', city: 'Dakar', published_at: new Date().toISOString(), video_url: '/synthetic-discovery.mp4', thumbnail_url: null, duration_seconds: 20, view_count: 0, like_count: 0, comment_count: 0, save_count: 0, share_count: 0, provider_service_id: null, service_title: null, duration_minutes: null, price_amount: null, currency: null, hashtags: [] };
   await page.route(`${api}/rest/v1/social_feed**`, route => route.fulfill({ json: new URL(route.request().url()).searchParams.get('select') === 'id' ? [{ id }] : [post] }));
   await page.route(`${api}/rest/v1/rpc/get_available_slots**`, route => { availabilityRequests++; return route.fulfill({ json: [] }); });
   await page.route('**/api/public/social-posts/*/media', route => route.fulfill({ json: { videoUrl: 'https://audit.supabase.co/storage/discovery.mp4', thumbnailUrl: null } }));
@@ -89,7 +90,81 @@ test('a public video with no public service stays visible without booking action
   await expect(card).toHaveCount(1);
   await expect(card).toHaveAttribute('data-post-id', id);
   await expect(card.locator('video')).toHaveAttribute('src', /discovery\.mp4/);
-  await expect(card.getByRole('button', { name: 'Réserver', exact: true })).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Réserver', exact: true })).toBeVisible();
   await expect(card.getByRole('button', { name: 'Voir les disponibilités', exact: true })).toHaveCount(0);
   expect(availabilityRequests).toBe(0);
+  await page.route('**/professional/createur-public**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Profil public</h1><section id="prestations">Prestations publiques</section>' }));
+  await card.getByRole('button', { name: 'Réserver', exact: true }).click();
+  await expect(page).toHaveURL(/\/professional\/createur-public#prestations$/);
+});
+
+test('feed profile share, likes and comments work without a booking catalogue entry', async ({ page, context }) => {
+  const session = await qaLogin(context, 'client');
+  await page.addInitScript(() => Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: ShareData) => { sessionStorage.setItem('shared-url', data.url ?? ''); } }));
+  const id = '10000000-0000-4000-8000-000000000098';
+  const post = { id, author_id: '20000000-0000-4000-8000-000000000098', slug: 'coiffeuse-publique', post_type: 'video', caption: 'Vidéo publique', business_name: 'Coiffeuse publique', city: 'Dakar', published_at: new Date().toISOString(), video_url: '/video.mp4', thumbnail_url: null, view_count: 0, like_count: 0, comment_count: 0, save_count: 0, share_count: 0, provider_service_id: null, service_title: null, duration_minutes: null, price_amount: null, currency: null, hashtags: [] };
+  await page.route(`${api}/rest/v1/provider_profiles**`, route => route.fulfill({ json: [] }));
+  await page.route(`${api}/rest/v1/social_feed**`, route => route.fulfill({ json: new URL(route.request().url()).searchParams.get('select') === 'id' ? [{ id }] : [post] }));
+  await page.route('**/api/public/social-posts/*/media', route => route.fulfill({ json: { videoUrl: 'https://audit.supabase.co/storage/actions.mp4', thumbnailUrl: null } }));
+  await page.route('https://audit.supabase.co/storage/**', route => route.fulfill({ status: 200, contentType: 'video/mp4', body: bookingVideo }));
+  let liked = false;
+  await page.route(`${api}/rest/v1/rpc/toggle_post_like`, route => { expect(route.request().postDataJSON().target_post_id).toBe(id); liked = !liked; return route.fulfill({ json: { active: liked, count: liked ? 1 : 0 } }); });
+  let failed = true;
+  const comments: Array<{ id: string; author_id: string; body: string; parent_id: null; created_at: string; profiles: null }> = [];
+  await page.route(`${api}/rest/v1/post_comments**`, async route => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      expect(body.post_id).toBe(id); expect(body.author_id).toBe(session.user.id);
+      if (failed) return route.fulfill({ status: 503, json: { message: 'Synthetic outage' } });
+      comments.push({ id: 'comment', author_id: session.user.id, body: body.body, parent_id: null, created_at: new Date().toISOString(), profiles: null });
+      return route.fulfill({ status: 201, json: null });
+    }
+    return route.fulfill({ json: comments });
+  });
+  await page.goto('/');
+  const card = page.locator('.social-video-card');
+  await expect(card).toHaveCount(1);
+  await card.getByRole('button', { name: 'J’aime', exact: true }).click();
+  await expect(card.getByRole('button', { name: 'J’aime', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await card.getByRole('button', { name: 'J’aime', exact: true }).click();
+  await expect(card.getByRole('button', { name: 'J’aime', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await card.getByRole('button', { name: 'Partager', exact: true }).click();
+  expect(await page.evaluate(() => sessionStorage.getItem('shared-url'))).toContain('/posts/' + id);
+  await card.getByLabel('Plus d’options', { exact: true }).click();
+  await card.getByRole('button', { name: 'Partager le profil', exact: true }).click();
+  expect(await page.evaluate(() => sessionStorage.getItem('shared-url'))).toMatch(/\/professional\/coiffeuse-publique$/);
+  await card.getByLabel('Plus d’options', { exact: true }).click();
+  await card.getByRole('button', { name: 'Commentaires', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Commentaires', exact: true });
+  await dialog.getByLabel('Ajouter un commentaire', { exact: true }).fill('Belle réalisation');
+  await dialog.getByRole('button', { name: 'Publier', exact: true }).click();
+  await expect(page.locator('.feed-feedback')).toContainText('Commentaire non publié');
+  await expect(dialog.getByLabel('Ajouter un commentaire', { exact: true })).toHaveValue('Belle réalisation');
+  failed = false;
+  await dialog.getByRole('button', { name: 'Publier', exact: true }).click();
+  await expect(dialog.getByText('Belle réalisation', { exact: false })).toBeVisible();
+  await expect(dialog.getByLabel('Ajouter un commentaire', { exact: true })).toHaveValue('');
+  await dialog.getByRole('button', { name: 'Fermer', exact: true }).click();
+  await page.route('**/professional/coiffeuse-publique', route => route.fulfill({ contentType: 'text/html', body: '<h1>Profil du professionnel</h1>' }));
+  await card.getByRole('button', { name: 'Profil de Coiffeuse publique', exact: true }).click();
+  await expect(page).toHaveURL(/\/professional\/coiffeuse-publique$/);
+});
+
+test('Studio publishes a linked draft service only after the owner requests it', async ({ page, context }) => {
+  await qaLogin(context, 'provider');
+  let published = false;
+  let calls = 0;
+  const service = () => ({ id: auditService, title: 'Prestation du Studio', duration_minutes: 60, price_amount: 10000, currency: 'XOF', services: null, status: published ? 'published' : 'draft', is_active: published, archived_at: null });
+  await page.route(`${api}/rest/v1/posts**`, route => route.fulfill({ json: [{ id: '10000000-0000-4000-8000-000000000097', post_type: 'video', title: 'Vidéo existante', caption: '', status: 'published', thumbnail_url: null, view_count: 0, like_count: 0, comment_count: 0, created_at: new Date().toISOString(), published_at: new Date().toISOString(), post_services: [{ is_primary: true, provider_services: service() }] }] }));
+  await page.route(`${api}/rest/v1/provider_services**`, route => route.fulfill({ json: new URL(route.request().url()).searchParams.has('id') ? service() : [service()] }));
+  await page.route(`${api}/rest/v1/rpc/set_owned_service_status`, route => { calls++; expect(route.request().postDataJSON()).toEqual({ target_service_id: auditService, next_status: 'published' }); published = true; return route.fulfill({ json: null }); });
+  await page.goto('/pro/videos');
+  await page.getByRole('button', { name: 'Mes vidéos', exact: true }).click();
+  const action = page.getByRole('button', { name: 'Publier la prestation pour permettre la réservation', exact: true });
+  await expect(action).toBeVisible();
+  expect(calls).toBe(0);
+  await action.click();
+  await expect(page.getByRole('status').filter({ hasText: 'Prestation publiée.' })).toBeVisible();
+  await expect(action).toHaveCount(0);
+  expect(calls).toBe(1);
 });

@@ -28,6 +28,15 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
   const [notice, setNotice] = useState("");
   const [editorOpen, setEditorOpen] = useState(initialEditMode);
   const [applicationStatus, setApplicationStatus] = useState<string | null | "loading" | "unavailable">("loading");
+  useEffect(() => {
+    const showServices = () => { if (profile.kind !== "client" && window.location.hash === "#prestations") setTab("services"); };
+    const frame = requestAnimationFrame(showServices);
+    window.addEventListener("hashchange", showServices);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("hashchange", showServices); };
+  }, [profile.kind]);
+  useEffect(() => {
+    if (tab === "services" && window.location.hash === "#prestations") document.getElementById("prestations")?.scrollIntoView({ block: "start" });
+  }, [tab]);
   useEffect(() => { if(editorOpen) document.getElementById("profile-editor")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [editorOpen]);
   const profilePath = profile.kind === "client" ? "/u/" + encodeURIComponent(profile.slug)
     : profile.kind === "salon" ? "/salons/" + encodeURIComponent(profile.slug)
@@ -117,9 +126,10 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
     setNotice(data ? "Vous suivez maintenant ce profil." : "Vous ne suivez plus ce profil.");
   }
   async function shareProfile() {
+    const url = new URL(profilePath, window.location.origin).href;
     try {
-      if (navigator.share) await navigator.share({ title: profile.name, text: "Découvrez ce profil sur MATA Beauty.", url: window.location.href });
-      else await navigator.clipboard.writeText(window.location.href);
+      if (navigator.share) await navigator.share({ title: profile.name, text: "Découvrez ce profil sur MATA Beauty.", url });
+      else await navigator.clipboard.writeText(url);
       setNotice("Lien du profil copié ou partagé.");
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) setNotice("Le partage n’a pas abouti.");
@@ -249,11 +259,11 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
     </nav>
 
     {notice && <p className={styles.notice} role="status">{notice}</p>}
-    {tab === "services" && <section className={styles.serviceList} aria-label="Prestations">
+    {tab === "services" && <section id="prestations" className={styles.serviceList} aria-label="Prestations">
       {profile.services.length ? profile.services.map(service => <article className={styles.serviceCard} key={service.id}>
         <div><h2><Link href={bookingHref(service.id)} onClick={openBooking}>{service.title}</Link></h2>{service.description && <p>{service.description}</p>}<small>{service.durationMinutes} min · {formatMoney(service.priceAmount, service.currency)}</small></div>
         <div className={styles.serviceActions}><Link href={`/service/${encodeURIComponent(service.id)}`}>Détails</Link><Link href={bookingHref(service.id)} onClick={openBooking}>Réserver</Link></div>
-      </article>) : <p className={styles.empty}>Aucune prestation active n’est publiée pour le moment.</p>}
+      </article>) : <div className={styles.empty}><p>Aucune prestation active n’est publiée pour le moment. Vous pouvez contacter ce professionnel.</p>{profile.isOwner && <Link href={profile.kind === "salon" ? "/salon/videos" : "/pro/videos"}>Publier une prestation depuis le Studio</Link>}</div>}
     </section>}
     {tab === "reviews" && <section className={styles.reviewList} aria-label="Avis vérifiés">
       {profile.reviews.length ? profile.reviews.map(review => <article className={styles.reviewCard} key={review.id}>

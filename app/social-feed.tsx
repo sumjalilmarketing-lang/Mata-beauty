@@ -1,5 +1,7 @@
 "use client";
 
+import { feedProfilePath } from "@/lib/domain/feed-profile-path";
+
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { discoverFeed, videoTopics, videoInterestAffinity, type DiscoveryTopic } from "@/lib/domain/social-feed";
@@ -646,6 +648,17 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     });
   }
 
+  async function shareProvider(post: FeedPost) {
+    const url = new URL(feedProfilePath(post), window.location.origin).href;
+    try {
+      if (navigator.share) await navigator.share({ title: post.businessName, text: t("Découvrez ce profil sur MATA Beauty."), url });
+      else await navigator.clipboard.writeText(url);
+      setFeedback(t("Lien du profil copié ou partagé."));
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) setFeedback(t("Le partage du profil n’a pas pu être effectué."));
+    }
+  }
+
   async function report(post: FeedPost) {
     if (!authenticated) { onRequireAuth(); return; }
     if (!window.confirm(t("Signaler cette vidéo pour contenu inapproprié ?"))) return;
@@ -660,10 +673,12 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     setCommentsPost(post); setComments([]); setReplyTo(null); setCommentsState("loading");
     const supabase = getSupabaseBrowserClient();
     if (!supabase) { setCommentsState("error"); return; }
-    const { data, error } = await supabase.from("post_comments").select("id,author_id,parent_id,body,created_at,profiles!post_comments_author_id_fkey(display_name,avatar_url)").eq("post_id", post.id).eq("is_hidden", false).order("created_at", { ascending: false }).limit(50).abortSignal(AbortSignal.timeout(15000));
-    if (request !== commentRequest.current) return;
-    setCommentsState(error ? "error" : "ready");
-    setComments((data ?? []) as unknown as CommentRow[]);
+    try {
+      const { data, error } = await supabase.from("post_comments").select("id,author_id,parent_id,body,created_at,profiles!post_comments_author_id_fkey(display_name,avatar_url)").eq("post_id", post.id).eq("is_hidden", false).order("created_at", { ascending: false }).limit(50).abortSignal(AbortSignal.timeout(15000));
+      if (request !== commentRequest.current) return;
+      setCommentsState(error ? "error" : "ready");
+      setComments((data ?? []) as unknown as CommentRow[]);
+    } catch { if (request === commentRequest.current) setCommentsState("error"); }
   }
 
   async function addComment() {
@@ -676,7 +691,8 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       const { error } = await supabase.from("post_comments").insert({ post_id: commentsPost.id, author_id: authenticated.userId, parent_id: replyTo?.id ?? null, body: commentText.trim() });
       if (error) { setFeedback(t("Commentaire non publié. Patientez avant de réessayer.")); return; }
       setCommentText(""); setReplyTo(null); await openComments(commentsPost);
-    } finally { commentPending.current = false; setCommentBusy(false); }
+    } catch { setFeedback(t("Commentaire non publié. Vos mots sont conservés ; réessayez.")); }
+    finally { commentPending.current = false; setCommentBusy(false); }
   }
 
   async function deleteComment(comment: CommentRow) {
@@ -698,7 +714,10 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   }
 
   function book(post: FeedPost) {
-    if (!post.serviceId || !post.serviceTitle || post.durationMinutes === null || post.priceAmount === null) return;
+    if (!post.serviceId || !post.serviceTitle || post.durationMinutes === null || post.priceAmount === null) {
+      window.location.assign(feedProfilePath(post) + "#prestations");
+      return;
+    }
     onBook(post.authorId, { id: post.serviceId, title: post.serviceTitle, duration_minutes: post.durationMinutes, price_amount: post.priceAmount }, post.id);
     const supabase = getSupabaseBrowserClient();
     if (supabase) void recordSessionMetric(supabase, "record_post_booking_click", { target_post_id: post.id }, "mata-feed-session", pageRequests.current.signal);
@@ -717,8 +736,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   }
 
   function openProvider(post: FeedPost) {
-    if(post.businessSlug) window.location.assign("/salons/"+encodeURIComponent(post.businessSlug));
-    else onOpenProvider(post.authorId);
+    window.location.assign(feedProfilePath(post));
     const supabase = getSupabaseBrowserClient();
     if (supabase) void recordSessionMetric(supabase, "record_social_profile_visit", { target_provider_id: post.authorId, target_post_id: post.id }, "mata-feed-session", pageRequests.current.signal);
   }
@@ -907,6 +925,8 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
         <button disabled={authPending} aria-label={t("Commentaires")} onClick={() => void openComments(post)}>◌</button>
         <button disabled={authPending} aria-label={t("Partager")} onClick={() => void share(post)}>↗</button>
         <details className="feed-options"><summary aria-label={t("Plus d’options")}>•••</summary><div>
+          <button type="button" onClick={() => openProvider(post)}>{t("Voir le profil")}</button>
+          <button type="button" onClick={() => void shareProvider(post)}>{t("Partager le profil")}</button>
           <button disabled={authPending || socialBusy.has(`follow:${post.authorId}`)} aria-pressed={followed.has(post.authorId)} onClick={() => void follow(post)}>{t(followed.has(post.authorId) ? t("Se désabonner") : t("Suivre"))}</button>
           <button disabled={authPending || socialBusy.has(`save:${post.id}`)} aria-pressed={saved.has(post.id)} onClick={() => void toggle("save",post)}>{t(saved.has(post.id) ? t("Retirer des inspirations") : t("Enregistrer"))}</button>
           <button disabled={authPending} onClick={() => void report(post)}>{t("Signaler")}</button>
@@ -919,12 +939,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
           <button className="service-profile-link" onClick={() => void book(post)}><strong>{post.serviceTitle}</strong>{feedPrice(post.priceAmount, post.currency, locale) && <span>{feedPrice(post.priceAmount, post.currency, locale)}</span>}</button>
           <div className="feed-booking-actions"><button className="feed-availability" disabled={authPending} onClick={() => void book(post)}>{t("Voir les disponibilités")}</button><button className="feed-book" disabled={authPending} onClick={() => void book(post)}>{t("Réserver")}</button></div>
         </div>}
+        {!post.serviceId && <div className="linked-service"><p>{t("Choisissez une prestation sur le profil du professionnel.")}</p><div className="feed-booking-actions"><button className="feed-book" onClick={() => book(post)}>{t("Réserver")}</button></div></div>}
       </div>
       <aside className="feed-premium-panel" aria-label={t("Informations de réservation")}>
         <div className="feed-premium-provider"><span>{t("Professionnel")}</span><button onClick={() => void openProvider(post)}>{post.businessName}</button>{post.verified && <span className="feed-verified">{t("Profil vérifié")}</span>}{post.city && <p>{post.city}</p>}</div>
         <div className="feed-premium-service"><span>{t("Prestation")}</span>{post.serviceId && post.serviceTitle ? <><h2>{post.serviceTitle}</h2><p>{post.priceAmount !== null && feedPrice(post.priceAmount, post.currency, locale) ? feedPrice(post.priceAmount, post.currency, locale) : t("Tarif non renseigné")}{post.durationMinutes !== null ? ` · ${post.durationMinutes} ${t("min")}` : ""}</p></> : <p>{t("Aucune prestation associée à cette publication.")}</p>}</div>
         <div className="feed-premium-availability"><span>{t("Disponibilités")}</span><p>{!post.serviceId ? t("Aucune prestation associée à cette publication.") : availabilityFailed.has(post.id) ? t("Disponibilités momentanément indisponibles.") : realAvailability[post.id] ? `${t("Prochain créneau")} · ${new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(realAvailability[post.id] as string))}` : availabilityChecked.has(post.id) ? t("Aucun créneau disponible dans les 14 prochains jours.") : t("Vérification des disponibilités…")}</p></div>
-        {post.serviceId && <div className="feed-premium-actions"><button className="feed-premium-availability-button" disabled={authPending} onClick={() => void book(post)}>{t("Voir les disponibilités")}</button><button className="feed-premium-book" disabled={authPending} onClick={() => void book(post)}>{t("Réserver")}</button></div>}
+        <div className="feed-premium-actions">{post.serviceId && <button className="feed-premium-availability-button" disabled={authPending} onClick={() => void book(post)}>{t("Voir les disponibilités")}</button>}<button className="feed-premium-book" disabled={authPending} onClick={() => void book(post)}>{t("Réserver")}</button></div>
       </aside>
     </article>)}
   </div>{activePost?.isSponsored && <span className="sponsored-label">{t("Contenu sponsorisé")}</span>}
