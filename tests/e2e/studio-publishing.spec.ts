@@ -158,7 +158,7 @@ test('an inactive service is refused before video transfer for public publicatio
   await panel.locator('input[name=consent]').check();
   await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('Choisissez une prestation active');
-  expect(transfers).toBe(2);
+  expect(transfers).toBe(0);
 });
 
 test('preview preparation failure can be retried without losing fields or publishing', async ({ page, context }) => {
