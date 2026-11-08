@@ -59,6 +59,10 @@ test("sensitive confirmation traps focus, cancels with Escape, and restores the 
  const dialog=page.getByRole("dialog",{name:"Suspendre Salon audit ?"});await expect(dialog).toBeVisible();
  await expect(dialog.getByRole("button",{name:"Annuler",exact:true})).toBeFocused();
  for(let i=0;i<5;i++){await page.keyboard.press("Tab");expect(await dialog.evaluate(node=>node.contains(document.activeElement))).toBe(true);}
+ for(let i=0;i<5;i++){await page.keyboard.press("Shift+Tab");expect(await dialog.evaluate(node=>node.contains(document.activeElement))).toBe(true);}
+ await dialog.getByLabel("Motif obligatoire").fill("Motif de test");
+ await expect(dialog.getByRole("button",{name:"Confirmer",exact:true})).toBeEnabled();
+ for(const key of ["Tab","Shift+Tab"]) for(let i=0;i<5;i++){await page.keyboard.press(key);expect(await dialog.evaluate(node=>node.contains(document.activeElement))).toBe(true);}
  await page.keyboard.press("Escape");await expect(dialog).toHaveCount(0);await expect(trigger).toBeFocused();
 });
 test("an existing colleague review hides the second submission form while content remains sealed",async({page,context})=>{

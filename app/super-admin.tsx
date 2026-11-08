@@ -336,7 +336,13 @@ function ConfirmationModal({
     cancelButton.current?.focus();
     return () => { node?.close(); previous?.focus(); };
   }, []);
-  return <dialog ref={dialog} className="admin-modal-backdrop" aria-labelledby="confirmation-title" onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }}>
+  return <dialog ref={dialog} className="admin-modal-backdrop" aria-labelledby="confirmation-title" onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }} onKeyDown={event => {
+    if (event.key !== "Tab") return;
+    const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),a[href]'));
+    const first = controls[0], last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }}>
     <section className="admin-modal">
       <p className="admin-kicker">Action sensible</p>
       <h2 id="confirmation-title">{title}</h2>

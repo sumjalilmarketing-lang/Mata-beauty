@@ -51,5 +51,6 @@ test("legacy profile redirects to the authenticated profile with its nonce",asyn
  const response=await page.goto("/app/social-profile");
  await expect(page).toHaveURL(/\/app\/profile$/);
  expect(response?.headers()["content-security-policy"]).toContain("'nonce-");
- await expect(page.getByRole("link",{name:"Identité, préférences et confidentialité",exact:true})).toBeVisible();
+ await page.getByRole("link",{name:"Paramètres et confidentialité",exact:true}).click();
+ await expect(page.getByRole("heading",{name:"Identité",exact:true})).toBeVisible();
 });
