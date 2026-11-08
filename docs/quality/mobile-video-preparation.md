@@ -1,0 +1,11 @@
+# Préparation vidéo mobile
+
+La préparation des formats non lisibles sur le téléphone se fait désormais sur le serveur. Le Studio conserve son aperçu natif pour les fichiers H.264/AAC compatibles. Les autres fichiers sont envoyés par TUS dans un bucket privé dédié, sans passer dans le corps d’une route Next. Le serveur vérifie compte/propriétaire/taille/quota, décode la source, produit un MP4 H.264/AAC et une couverture JPEG, puis renvoie un lien privé pour l’aperçu. Le moteur WASM n’est plus chargé dans ce parcours.
+
+La publication réutilise le MP4 déjà envoyé, permet une couverture personnalisée puis passe par la validation et les attestations existantes. Aucun média source n’est exposé au feed. Les sources sont supprimées après préparation; une sortie reçue mais abandonnée est supprimée côté client. Une sortie préservée avant une publication éventuellement enregistrée n’est jamais supprimée par le démontage du Studio. Les champs restent présents en cas d’échec et une nouvelle préparation utilise de nouveaux chemins.
+
+La source est limitée à 100 Mo, 10 envois par heure et par utilisateur. Le serveur limite également les préparations à 10/h par utilisateur et 300/h globalement; les requêtes anonymes sont interdites. Le traitement est borné dans le temps, la taille et les dimensions; il ne garantit pas de convertir tout fichier endommagé ou trop complexe. Aucun plafond éditorial de durée ou de cadrage n’est ajouté.
+
+Limites : la capture VIDEO_ENGINE_LOAD ne distingue pas panne réseau, erreur du worker et échec d’initialisation WASM. La suppression de cette dépendance traite ces cas sans assouplir la CSP. Une réponse perdue sans signal d’annulation peut laisser une sortie privée que le client n’a jamais reçue; le nettoyage en cas d’annulation est vérifié, la rétention des sorties orphelines reste à compléter. Aucun essai sur le téléphone physique n’est revendiqué.
+
+Livraison : déployer la migration studio_server_preparation avant le nouveau Studio; elle ajoute uniquement un bucket privé, son isolation/quotas et une lecture de snapshot réservée au serveur. Le binaire FFmpeg doit être inclus dans le tracing des routes prepare-video et validate-video. La configuration d’installation Vercel vérifiée reste la même.

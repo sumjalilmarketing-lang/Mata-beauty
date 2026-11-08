@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { qaLogin } from './helpers/qa-session';
+import sharp from 'sharp';
+import { qaLogin, qaSession } from './helpers/qa-session';
 import { auditBusiness, auditCategory, auditService } from './fixtures/provider-audit.mjs';
 import { fileURLToPath } from 'node:url';
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
@@ -7,7 +8,13 @@ const tusHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-
 test.beforeEach(async ({ page }) => {
   // UI fixture only: real byte decoding and attestation are tested separately.
   await page.route('**/api/studio/validate-video', route => route.fulfill({ json: { ok: true } }));
-  page.on('requestfailed', request => console.log('STUDIO_REQUEST_FAILURE', request.method(), new URL(request.url()).pathname, request.failure()?.errorText)); });
+  const thumbnail = (await sharp({ create: { width: 4, height: 4, channels: 3, background: "pink" } }).jpeg().toBuffer()).toString('base64');
+  await page.route('**/_qa/normalized.mp4', route => route.fulfill({ path: fileURLToPath(new URL('./fixtures/studio-formats.mov', import.meta.url)), contentType: 'video/mp4' }));
+  await page.route('**/api/studio/prepare-video', route => {
+    const id = route.request().postDataJSON().preparationId;
+    return route.fulfill({ json: { ok: true, postId: id, videoPath: `${qaSession('provider').user.id}/${id}/video.mp4`, previewUrl: new URL('/_qa/normalized.mp4', route.request().url()).href, duration: 2, aspectRatio: 2 / 3, thumbnail } });
+  });
+  page.on('requestfailed' , request => console.log('STUDIO_REQUEST_FAILURE', request.method(), new URL(request.url()).pathname, request.failure()?.errorText)); });
 test.afterEach(async ({ page }, info) => { if (info.status !== info.expectedStatus) console.log('STUDIO_FAILURE_STATE', (await page.locator('#video-publisher').innerText().catch(() => 'panel unavailable')).slice(-2500)); });
 const video = fileURLToPath(new URL('./fixtures/studio-long.mp4', import.meta.url));
 
@@ -20,7 +27,7 @@ async function openStudio(page: Page, path = '/pro/videos') {
 for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, service and hashtags remain together with no duration cap or navigation`, async ({ page, context }) => {
   test.setTimeout(120000);
   const session = await qaLogin(context, 'provider');
-  if (format === 'mov' || format === 'mp4') await page.route('**/video-converter/**', route => route.abort('failed'));
+  await page.route('**/video-converter/**', route => route.abort('failed'));
   let published: Record<string, unknown> | null = null;
   const savedPublication = () => published;
   await page.route(`${api}/storage/v1/object/provider-social-media/**`, route => route.fulfill({ json: { Key: 'fixture' } }));
@@ -34,6 +41,7 @@ for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, servic
   });
   const start = page.url();
   const panel = page.locator('#video-publisher');
+  const transfer = page.waitForResponse(response => response.request().method() === 'POST' && response.url() === `${api}/storage/v1/upload/resumable`);
   await panel.getByLabel('Choisir une photo ou une vidéo', { exact: true }).setInputFiles(format === 'mp4' ? video : fileURLToPath(new URL(`./fixtures/studio-formats.${format}`, import.meta.url)));
   const preview = panel.getByLabel('Aperçu de votre vidéo', { exact: true });
   await expect(preview).toBeVisible({ timeout: 90000 });
@@ -51,7 +59,6 @@ for (const format of ['mp4', 'avi', 'mkv', 'mov']) test(`video ${format}, servic
   await panel.getByLabel('Hashtags', { exact: true }).fill('#tresses #dakar');
   await panel.locator('select[name=serviceId]').selectOption(auditService);
   await panel.locator('input[name=consent]').check();
-  const transfer = page.waitForResponse(response => response.request().method() === 'POST' && response.url() === `${api}/storage/v1/upload/resumable`);
   await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
   const transferResponse = await transfer;
   const location = (await transferResponse.allHeaders()).location;
@@ -154,12 +161,13 @@ test('an inactive service is refused before video transfer for public publicatio
   expect(transfers).toBe(0);
 });
 
-test('preview preparation failure can be retried without losing fields or uploading', async ({ page, context }) => {
+test('preview preparation failure can be retried without losing fields or publishing', async ({ page, context }) => {
   test.setTimeout(120000);
   await qaLogin(context, 'provider');
   let transfers = 0;
-  await page.route(`${api}/storage/v1/upload/resumable**`, route => { transfers++; return route.abort(); });
-  await page.route('**/video-converter/ffmpeg-core.wasm', route => route.fulfill({ status: 503, body: 'synthetic preparation failure' }));
+  await page.route(`${api}/storage/v1/upload/resumable**`, route => { transfers++; return route.fulfill({ status: 201, headers: { ...tusHeaders, Location: `${api}/storage/v1/upload/resumable/fixture`, 'Upload-Offset': String(route.request().postDataBuffer()?.length ?? 0) } }); });
+  let failed = true;
+  await page.route('**/api/studio/prepare-video', route => failed ? route.fulfill({ status: 503, json: { error: { message: 'Préparation indisponible. Réessayez.' } } }) : route.fallback());
   await openStudio(page);
   const panel = page.locator('#video-publisher');
   await panel.getByLabel('Légende', { exact: true }).fill('Ma légende reste ici');
@@ -169,11 +177,49 @@ test('preview preparation failure can be retried without losing fields or upload
   await expect(retry).toBeVisible({ timeout: 30000 });
   await expect(panel.getByRole('button', { name: 'Publier la vidéo', exact: true })).toBeDisabled();
   await expect(panel.getByLabel('Légende', { exact: true })).toHaveValue('Ma légende reste ici');
-  await page.unroute('**/video-converter/ffmpeg-core.wasm');
+  failed = false;
   await retry.click();
   await expect(panel.getByLabel('Aperçu de votre vidéo', { exact: true })).toBeVisible({ timeout: 30000 });
   await expect(panel.getByLabel('Aperçu de votre vidéo', { exact: true })).toHaveAttribute('poster', /^blob:/);
   await expect(panel.locator('select[name=serviceId]')).toHaveValue(auditService);
   await expect(panel.getByLabel('Légende', { exact: true })).toHaveValue('Ma légende reste ici');
-  expect(transfers).toBe(0);
+  expect(transfers).toBe(2);
+});
+
+test('a late abandoned preparation cannot delete the newer published video', async ({ page, context }) => {
+  await qaLogin(context, 'provider');
+  const preparations: string[] = [], removed: string[] = [];
+  let releaseFirst: (() => Promise<void>) | undefined;
+  let sourceDeletes = 0;
+  let published: Record<string, unknown> | undefined;
+  page.on('request', request => { if (request.url().endsWith('/api/studio/prepare-video')) preparations.push(request.postDataJSON().preparationId); });
+  await page.route(`${api}/storage/v1/object/studio-video-inputs`, async route => {
+    if (route.request().method() === 'DELETE' && ++sourceDeletes === 1) { releaseFirst = () => route.fulfill({ json: [] }); return; }
+    await route.fulfill({ json: [] });
+  });
+  await page.route(`${api}/storage/v1/object/provider-social-media**`, route => {
+    if (route.request().method() === 'DELETE') removed.push(...route.request().postDataJSON().prefixes);
+    return route.fulfill({ json: { Key: 'fixture' } });
+  });
+  await page.route(`${api}/storage/v1/object/sign/provider-social-media/**`, route => route.fulfill({ json: { signedURL: '/object/sign/provider-social-media/fixture?token=synthetic' } }));
+  await page.route(`${api}/rest/v1/rpc/create_provider_video_post`, route => { published = route.request().postDataJSON(); return route.fulfill({ json: published!.target_post_id }); });
+  await page.route(`${api}/rest/v1/social_feed**`, route => route.fulfill({ json: { id: published?.target_post_id } }));
+  await openStudio(page);
+  await page.route(`${api}/rest/v1/posts**`, route => route.fulfill({ json: new URL(route.request().url()).searchParams.has('id') ? {
+    id: published?.target_post_id, status: 'published', visibility: 'public', published_at: new Date().toISOString(), post_services: [{ provider_service_id: auditService, is_primary: true }], social_post_media: [{ bucket_id: 'provider-social-media', storage_path: published?.target_video_path, thumbnail_path: published?.target_thumbnail_path }],
+  } : [] }));
+  const panel = page.locator('#video-publisher'), picker = panel.getByLabel('Choisir une photo ou une vidéo', { exact: true });
+  await picker.setInputFiles(fileURLToPath(new URL('./fixtures/studio-formats.avi', import.meta.url)));
+  await expect.poll(() => Boolean(releaseFirst)).toBe(true);
+  await picker.setInputFiles(fileURLToPath(new URL('./fixtures/studio-formats.mkv', import.meta.url)));
+  await expect(panel.getByLabel('Aperçu de votre vidéo', { exact: true })).toBeVisible();
+  await releaseFirst!();
+  await expect.poll(() => removed.some(path => path.includes(preparations[0]))).toBe(true);
+  await panel.locator('select[name=serviceId]').selectOption(auditService);
+  await panel.locator('input[name=consent]').check();
+  await panel.getByRole('button', { name: 'Publier la vidéo', exact: true }).click();
+  await expect.poll(() => published?.target_post_id).toBe(preparations[1]);
+  await expect(panel.getByLabel('Aperçu de votre vidéo', { exact: true })).toHaveCount(0);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  expect(removed.some(path => path.includes(preparations[1]))).toBe(false);
 });
