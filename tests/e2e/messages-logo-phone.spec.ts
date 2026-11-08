@@ -85,7 +85,12 @@ test('uploaded salon logo is propagated through the controlled branding operatio
 
 
 test('professional public profile displays its uploaded business logo',async({page})=>{
- await page.goto('/professional/mata-audit-tresses');
+ await page.addInitScript(() => Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: ShareData) => { sessionStorage.setItem('shared-profile-url', data.url ?? ''); } }));
+ await page.goto('/professional/mata-audit-tresses?video=unknown#prestations');
  const image=page.getByRole('img',{name:'Photo de Mata Audit Tresses',exact:true});
  await expect(image).toBeVisible();await expect(image).toHaveAttribute('src',/\/brand\/icon-512\.png$/);
+ await expect(page.getByRole('button', { name: 'Prestations', exact: true })).toHaveAttribute('aria-current', 'page');
+ await expect(page.getByRole('region', { name: 'Prestations', exact: true })).toBeVisible();
+ await page.getByRole('button', { name: 'Partager le profil', exact: true }).click();
+ expect(await page.evaluate(() => sessionStorage.getItem('shared-profile-url'))).toMatch(/\/professional\/mata-audit-tresses$/);
 });

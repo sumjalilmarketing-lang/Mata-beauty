@@ -6,7 +6,7 @@ import { activityLocationReady, serviceDetailsError } from "@/lib/domain/service
 import { serviceReference } from "@/lib/domain/service-reference";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 
-type Service = { is_active: boolean; id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
+type Service = { status: string; archived_at: string | null; is_active: boolean; id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
 type Context = { id?: string; name?: string; currency: string | null; country_code: string | null; timezone: string | null };
 
 export function StudioServiceCreator({ userId, salon, providerApproved, onCreated, onCancel }: { userId: string; salon: boolean; providerApproved: boolean; onCreated: (service: Service) => void; onCancel: () => void }) {
@@ -53,7 +53,7 @@ export function StudioServiceCreator({ userId, salon, providerApproved, onCreate
     pending.current = true; setBusy(true); setMessage("");
     try {
       const payload = { provider_id: userId, business_id: salon ? context.id : null, service_id: details.serviceId, title: details.title, duration_minutes: details.durationMinutes, price_amount: details.priceAmount, currency: context.currency, is_active: providerApproved, status: providerApproved ? "published" : "draft" };
-      const { data, error } = await client.from("provider_services").insert(payload).select("id,title,duration_minutes,price_amount,currency,is_active,services(categories(name))").abortSignal(AbortSignal.timeout(20000)).single();
+      const { data, error } = await client.from("provider_services").insert(payload).select("id,title,duration_minutes,price_amount,currency,is_active,status,archived_at,services(categories(name))").abortSignal(AbortSignal.timeout(20000)).single();
       if (error) throw error;
       if (!data) throw new Error("Enregistrement non confirmé.");
       onCreated(data as unknown as Service);
@@ -62,7 +62,7 @@ export function StudioServiceCreator({ userId, salon, providerApproved, onCreate
   }
 
   return <section ref={panel} tabIndex={-1} className="studio-inline-service" aria-label="Nouvelle prestation du Studio">
-    <h3>Ajouter une prestation</h3><p>Elle sera enregistrée dans votre catalogue et associée à cette publication.</p>
+    <h3>Ajouter une prestation</h3><p>{providerApproved ? "Elle sera publiée dans votre catalogue et associée à cette vidéo. Les réservations dépendent de vos horaires et disponibilités." : "Elle sera enregistrée en brouillon et associée à cette publication."}</p>
     {loading ? <p role="status">Chargement de votre activité…</p> : <form onSubmit={event => void create(event)}>
       <fieldset disabled={busy}>
         {salon && <label>Salon de la prestation<select aria-label="Salon de la prestation" required value={context?.id ?? ""} onChange={event => setContext(businesses.find(item => item.id === event.target.value) ?? null)}><option value="">Choisir votre salon</option>{businesses.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
@@ -70,7 +70,7 @@ export function StudioServiceCreator({ userId, salon, providerApproved, onCreate
         <label>Nom de la prestation<input name="serviceTitle" required minLength={2} maxLength={120} /></label>
         <label>Durée de la prestation (minutes)<input name="serviceDuration" type="number" min={15} max={720} step={1} defaultValue={60} required /></label>
         <label>Prix ({context?.currency ?? "devise de votre activité"})<input name="servicePrice" type="number" min={0} max={10000000} step={1} required /></label>
-        <button type="submit" disabled={!context || !catalog.length}>{busy ? "Enregistrement…" : "Enregistrer et associer"}</button>
+        <button type="submit" disabled={!context || !catalog.length}>{busy ? "Enregistrement…" : providerApproved ? "Publier et associer" : "Enregistrer et associer"}</button>
       </fieldset>
     </form>}
     <button type="button" disabled={busy} onClick={onCancel}>Fermer</button>

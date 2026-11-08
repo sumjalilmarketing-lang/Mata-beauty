@@ -1,5 +1,7 @@
 "use client";
 
+import { studioServiceIsPublic } from "@/lib/domain/studio-booking";
+
 import { isVideoFile, STUDIO_MEDIA_ACCEPT } from "@/lib/domain/video-formats";
 
 import { useStudioVideoPreview } from "@/lib/media/use-studio-video-preview";
@@ -16,7 +18,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { validatePublishedVideoDelivery, type PublishedVideoRecord } from "@/lib/domain/video-delivery";
 
-type ProviderService = { is_active: boolean; id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
+type ProviderService = { status: string; archived_at: string | null; is_active: boolean; id: string; title: string; duration_minutes: number; price_amount: number; currency: string; services: { categories: { name: string } | null } | null };
 type PublishStatus = "draft" | "scheduled" | "published";
 type ContentType = "video" | "photo" | "before_after" | "promotion" | "availability";
 
@@ -34,8 +36,9 @@ async function verifyPublishedVideo(postId: string, serviceId: string, videoPath
   if (postError) throw postError;
   const deliveryError = validatePublishedVideoDelivery(post as unknown as PublishedVideoRecord, { postId, serviceId, videoPath, thumbnailPath });
   if (deliveryError) throw new Error(deliveryError);
-  const { data: feedPost, error: feedError } = await supabase.from("social_feed").select("id").eq("id", postId).single();
+  const { data: feedPost, error: feedError } = await supabase.from("social_feed").select("id,provider_service_id").eq("id", postId).single();
   if (feedError || feedPost?.id !== postId) throw new Error("La publication n’est pas encore lisible dans le feed client.");
+  if (feedPost.provider_service_id !== serviceId) throw new Error("La vidéo est enregistrée, mais sa prestation n’est pas encore réservable publiquement. Vérifiez son statut dans le Studio.");
   const { data: signedVideo, error: signedVideoError } = await supabase.storage.from("provider-social-media").createSignedUrl(videoPath, 60);
   const { data: signedThumbnail, error: signedThumbnailError } = await supabase.storage.from("provider-social-media").createSignedUrl(thumbnailPath, 60);
   if (signedVideoError || !signedVideo?.signedUrl || signedThumbnailError || !signedThumbnail?.signedUrl) {
@@ -63,7 +66,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount,currency,is_active,services(categories(name))").eq("provider_id", userId).is("archived_at", null).order("title").abortSignal(AbortSignal.timeout(15000)).then(({ data, error }) => { if (error) setServicesError("Les prestations sont indisponibles. Actualisez le Studio pour réessayer."); else setServices((data ?? []) as unknown as ProviderService[]); });
+    void supabase.from("provider_services").select("id,title,duration_minutes,price_amount,currency,is_active,status,archived_at,services(categories(name))").eq("provider_id", userId).is("archived_at", null).order("title").abortSignal(AbortSignal.timeout(15000)).then(({ data, error }) => { if (error) setServicesError("Les prestations sont indisponibles. Actualisez le Studio pour réessayer."); else setServices((data ?? []) as unknown as ProviderService[]); });
   }, [userId]);
 
   useEffect(() => () => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); }, [previewUrls]);
@@ -94,7 +97,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
     if (selectedType !== "video" && selectedType !== "before_after" && files.length > 10) { setFeedback("Un carrousel contient au maximum 10 images."); return; }
     if (status === "published" && !consent) { setFeedback("Confirmez le consentement de la personne filmée."); return; }
     if (status !== "draft" && !selectedServiceId) { setFeedback("Associez une prestation avant de publier ou programmer."); return; }
-    if (status !== "draft" && !services.find(service => service.id === selectedServiceId)?.is_active) { setFeedback("Choisissez une prestation active pour publier. Vous pouvez conserver cette vidéo en brouillon."); return; }
+    if (status !== "draft" && !studioServiceIsPublic(services.find(service => service.id === selectedServiceId))) { setFeedback("Choisissez une prestation active et publiée pour permettre la réservation. Publiez la prestation depuis votre catalogue ou conservez la vidéo en brouillon."); return; }
     if (status === "scheduled" && !scheduledValue) { setFeedback("Choisissez une date de publication."); return; }
 
     publishPending.current = true;
@@ -229,7 +232,7 @@ export function VideoPublisher({ userId, providerApproved, onPublished, initialC
       {contentType === "promotion" && <><label>Remise (%)<input name="discount" type="number" min="1" max="90" required /></label><label>Fin de l’offre<input name="promotionEndsAt" type="datetime-local" required /></label><label>Places disponibles<input name="promotionSlots" type="number" min="1" max="10000" required /></label></>}
       {servicesError && <p role="alert">{servicesError}</p>}
       <button type="button" disabled={phase !== "idle"} onClick={() => setCreatingService(true)}>＋ Ajouter une prestation dans le Studio</button>
-      <label>Catégorie et prestation<select name="serviceId" value={serviceId} onChange={event => setServiceId(event.target.value)}><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title}{!service.is_active ? " (inactive · brouillon uniquement)" : ""} · {service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</option>)}</select></label>
+      <label>Catégorie et prestation<select name="serviceId" value={serviceId} onChange={event => setServiceId(event.target.value)}><option value="">Choisir une prestation</option>{services.map((service) => <option key={service.id} value={service.id}>{service.services?.categories?.name ?? "Beauté"} · {service.title}{!studioServiceIsPublic(service) ? " (non publiée · brouillon uniquement)" : ""} · {service.duration_minutes} min · {formatServiceMoney(service.price_amount, service.currency)}</option>)}</select></label>
       <details className="wide publisher-options"><summary>Options de publication</summary>
       <label>Visibilité<select name="visibility" defaultValue="public"><option value="public">Tout le monde</option><option value="followers">Abonnés</option></select></label>
       {contentType === "video" && <label>Couverture personnalisée<input name="thumbnail" type="file" accept="image/jpeg,image/png,image/webp" /></label>}<label>Publication<select name="status" defaultValue={providerApproved ? "published" : "draft"}><option value="draft">Brouillon</option><option value="scheduled" disabled={!providerApproved}>Programmer</option><option value="published" disabled={!providerApproved}>Publier maintenant</option></select></label>

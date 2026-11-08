@@ -20,7 +20,7 @@ async function loadProfessional(username: string) {
   enrichedQuery = isUuid ? enrichedQuery.eq("profile_id", lookup) : enrichedQuery.eq("slug", lookup);
   const enriched = await enrichedQuery.maybeSingle();
   if (!enriched.error) return enriched.data as PublicProfessional | null;
-  const fallback = await client.from("provider_profiles").select("profile_id,slug,business_name,bio,city,cover_url,average_rating,review_count,provider_services(id,title,duration_minutes,price_amount)").eq("status", "approved").eq("slug", lookup).maybeSingle();
+  const fallback = await client.from("provider_profiles").select("profile_id,slug,business_name,bio,city,cover_url,average_rating,review_count,provider_services(id,title,duration_minutes,price_amount)").eq("status", "approved").eq(isUuid ? "profile_id" : "slug", lookup).maybeSingle();
   return fallback.data as PublicProfessional | null;
 }
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
