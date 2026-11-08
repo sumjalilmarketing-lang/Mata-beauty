@@ -25,7 +25,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - run: npm install --global pnpm@11.25.0
-      - run: pnpm install --frozen-lockfile
+      - run: node scripts/install-dependencies.mjs
       - run: command -v google-chrome && google-chrome --version
       - name: Run audit acceptance and regression tests
         run: pnpm test:e2e --project=desktop --project=mobile-390 tests/e2e/${{ matrix.spec }}.spec.ts --reporter=list,json
