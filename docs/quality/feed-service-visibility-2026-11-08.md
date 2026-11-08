@@ -9,3 +9,5 @@ Aucun brouillon de prestation n'est publié, aucun statut de contenu n'est modif
 Validation : reproduction SQL sur PGlite avec rôles visiteur/propriétaire ; vidéo liée à un service publié, brouillon, en pause et archivé ; absence de fuite des champs privés ; exclusion des brouillons vidéo, abonnés, signalements, dates futures et nulles ; conservation des autorisations. Régression navigateur isolée ajoutée : vidéo visible sans bouton de réservation ni recherche de disponibilités.
 
 Les comptes, fichiers et publications réels ne sont pas modifiés pour les tests. Le contrôle final de production doit vérifier les comptes agrégés sous le rôle visiteur après application de la migration.
+
+Production : migration appliquée sous la version `20261108140854`. Contrôle en lecture seule après application : neuf vidéos visibles pour un visiteur, dont huit avec prestation réservable et une sans réservation. Le service concerné reste en brouillon et les neuf vidéos satisfont le prédicat de lecture des médias.

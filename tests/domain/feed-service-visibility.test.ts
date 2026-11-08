@@ -47,7 +47,7 @@ beforeAll(async () => {
   await db.exec("set role visitor");
   expect((await db.query("select count(*)::int as n from social_feed")).rows).toEqual([{ n: 3 }]);
   await db.exec("reset role");
-  await db.exec(await readFile(new URL("../../supabase/migrations/20261108140311_studio_public_service_visibility.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261108140854_studio_public_service_visibility.sql", import.meta.url), "utf8"));
 }, 60000);
 afterAll(() => db.close());
 
