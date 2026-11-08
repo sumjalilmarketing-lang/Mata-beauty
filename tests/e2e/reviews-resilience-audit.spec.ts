@@ -7,6 +7,7 @@ for (const status of [400, 401, 403, 500]) test(`reviews: HTTP ${status}, no fal
   const pending = new Promise<void>(resolve => { release = resolve; });
   await page.route(`${api}/rest/v1/bookings**`, route => route.fulfill({ json: [{ id: '11111111-1111-4111-8111-111111111111', starts_at: '2026-11-01T12:00:00Z', provider_services: { title: 'Audit résilience avis' } }] }));
   await page.route(`${api}/rest/v1/rpc/get_booking_reviews`, route => route.fulfill({ json: saved ? [{ id: 'qa-review', reviewer_id: session.user.id, type: 'client_to_provider', rating: 4, comment: 'Commentaire préservé.', visibility: 'public' }] : [] }));
+  await page.route(`${api}/rest/v1/rpc/booking_review_submission_state`, route => route.fulfill({ json: saved }));
   await page.route('**/api/bookings/reviews', async route => {
     calls++;
     expect(route.request().postDataJSON()).toMatchObject({ rating: 4, comment: 'Commentaire préservé.' });
@@ -38,6 +39,7 @@ test('QA-B03: pending review request expires and preserves the comment', async (
   const pending = new Promise<void>(resolve => { release = resolve; });
   await page.route(`${api}/rest/v1/bookings**`, route => route.fulfill({ json: [{ id: '11111111-1111-4111-8111-111111111111', starts_at: '2026-11-01T12:00:00Z', provider_services: { title: 'Audit délai avis' } }] }));
   await page.route(`${api}/rest/v1/rpc/get_booking_reviews`, route => route.fulfill({ json: [] }));
+  await page.route(`${api}/rest/v1/rpc/booking_review_submission_state`, route => route.fulfill({ json: false }));
   await page.route('**/api/bookings/reviews', async route => { await pending; await route.fulfill({ status: 504, json: { error: 'Synthetic timeout' } }).catch(() => undefined); });
   await page.goto('/app/reviews');
   await page.getByText(/Audit délai avis.*Donner ou consulter mon avis/).click();

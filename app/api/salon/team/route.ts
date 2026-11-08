@@ -1,3 +1,4 @@
+import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 import { normalizeInvitationPhone } from "@/lib/domain/salon-invitation-phone";
 import { createHash, randomBytes } from "node:crypto";
 import { authenticatedSupabase, applicationOrigin, hasTrustedOrigin, jsonError } from "@/lib/payments/server";
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
   if (!auth) return jsonError("Connexion requise.", 401, "unauthorized");
   if (Number(request.headers.get("content-length") ?? 0) > 16_384) return jsonError("Requête trop volumineuse.", 413, "payload_too_large");
   let payload: unknown;
-  try { payload = await request.json(); } catch { return jsonError("Requête invalide.", 400, "invalid_json"); }
+  try { payload = JSON.parse(await readBoundedText(request, 16384)); } catch (error) { if (error instanceof BodyTooLargeError) return jsonError("Requête trop volumineuse.", 413, "payload_too_large"); return jsonError("Requête invalide.", 400, "invalid_json"); }
   const action = parseAction(payload);
   if (!action) return jsonError("Vérifiez les informations et les permissions.", 400, "invalid_request");
   if (action.action === "review_phone") {

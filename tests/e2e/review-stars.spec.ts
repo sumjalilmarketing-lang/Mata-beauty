@@ -8,6 +8,7 @@ test('avis : sélectionner trois étoiles et publier un commentaire', async ({ p
   let submitted = false;
   await page.route(`${api}/rest/v1/bookings**`, route => route.fulfill({ json: [{ id: '11111111-1111-4111-8111-111111111111', starts_at: '2026-11-01T12:00:00Z', provider_services: { title: 'Soin visage test' } }] }));
   await page.route(`${api}/rest/v1/rpc/get_booking_reviews`, route => route.fulfill({ json: submitted ? [{ id: 'review-test', reviewer_id: session.user.id, type: 'client_to_provider', rating: 3, comment: 'Une belle expérience.', visibility: 'public' }] : [] }));
+  await page.route(`${api}/rest/v1/rpc/booking_review_submission_state`, route => route.fulfill({ json: submitted }));
   await page.route('**/api/bookings/reviews', route => {
     expect(route.request().postDataJSON()).toMatchObject({ rating: 3, comment: 'Une belle expérience.', type: 'client_to_provider' });
     submitted = true;

@@ -3,6 +3,8 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { workspacePage, workspacePageSize } from "@/lib/domain/workspace-list-query";
 import { MessageBubble } from "./message-bubble";
 
 type Ticket = { id: string; subject: string; status: string; priority: string };
@@ -57,25 +59,54 @@ export function SupportThread({ ticketId, staff = false, onChange }: { ticketId:
 }
 
 export function SupportInbox({ filter = "tickets", userId }: { filter?: string; userId?: string }) {
+  const params = useSearchParams(), router = useRouter(), pathname = usePathname();
+  const page = workspacePage(params.get("page")), term = (params.get("q") ?? "").trim().slice(0, 160);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
-  const load = useCallback(async () => {
-    setLoading(true); setNotice("");
-    try {
-      const api = getSupabaseBrowserClient(); if (!api) throw new Error("Connexion indisponible");
-      let query = api.from("support_tickets").select("id,subject,status,priority");
-      if (filter === "unassigned") query = query.is("assigned_to", null);
-      if (filter === "mine") { if (!userId) throw new Error("Session indisponible"); query = query.eq("assigned_to", userId); }
-      if (filter === "priority") query = query.in("priority", ["high", "urgent"]);
-      if (filter === "escalations") query = query.eq("status", "pending").eq("priority", "urgent");
-      const result = await query.order("updated_at",{ascending:false}).limit(100).abortSignal(AbortSignal.timeout(10000));
-      if (result.error) throw result.error;
-      setTickets(result.data as Ticket[]);
-    } catch (error) { setNotice(publicErrorMessage(error, "Les demandes sont indisponibles.")); }
-    finally { setLoading(false); }
-  }, [filter, userId]);
-  useEffect(() => { const timer = setTimeout(() => void load(),0); return () => clearTimeout(timer); }, [load]);
-  return <section className="admin-panel panel"><h2>Demandes au support</h2><button disabled={loading} onClick={() => void load()}>Actualiser les demandes</button>{notice && <p role="alert">{notice}</p>}{loading ? <p>Chargement…</p> : !notice && tickets.length === 0 ? <p>Aucune demande.</p> : tickets.map(ticket => <div className="control-list-row" key={ticket.id}><button onClick={() => setSelected(ticket)}>{ticket.subject}</button><span>{ticket.status} · {ticket.priority}</span></div>)}{selected && <article><h3>{selected.subject}</h3><button onClick={() => setSelected(null)}>Fermer la demande</button><SupportThread key={selected.id} ticketId={selected.id} staff onChange={load} /></article>}</section>;
+  const [revision, setRevision] = useState(0);
+  const load = useCallback(async () => { setRevision(value => value + 1); }, []);
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => { controller.abort(); if (active) { setNotice("Le chargement a expiré. Réessayez."); setLoading(false); } }, 10000);
+    queueMicrotask(() => { if (active) { setLoading(true); setNotice(""); setTickets([]); setTotal(null); } });
+    async function fetchTickets() {
+      try {
+        const api = getSupabaseBrowserClient(); if (!api) throw new Error("Connexion indisponible");
+        let query = api.from("support_tickets").select("id,subject,status,priority", { count: "exact" });
+        if (filter === "unassigned") query = query.is("assigned_to", null);
+        if (filter === "mine") { if (!userId) throw new Error("Session indisponible"); query = query.eq("assigned_to", userId); }
+        if (filter === "priority") query = query.in("priority", ["high", "urgent"]);
+        if (filter === "escalations") query = query.eq("status", "pending").eq("priority", "urgent");
+        if (term) query = query.ilike("subject", `%${term.replace(/[\\%_]/g, "\\$&")}%`);
+        const from = (page - 1) * workspacePageSize;
+        const result = await query.order("updated_at", { ascending: false }).order("id", { ascending: false }).range(from, from + workspacePageSize - 1).abortSignal(controller.signal);
+        if (result.error) throw result.error;
+        if (active && !controller.signal.aborted) { setTickets(result.data as Ticket[]); setTotal(result.count); }
+      } catch (error) { if (active) setNotice(publicErrorMessage(error, "Les demandes sont indisponibles.")); }
+      finally { window.clearTimeout(timer); if (active) setLoading(false); }
+    }
+    void fetchTickets();
+    return () => { active = false; controller.abort(); window.clearTimeout(timer); };
+  }, [filter, userId, page, term, revision]);
+  useEffect(() => { queueMicrotask(() => setSelected(null)); }, [filter, page, term]);
+  function navigate(next: number, query = term) {
+    const search = new URLSearchParams(params.toString());
+    search.set("page", String(next));
+    if (query) search.set("q", query); else search.delete("q");
+    router.push(`${pathname}?${search.toString()}`, { scroll: false });
+  }
+  return <section className="admin-panel panel"><h2>Demandes au support</h2>
+    <form role="search" onSubmit={event => { event.preventDefault(); navigate(1, String(new FormData(event.currentTarget).get("subject") ?? "").trim().slice(0, 160)); }}>
+      <label>Rechercher une demande<input type="search" name="subject" key={term} defaultValue={term} maxLength={160} /></label><button>Rechercher</button>
+    </form>
+    <button disabled={loading} onClick={() => void load()}>Actualiser les demandes</button>
+    {notice && <p role="alert">{notice}</p>}
+    {loading ? <p>Chargement…</p> : !notice && tickets.length === 0 ? <p>Aucune demande.</p> : tickets.map(ticket => <div className="control-list-row" key={ticket.id}><button onClick={() => setSelected(ticket)}>{ticket.subject}</button><span>{ticket.status} · {ticket.priority}</span></div>)}
+    <nav aria-label="Pagination des demandes"><p role="status">{total === null ? "Résultats indisponibles" : `${total} demande(s) · Page ${page}`}</p><button disabled={loading || page <= 1} onClick={() => navigate(page - 1)}>Demandes précédentes</button><button disabled={loading || total === null || page * workspacePageSize >= total} onClick={() => navigate(page + 1)}>Demandes suivantes</button></nav>
+    {selected && <article><h3>{selected.subject}</h3><button onClick={() => setSelected(null)}>Fermer la demande</button><SupportThread key={selected.id} ticketId={selected.id} staff onChange={load} /></article>}
+  </section>;
 }

@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { internalWorkspaceDestination } from "@/lib/auth/workspace-access";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { configureSupabaseBrowserClient, getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
 import { ProviderReview } from "./provider-review";
@@ -327,21 +327,28 @@ function ConfirmationModal({
 }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  return <div className="admin-modal-backdrop">
-    <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="confirmation-title">
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const node = dialog.current;
+    node?.showModal();
+    return () => { node?.close(); previous?.focus(); };
+  }, []);
+  return <dialog ref={dialog} className="admin-modal-backdrop" aria-labelledby="confirmation-title" onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }}>
+    <section className="admin-modal">
       <p className="admin-kicker">Action sensible</p>
       <h2 id="confirmation-title">{title}</h2>
       <p>{description}</p>
       <label>Motif obligatoire<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={2} /></label>
       <div className="admin-modal-actions">
-        <button className="secondary" onClick={onCancel}>Annuler</button>
+        <button className="secondary" autoFocus disabled={busy} onClick={onCancel}>Annuler</button>
         <button className={dangerous ? "danger" : "primary"} disabled={busy || reason.trim().length < 2} onClick={() => {
           setBusy(true);
           void onConfirm(reason).finally(() => setBusy(false));
         }}>{busy ? "Traitement…" : "Confirmer"}</button>
       </div>
     </section>
-  </div>;
+  </dialog>;
 }
 
 export function SuperAdminApp({ supabaseUrl, supabaseAnonKey, initialModule = "overview" }: { supabaseUrl: string; supabaseAnonKey: string; initialModule?: ModuleKey }) {
@@ -638,9 +645,27 @@ function AdminModule({
 
 function Overview({ context, setModule }: { context: AdminContext; setModule: (module: ModuleKey) => void }) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    void getSupabaseBrowserClient()?.rpc("get_admin_dashboard").then(({ data }) => setMetrics(data as Metrics | null));
-  }, []);
+    let active = true;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => { controller.abort(); if (active) setError(true); }, 12000);
+    queueMicrotask(() => { if (active) { setError(false); setMetrics(null); } });
+    async function load() {
+      try {
+        const client = getSupabaseBrowserClient();
+        if (!client) throw new Error("unavailable");
+        const result = await client.rpc("get_admin_dashboard").abortSignal(controller.signal);
+        if (result.error || !result.data) throw new Error("unavailable");
+        if (active && !controller.signal.aborted) setMetrics(result.data as Metrics);
+      } catch { if (active) setError(true); }
+      finally { window.clearTimeout(timer); }
+    }
+    void load();
+    return () => { active = false; controller.abort(); window.clearTimeout(timer); };
+  }, [attempt]);
+  if (error) return <section className="admin-panel" role="alert"><p>Le tableau de bord est indisponible. Vérifiez votre accès et réessayez.</p><button onClick={() => setAttempt(value => value + 1)}>Réessayer le tableau de bord</button></section>;
   if (!metrics) return <LoadingSkeleton />;
   const bookingTotal = metrics.bookings_confirmed + metrics.bookings_cancelled;
   const cancellationRate = bookingTotal ? Math.round((metrics.bookings_cancelled / bookingTotal) * 100) : 0;

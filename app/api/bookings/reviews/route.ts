@@ -1,3 +1,4 @@
+import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 import { z } from "zod";
 import { authenticatedSupabase, hasTrustedOrigin, jsonError } from "@/lib/payments/server";
 const input = z.object({ bookingId: z.uuid(), type: z.enum(["client_to_provider", "provider_to_client"]), rating: z.number().int().min(1).max(5), comment: z.string().trim().max(2000).default(""), criteria: z.array(z.enum(["quality", "welcome", "punctuality", "respect", "behaviour"])).max(5).default([]), visibility: z.enum(["public", "internal"]).default("public") }).strict();
@@ -24,9 +25,10 @@ export async function POST(request: Request) {
         return jsonError("Requête trop volumineuse.", 413, "payload_too_large");
     let body: unknown;
     try {
-        body = await request.json();
+        body = JSON.parse(await readBoundedText(request, 16384));
     }
-    catch {
+    catch (error) {
+        if (error instanceof BodyTooLargeError) return jsonError("Requête trop volumineuse.", 413, "payload_too_large");
         return jsonError("Requête invalide.", 400, "invalid_json");
     }
     const parsed = input.safeParse(body);

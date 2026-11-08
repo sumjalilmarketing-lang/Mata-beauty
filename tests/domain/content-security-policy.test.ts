@@ -26,10 +26,10 @@ describe("workspace CSP without changing public static rendering", () => {
     for (const path of ["/", "/conseils/test", "/api/push", "/staff/manifest.webmanifest", "/professional/salon"]) expect(usesWorkspaceNonce(path, "text/html")).toBe(false);
     expect(usesWorkspaceNonce("/app/profile", "text/x-component")).toBe(false);
   });
-  it("excludes prerendered workspace entry documents, including trailing slashes", () => {
+  it("protects formerly prerendered entry documents, including trailing slashes", () => {
     for (const path of ["/admin", "/app/social-profile", "/auth/update-password", "/salon/invitation/accept"]) {
-      expect(usesWorkspaceNonce(path, "text/html")).toBe(false);
-      expect(usesWorkspaceNonce(path + "/", "text/html")).toBe(false);
+      expect(usesWorkspaceNonce(path, "text/html")).toBe(true);
+      expect(usesWorkspaceNonce(path + "/", "text/html")).toBe(true);
     }
     expect(usesWorkspaceNonce("/staff/profile/", "text/html")).toBe(true);
   });

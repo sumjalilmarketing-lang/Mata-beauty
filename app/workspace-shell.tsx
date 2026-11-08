@@ -4,7 +4,7 @@ import { useApplicationLocale } from "./use-application-locale";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FormEvent, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { workspaceHref, workspaceSpaces, simpleNavigation, navigationLabel, navigationParent, type WorkspaceSpaceKey } from "@/lib/navigation/spaces";
 import "./workspace.css";
@@ -51,13 +51,6 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
   const visibleSpaces = ["client", "pro", "salon", "staff"].includes(space)
     ? refreshedSpaces.filter(key => ["client", "pro", "salon", "staff"].includes(key)) : refreshedSpaces;
 
-  function search(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const query = String(new FormData(event.currentTarget).get("workspace-search") ?? "").trim();
-    const target = workspaceHref(space, activeModule.key);
-    router.push(query ? `${target}?q=${encodeURIComponent(query)}` : target);
-  }
-
   async function signOut() {
     await getSupabaseBrowserClient()?.auth.signOut();
     router.replace("/");
@@ -93,7 +86,7 @@ export function WorkspaceShell({ space, moduleKey, availableSpaces, allowedModul
     <main className="workspace-main">
       <header className="workspace-topbar">
         <div><p>{t(definition.eyebrow)}</p><h1>{t(activeModule.label)}</h1></div>
-        <div className="workspace-tools"><form role="search" onSubmit={search}><label><span className="sr-only">{t("Rechercher dans ce module")}</span><input name="workspace-search" type="search" placeholder={t("Rechercher…")} /></label></form>{modules.some(item=>item.key==="messages") && <Link className="inbox-icon" href={workspaceHref(space,"messages")} aria-label={t("Messages")}>✉<UnreadBadge kind="messages"/></Link>}{notificationsModule && <Link className="workspace-notifications" href={workspaceHref(space, notificationsModule.key)} aria-label={t("Notifications")}>◌<NotificationBadge /></Link>}<WorkspaceProfileAvatar email={userEmail} href={space === "staff" ? "/staff/profile" : space === "pro" ? "/pro/settings" : "/app/profile?edit=1"} /></div>
+        <div className="workspace-tools">{modules.some(item=>item.key==="messages") && <Link className="inbox-icon" href={workspaceHref(space,"messages")} aria-label={t("Messages")}>✉<UnreadBadge kind="messages"/></Link>}{notificationsModule && <Link className="workspace-notifications" href={workspaceHref(space, notificationsModule.key)} aria-label={t("Notifications")}>◌<NotificationBadge /></Link>}<WorkspaceProfileAvatar email={userEmail} href={space === "staff" ? "/staff/profile" : space === "pro" ? "/pro/settings" : space === "salon" ? "/salon/settings" : space === "client" ? "/app/profile?edit=1" : "/account/settings"} /></div>
       </header>
       <div className="workspace-breadcrumb"><Link href={definition.prefix}>{t(definition.label)}</Link><span>/</span><span>{t(activeModule.label)}</span></div>
       {secondary.length > 0 && !(space === "client" && moduleKey === "profile") && <details className="workspace-secondary" open={secondary.some((item) => item.key === moduleKey)}><summary>{space === "client" ? t("Mon compte") : t("Dans cette rubrique")}</summary><nav aria-label={t("Navigation secondaire")}>{secondary.map((item) => <Link key={item.key} href={workspaceHref(space, item.key)} aria-current={item.key === moduleKey ? "page" : undefined}>{t(navigationLabel(space, item))}<MenuUnreadBadge moduleKey={item.key}/></Link>)}</nav></details>}

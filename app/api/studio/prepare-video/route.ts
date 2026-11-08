@@ -2,6 +2,7 @@ import { z } from "zod";
 import { authenticatedSupabase, consumeRateLimit, hasTrustedOrigin, jsonError, serviceSupabase } from "@/lib/payments/server";
 import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 import { InvalidStudioMedia, MAX_STUDIO_VIDEO_BYTES, normalizeStudioVideo, readBoundedMedia } from "@/lib/media/video-validation-server";
+import { logStudioFailure } from "@/lib/media/studio-logging";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 const input = z.object({ preparationId: z.uuid() }).strict();
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
     if (error instanceof InvalidStudioMedia) return jsonError(error.message, 422, "invalid_media");
     if (error instanceof BodyTooLargeError) return jsonError("Requête trop volumineuse.", 413, "body_too_large");
     if (error instanceof SyntaxError) return jsonError("Requête invalide.", 400, "invalid_request");
+    logStudioFailure("prepare-video", error);
     return jsonError("La préparation sur le serveur est indisponible. Votre sélection et vos champs sont conservés ; réessayez.", 503, "preparation_unavailable");
   }
 }

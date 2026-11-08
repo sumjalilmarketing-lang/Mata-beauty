@@ -14,3 +14,8 @@ describe("verified booking feedback", () => {
     it("does not disclose database errors", async () => { mocks.rpc.mockResolvedValue({ error: { message: "sensitive database data" } }); const r = await POST(request({ bookingId, type: "client_to_provider", rating: 5 })); expect(r.status).toBe(409); expect(await r.text()).not.toContain("sensitive"); });
     it("never caches review responses", async () => { mocks.rpc.mockResolvedValue({ data: [], error: null }); const r = await GET(new Request(`https://mata-beauty.com/api/bookings/reviews?bookingId=${bookingId}`)); expect(r.headers.get("Cache-Control")).toBe("private, no-store"); });
 });
+
+it("rejects streamed oversized reviews even with a forged small length", async () => {
+ const request=new Request("https://mata-beauty.com/api/bookings/reviews",{method:"POST",headers:{"content-length":"1"},body:JSON.stringify({comment:"x".repeat(17000)})});
+ expect((await POST(request)).status).toBe(413); expect(mocks.rpc).not.toHaveBeenCalled();
+});

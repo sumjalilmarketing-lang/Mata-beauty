@@ -1,7 +1,19 @@
-import { Upload } from "tus-js-client";
+import { Upload, DetailedError } from "tus-js-client";
 import { getSupabaseBrowserClient, getSupabaseConfiguration } from "@/lib/supabase/client";
 
 export class StudioUploadError extends Error {}
+
+export function studioTransferMessage(status: number) {
+  const suffix = " Votre vidéo et vos champs sont conservés.";
+  if (status === 401) return "Votre session a expiré. Reconnectez-vous puis réessayez." + suffix;
+  if (status === 403) return "Le serveur a refusé cet envoi. Vérifiez votre accès professionnel puis réessayez." + suffix;
+  if (status === 413) return "Cette vidéo dépasse la taille autorisée. Choisissez un fichier plus léger." + suffix;
+  if (status === 429) return "La limite d’envois est atteinte. Réessayez plus tard." + suffix;
+  if (status === 409) return "Cet envoi existe déjà. Relancez la préparation." + suffix;
+  if (status >= 500) return "Le service vidéo est momentanément indisponible. Réessayez." + suffix;
+  if (status >= 400) return "Le serveur n’a pas accepté cet envoi. Relancez la préparation." + suffix;
+  return "L’envoi a été interrompu. Vérifiez la connexion puis réessayez." + suffix;
+}
 
 /** Chunked transfer retries network interruptions without restarting the whole video. */
 export async function uploadStudioVideo(file: File, path: string, onProgress: (percent: number) => void, options: { bucket?: "provider-social-media" | "studio-video-inputs"; signal?: AbortSignal } = {}) {
@@ -25,7 +37,7 @@ export async function uploadStudioVideo(file: File, path: string, onProgress: (p
       removeFingerprintOnSuccess: true,
       onProgress: (sent, total) => onProgress(total ? Math.round(sent * 100 / total) : 0),
       onSuccess: () => { options.signal?.removeEventListener("abort", cancelled); window.clearTimeout(deadline); resolve(); },
-      onError: () => { options.signal?.removeEventListener("abort", cancelled); window.clearTimeout(deadline); reject(new StudioUploadError("L’envoi a été interrompu. Votre vidéo et vos champs sont conservés ; vérifiez la connexion puis réessayez.")); },
+      onError: error => { options.signal?.removeEventListener("abort", cancelled); window.clearTimeout(deadline); reject(new StudioUploadError(studioTransferMessage(error instanceof DetailedError ? error.originalResponse?.getStatus() ?? 0 : 0))); },
     });
     const deadline = window.setTimeout(() => {
       options.signal?.removeEventListener("abort", cancelled);
