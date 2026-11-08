@@ -35,12 +35,21 @@ test("public static HTML keeps a non-blocking CSP rollout", async ({ page }) => 
   expect(enforced).not.toContain("'nonce-");
 });
 
-for (const path of ["/admin", "/app/social-profile", "/auth/update-password", "/salon/invitation/accept"]) {
-  test(`prerendered ${path} keeps compatible script headers`, async ({ page }) => {
+for (const path of ["/admin", "/auth/update-password", "/salon/invitation/accept"]) {
+  test(`private entry ${path} uses a nonce after becoming dynamic`, async ({ page }) => {
     const response = await page.goto(path);
     const enforced = response?.headers()["content-security-policy"]?.split(";").find(value => value.trim().startsWith("script-src")) ?? "";
-    expect(enforced).toContain("'unsafe-inline'");
-    expect(enforced).not.toContain("'nonce-");
+    expect(enforced).not.toContain("'unsafe-inline'");
+    expect(enforced).toContain("'nonce-");
     await expect(page.locator("body")).toBeVisible();
   });
 }
+
+test("legacy profile redirects to the authenticated profile with its nonce",async({page,context})=>{
+ const session=syntheticSession("client");
+ await context.addCookies([{name:"sb-127-auth-token",value:"base64-"+Buffer.from(JSON.stringify(session)).toString("base64url"),domain:"127.0.0.1",path:"/",sameSite:"Lax"}]);
+ const response=await page.goto("/app/social-profile");
+ await expect(page).toHaveURL(/\/app\/profile$/);
+ expect(response?.headers()["content-security-policy"]).toContain("'nonce-");
+ await expect(page.getByRole("link",{name:"Identité, préférences et confidentialité",exact:true})).toBeVisible();
+});

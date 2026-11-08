@@ -18,7 +18,7 @@ test("support: ticket 101 is accessible and subject search resets pagination",as
   const url=new URL(route.request().url()), term=url.searchParams.get("subject"), offset=Number(url.searchParams.get("offset")??0),limit=Number(url.searchParams.get("limit")??50);
   expect(url.searchParams.get("order")).toBe("updated_at.desc,id.desc");
   const matches=term?rows.filter(row=>row.subject.includes("101")):rows;
-  return route.fulfill({json:matches.slice(offset,offset+limit),headers:{"content-range":`${offset}-${Math.min(offset+limit,matches.length)-1}/${matches.length}`}});
+  return route.fulfill({json:matches.slice(offset,offset+limit),headers:{"Access-Control-Expose-Headers":"content-range","content-range":`${offset}-${Math.min(offset+limit,matches.length)-1}/${matches.length}`}});
  });
  await page.goto("/support-agent/tickets");
  await expect(page.getByRole("button",{name:"Demande 001",exact:true})).toBeVisible();
@@ -26,7 +26,7 @@ test("support: ticket 101 is accessible and subject search resets pagination",as
  await expect(page.getByRole("button",{name:"Demande 051",exact:true})).toBeVisible();
  await page.getByRole("button",{name:"Demandes suivantes"}).click();
  await expect(page.getByRole("button",{name:"Demande 101",exact:true})).toBeVisible();
- await page.getByRole("button",{name:"Demandes suivantes"}).isDisabled().then(disabled=>expect(disabled).toBe(true));
+ await expect(page.getByRole("button",{name:"Demandes suivantes"})).toBeDisabled();
  await page.getByRole("button",{name:"Demandes précédentes"}).click();
  await page.getByLabel("Rechercher une demande").fill("101");await page.getByRole("button",{name:"Rechercher",exact:true}).click();
  await expect(page).toHaveURL(/page=1.*q=101/);

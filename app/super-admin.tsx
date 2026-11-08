@@ -328,10 +328,12 @@ function ConfirmationModal({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const node = dialog.current;
     node?.showModal();
+    cancelButton.current?.focus();
     return () => { node?.close(); previous?.focus(); };
   }, []);
   return <dialog ref={dialog} className="admin-modal-backdrop" aria-labelledby="confirmation-title" onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }}>
@@ -341,7 +343,7 @@ function ConfirmationModal({
       <p>{description}</p>
       <label>Motif obligatoire<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={2} /></label>
       <div className="admin-modal-actions">
-        <button className="secondary" autoFocus disabled={busy} onClick={onCancel}>Annuler</button>
+        <button ref={cancelButton} className="secondary" disabled={busy} onClick={onCancel}>Annuler</button>
         <button className={dangerous ? "danger" : "primary"} disabled={busy || reason.trim().length < 2} onClick={() => {
           setBusy(true);
           void onConfirm(reason).finally(() => setBusy(false));
