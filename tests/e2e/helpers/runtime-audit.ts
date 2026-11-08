@@ -55,7 +55,8 @@ export async function startRuntimeAudit(page: Page) {
     const text = message.text();
     // Public CSP report-only is an intentional observed candidate, not an
     // execution block. Preserve these messages; never ignore enforced CSP.
-    if (/^\[Report Only\]/i.test(text) && /Content[ -]Security[ -]Policy/i.test(text)) state.reportOnlyConsole.push(text);
+    if ((/^\[Report Only\]/i.test(text) && /Content[ -]Security[ -]Policy/i.test(text))
+      || (/frame-ancestors.*ignored when delivered in a report-only policy|delivered in report-only mode, but does not specify a ['"]?report-to/i.test(text))) state.reportOnlyConsole.push(text);
     else if (!text.includes('Failed to load resource')) state.unexpectedConsole.push(text);
   });
 }

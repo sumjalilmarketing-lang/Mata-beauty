@@ -1,6 +1,6 @@
 import {expect,test,type BrowserContext} from '@playwright/test';
 import {syntheticSession} from './fixtures/department-workspaces.mjs';
-import {auditBusiness,auditService,auditBooking,auditMedia} from './fixtures/provider-audit.mjs';
+import {auditBusiness,auditService,auditBooking,auditMedia,auditCategory} from './fixtures/provider-audit.mjs';
 const api=process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
 async function login(context:BrowserContext,role='provider'){const session=syntheticSession(role);await context.addCookies([{name:'sb-127-auth-token',value:'base64-'+Buffer.from(JSON.stringify(session)).toString('base64url'),domain:'127.0.0.1',path:'/',httpOnly:false,sameSite:'Lax'}]);}
 
@@ -16,6 +16,30 @@ test('salon : réservation sous statut attendu et périmètre du salon',async({p
  await page.route(`${api}/rest/v1/bookings**`,route=>{if(route.request().method()!=='PATCH')return route.fallback();const params=new URL(route.request().url()).searchParams;expect(params.get('business_id')).toBe('eq.'+auditBusiness);expect(params.get('status')).toBe('eq.pending');return route.fulfill({json:saved?{id:auditBooking}:null});});
  await page.goto('/salon/bookings');await page.getByRole('button',{name:'Confirmer',exact:true}).click();await expect(page.getByText('La réservation a changé ou n’est plus accessible. Actualisez la liste.',{exact:true})).toBeVisible();
  saved=true;await page.getByRole('button',{name:'Confirmer',exact:true}).click();await expect(page.getByText('Réservation mise à jour.',{exact:true})).toBeVisible();
+});
+
+test('pro : crée une prestation avec une catégorie et confirme sa persistance',async({page,context})=>{
+ await login(context);let payload:Record<string,unknown>|undefined;
+ await page.route(`${api}/rest/v1/provider_services**`,route=>{
+  if(route.request().method()!=='POST')return route.fallback();
+  payload=route.request().postDataJSON() as Record<string,unknown>;
+  expect(payload.provider_id).toBe(syntheticSession('provider').user.id);
+  expect(payload.service_id).toBe(auditCategory);
+  expect(payload.currency).toBe('XOF');
+  return route.fulfill({json:{id:'aaaaaaaa-aaaa-4aaa-8aaa-000000000508',business_id:null,service_id:auditCategory,title:'Nouvelle prestation de recette',description:null,duration_minutes:60,price_amount:15000,currency:'XOF',deposit_percentage:0,is_active:true,archived_at:null,updated_at:'2026-11-08T12:00:00Z'}});
+ });
+ await page.goto('/pro/services');
+ const form=page.locator('form.service-form');
+ await expect(form.getByRole('button',{name:'Ajouter la prestation',exact:true})).toBeEnabled();
+ await expect(form.getByLabel('Catégorie de prestation')).toHaveAttribute('required','');
+ await form.getByLabel('Catégorie de prestation').selectOption(auditCategory);
+ await form.getByLabel('Nom de votre prestation').fill('Nouvelle prestation de recette');
+ await form.getByLabel('Heures',{exact:true}).fill('1');
+ await form.getByLabel('Minutes',{exact:true}).fill('0');
+ await form.getByLabel('Prix (XOF)').fill('15000');
+ await form.getByRole('button',{name:'Ajouter la prestation',exact:true}).click();
+ await expect(page.getByText('Prestation ajoutée et confirmée dans votre catalogue.',{exact:true})).toBeVisible();
+ expect(payload).toMatchObject({service_id:auditCategory,title:'Nouvelle prestation de recette',duration_minutes:60,price_amount:15000,currency:'XOF'});
 });
 
 test('salon : modifier une prestation exige une ligne, puis conserve le taux d’acompte',async({page,context})=>{

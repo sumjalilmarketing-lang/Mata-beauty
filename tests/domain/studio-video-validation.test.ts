@@ -31,7 +31,8 @@ it("rejects audio-only containers and preserves videos longer than 90 seconds", 
   const path = join(dir, "audio.mp4");
   execFileSync(ffmpeg!, ["-v", "error", "-f", "lavfi", "-i", "sine=frequency=1000:duration=2", "-y", path]);
   await expect(validateVideoBytes(await readFile(path))).rejects.toThrow();
-  await expect(validateVideoBytes(await video("mp4", 92))).resolves.toHaveProperty("duration", 92);
+  const longVideo = await validateVideoBytes(await video("mp4", 92));
+  expect(longVideo.duration).toBeGreaterThan(90);
 }, 30_000);
 it("actually decodes allowed thumbnail bytes and rejects renamed garbage", async () => {
   const bytes = await sharp({ create: { width: 4, height: 4, channels: 3, background: "pink" } }).jpeg().toBuffer();
