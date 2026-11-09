@@ -1020,6 +1020,11 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   }
   const depositQuote = serviceDepositQuote(service.price_amount, compositeBooking ? 0 : service.deposit_percentage ?? provider.depositPercentage ?? 0, service.currency ?? "XOF");
   const onlinePaymentAvailable = !compositeBooking && depositQuote.percentage === 0 && paymentCapabilities.onlineCheckoutEnabled && (service.currency ?? "XOF") === "XOF";
+  const onlinePaymentNotice = paymentCapabilitiesLoading ? "Vérification des moyens de paiement…"
+    : compositeBooking ? "Ce panier personnalisé est à régler sur place."
+    : (service.currency ?? "XOF") !== "XOF" ? "Wave et Orange Money sont proposés uniquement pour les paiements en francs CFA (XOF)."
+    : depositQuote.percentage > 0 ? "Le paiement des acomptes en ligne n’est pas encore activé pour cette prestation."
+    : "L’encaissement en ligne n’est pas encore activé sur MATA Beauty. Vous pouvez réserver et régler sur place.";
 
   useEffect(() => {
     writeBrowserStorage("sessionStorage", bookingDraftKey, JSON.stringify({ selection, request: form }));
@@ -1192,7 +1197,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
                 {paymentCapabilities.methods.includes("wave") && <label><input type="radio" name="payment" checked={form.paymentMethod === "wave"} onChange={() => setForm({ ...form, paymentMethod: "wave" })} /><span><strong>{t("Wave · Paiement de démonstration")}</strong><small>{t("PayDunya Sandbox · aucun argent réel")}</small></span></label>}
                 {paymentCapabilities.methods.includes("orange_money") && <label><input type="radio" name="payment" checked={form.paymentMethod === "orange_money"} onChange={() => setForm({ ...form, paymentMethod: "orange_money" })} /><span><strong>{t("Orange Money · Paiement de démonstration")}</strong><small>{t("PayDunya Sandbox · aucun argent réel")}</small></span></label>}
                 {paymentCapabilities.methods.includes("card") && <label><input type="radio" name="payment" checked={form.paymentMethod === "card"} onChange={() => setForm({ ...form, paymentMethod: "card" })} /><span><strong>{t("Carte · Paiement de démonstration")}</strong><small>{t("PayDunya Sandbox · aucune carte réelle")}</small></span></label>}
-              </> : <label><input type="radio" name="payment" disabled /><span><strong>{t("Wave, Orange Money ou carte")}</strong><small>{paymentCapabilitiesLoading ? t("Vérification…") : t("Le paiement en ligne n’est pas encore disponible")}</small></span></label>}
+              </> : <details className="payment-method-access"><summary><strong>{t("Wave, Orange Money ou carte")}</strong><small>{t("Voir les moyens de paiement")}</small></summary><div className="payment-method-status"><p role="status">{t(onlinePaymentNotice)}</p><ul aria-label={t("Moyens de paiement en ligne")}><li>Wave</li><li>Orange Money</li><li>{t("Carte bancaire")}</li></ul><p>{t("Aucun paiement en ligne ne sera lancé. Le paiement sur place reste sélectionné.")}</p></div></details>}
             </fieldset>
             <section className="booking-cancellation-policy" aria-label={t("Politique d’annulation")}><h4>{t("Politique d’annulation")}</h4><p>{t("Annulation gratuite au moins 48 h avant le rendez-vous. Si le professionnel annule, les sommes versées sont intégralement remboursées. À moins de 48 h ou en cas d’absence, seul l’acompte effectivement payé peut être conservé, sous réserve des droits applicables.")}</p><p>{t("Aucun acompte payé : aucune retenue d’acompte.")}</p><Link href="/legal/annulation" target="_blank" rel="noopener noreferrer">{t("Lire la politique d’annulation")}</Link></section>
             <details className="booking-options"><summary>{t("Note")}</summary><label>{t("Note")}<textarea maxLength={1000} value={form.note} placeholder={t("Précision utile pour le professionnel")} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label></details>

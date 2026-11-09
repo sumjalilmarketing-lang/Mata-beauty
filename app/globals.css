@@ -680,3 +680,13 @@ body{background:#080810;color:#fff8fc}
 .booking-service-selection label:hover { background:rgba(139,99,59,.08); }
 .premium-booking-modal button:focus-visible { outline:3px solid #8b633b; outline-offset:3px; }
 .premium-booking-modal button:disabled { cursor:not-allowed; opacity:.55; }
+
+.payment-method-access{margin-bottom:8px;border:1px solid var(--mb-line);border-radius:11px;background:rgba(255,255,255,.025)}
+.payment-method-access summary{padding:13px;cursor:pointer;min-height:48px;color:var(--mb-text,#fff)}
+.payment-method-access summary:hover{background:rgba(215,166,75,.08)}
+.payment-method-access summary:active{background:rgba(215,166,75,.14)}
+.payment-method-access summary:focus-visible{outline:3px solid var(--mb-gold);outline-offset:3px;border-radius:11px}
+.payment-method-access[open]{border-color:var(--mb-gold)}
+.payment-method-access .payment-method-status{padding:0 13px 13px;font-size:13px;line-height:1.5;color:var(--mb-muted)}
+.payment-method-status ul{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0}
+.payment-method-status li{padding:6px 10px;border:1px solid var(--mb-line);border-radius:8px;color:var(--mb-text,#fff)}

@@ -1,6 +1,15 @@
 import { feedText } from "./feed-copy";
 
 const copy: Record<string, readonly [string, string]> = {
+  "Voir les moyens de paiement": ["View payment methods", "Ver los medios de pago"],
+  "Moyens de paiement en ligne": ["Online payment methods", "Medios de pago en línea"],
+  "Carte bancaire": ["Bank card", "Tarjeta bancaria"],
+  "Vérification des moyens de paiement…": ["Checking payment methods…", "Verificando los medios de pago…"],
+  "Ce panier personnalisé est à régler sur place.": ["This customized basket must be paid on site.", "Esta selección personalizada se paga en el establecimiento."],
+  "Wave et Orange Money sont proposés uniquement pour les paiements en francs CFA (XOF).": ["Wave and Orange Money are only offered for CFA franc (XOF) payments.", "Wave y Orange Money solo se ofrecen para pagos en francos CFA (XOF)."],
+  "Le paiement des acomptes en ligne n’est pas encore activé pour cette prestation.": ["Online deposit payments are not yet enabled for this service.", "Los anticipos en línea aún no están activados para este servicio."],
+  "L’encaissement en ligne n’est pas encore activé sur MATA Beauty. Vous pouvez réserver et régler sur place.": ["Online collection is not yet enabled on MATA Beauty. You can book and pay on site.", "El cobro en línea aún no está activado en MATA Beauty. Puedes reservar y pagar en el establecimiento."],
+  "Aucun paiement en ligne ne sera lancé. Le paiement sur place reste sélectionné.": ["No online payment will be started. Payment on site remains selected.", "No se iniciará ningún pago en línea. El pago en el establecimiento sigue seleccionado."],
   "Actualisées chaque minute": ["Refreshed every minute", "Actualizadas cada minuto"],
   "Cette prestation n’est pas encore ouverte à la réservation. Le salon doit terminer sa publication.": ["This service is not open for bookings yet. The salon must finish publication.", "Este servicio aún no admite reservas. El salón debe completar su publicación."],
   "Voir les prochaines disponibilités": ["See next available slots", "Ver las próximas horas disponibles"],
