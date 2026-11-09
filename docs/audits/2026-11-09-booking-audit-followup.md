@@ -77,7 +77,7 @@ Les agendas réutilisent les intitulés contractuels avec variantes. Les candida
 
 ### Erreurs, API et confidentialité
 
-Une page `loading.tsx` fournit un état de chargement annoncé. Les routes maps, invitations et administration lisent désormais des corps bornés avant traitement. Le précédent correctif du portefeuille distingue toujours panne et solde nul.
+Les chargements du calendrier et des options sont annoncés localement. Le fallback global `loading.tsx` a été retiré après détection en CI de réponses HTTP 200 remplaçant les statuts de redirection/404 ; les limites locales conservent les statuts serveur. Les routes maps, invitations et administration lisent désormais des corps bornés avant traitement. Le précédent correctif du portefeuille distingue toujours panne et solde nul.
 
 Une lecture des métadonnées réelles a confirmé la fuite du champ `availability_exceptions.reason`. Le test reproduit d'abord la lecture anonyme, puis applique la migration : visiteurs et tiers ne voient plus l'absence, le propriétaire conserve lecture/modification et les RPC publics continuent d'exclure la période bloquée sans renvoyer de motif.
 
@@ -98,6 +98,6 @@ Les fichiers réécrits restent complets, TypeScript strict, sans ajout de `any`
 
 ## 4. Validation et recette de livraison
 
-Suite qualité locale terminée avec succès : **145 fichiers / 929 tests**, TypeScript strict et build de production réussis ; lint sans erreur, 8 avertissements préexistants. Les résultats des scénarios navigateur distants, de la compatibilité sur la base de recette et de la publication éventuelle sont consignés dans la PR de cette livraison. Les tests ciblés déjà exécutés couvrent la tarification réelle, le report, les options, le bloc continu, les ACL/RLS, les filtres paginés et les requêtes surdimensionnées.
+Suite qualité locale terminée avec succès : **145 fichiers / 929 tests**, TypeScript strict et build de production réussis ; lint sans erreur, 8 avertissements préexistants. Après retrait du fallback global, les 18 scénarios HTTP du routeur ont également réussi localement. Les résultats des scénarios navigateur distants, de la compatibilité sur la base de recette et de la publication éventuelle sont consignés dans la PR de cette livraison. Les tests ciblés déjà exécutés couvrent la tarification réelle, le report, les options, le bloc continu, les ACL/RLS, les filtres paginés et les requêtes surdimensionnées.
 
 L'inventaire statique n'est pas présenté comme une validation de tous les états hover, focus, disabled et loading sur tous les appareils. Les tests de charge, les comptes multiples distants concurrents, le PSP réel et les notifications physiques restent des limites explicites tant qu'aucune preuve d'exécution ne les valide.

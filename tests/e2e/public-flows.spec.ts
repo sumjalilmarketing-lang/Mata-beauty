@@ -186,6 +186,8 @@ test("primary mobile navigation keeps comfortable touch targets", async ({ page 
 });
 
 test("Inspiration swipes vertically with one active player, filters and an eight-item batch", async ({ page }) => {
+  // These synthetic services have no configured optional or required variants.
+  await page.route(`${testSupabaseOrigin}/rest/v1/service_options**`, route => route.fulfill({ json: [] }));
   const signedPosts: string[] = [];
   await page.route("**/api/public/social-posts/*/media", (route) => {
     const postId = new URL(route.request().url()).pathname.split("/").at(-2);

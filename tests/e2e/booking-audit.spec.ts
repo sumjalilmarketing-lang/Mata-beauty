@@ -24,6 +24,7 @@ type AuditState = {
   lastBookingCurrency?: string;
   currentRole: "client" | "provider" | "other";
   selectedSlot: string;
+  lastSearch?: Record<string, unknown>;
   lastBookingSource?: string | null;
 };
 
@@ -84,7 +85,8 @@ async function mockSupabase(page: Page, state: AuditState) {
       return json(route, { id: userId, email: `${state.currentRole}-audit@example.test`, aud: "authenticated", role: "authenticated", user_metadata: {} });
     }
     if (path === "/auth/v1/logout") return json(route, {});
-    if (path === "/rest/v1/social_feed") {
+    if (path === "/rest/v1/social_feed" || path === "/rest/v1/rpc/search_inspiration_feed") {
+      if (path.endsWith("search_inspiration_feed")) state.lastSearch = request.postDataJSON() as Record<string, unknown>;
       return json(route, [{
         id: socialPostId, author_id: providerId,
         caption: "Tresses express réalisées à Dakar", video_url: `${appOrigin}/social-sample.mp4`, thumbnail_url: null,
@@ -382,6 +384,7 @@ test.describe("audit chronométré de réservation", () => {
     await search.locator("select").first().selectOption("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"); actions += 1;
     await search.getByRole("button", { name: "Afficher les vidéos", exact: true }).click(); actions += 1;
     await expect(page.locator(".social-video-card")).toHaveCount(1);
+    expect(state.lastSearch).toMatchObject({ target_category_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" });
     await page.locator(".social-video-card").first().locator(".feed-book").click(); actions += 1;
     await page.getByRole("button", { name: "10:00" }).click(); actions += 1;
     await expect(page.getByRole("dialog", { name: "Réserver" }).getByText("Tresses express", { exact: true })).toBeVisible();
