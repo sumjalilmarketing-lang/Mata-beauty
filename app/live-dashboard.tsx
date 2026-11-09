@@ -1,4 +1,5 @@
 "use client";
+import { bookingServiceTitle } from "@/lib/domain/booking-service-title";
 import { PhoneInput } from "./phone-input";
 import { BookingReschedule } from "./booking-reschedule";
 import { BookingFeedback } from "./booking-feedback";
@@ -30,6 +31,7 @@ import type { ClientBookingItem } from "@/lib/domain/client-bookings";
 type Role = "client" | "provider" | "admin";
 type ProviderStatus = "draft" | "pending_review" | "approved" | "rejected" | "suspended";
 type BookingRow = {
+  service_snapshot?: unknown;
   id: string;
   provider_id: string;
   provider_service_id: string;
@@ -172,7 +174,7 @@ export function LiveDashboard({
         timeZone: business?.timezone ?? provider?.timezone ?? (provider?.country_code === "SN" ? "Africa/Dakar" : "UTC"),
         serviceId: row.provider_service_id,
         serviceBookable: Boolean(service?.is_active && !service.archived_at),
-        serviceName: service?.title ?? "Prestation beauté",
+        serviceName: bookingServiceTitle(row.service_snapshot, service?.title ?? "Prestation beauté"),
         startsAt: row.starts_at,
         endsAt: row.ends_at,
         status: row.status,
@@ -190,7 +192,7 @@ export function LiveDashboard({
       const nextPage = bookingPage + 1;
       const start = nextPage * clientBookingPageSize;
       const { data, error: queryError } = await supabase.from("bookings")
-        .select("id,provider_id,provider_service_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,provider_services(title,duration_minutes,business_id,is_active,archived_at)")
+        .select("id,provider_id,provider_service_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,service_snapshot,provider_services(title,duration_minutes,business_id,is_active,archived_at)")
         .eq("client_id", userId).order("starts_at", { ascending: false }).range(start, start + clientBookingPageSize);
       if (queryError) throw queryError;
       const pageRows = ((data ?? []) as unknown as BookingQueryRow[]);
@@ -240,7 +242,7 @@ export function LiveDashboard({
         if (owned?.error) throw owned.error;
         const businessIds = (owned?.data ?? []).map((item: { id: string }) => item.id);
         let bookingQuery = supabase.from("bookings")
-          .select("id,provider_id,provider_service_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,provider_services(title,duration_minutes,business_id,is_active,archived_at)")
+          .select("id,provider_id,provider_service_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,service_snapshot,provider_services(title,duration_minutes,business_id,is_active,archived_at)")
           ;
         bookingQuery = role === "provider" && businessIds.length
           ? bookingQuery.or(`provider_id.eq.${userId},business_id.in.(${businessIds.join(",")})`)
@@ -265,7 +267,7 @@ export function LiveDashboard({
           const now = new Date().toISOString();
           for (let offset = 0; ; offset += clientBookingPageSize) {
             const { data: activeData, error: activeError } = await supabase.from("bookings")
-              .select("id,provider_id,provider_service_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,provider_services(title,duration_minutes,business_id,is_active,archived_at)")
+              .select("id,provider_id,provider_service_id,starts_at,ends_at,status,total_amount,currency,location_mode,appointment_address,collaborator_name,collaborator_avatar_url,service_snapshot,provider_services(title,duration_minutes,business_id,is_active,archived_at)")
               .eq("client_id", userId).in("status", ["pending", "confirmed", "in_progress"])
               .or(`ends_at.gte.${now},status.eq.in_progress`).order("starts_at", { ascending: true })
               .range(offset, offset + clientBookingPageSize - 1);
@@ -605,7 +607,7 @@ export function LiveDashboard({
               <div className="appointment live-appointment" key={booking.id} id={`booking-${booking.id}`}>
                 <span className="date-block">{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", ...(role === "provider" ? { timeZone } : {}) }).format(new Date(booking.starts_at))}</span>
                 <div>
-                  <strong>{booking.provider_services?.title ?? "Prestation beauté"}</strong>
+                  <strong>{bookingServiceTitle(booking.service_snapshot, booking.provider_services?.title ?? "Prestation beauté")}</strong>
                   {booking.collaborator_name && <small>{booking.collaborator_avatar_url && <Image unoptimized src={booking.collaborator_avatar_url} alt="" width={36} height={36} />} Prestation assurée par {booking.collaborator_name}</small>}
                   {role === "provider" && booking.status === "completed" && <BookingFeedback bookingId={booking.id} direction="provider_to_client" />}
                   {role === "client" && booking.status === "completed" && <BookingReview bookingId={booking.id} clientId={userId} providerId={booking.provider_id} performer={booking.collaborator_name} />}
@@ -623,7 +625,7 @@ export function LiveDashboard({
                   {role === "provider" && booking.status === "in_progress" && <button onClick={() => void updateStatus(booking, "completed")}>Terminer</button>}
                   {role === "client" && ["pending", "confirmed"].includes(booking.status) && <button onClick={() => void updateStatus(booking, "cancelled_by_client")}>Annuler</button>}
                   <button onClick={() => {
-                    setMessageBooking({ id: booking.id, serviceTitle: booking.provider_services?.title ?? "Rendez-vous" });
+                    setMessageBooking({ id: booking.id, serviceTitle: bookingServiceTitle(booking.service_snapshot, booking.provider_services?.title ?? "Rendez-vous") });
                     window.setTimeout(() => document.getElementById("booking-conversation")?.scrollIntoView({ behavior: "smooth" }), 0);
                   }}>Messages</button>
                 </div>

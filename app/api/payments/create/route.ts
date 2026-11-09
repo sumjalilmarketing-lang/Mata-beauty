@@ -35,9 +35,10 @@ export async function POST(request: Request) {
     return jsonError("Le paiement en ligne sandbox n’est pas configuré. Aucun débit n’a été initié.", 503, "PAYMENT_SANDBOX_UNAVAILABLE");
   }
   const { data: booking } = await auth.client.from("bookings")
-    .select("id,client_id,provider_id,total_amount,currency,provider_service_id,status")
+    .select("id,client_id,provider_id,total_amount,currency,provider_service_id,status,service_ids")
     .eq("id", parsed.data.bookingId).eq("client_id", auth.user.id).maybeSingle();
   if (!booking) return jsonError("Réservation introuvable.", 404, "BOOKING_NOT_FOUND");
+  if (Array.isArray(booking.service_ids) && booking.service_ids.length > 0) return jsonError("Les paniers personnalisés sont à régler sur place.", 409, "MULTI_SERVICE_ON_SITE_ONLY");
   if (booking.currency !== "XOF" || booking.status !== "pending") return jsonError("Cette réservation ne peut pas être payée.", 409, "BOOKING_NOT_PAYABLE");
 
   const { data: service, error: serviceError } = await auth.client.from("provider_services").select("deposit_percentage").eq("id", booking.provider_service_id).maybeSingle();

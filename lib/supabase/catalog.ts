@@ -82,7 +82,9 @@ type ProviderRecord = {
   }>;
 };
 
-export async function fetchPublishedProviders(client: SupabaseClient, providerId?: string, signal?: AbortSignal): Promise<CatalogProvider[]> {
+/** Optional startup window; authoritative filtered discovery uses the paginated server feed. */
+export async function fetchPublishedProviders(client: SupabaseClient, providerId?: string, signal?: AbortSignal, maxProviderRecords?: number): Promise<CatalogProvider[]> {
+  if (maxProviderRecords !== undefined && (!Number.isInteger(maxProviderRecords) || maxProviderRecords < 1 || maxProviderRecords > 500)) throw new RangeError("Fenêtre de catalogue invalide.");
   const records: ProviderRecord[] = [];
   for (let offset = 0; ; offset += 100) {
     let query = client
@@ -99,7 +101,7 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
     .eq("provider_services.is_active", true)
     .order("average_rating", { ascending: false })
     .order("profile_id")
-    .range(offset, offset + 99);
+    .range(offset, Math.min(offset + 99, (maxProviderRecords ?? Infinity) - 1));
   if (providerId) query = query.eq("profile_id", providerId);
   if (signal) query = query.abortSignal(signal);
   const { data, error } = await query;
@@ -107,7 +109,7 @@ export async function fetchPublishedProviders(client: SupabaseClient, providerId
   if (error) throw error;
     const batch = (data ?? []) as unknown as ProviderRecord[];
     records.push(...batch);
-    if (batch.length < 100) break;
+    if (batch.length < 100 || (maxProviderRecords !== undefined && records.length >= maxProviderRecords)) break;
   }
 
   const serviceIds = records.flatMap(provider => provider.provider_services.map(service => service.id));

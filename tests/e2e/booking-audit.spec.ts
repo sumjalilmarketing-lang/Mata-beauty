@@ -20,6 +20,7 @@ type AuditState = {
   depositPercentage?: number;
   currency?: "XOF" | "EUR";
   priceAmount?: number;
+  durationMinutes?: number;
   lastBookingCurrency?: string;
   currentRole: "client" | "provider" | "other";
   selectedSlot: string;
@@ -92,7 +93,7 @@ async function mockSupabase(page: Page, state: AuditState) {
         published_at: new Date().toISOString(), business_name: "Mata Audit Tresses", slug: "mata-audit-tresses",
         city: "Dakar", average_rating: 4.9, review_count: 48, verified_at: "2026-01-01T00:00:00Z",
         cover_url: null, avatar_url: null, provider_service_id: serviceId, service_title: "Tresses express",
-        duration_minutes: 60, price_amount: state.priceAmount ?? 10000, currency: state.currency ?? "XOF", age_hours: 0,
+        duration_minutes: state.durationMinutes ?? 60, price_amount: state.priceAmount ?? 10000, currency: state.currency ?? "XOF", age_hours: 0,
       }]);
     }
     if (path === "/rest/v1/provider_profiles" && url.searchParams.get("select")?.includes("provider_services!inner")) {
@@ -110,7 +111,7 @@ async function mockSupabase(page: Page, state: AuditState) {
         provider_services: [{
           id: serviceId,
           title: "Tresses express",
-          duration_minutes: 60,
+          duration_minutes: state.durationMinutes ?? 60,
           price_amount: state.priceAmount ?? 10000,
           deposit_percentage: state.depositPercentage ?? 0,
           currency: state.currency ?? "XOF",
@@ -138,7 +139,7 @@ async function mockSupabase(page: Page, state: AuditState) {
       });
     }
     if (path === "/rest/v1/provider_services") {
-      return json(route, [{ id: serviceId, title: "Tresses express", duration_minutes: 60, price_amount: 10000 }]);
+      return json(route, [{ id: serviceId, title: "Tresses express", duration_minutes: state.durationMinutes ?? 60, price_amount: 10000 }]);
     }
     if (path === "/rest/v1/portfolio_items" || path === "/rest/v1/promotions" || path === "/rest/v1/notifications") return json(route, []);
     if (path === "/rest/v1/rpc/get_available_slots") {
@@ -173,11 +174,11 @@ async function mockSupabase(page: Page, state: AuditState) {
     if (path === "/rest/v1/client_profiles") return json(route, { city: "Dakar", default_address: null, preferences: {} });
     if (path === "/rest/v1/bookings" && request.method() === "POST") {
       if (state.bookingCreated) return json(route, { code: "23P01", message: "slot overlap" }, 409);
-      const payload = request.postDataJSON() as { source_post_id?: string | null; currency?: string; starts_at?: string };
+      const payload = request.postDataJSON() as { source_post_id?: string | null; currency?: string; starts_at?: string; ends_at?: string; total_amount?: number };
       state.lastBookingSource = payload.source_post_id ?? null;
       state.lastBookingCurrency = payload.currency;
       state.bookingCreated = true;
-      return json(route, { id: bookingId, starts_at: payload.starts_at, collaborator_name: null, collaborator_avatar_url: null }, 201);
+      return json(route, { id: bookingId, starts_at: payload.starts_at, ends_at: payload.ends_at, total_amount: payload.total_amount, currency: payload.currency, collaborator_name: null, collaborator_avatar_url: null }, 201);
     }
     if (path === "/rest/v1/bookings" && request.method() === "PATCH") {
       if (state.currentRole === "other") return json(route, { code: "42501", message: "permission denied" }, 403);
@@ -194,7 +195,7 @@ async function mockSupabase(page: Page, state: AuditState) {
         currency: "XOF",
         location_mode: "salon",
         appointment_address: null,
-        provider_services: { title: "Tresses express", duration_minutes: 60 },
+        provider_services: { title: "Tresses express", duration_minutes: state.durationMinutes ?? 60 },
       }]);
     }
     if (path === "/rest/v1/payments") return json(route, [], 201);
@@ -222,6 +223,107 @@ async function openFirstFeedBooking(page: Page) {
   await page.locator(".social-video-card").first().locator(".feed-book").click();
   await expect(page.getByRole("dialog", { name: "Réserver" })).toBeVisible();
 }
+
+test("réserve deux soins dans un bloc continu de 75 minutes sans transmettre de prix client", async ({ page }) => {
+  const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "", durationMinutes: 45 };
+  await mockSupabase(page, state);
+  const manicureId = "77777777-7777-4777-8777-777777777777";
+  const services = [
+    { id: serviceId, title: "Tresses express", duration_minutes: 45, price_amount: 10000, currency: "XOF", business_id: null, deposit_percentage: 0 },
+    { id: manicureId, title: "Manucure", duration_minutes: 30, price_amount: 5000, currency: "XOF", business_id: null, deposit_percentage: 0 },
+  ];
+  await page.route(`${api}/rest/v1/provider_services**`, route => {
+    const url = new URL(route.request().url());
+    return url.searchParams.get("provider_id") === `eq.${providerId}` ? json(route, services) : route.fallback();
+  });
+  await page.route(`${api}/rest/v1/rpc/get_multi_service_availability`, route => json(route, {
+    teamEnabled: false, people: [], slots: [{ slot_start: state.selectedSlot }],
+    totalAmount: 15000, durationMinutes: 75, currency: "XOF", services,
+  }));
+  let createdPayload: Record<string, unknown> | null = null;
+  await page.route(`${api}/rest/v1/rpc/create_multi_service_booking`, route => {
+    createdPayload = route.request().postDataJSON() as Record<string, unknown>;
+    state.bookingCreated = true;
+    return json(route, { id: bookingId, starts_at: state.selectedSlot, ends_at: new Date(Date.parse(state.selectedSlot) + 75 * 60000).toISOString(),
+      total_amount: 15000, currency: "XOF", collaborator_name: null, collaborator_avatar_url: null, services });
+  });
+  await page.goto("/");
+  await openFirstFeedBooking(page);
+  const dialog = page.getByRole("dialog", { name: "Réserver" });
+  await dialog.getByRole("checkbox", { name: /Manucure/ }).check();
+  await expect(dialog.locator(".fast-service-summary")).toContainText("1 h 15");
+  await dialog.getByRole("button", { name: /10:00/ }).click();
+  await expect(dialog.locator(".booking-recap-card")).toContainText("Manucure");
+  await expect(dialog.getByText("À mon domicile", { exact: true })).toHaveCount(0);
+  await dialog.getByRole("button", { name: /Confirmer.*15.*000/ }).click();
+  await signIn(page, "client-multiple@example.test");
+  await expect(page.getByText("Votre rendez-vous est créé", { exact: true })).toBeVisible();
+  expect(createdPayload).toMatchObject({ target_service_ids: [serviceId, manicureId], target_location_mode: "salon" });
+  expect(createdPayload).not.toHaveProperty("total_amount");
+  expect(createdPayload).not.toHaveProperty("duration_minutes");
+  await expect(dialog).toContainText("Tresses express + Manucure");
+});
+
+for (const required of [false, true]) test(`les variantes ${required ? "obligatoires" : "facultatives"} prolongent le créneau et sont recalculées au serveur`, async ({ page }) => {
+  const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "", durationMinutes: 45 };
+  await mockSupabase(page, state);
+  const optionId = "88888888-8888-4888-8888-888888888888";
+  await page.route(`${api}/rest/v1/service_options**`, route => json(route, [{ id: optionId, provider_service_id: serviceId,
+    name: "Cheveux longs", price_amount: 2000, duration_minutes: 15, is_required: required }]));
+  const services = [{ id: serviceId, title: "Tresses express (Cheveux longs)", duration_minutes: 60, price_amount: 12000, currency: "XOF" }];
+  let optionRequested = false, createRequested = false;
+  await page.route(`${api}/rest/v1/rpc/get_multi_service_availability`, route => {
+    const payload = route.request().postDataJSON();
+    optionRequested = payload.target_option_ids.includes(optionId);
+    return json(route, { teamEnabled: false, people: [], slots: [{ slot_start: state.selectedSlot }], totalAmount: 12000, durationMinutes: 60, currency: "XOF", services });
+  });
+  await page.route(`${api}/rest/v1/rpc/create_multi_service_booking`, route => {
+    expect(route.request().postDataJSON()).toMatchObject({ target_service_ids: [serviceId], target_option_ids: [optionId] });
+    createRequested = true;
+    return json(route, { id: bookingId, starts_at: state.selectedSlot, ends_at: new Date(Date.parse(state.selectedSlot) + 60 * 60000).toISOString(),
+      total_amount: 12000, currency: "XOF", collaborator_name: null, collaborator_avatar_url: null, services });
+  });
+  await page.goto("/"); await openFirstFeedBooking(page);
+  const dialog = page.getByRole("dialog", { name: "Réserver" });
+  const choice = dialog.getByRole("checkbox", { name: /Cheveux longs/ });
+  if (required) { await expect(choice).toBeChecked(); await expect(choice).toBeDisabled(); } else await choice.check();
+  await expect.poll(() => optionRequested).toBe(true);
+  await expect(dialog.locator(".fast-service-summary")).toContainText("1 h");
+  await dialog.getByRole("button", { name: /10:00/ }).click();
+  await dialog.getByRole("button", { name: /Confirmer.*12.*000/ }).click();
+  await signIn(page, "client-variants@example.test");
+  await expect(page.getByText("Votre rendez-vous est créé", { exact: true })).toBeVisible();
+  await expect(dialog).toContainText("Cheveux longs");
+  expect(createRequested).toBe(true);
+});
+
+test("un créneau retiré pendant la confirmation ne reste pas réservable", async ({ page }) => {
+  const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
+  await mockSupabase(page, state);
+  await page.goto("/");
+  await openFirstFeedBooking(page);
+  const dialog = page.getByRole("dialog", { name: "Réserver" });
+  await dialog.getByRole("button", { name: /10:00/ }).click();
+  const confirm = dialog.getByRole("button", { name: /Confirmer.*10.*000/ });
+  await expect(confirm).toBeEnabled();
+  state.bookingCreated = true;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(confirm).toBeDisabled();
+  await expect(dialog.getByRole("alert")).toContainText("Ce créneau n’est plus disponible");
+});
+
+test("le dialogue de réservation retient le focus et se ferme avec Échap", async ({ page }) => {
+  const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
+  await mockSupabase(page, state);
+  await page.goto("/");
+  await openFirstFeedBooking(page);
+  const dialog = page.getByRole("dialog", { name: "Réserver" });
+  await expect(dialog.getByRole("button", { name: "Fermer", exact: true })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect.poll(() => dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
 
 test.describe("audit chronométré de réservation", () => {
   test.beforeEach(async ({ page }) => {

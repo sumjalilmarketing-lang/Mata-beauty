@@ -1,13 +1,14 @@
+import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { applicationOrigin, serviceSupabase } from "@/lib/payments/server";
 
 const input = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("lookup"), email: z.email().max(254) }),
-  z.object({ action: z.literal("invite"), email: z.email().max(254), firstName: z.string().trim().min(1).max(100), lastName: z.string().trim().min(1).max(100), role: z.string().min(1).max(50) }),
-  z.object({ action: z.literal("resend"), invitationId: z.uuid() }),
-  z.object({ action: z.literal("role"), userId: z.uuid(), role: z.string().min(1).max(50), reason: z.string().trim().min(2).max(1000) }),
-  z.object({ action: z.enum(["suspend", "reactivate", "revoke"]), userId: z.uuid(), reason: z.string().trim().min(2).max(1000) }),
+  z.object({ action: z.literal("lookup"), email: z.email().max(254) }).strict(),
+  z.object({ action: z.literal("invite"), email: z.email().max(254), firstName: z.string().trim().min(1).max(100), lastName: z.string().trim().min(1).max(100), role: z.string().min(1).max(50) }).strict(),
+  z.object({ action: z.literal("resend"), invitationId: z.uuid() }).strict(),
+  z.object({ action: z.literal("role"), userId: z.uuid(), role: z.string().min(1).max(50), reason: z.string().trim().min(2).max(1000) }).strict(),
+  z.object({ action: z.enum(["suspend", "reactivate", "revoke"]), userId: z.uuid(), reason: z.string().trim().min(2).max(1000) }).strict(),
 ]);
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 const accountRows = z.array(z.object({
@@ -42,7 +43,9 @@ export async function POST(request: Request) {
   if (request.headers.get("origin") !== new URL(applicationOrigin(request)).origin) return reply({ error: "Origine refusée." }, 403);
   const auth = await manager(request);
   if (!auth) return reply({ error: "Accès Équipe & accès refusé. MFA requis." }, 403);
-  const parsed = input.safeParse(await request.json().catch(() => null));
+  let body: unknown;
+  try { body = JSON.parse(await readBoundedText(request, 16_384)); } catch (error) { return reply({ error: error instanceof BodyTooLargeError ? "Requête trop volumineuse." : "Requête invalide." }, error instanceof BodyTooLargeError ? 413 : 400); }
+  const parsed = input.safeParse(body);
   if (!parsed.success) return reply({ error: "Vérifiez les informations saisies." }, 400);
   const values = parsed.data;
   if (values.action === "lookup") {

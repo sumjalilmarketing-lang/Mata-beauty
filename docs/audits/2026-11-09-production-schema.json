@@ -1,0 +1,2875 @@
+{
+  "capturedAt": "2026-11-09",
+  "source": "mata-beauty.com production metadata before second audit delivery; no user records",
+  "tables": [
+    {
+      "rls": true,
+      "table": "availability_exceptions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "provider_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "starts_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "ends_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "is_available",
+          "type": "bool",
+          "default": "false",
+          "nullable": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "exceptions owner write",
+          "check": "(provider_id = auth.uid())",
+          "roles": [
+            "public"
+          ],
+          "using": "(provider_id = auth.uid())",
+          "command": "ALL"
+        },
+        {
+          "name": "exceptions public read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "true",
+          "command": "SELECT"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "availability_exceptions_check",
+          "definition": "CHECK ((starts_at < ends_at))"
+        },
+        {
+          "name": "availability_exceptions_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "availability_exceptions_provider_id_fkey",
+          "definition": "FOREIGN KEY (provider_id) REFERENCES provider_profiles(profile_id) ON DELETE CASCADE"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "availability_rules",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "provider_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "weekday",
+          "type": "int2",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "starts_at",
+          "type": "time",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "ends_at",
+          "type": "time",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "slot_interval_minutes",
+          "type": "int4",
+          "default": "30",
+          "nullable": false
+        },
+        {
+          "name": "valid_from",
+          "type": "date",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "valid_until",
+          "type": "date",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "availability owner write",
+          "check": "(provider_id = auth.uid())",
+          "roles": [
+            "public"
+          ],
+          "using": "(provider_id = auth.uid())",
+          "command": "ALL"
+        },
+        {
+          "name": "availability public read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "true",
+          "command": "SELECT"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "availability_rules_check",
+          "definition": "CHECK ((starts_at < ends_at))"
+        },
+        {
+          "name": "availability_rules_check1",
+          "definition": "CHECK (((valid_until IS NULL) OR (valid_from IS NULL) OR (valid_until >= valid_from)))"
+        },
+        {
+          "name": "availability_rules_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "availability_rules_provider_id_fkey",
+          "definition": "FOREIGN KEY (provider_id) REFERENCES provider_profiles(profile_id) ON DELETE CASCADE"
+        },
+        {
+          "name": "availability_rules_provider_id_weekday_starts_at_ends_at_key",
+          "definition": "UNIQUE (provider_id, weekday, starts_at, ends_at)"
+        },
+        {
+          "name": "availability_rules_slot_interval_minutes_check",
+          "definition": "CHECK (((slot_interval_minutes >= 15) AND (slot_interval_minutes <= 240)))"
+        },
+        {
+          "name": "availability_rules_weekday_check",
+          "definition": "CHECK (((weekday >= 0) AND (weekday <= 6)))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "booking_reviews",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "booking_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "reviewer_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "reviewee_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "rating",
+          "type": "int2",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "criteria",
+          "type": "_text",
+          "default": "'{}'::text[]",
+          "nullable": false
+        },
+        {
+          "name": "comment",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "visibility",
+          "type": "text",
+          "default": "'public'::text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "release_at",
+          "type": "timestamptz",
+          "default": "(now() + '48:00:00'::interval)",
+          "nullable": false
+        }
+      ],
+      "policies": null,
+      "constraints": [
+        {
+          "name": "booking_reviews_booking_id_fkey",
+          "definition": "FOREIGN KEY (booking_id) REFERENCES bookings(id)"
+        },
+        {
+          "name": "booking_reviews_booking_id_type_key",
+          "definition": "UNIQUE (booking_id, type)"
+        },
+        {
+          "name": "booking_reviews_comment_check",
+          "definition": "CHECK ((char_length(comment) <= 2000))"
+        },
+        {
+          "name": "booking_reviews_criteria_check",
+          "definition": "CHECK ((criteria <@ ARRAY['quality'::text, 'welcome'::text, 'punctuality'::text, 'respect'::text, 'behaviour'::text]))"
+        },
+        {
+          "name": "booking_reviews_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "booking_reviews_rating_check",
+          "definition": "CHECK (((rating >= 1) AND (rating <= 5)))"
+        },
+        {
+          "name": "booking_reviews_reviewee_id_fkey",
+          "definition": "FOREIGN KEY (reviewee_id) REFERENCES profiles(id)"
+        },
+        {
+          "name": "booking_reviews_reviewer_id_fkey",
+          "definition": "FOREIGN KEY (reviewer_id) REFERENCES profiles(id)"
+        },
+        {
+          "name": "booking_reviews_type_check",
+          "definition": "CHECK ((type = ANY (ARRAY['client_to_provider'::text, 'provider_to_client'::text])))"
+        },
+        {
+          "name": "booking_reviews_visibility_check",
+          "definition": "CHECK ((visibility = ANY (ARRAY['public'::text, 'internal'::text])))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "bookings",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "provider_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "provider_service_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "starts_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "ends_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "booking_status",
+          "default": "'pending'::booking_status",
+          "nullable": false
+        },
+        {
+          "name": "location_mode",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "appointment_address",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "total_amount",
+          "type": "int4",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "currency",
+          "type": "bpchar",
+          "default": "'XOF'::bpchar",
+          "nullable": false
+        },
+        {
+          "name": "client_note",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "cancellation_reason",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "business_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "collaborator_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "promotion_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "source_post_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "selected_option_ids",
+          "type": "_uuid",
+          "default": "'{}'::uuid[]",
+          "nullable": false
+        },
+        {
+          "name": "base_amount",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "options_amount",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "discount_amount",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "deposit_amount",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "appointment_place_id",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "appointment_latitude",
+          "type": "float8",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "appointment_longitude",
+          "type": "float8",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "travel_distance_km",
+          "type": "numeric",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "distance_travel_fee_amount",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "collaborator_name",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "collaborator_avatar_url",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "resource_busy_until",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "assignment_reason",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "conversation_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "conversation_quote_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        }
+      ],
+      "policies": [
+        {
+          "name": "booking members or authorized read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "((client_id = auth.uid()) OR (provider_id = auth.uid()) OR has_admin_permission('bookings.read'::text))",
+          "command": "SELECT"
+        },
+        {
+          "name": "booking members or authorized update",
+          "check": "((client_id = auth.uid()) OR (provider_id = auth.uid()) OR has_admin_permission('bookings.update'::text))",
+          "roles": [
+            "public"
+          ],
+          "using": "((client_id = auth.uid()) OR (provider_id = auth.uid()) OR has_admin_permission('bookings.update'::text))",
+          "command": "UPDATE"
+        },
+        {
+          "name": "clients create bookings",
+          "check": "((client_id = auth.uid()) AND (status = 'pending'::booking_status))",
+          "roles": [
+            "public"
+          ],
+          "using": null,
+          "command": "INSERT"
+        },
+        {
+          "name": "salon owners read business bookings",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "(EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = bookings.business_id) AND (b.owner_id = auth.uid()))))",
+          "command": "SELECT"
+        },
+        {
+          "name": "salon owners update business bookings",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "(EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = bookings.business_id) AND (b.owner_id = auth.uid()))))",
+          "command": "UPDATE"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "bookings_business_id_fkey",
+          "definition": "FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "bookings_check",
+          "definition": "CHECK ((starts_at < ends_at))"
+        },
+        {
+          "name": "bookings_client_id_fkey",
+          "definition": "FOREIGN KEY (client_id) REFERENCES client_profiles(profile_id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "bookings_collaborator_id_fkey",
+          "definition": "FOREIGN KEY (collaborator_id) REFERENCES collaborators(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "bookings_conversation_id_fkey",
+          "definition": "FOREIGN KEY (conversation_id) REFERENCES conversations(id)"
+        },
+        {
+          "name": "bookings_conversation_quote_id_fkey",
+          "definition": "FOREIGN KEY (conversation_quote_id) REFERENCES conversation_quotes(id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "bookings_distance_travel_fee_amount_check",
+          "definition": "CHECK ((distance_travel_fee_amount >= 0))"
+        },
+        {
+          "name": "bookings_location_mode_check",
+          "definition": "CHECK ((location_mode = ANY (ARRAY['salon'::text, 'client_address'::text])))"
+        },
+        {
+          "name": "bookings_no_active_resource_overlap",
+          "definition": "EXCLUDE USING gist (provider_id WITH =, COALESCE(collaborator_id, provider_id) WITH =, tstzrange(starts_at, COALESCE(resource_busy_until, ends_at), '[)'::text) WITH &&) WHERE ((status = ANY (ARRAY['pending'::booking_status, 'confirmed'::booking_status, 'in_progress'::booking_status])))"
+        },
+        {
+          "name": "bookings_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "bookings_promotion_id_fkey",
+          "definition": "FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "bookings_provider_id_fkey",
+          "definition": "FOREIGN KEY (provider_id) REFERENCES provider_profiles(profile_id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "bookings_provider_service_id_fkey",
+          "definition": "FOREIGN KEY (provider_service_id) REFERENCES provider_services(id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "bookings_source_post_id_fkey",
+          "definition": "FOREIGN KEY (source_post_id) REFERENCES posts(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "bookings_total_amount_check",
+          "definition": "CHECK ((total_amount >= 0))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "businesses",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "business_type",
+          "type": "text",
+          "default": "'salon'::text",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "area",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "latitude",
+          "type": "numeric",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "longitude",
+          "type": "numeric",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "cover_url",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'draft'::text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "logo_url",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "default": "true",
+          "nullable": false
+        },
+        {
+          "name": "archived_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "location_place_id",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "service_radius_km",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "travel_fee_per_km_amount",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "free_travel_radius_km",
+          "type": "numeric",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "location_verified_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "team_booking_enabled",
+          "type": "bool",
+          "default": "false",
+          "nullable": false
+        },
+        {
+          "name": "country_code",
+          "type": "bpchar",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "region",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "timezone",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "currency",
+          "type": "bpchar",
+          "default": null,
+          "nullable": true
+        }
+      ],
+      "policies": [
+        {
+          "name": "Assigned professional business",
+          "check": null,
+          "roles": [
+            "authenticated"
+          ],
+          "using": "department_provider_access(owner_id)",
+          "command": "SELECT"
+        },
+        {
+          "name": "approved businesses public read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "((status = 'approved'::text) OR (owner_id = auth.uid()) OR has_admin_permission('providers.read'::text))",
+          "command": "SELECT"
+        },
+        {
+          "name": "providers manage own businesses",
+          "check": "((owner_id = auth.uid()) OR is_super_admin())",
+          "roles": [
+            "public"
+          ],
+          "using": "((owner_id = auth.uid()) OR is_super_admin())",
+          "command": "ALL"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "businesses_business_type_check",
+          "definition": "CHECK ((business_type = ANY (ARRAY['salon'::text, 'institute'::text, 'mobile_collective'::text])))"
+        },
+        {
+          "name": "businesses_country_code_format",
+          "definition": "CHECK (((country_code IS NULL) OR (country_code ~ '^[A-Z]{2}$'::text))) NOT VALID"
+        },
+        {
+          "name": "businesses_currency_code_supported",
+          "definition": "CHECK (((currency IS NULL) OR (currency = ANY (ARRAY['XOF'::bpchar, 'EUR'::bpchar, 'USD'::bpchar, 'GBP'::bpchar, 'CAD'::bpchar])))) NOT VALID"
+        },
+        {
+          "name": "businesses_description_check",
+          "definition": "CHECK ((char_length(description) <= 3000))"
+        },
+        {
+          "name": "businesses_free_travel_radius_km_check",
+          "definition": "CHECK (((free_travel_radius_km >= (0)::numeric) AND (free_travel_radius_km <= (500)::numeric)))"
+        },
+        {
+          "name": "businesses_name_check",
+          "definition": "CHECK (((char_length(name) >= 2) AND (char_length(name) <= 120)))"
+        },
+        {
+          "name": "businesses_owner_id_fkey",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES provider_profiles(profile_id) ON DELETE CASCADE"
+        },
+        {
+          "name": "businesses_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "businesses_service_radius_km_check",
+          "definition": "CHECK (((service_radius_km >= 0) AND (service_radius_km <= 500)))"
+        },
+        {
+          "name": "businesses_slug_check",
+          "definition": "CHECK ((slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'::text))"
+        },
+        {
+          "name": "businesses_slug_key",
+          "definition": "UNIQUE (slug)"
+        },
+        {
+          "name": "businesses_status_check",
+          "definition": "CHECK ((status = ANY (ARRAY['draft'::text, 'pending_review'::text, 'approved'::text, 'suspended'::text])))"
+        },
+        {
+          "name": "businesses_timezone_nonempty",
+          "definition": "CHECK (((timezone IS NULL) OR ((length(TRIM(BOTH FROM timezone)) >= 3) AND (length(TRIM(BOTH FROM timezone)) <= 80)))) NOT VALID"
+        },
+        {
+          "name": "businesses_travel_fee_per_km_amount_check",
+          "definition": "CHECK (((travel_fee_per_km_amount >= 0) AND (travel_fee_per_km_amount <= 100000)))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "collaborator_services",
+      "columns": [
+        {
+          "name": "collaborator_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "provider_service_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "business owners manage collaborator services",
+          "check": "((EXISTS ( SELECT 1\n   FROM (collaborators c\n     JOIN businesses b ON ((b.id = c.business_id)))\n  WHERE ((c.id = collaborator_services.collaborator_id) AND (b.owner_id = auth.uid())))) OR is_super_admin())",
+          "roles": [
+            "public"
+          ],
+          "using": "((EXISTS ( SELECT 1\n   FROM (collaborators c\n     JOIN businesses b ON ((b.id = c.business_id)))\n  WHERE ((c.id = collaborator_services.collaborator_id) AND (b.owner_id = auth.uid())))) OR is_super_admin())",
+          "command": "ALL"
+        },
+        {
+          "name": "collaborator services public read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "((EXISTS ( SELECT 1\n   FROM (collaborators c\n     JOIN businesses b ON ((b.id = c.business_id)))\n  WHERE ((c.id = collaborator_services.collaborator_id) AND c.is_active AND (b.status = 'approved'::text)))) OR has_admin_permission('providers.read'::text))",
+          "command": "SELECT"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "collaborator_services_collaborator_id_fkey",
+          "definition": "FOREIGN KEY (collaborator_id) REFERENCES collaborators(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "collaborator_services_pkey",
+          "definition": "PRIMARY KEY (collaborator_id, provider_service_id)"
+        },
+        {
+          "name": "collaborator_services_provider_service_id_fkey",
+          "definition": "FOREIGN KEY (provider_service_id) REFERENCES provider_services(id) ON DELETE CASCADE"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "collaborators",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "business_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "profile_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "avatar_url",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "is_bookable",
+          "type": "bool",
+          "default": "true",
+          "nullable": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "default": "true",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "internal_role",
+          "type": "text",
+          "default": "'member'::text",
+          "nullable": false
+        },
+        {
+          "name": "archived_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "commercial_permissions",
+          "type": "_text",
+          "default": "'{}'::text[]",
+          "nullable": false
+        },
+        {
+          "name": "first_name",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "public_last_name",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "specialties",
+          "type": "_text",
+          "default": "'{}'::text[]",
+          "nullable": false
+        },
+        {
+          "name": "buffer_minutes",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "active collaborators public read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "((is_active AND (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = collaborators.business_id) AND (b.status = 'approved'::text))))) OR (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = collaborators.business_id) AND (b.owner_id = auth.uid())))) OR has_admin_permission('providers.read'::text))",
+          "command": "SELECT"
+        },
+        {
+          "name": "business owners manage collaborators",
+          "check": "((EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = collaborators.business_id) AND (b.owner_id = auth.uid())))) OR is_super_admin())",
+          "roles": [
+            "public"
+          ],
+          "using": "((EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = collaborators.business_id) AND (b.owner_id = auth.uid())))) OR is_super_admin())",
+          "command": "ALL"
+        },
+        {
+          "name": "collaborators read own membership",
+          "check": null,
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(profile_id = auth.uid())",
+          "command": "SELECT"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "collaborators_buffer_minutes_check",
+          "definition": "CHECK (((buffer_minutes >= 0) AND (buffer_minutes <= 120)))"
+        },
+        {
+          "name": "collaborators_business_id_fkey",
+          "definition": "FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "collaborators_business_id_profile_id_key",
+          "definition": "UNIQUE (business_id, profile_id)"
+        },
+        {
+          "name": "collaborators_commercial_permissions_check",
+          "definition": "CHECK ((commercial_permissions <@ ARRAY['service.read'::text, 'service.create'::text, 'service.update'::text, 'service.publish'::text, 'service.archive'::text, 'pricing.update'::text, 'promotion.create'::text, 'promotion.update'::text, 'promotion.publish'::text]))"
+        },
+        {
+          "name": "collaborators_display_name_check",
+          "definition": "CHECK (((char_length(display_name) >= 2) AND (char_length(display_name) <= 100)))"
+        },
+        {
+          "name": "collaborators_internal_role_check",
+          "definition": "CHECK ((internal_role = ANY (ARRAY['manager'::text, 'reception'::text, 'member'::text])))"
+        },
+        {
+          "name": "collaborators_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "collaborators_profile_id_fkey",
+          "definition": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE SET NULL"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "payments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "booking_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "payment_method",
+          "type": "payment_method",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "payment_status",
+          "type": "payment_status",
+          "default": "'pending'::payment_status",
+          "nullable": false
+        },
+        {
+          "name": "amount",
+          "type": "int4",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "currency",
+          "type": "bpchar",
+          "default": "'XOF'::bpchar",
+          "nullable": false
+        },
+        {
+          "name": "provider_reference",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "is_test",
+          "type": "bool",
+          "default": "true",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "customer_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "professional_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "default": "'mock'::text",
+          "nullable": false
+        },
+        {
+          "name": "provider_transaction_id",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "idempotency_key",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "gross_amount",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "platform_fee",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "provider_fee",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "professional_net_amount",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "refunded_amount",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "failure_reason",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "paid_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "confirmed_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "internal_reference",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "request_fingerprint",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "risk_status",
+          "type": "text",
+          "default": "'accepted'::text",
+          "nullable": false
+        },
+        {
+          "name": "risk_score",
+          "type": "int2",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "last_provider_checked_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        }
+      ],
+      "policies": [
+        {
+          "name": "payments scoped read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "(has_admin_permission('payments.read'::text) OR (EXISTS ( SELECT 1\n   FROM bookings booking\n  WHERE ((booking.id = payments.booking_id) AND ((booking.client_id = auth.uid()) OR (booking.provider_id = auth.uid()))))))",
+          "command": "SELECT"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "payments_amount_check",
+          "definition": "CHECK ((amount >= 0))"
+        },
+        {
+          "name": "payments_booking_id_fkey",
+          "definition": "FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "payments_customer_id_fkey",
+          "definition": "FOREIGN KEY (customer_id) REFERENCES profiles(id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "payments_financial_amounts_check",
+          "definition": "CHECK (((amount >= 0) AND (COALESCE(gross_amount, amount) >= 0) AND (platform_fee >= 0) AND (provider_fee >= 0) AND (COALESCE(professional_net_amount, amount) >= 0) AND ((refunded_amount >= 0) AND (refunded_amount <= amount)))) NOT VALID"
+        },
+        {
+          "name": "payments_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "payments_professional_id_fkey",
+          "definition": "FOREIGN KEY (professional_id) REFERENCES profiles(id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "payments_risk_score_check",
+          "definition": "CHECK (((risk_score >= 0) AND (risk_score <= 100)))"
+        },
+        {
+          "name": "payments_risk_status_check",
+          "definition": "CHECK ((risk_status = ANY (ARRAY['accepted'::text, 'review'::text, 'blocked'::text])))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "provider_profiles",
+      "columns": [
+        {
+          "name": "profile_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "business_name",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "bio",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "provider_status",
+          "default": "'draft'::provider_status",
+          "nullable": false
+        },
+        {
+          "name": "cover_url",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "years_experience",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "service_mode",
+          "type": "text",
+          "default": "'salon'::text",
+          "nullable": false
+        },
+        {
+          "name": "base_address",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "default": "''::text",
+          "nullable": false
+        },
+        {
+          "name": "latitude",
+          "type": "float8",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "longitude",
+          "type": "float8",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "average_rating",
+          "type": "numeric",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "review_count",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "verified_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "activity_type",
+          "type": "text",
+          "default": "'independent'::text",
+          "nullable": false
+        },
+        {
+          "name": "languages",
+          "type": "_text",
+          "default": "ARRAY['fr'::text]",
+          "nullable": false
+        },
+        {
+          "name": "cancellation_policy",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "travel_radius_km",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "onboarding_progress",
+          "type": "int2",
+          "default": "10",
+          "nullable": false
+        },
+        {
+          "name": "location_place_id",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "area",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "location_verified_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "travel_fee_per_km_amount",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "free_travel_radius_km",
+          "type": "numeric",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "founder_badge_enabled",
+          "type": "bool",
+          "default": "false",
+          "nullable": false
+        },
+        {
+          "name": "country_code",
+          "type": "bpchar",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "region",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "timezone",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "currency",
+          "type": "bpchar",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "logo_url",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        }
+      ],
+      "policies": [
+        {
+          "name": "Assigned professional profile",
+          "check": null,
+          "roles": [
+            "authenticated"
+          ],
+          "using": "department_provider_access(profile_id)",
+          "command": "SELECT"
+        },
+        {
+          "name": "provider profiles scoped read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "((status = 'approved'::provider_status) OR (profile_id = auth.uid()) OR has_admin_permission('providers.read'::text))",
+          "command": "SELECT"
+        },
+        {
+          "name": "providers delete own profile",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "(profile_id = auth.uid())",
+          "command": "DELETE"
+        },
+        {
+          "name": "providers insert own profile",
+          "check": "(profile_id = auth.uid())",
+          "roles": [
+            "public"
+          ],
+          "using": null,
+          "command": "INSERT"
+        },
+        {
+          "name": "providers update own profile",
+          "check": "(profile_id = auth.uid())",
+          "roles": [
+            "public"
+          ],
+          "using": "(profile_id = auth.uid())",
+          "command": "UPDATE"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "provider_profiles_activity_type_check",
+          "definition": "CHECK ((activity_type = ANY (ARRAY['independent'::text, 'salon'::text, 'barber_shop'::text, 'makeup_artist'::text, 'hairdresser'::text, 'nail_artist'::text, 'esthetician'::text, 'care_specialist'::text, 'other'::text])))"
+        },
+        {
+          "name": "provider_profiles_average_rating_check",
+          "definition": "CHECK (((average_rating >= (0)::numeric) AND (average_rating <= (5)::numeric)))"
+        },
+        {
+          "name": "provider_profiles_country_code_format",
+          "definition": "CHECK (((country_code IS NULL) OR (country_code ~ '^[A-Z]{2}$'::text))) NOT VALID"
+        },
+        {
+          "name": "provider_profiles_currency_code_supported",
+          "definition": "CHECK (((currency IS NULL) OR (currency = ANY (ARRAY['XOF'::bpchar, 'EUR'::bpchar, 'USD'::bpchar, 'GBP'::bpchar, 'CAD'::bpchar])))) NOT VALID"
+        },
+        {
+          "name": "provider_profiles_free_travel_radius_km_check",
+          "definition": "CHECK (((free_travel_radius_km >= (0)::numeric) AND (free_travel_radius_km <= (500)::numeric)))"
+        },
+        {
+          "name": "provider_profiles_onboarding_progress_check",
+          "definition": "CHECK (((onboarding_progress >= 0) AND (onboarding_progress <= 100)))"
+        },
+        {
+          "name": "provider_profiles_pkey",
+          "definition": "PRIMARY KEY (profile_id)"
+        },
+        {
+          "name": "provider_profiles_profile_id_fkey",
+          "definition": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "provider_profiles_review_count_check",
+          "definition": "CHECK ((review_count >= 0))"
+        },
+        {
+          "name": "provider_profiles_service_mode_check",
+          "definition": "CHECK ((service_mode = ANY (ARRAY['salon'::text, 'mobile'::text, 'both'::text])))"
+        },
+        {
+          "name": "provider_profiles_slug_check",
+          "definition": "CHECK ((slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'::text))"
+        },
+        {
+          "name": "provider_profiles_slug_key",
+          "definition": "UNIQUE (slug)"
+        },
+        {
+          "name": "provider_profiles_timezone_nonempty",
+          "definition": "CHECK (((timezone IS NULL) OR ((length(TRIM(BOTH FROM timezone)) >= 3) AND (length(TRIM(BOTH FROM timezone)) <= 80)))) NOT VALID"
+        },
+        {
+          "name": "provider_profiles_travel_fee_per_km_amount_check",
+          "definition": "CHECK (((travel_fee_per_km_amount >= 0) AND (travel_fee_per_km_amount <= 100000)))"
+        },
+        {
+          "name": "provider_profiles_travel_radius_km_check",
+          "definition": "CHECK (((travel_radius_km >= 0) AND (travel_radius_km <= 500)))"
+        },
+        {
+          "name": "provider_profiles_years_experience_check",
+          "definition": "CHECK (((years_experience >= 0) AND (years_experience <= 80)))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "provider_services",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "provider_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "service_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "duration_minutes",
+          "type": "int4",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "price_amount",
+          "type": "int4",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "currency",
+          "type": "bpchar",
+          "default": "'XOF'::bpchar",
+          "nullable": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "default": "true",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "business_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "archived_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'published'::text",
+          "nullable": false
+        },
+        {
+          "name": "cover_url",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "pricing_mode",
+          "type": "text",
+          "default": "'fixed'::text",
+          "nullable": false
+        },
+        {
+          "name": "price_from_amount",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "preparation_minutes",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "location_modes",
+          "type": "_text",
+          "default": "ARRAY['salon'::text]",
+          "nullable": false
+        },
+        {
+          "name": "home_price_amount",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "travel_fee_amount",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "deposit_amount",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "cancellation_policy",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "client_instructions",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "capacity",
+          "type": "int4",
+          "default": "1",
+          "nullable": false
+        },
+        {
+          "name": "published_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "home_service_radius_km",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "travel_fee_per_km_amount",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "free_travel_radius_km",
+          "type": "numeric",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "deposit_percentage",
+          "type": "int2",
+          "default": "0",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "provider services scoped read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "(((status = 'published'::text) AND is_active AND (archived_at IS NULL)) OR (provider_id = auth.uid()) OR ((business_id IS NOT NULL) AND has_business_commercial_permission(business_id, 'service.read'::text)) OR has_admin_permission('categories.manage'::text))",
+          "command": "SELECT"
+        },
+        {
+          "name": "provider services scoped write",
+          "check": "(((provider_id = auth.uid()) AND ((business_id IS NULL) OR (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = provider_services.business_id) AND (b.owner_id = auth.uid())))))) OR ((business_id IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = provider_services.business_id) AND (b.owner_id = provider_services.provider_id)))) AND has_business_commercial_permission(business_id, 'service.update'::text)) OR has_admin_permission('categories.manage'::text))",
+          "roles": [
+            "public"
+          ],
+          "using": "(((provider_id = auth.uid()) AND ((business_id IS NULL) OR (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = provider_services.business_id) AND (b.owner_id = auth.uid())))))) OR ((business_id IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = provider_services.business_id) AND (b.owner_id = provider_services.provider_id)))) AND has_business_commercial_permission(business_id, 'service.update'::text)) OR has_admin_permission('categories.manage'::text))",
+          "command": "ALL"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "provider_services_business_id_fkey",
+          "definition": "FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "provider_services_commercial_amounts_check",
+          "definition": "CHECK (((COALESCE(price_from_amount, 0) >= 0) AND (COALESCE(home_price_amount, 0) >= 0) AND (travel_fee_amount >= 0) AND (deposit_amount >= 0) AND (deposit_amount <= GREATEST(price_amount, COALESCE(home_price_amount, price_amount))) AND ((preparation_minutes >= 0) AND (preparation_minutes <= 240)) AND ((capacity >= 1) AND (capacity <= 100)) AND (location_modes <@ ARRAY['salon'::text, 'client_address'::text]) AND (cardinality(location_modes) > 0)))"
+        },
+        {
+          "name": "provider_services_deposit_percentage_range",
+          "definition": "CHECK (((deposit_percentage >= 0) AND (deposit_percentage <= 60)))"
+        },
+        {
+          "name": "provider_services_duration_minutes_check",
+          "definition": "CHECK (((duration_minutes >= 15) AND (duration_minutes <= 720)))"
+        },
+        {
+          "name": "provider_services_free_travel_radius_km_check",
+          "definition": "CHECK (((free_travel_radius_km >= (0)::numeric) AND (free_travel_radius_km <= (500)::numeric)))"
+        },
+        {
+          "name": "provider_services_home_service_radius_km_check",
+          "definition": "CHECK (((home_service_radius_km >= 0) AND (home_service_radius_km <= 500)))"
+        },
+        {
+          "name": "provider_services_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "provider_services_price_amount_check",
+          "definition": "CHECK ((price_amount >= 0))"
+        },
+        {
+          "name": "provider_services_pricing_mode_check",
+          "definition": "CHECK ((pricing_mode = ANY (ARRAY['fixed'::text, 'from'::text, 'variable'::text, 'option_based'::text])))"
+        },
+        {
+          "name": "provider_services_provider_id_fkey",
+          "definition": "FOREIGN KEY (provider_id) REFERENCES provider_profiles(profile_id) ON DELETE CASCADE"
+        },
+        {
+          "name": "provider_services_service_id_fkey",
+          "definition": "FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "provider_services_status_check",
+          "definition": "CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'paused'::text, 'sold_out'::text, 'archived'::text, 'hidden'::text])))"
+        },
+        {
+          "name": "provider_services_travel_fee_per_km_amount_check",
+          "definition": "CHECK (((travel_fee_per_km_amount >= 0) AND (travel_fee_per_km_amount <= 100000)))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "refunds",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "payment_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "booking_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "requested_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "amount",
+          "type": "int4",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'requested'::text",
+          "nullable": false
+        },
+        {
+          "name": "provider_refund_id",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "approved_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "processed_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "idempotency_key",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "internal_reference",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "provider_reference",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "failure_code",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "refund owners read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "((requested_by = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM payments p\n  WHERE ((p.id = refunds.payment_id) AND (p.professional_id = auth.uid())))) OR has_admin_permission('payments.read'::text))",
+          "command": "SELECT"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "refunds_amount_check",
+          "definition": "CHECK ((amount > 0))"
+        },
+        {
+          "name": "refunds_approved_by_fkey",
+          "definition": "FOREIGN KEY (approved_by) REFERENCES profiles(id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "refunds_booking_id_fkey",
+          "definition": "FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "refunds_payment_id_fkey",
+          "definition": "FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "refunds_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "refunds_provider_refund_id_key",
+          "definition": "UNIQUE (provider_refund_id)"
+        },
+        {
+          "name": "refunds_reason_check",
+          "definition": "CHECK (((char_length(reason) >= 3) AND (char_length(reason) <= 1000)))"
+        },
+        {
+          "name": "refunds_requested_by_fkey",
+          "definition": "FOREIGN KEY (requested_by) REFERENCES profiles(id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "refunds_status_check",
+          "definition": "CHECK ((status = ANY (ARRAY['requested'::text, 'approved'::text, 'processing'::text, 'paid'::text, 'rejected'::text, 'failed'::text])))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "reviews",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "booking_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "provider_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "rating",
+          "type": "int2",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "comment",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "provider_reply",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "is_visible",
+          "type": "bool",
+          "default": "true",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "collaborator_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "collaborator_name",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        }
+      ],
+      "policies": [
+        {
+          "name": "completed client review",
+          "check": "((client_id = auth.uid()) AND (EXISTS ( SELECT 1\n   FROM bookings b\n  WHERE ((b.id = reviews.booking_id) AND (b.client_id = auth.uid()) AND (b.provider_id = reviews.provider_id) AND (b.status = 'completed'::booking_status)))))",
+          "roles": [
+            "public"
+          ],
+          "using": null,
+          "command": "INSERT"
+        },
+        {
+          "name": "reviews scoped read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "(is_visible OR (client_id = auth.uid()) OR (provider_id = auth.uid()) OR has_admin_permission('reviews.moderate'::text))",
+          "command": "SELECT"
+        },
+        {
+          "name": "reviews scoped update",
+          "check": "((client_id = auth.uid()) OR (provider_id = auth.uid()) OR has_admin_permission('reviews.moderate'::text))",
+          "roles": [
+            "public"
+          ],
+          "using": "((client_id = auth.uid()) OR (provider_id = auth.uid()) OR has_admin_permission('reviews.moderate'::text))",
+          "command": "UPDATE"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "reviews_booking_id_fkey",
+          "definition": "FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "reviews_booking_id_key",
+          "definition": "UNIQUE (booking_id)"
+        },
+        {
+          "name": "reviews_client_id_fkey",
+          "definition": "FOREIGN KEY (client_id) REFERENCES client_profiles(profile_id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "reviews_collaborator_id_fkey",
+          "definition": "FOREIGN KEY (collaborator_id) REFERENCES collaborators(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "reviews_comment_check",
+          "definition": "CHECK ((char_length(comment) <= 2000))"
+        },
+        {
+          "name": "reviews_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "reviews_provider_id_fkey",
+          "definition": "FOREIGN KEY (provider_id) REFERENCES provider_profiles(profile_id) ON DELETE CASCADE"
+        },
+        {
+          "name": "reviews_provider_reply_check",
+          "definition": "CHECK ((char_length(provider_reply) <= 2000))"
+        },
+        {
+          "name": "reviews_rating_check",
+          "definition": "CHECK (((rating >= 1) AND (rating <= 5)))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "account_roles",
+      "columns": [
+        {
+          "name": "profile_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "account roles scoped read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "((profile_id = auth.uid()) OR has_admin_permission('users.read'::text))",
+          "command": "SELECT"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "account_roles_pkey",
+          "definition": "PRIMARY KEY (profile_id, role)"
+        },
+        {
+          "name": "account_roles_profile_id_fkey",
+          "definition": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "account_roles_role_check",
+          "definition": "CHECK ((role = ANY (ARRAY['customer'::text, 'professional'::text])))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "business_closures",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "business_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "starts_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "ends_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "business owners manage closures",
+          "check": "((EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = business_closures.business_id) AND (b.owner_id = auth.uid())))) OR is_super_admin())",
+          "roles": [
+            "public"
+          ],
+          "using": "((EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = business_closures.business_id) AND (b.owner_id = auth.uid())))) OR is_super_admin())",
+          "command": "ALL"
+        },
+        {
+          "name": "business owners read closures",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "((EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = business_closures.business_id) AND (b.owner_id = auth.uid())))) OR has_admin_permission('providers.read'::text))",
+          "command": "SELECT"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "business_closures_business_id_fkey",
+          "definition": "FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "business_closures_check",
+          "definition": "CHECK ((starts_at < ends_at))"
+        },
+        {
+          "name": "business_closures_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "business_closures_reason_check",
+          "definition": "CHECK ((char_length(reason) <= 240))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "business_hours",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "business_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "weekday",
+          "type": "int2",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "opens_at",
+          "type": "time",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "closes_at",
+          "type": "time",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "is_closed",
+          "type": "bool",
+          "default": "false",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "business hours public or owner read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "((EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = business_hours.business_id) AND (((b.status = 'approved'::text) AND b.is_active AND (b.archived_at IS NULL)) OR (b.owner_id = auth.uid()))))) OR has_admin_permission('providers.read'::text))",
+          "command": "SELECT"
+        },
+        {
+          "name": "business owners manage hours",
+          "check": "((EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = business_hours.business_id) AND (b.owner_id = auth.uid())))) OR is_super_admin())",
+          "roles": [
+            "public"
+          ],
+          "using": "((EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = business_hours.business_id) AND (b.owner_id = auth.uid())))) OR is_super_admin())",
+          "command": "ALL"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "business_hours_business_id_fkey",
+          "definition": "FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "business_hours_business_id_weekday_key",
+          "definition": "UNIQUE (business_id, weekday)"
+        },
+        {
+          "name": "business_hours_check",
+          "definition": "CHECK ((is_closed OR ((opens_at IS NOT NULL) AND (closes_at IS NOT NULL) AND (opens_at < closes_at))))"
+        },
+        {
+          "name": "business_hours_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "business_hours_weekday_check",
+          "definition": "CHECK (((weekday >= 0) AND (weekday <= 6)))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "collaborator_exceptions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "collaborator_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "starts_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "ends_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "active account required for employee absences",
+          "check": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (NOT p.is_suspended) AND (p.account_status = 'active'::text))))",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (NOT p.is_suspended) AND (p.account_status = 'active'::text))))",
+          "command": "ALL"
+        },
+        {
+          "name": "owner manages employee absences",
+          "check": "(EXISTS ( SELECT 1\n   FROM (collaborators c\n     JOIN businesses b ON ((b.id = c.business_id)))\n  WHERE ((c.id = collaborator_exceptions.collaborator_id) AND (b.owner_id = auth.uid()))))",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(EXISTS ( SELECT 1\n   FROM (collaborators c\n     JOIN businesses b ON ((b.id = c.business_id)))\n  WHERE ((c.id = collaborator_exceptions.collaborator_id) AND (b.owner_id = auth.uid()))))",
+          "command": "ALL"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "collaborator_exceptions_check",
+          "definition": "CHECK ((starts_at < ends_at))"
+        },
+        {
+          "name": "collaborator_exceptions_collaborator_id_fkey",
+          "definition": "FOREIGN KEY (collaborator_id) REFERENCES collaborators(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "collaborator_exceptions_kind_check",
+          "definition": "CHECK ((kind = ANY (ARRAY['leave'::text, 'rest'::text, 'absence'::text, 'hours'::text])))"
+        },
+        {
+          "name": "collaborator_exceptions_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "collaborator_exceptions_reason_check",
+          "definition": "CHECK ((char_length(reason) <= 240))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "promotions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "provider_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "business_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "discount_type",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "discount_value",
+          "type": "int4",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "starts_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "ends_at",
+          "type": "timestamptz",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "default": "true",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "provider_service_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "promotional_price_amount",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "max_uses",
+          "type": "int4",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "used_count",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "new_clients_only",
+          "type": "bool",
+          "default": "false",
+          "nullable": false
+        },
+        {
+          "name": "audience",
+          "type": "text",
+          "default": "'all'::text",
+          "nullable": false
+        },
+        {
+          "name": "promo_code",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'published'::text",
+          "nullable": false
+        },
+        {
+          "name": "campaign_kind",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "auto_apply",
+          "type": "bool",
+          "default": "false",
+          "nullable": false
+        },
+        {
+          "name": "launch_configuration",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "active promotions public read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "(((status = 'published'::text) AND is_active AND (starts_at <= now()) AND (ends_at > now()) AND ((max_uses IS NULL) OR (used_count < max_uses))) OR (provider_id = auth.uid()) OR has_admin_permission('content.manage'::text))",
+          "command": "SELECT"
+        },
+        {
+          "name": "providers manage own promotions",
+          "check": "(((provider_id = auth.uid()) AND ((business_id IS NULL) OR (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = promotions.business_id) AND (b.owner_id = auth.uid())))))) OR ((business_id IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = promotions.business_id) AND (b.owner_id = promotions.provider_id)))) AND has_business_commercial_permission(business_id, 'promotion.create'::text)) OR has_admin_permission('content.manage'::text))",
+          "roles": [
+            "public"
+          ],
+          "using": "(((provider_id = auth.uid()) AND ((business_id IS NULL) OR (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = promotions.business_id) AND (b.owner_id = auth.uid())))))) OR ((business_id IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = promotions.business_id) AND (b.owner_id = promotions.provider_id)))) AND has_business_commercial_permission(business_id, 'promotion.update'::text)) OR has_admin_permission('content.manage'::text))",
+          "command": "ALL"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "promotions_business_id_fkey",
+          "definition": "FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "promotions_check",
+          "definition": "CHECK ((ends_at > starts_at))"
+        },
+        {
+          "name": "promotions_check1",
+          "definition": "CHECK (((discount_type <> 'percentage'::text) OR (discount_value <= 100)))"
+        },
+        {
+          "name": "promotions_commercial_check",
+          "definition": "CHECK ((((promotional_price_amount IS NULL) OR (promotional_price_amount >= 0)) AND ((max_uses IS NULL) OR (max_uses > 0)) AND (used_count >= 0) AND (audience = ANY (ARRAY['all'::text, 'followers'::text, 'new_clients'::text])) AND (status = ANY (ARRAY['draft'::text, 'published'::text, 'paused'::text, 'archived'::text]))))"
+        },
+        {
+          "name": "promotions_description_check",
+          "definition": "CHECK ((char_length(description) <= 1000))"
+        },
+        {
+          "name": "promotions_discount_type_check",
+          "definition": "CHECK ((discount_type = ANY (ARRAY['percentage'::text, 'fixed'::text])))"
+        },
+        {
+          "name": "promotions_discount_value_check",
+          "definition": "CHECK ((discount_value > 0))"
+        },
+        {
+          "name": "promotions_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "promotions_provider_id_fkey",
+          "definition": "FOREIGN KEY (provider_id) REFERENCES provider_profiles(profile_id) ON DELETE CASCADE"
+        },
+        {
+          "name": "promotions_provider_service_id_fkey",
+          "definition": "FOREIGN KEY (provider_service_id) REFERENCES provider_services(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "promotions_title_check",
+          "definition": "CHECK (((char_length(title) >= 2) AND (char_length(title) <= 120)))"
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "table": "service_options",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "provider_service_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "price_amount",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "duration_minutes",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "is_required",
+          "type": "bool",
+          "default": "false",
+          "nullable": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "default": "true",
+          "nullable": false
+        },
+        {
+          "name": "sort_order",
+          "type": "int4",
+          "default": "0",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "default": "now()",
+          "nullable": false
+        }
+      ],
+      "policies": [
+        {
+          "name": "published service options read",
+          "check": null,
+          "roles": [
+            "public"
+          ],
+          "using": "(EXISTS ( SELECT 1\n   FROM provider_services ps\n  WHERE ((ps.id = service_options.provider_service_id) AND (((ps.status = 'published'::text) AND ps.is_active) OR (ps.provider_id = auth.uid()) OR ((ps.business_id IS NOT NULL) AND has_business_commercial_permission(ps.business_id, 'service.read'::text))))))",
+          "command": "SELECT"
+        },
+        {
+          "name": "service owners manage options",
+          "check": "(EXISTS ( SELECT 1\n   FROM provider_services ps\n  WHERE ((ps.id = service_options.provider_service_id) AND ((ps.provider_id = auth.uid()) OR ((ps.business_id IS NOT NULL) AND has_business_commercial_permission(ps.business_id, 'pricing.update'::text))))))",
+          "roles": [
+            "public"
+          ],
+          "using": "(EXISTS ( SELECT 1\n   FROM provider_services ps\n  WHERE ((ps.id = service_options.provider_service_id) AND ((ps.provider_id = auth.uid()) OR ((ps.business_id IS NOT NULL) AND has_business_commercial_permission(ps.business_id, 'pricing.update'::text))))))",
+          "command": "ALL"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "service_options_description_check",
+          "definition": "CHECK ((char_length(description) <= 1000))"
+        },
+        {
+          "name": "service_options_duration_minutes_check",
+          "definition": "CHECK (((duration_minutes >= 0) AND (duration_minutes <= 360)))"
+        },
+        {
+          "name": "service_options_name_check",
+          "definition": "CHECK (((char_length(name) >= 2) AND (char_length(name) <= 120)))"
+        },
+        {
+          "name": "service_options_pkey",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "service_options_price_amount_check",
+          "definition": "CHECK ((price_amount >= 0))"
+        },
+        {
+          "name": "service_options_provider_service_id_fkey",
+          "definition": "FOREIGN KEY (provider_service_id) REFERENCES provider_services(id) ON DELETE CASCADE"
+        }
+      ]
+    }
+  ]
+}
