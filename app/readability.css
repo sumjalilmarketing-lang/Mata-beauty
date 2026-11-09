@@ -554,7 +554,7 @@
 .booking-disclosure { margin-top:10px; border:1px solid var(--mb-line); border-radius:14px; background:rgba(255,255,255,.025); overflow:clip; }
 .booking-disclosure>summary { padding:13px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:58px; list-style:none; cursor:pointer; }
 .booking-disclosure>summary::-webkit-details-marker { display:none; }
-.booking-disclosure>summary::after { content:"＋"; flex-shrink:0; color:var(--mb-gold); font-size:20px; }
+.booking-disclosure>summary::after { content:"+"; flex-shrink:0; color:var(--mb-gold); font-size:20px; }
 .booking-disclosure[open]>summary::after { content:"−"; }
 .booking-disclosure>summary strong { display:block; font-size:14px; line-height:1.4; }
 .booking-disclosure>summary small { display:block; margin-top:2px; color:var(--mb-muted); font-size:12px; line-height:1.4; }
