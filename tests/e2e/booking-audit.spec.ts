@@ -338,6 +338,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.goto("/");
     await openFirstFeedBooking(page);
     await page.getByRole("button", { name: "10:00" }).click();
+    await page.locator("details.booking-price-details summary").click();
     const summary = page.getByRole("region", { name: "Détail du prix" });
     await expect(summary).toBeVisible();
     await expect(summary).toContainText(`Acompte prévu (${percentage} %)`);
@@ -345,6 +346,7 @@ test.describe("audit chronométré de réservation", () => {
     await expect(summary).toContainText(percentage === 60 ? /4\s*000/ : /7\s*000/);
     await expect(summary).toContainText(/À payer aujourd’hui : 0/);
     await expect(summary).toContainText(/Aucun acompte encaissé.*10\s*000/);
+    await page.locator("details.booking-policy-details summary").click();
     await expect(page.getByRole("link", { name: "Lire la politique d’annulation" })).toBeVisible();
     if (percentage === 60) await page.screenshot({ path: testInfo.outputPath("deposit-summary.png") });
     expect(state.bookingCreated).toBe(false);
@@ -361,6 +363,7 @@ test.describe("audit chronométré de réservation", () => {
     await page.goto("/");
     await openFirstFeedBooking(page);
     await page.getByRole("button", { name: "10:00" }).click();
+    await page.locator("details.booking-price-details summary").click();
     const summary = page.getByRole("region", { name: "Détail du prix" });
     await expect(summary).toContainText(/10,50\s*€/);
     await expect(summary).toContainText(/24,50\s*€/);
@@ -676,5 +679,37 @@ test("le bouton des moyens de paiement reste accessible sans lancer un paiement 
   await toggle.click();
   await expect(dialog.locator("details.payment-method-access")).not.toHaveAttribute("open", "");
   expect(checkoutRequests).toBe(0);
+  expect(state.bookingCreated).toBe(false);
+});
+
+
+test("la confirmation compacte déplie le prix et les conditions uniquement à la demande", async ({ page }, testInfo) => {
+  const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "", depositPercentage: 60 };
+  await mockSupabase(page, state);
+  await page.goto("/");
+  await openFirstFeedBooking(page);
+  const dialog = page.getByRole("dialog", { name: "Réserver" });
+  await dialog.getByRole("button", { name: /^10:00/ }).click();
+  const price = dialog.locator("details.booking-price-details");
+  const policy = dialog.locator("details.booking-policy-details");
+  await expect(price).not.toHaveAttribute("open", "");
+  await expect(policy).not.toHaveAttribute("open", "");
+  await expect(dialog.getByRole("region", { name: "Détail du prix" })).toHaveCount(0);
+  await expect(dialog.getByRole("link", { name: "Lire la politique d’annulation" })).toHaveCount(0);
+  await expect(dialog.getByRole("radio", { name: /Sur place/ })).toBeVisible();
+  await expect(dialog.locator(".booking-recap-card")).toContainText("Tresses express");
+  const confirm = dialog.getByRole("button", { name: /Confirmer/ });
+  await expect(confirm).toBeEnabled();
+  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("compact-confirmation.png") });
+  const priceToggle = price.locator("summary");
+  await priceToggle.evaluate(element => element.focus());
+  await priceToggle.press("Enter");
+  await expect(dialog.getByRole("region", { name: "Détail du prix" })).toContainText(/6\s*000/);
+  await priceToggle.press("Enter");
+  await expect(price).not.toHaveAttribute("open", "");
+  await policy.locator("summary").click();
+  await expect(dialog.getByRole("link", { name: "Lire la politique d’annulation" })).toBeVisible();
+  await expect(confirm).toBeEnabled();
   expect(state.bookingCreated).toBe(false);
 });
