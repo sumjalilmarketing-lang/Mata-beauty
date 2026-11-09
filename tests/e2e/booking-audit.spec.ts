@@ -419,6 +419,33 @@ test.describe("audit chronométré de réservation", () => {
     expect(targetedReads).toBeGreaterThan(0);
   });
 
+  test("rejette une réponse de calendrier malformée et récupère après nouvelle tentative", async ({ page }) => {
+    const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
+    await mockSupabase(page, state);
+    let invalid = true;
+    await page.route(`${api}/rest/v1/rpc/get_booking_team_availability`, route => invalid ? json(route, { teamEnabled: false, slots: [{ slot_start: "not-a-date" }] }) : route.fallback());
+    await page.goto("/");
+    await openFirstFeedBooking(page);
+    const dialog = page.getByRole("dialog", { name: "Réserver" });
+    await expect(dialog.getByRole("alert")).toContainText("Les disponibilités n’ont pas pu être chargées");
+    invalid = false;
+    await dialog.getByRole("button", { name: "Réessayer", exact: true }).click();
+    await expect(dialog.getByRole("button", { name: /10:00/ })).toBeVisible();
+  });
+
+  test("actualise le calendrier au retour dans la fenêtre", async ({ page }) => {
+    const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
+    await mockSupabase(page, state);
+    await page.goto("/");
+    await openFirstFeedBooking(page);
+    const dialog = page.getByRole("dialog", { name: "Réserver" });
+    await expect(dialog.getByRole("button", { name: /10:00/ })).toBeVisible();
+    state.bookingCreated = true;
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(dialog.getByRole("button", { name: /10:00/ })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: /11:00/ })).toBeVisible();
+  });
+
   test("signale une panne des disponibilités et permet de réessayer", async ({ page }) => {
     const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
     await mockSupabase(page, state);

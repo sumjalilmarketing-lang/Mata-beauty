@@ -1,10 +1,11 @@
+import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 import { z } from "zod";
 import { authenticatedSupabase, consumeRateLimit, hasTrustedOrigin, jsonError, requestContext } from "@/lib/payments/server";
 
 const schema = z.object({
   paymentId: z.uuid(), amount: z.number().int().positive(), reason: z.string().trim().min(3).max(1000),
   attempt: z.string().min(8).max(80),
-});
+}).strict();
 
 export async function POST(request: Request) {
   if (!hasTrustedOrigin(request)) return jsonError("Origine de requête refusée.", 403, "UNTRUSTED_ORIGIN");
@@ -20,7 +21,14 @@ export async function POST(request: Request) {
   if (!rateLimitAllowed) {
     return jsonError("Trop de demandes de remboursement.", 429, "RATE_LIMITED");
   }
-  const parsed = schema.safeParse(await request.json().catch(() => null));
+  let body: unknown;
+  try {
+    body = JSON.parse(await readBoundedText(request, 16_384));
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) return jsonError("Requête trop volumineuse.", 413, "PAYLOAD_TOO_LARGE");
+    return jsonError("Requête invalide.", 400, "INVALID_REQUEST");
+  }
+  const parsed = schema.safeParse(body);
   if (!parsed.success) return jsonError("Demande de remboursement invalide.", 400, "INVALID_REQUEST");
   const { data, error } = await auth.client.rpc("request_payment_refund_v2", {
     target_payment_id: parsed.data.paymentId, target_amount: parsed.data.amount, target_reason: parsed.data.reason,

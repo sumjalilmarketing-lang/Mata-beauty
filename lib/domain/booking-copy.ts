@@ -1,6 +1,7 @@
 import { feedText } from "./feed-copy";
 
 const copy: Record<string, readonly [string, string]> = {
+  "Actualisées chaque minute": ["Refreshed every minute", "Actualizadas cada minuto"],
   "Cette prestation n’est pas encore ouverte à la réservation. Le salon doit terminer sa publication.": ["This service is not open for bookings yet. The salon must finish publication.", "Este servicio aún no admite reservas. El salón debe completar su publicación."],
   "Voir les prochaines disponibilités": ["See next available slots", "Ver las próximas horas disponibles"],
   "Recherche…": ["Searching…", "Buscando…"],
