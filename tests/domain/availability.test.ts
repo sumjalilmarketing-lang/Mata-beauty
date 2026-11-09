@@ -5,6 +5,25 @@ import { zonedWallTimeAt } from "../../lib/domain/time-zone";
 const mondayRule = [{ weekday: 1, startsAt: "09:00", endsAt: "13:00", intervalMinutes: 30 }];
 
 describe("availability generation in provider timezone", () => {
+  it("deduplicates overlapping opening rules", () => {
+    const input = { date: "2026-07-27", durationMinutes: 60, rules: mondayRule, now: new Date("2026-07-25T08:00:00Z") };
+    expect(generateAvailableSlots({ ...input, rules: [...mondayRule, ...mondayRule] })).toEqual(generateAvailableSlots(input));
+  });
+
+  it("rejects invalid buffers and notice even on a closed day", () => {
+    const input = { date: "2026-07-27", durationMinutes: 60, rules: [], now: new Date("2026-07-25T08:00:00Z") };
+    for (const bufferMinutes of [-1, NaN, 121, 0.5]) expect(() => generateAvailableSlots({ ...input, bufferMinutes })).toThrow();
+    for (const minimumNoticeMinutes of [-1, NaN, 43201]) expect(() => generateAvailableSlots({ ...input, minimumNoticeMinutes })).toThrow();
+    expect(() => generateAvailableSlots({ ...input, durationMinutes: 0 })).toThrow();
+    expect(() => generateAvailableSlots({ ...input, now: new Date(NaN) })).toThrow();
+  });
+
+  it("reserves cleaning time and allows a slot ending exactly at an unavailable range", () => {
+    const slots = generateAvailableSlots({ date: "2026-07-27", durationMinutes: 45, bufferMinutes: 15, rules: mondayRule,
+      now: new Date("2026-07-25T08:00:00Z"), blockedRanges: [{ startsAt: new Date("2026-07-27T10:00:00Z"), endsAt: new Date("2026-07-27T11:00:00Z") }] });
+    expect(slots.map(slot => slot.startsAt.toISOString().slice(11, 16))).toEqual(["09:00", "11:00", "11:30", "12:00"]);
+  });
+
   it.each([
     ["Dakar", "Africa/Dakar", "2026-06-15T09:00:00.000Z"],
     ["Paris", "Europe/Paris", "2026-06-15T07:00:00.000Z"],

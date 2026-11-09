@@ -58,6 +58,14 @@ export function generateAvailableSlots({
 }: GenerateSlotsInput) {
   const { year, month, day, weekday } = localDateParts(date);
   if (!isIanaTimeZone(timeZone)) throw new Error(`Fuseau IANA invalide : ${timeZone}`);
+  if (!Number.isFinite(now.getTime())) throw new Error("Date de référence invalide.");
+  if (!Number.isInteger(minimumNoticeMinutes) || minimumNoticeMinutes < 0 || minimumNoticeMinutes > 43200) throw new Error("Préavis invalide.");
+  if (!Number.isInteger(bufferMinutes) || bufferMinutes < 0 || bufferMinutes > 120) throw new Error("Temps de pause invalide.");
+  // Validate even when there are no opening rules for this date.
+  calculateBookingEnd(now, durationMinutes);
+  for (const range of blockedRanges) {
+    if (!Number.isFinite(range.startsAt.getTime()) || !Number.isFinite(range.endsAt.getTime()) || range.endsAt <= range.startsAt) throw new Error("Indisponibilité invalide.");
+  }
   const earliestStart = new Date(now.getTime() + minimumNoticeMinutes * 60_000);
   const slots: TimeRange[] = [];
 
@@ -81,5 +89,5 @@ export function generateAvailableSlots({
     }
   }
 
-  return slots.sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime());
+  return [...new Map(slots.map(slot => [slot.startsAt.getTime(), slot])).values()].sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime());
 }

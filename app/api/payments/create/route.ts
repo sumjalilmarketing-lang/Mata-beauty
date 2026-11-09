@@ -1,10 +1,11 @@
+import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { calculatePaymentQuote } from "@/lib/domain/payments";
 import { getPaymentGateway, paymentCapabilities } from "@/lib/payments/gateway";
 import { applicationOrigin, authenticatedSupabase, consumeRateLimit, hasTrustedOrigin, jsonError, requestContext, requestFingerprint, serviceSupabase } from "@/lib/payments/server";
 
-const schema = z.object({ bookingId: z.uuid(), method: z.enum(["orange_money", "wave", "card"]), attempt: z.string().min(8).max(80) });
+const schema = z.object({ bookingId: z.uuid(), method: z.enum(["orange_money", "wave", "card"]), attempt: z.string().min(8).max(80) }).strict();
 
 export async function POST(request: Request) {
   if (!hasTrustedOrigin(request)) return jsonError("Origine de requête refusée.", 403, "UNTRUSTED_ORIGIN");
@@ -20,7 +21,14 @@ export async function POST(request: Request) {
   if (!rateLimitAllowed) {
     return jsonError("Trop de tentatives de paiement.", 429, "RATE_LIMITED");
   }
-  const parsed = schema.safeParse(await request.json().catch(() => null));
+  let body: unknown;
+  try {
+    body = JSON.parse(await readBoundedText(request, 16_384));
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) return jsonError("Requête trop volumineuse.", 413, "PAYLOAD_TOO_LARGE");
+    return jsonError("Requête invalide.", 400, "INVALID_REQUEST");
+  }
+  const parsed = schema.safeParse(body);
   if (!parsed.success) return jsonError("Demande de paiement invalide.", 400, "INVALID_REQUEST");
   const capabilities = paymentCapabilities();
   if (!capabilities.onlineCheckoutEnabled || !capabilities.methods.includes(parsed.data.method)) {

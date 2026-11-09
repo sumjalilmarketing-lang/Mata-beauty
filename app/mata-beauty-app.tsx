@@ -1,4 +1,5 @@
 "use client";
+import { bookingAvailabilitySchema } from "@/lib/domain/booking-availability";
 import { nextBookingDate } from "@/lib/domain/next-booking-slot";
 import { UnreadBadge } from "./unread-inbox";
 import { bookingTeamPeople, selectedTeamSlots, type BookingTeamPerson, type BookingTeamSlot } from "@/lib/domain/booking-team";
@@ -929,24 +930,49 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 15_000);
     void Promise.resolve().then(() => { if (active) { setAvailabilityLoading(true); setAvailabilityError(false); } });
-    void supabase.rpc("get_booking_team_availability", {
+    void Promise.resolve(supabase.rpc("get_booking_team_availability", {
       target_service_id: service.id,
       from_date: form.date,
-    }).abortSignal(controller.signal).then(({ data, error }) => {
-      window.clearTimeout(timeout);
+    }).abortSignal(controller.signal)).then(({ data, error }) => {
       if (!active) return;
-      const availability = data as { teamEnabled: boolean; blockedReason?: string; people?: BookingTeamPerson[]; slots: BookableCollaborator[] } | null;
-      setTeamEnabled(Boolean(availability?.teamEnabled));
-      setAvailabilityBlocked(availability?.blockedReason === "salon_not_published");
+      const parsed = bookingAvailabilitySchema.safeParse(data);
+      if (error || !parsed.success) throw new Error("Disponibilités invalides ou indisponibles.");
+      const availability = parsed.data;
+      setTeamEnabled(availability.teamEnabled);
+      setAvailabilityBlocked(availability.blockedReason === "salon_not_published");
       setNextNotice("");
-      setTeamPeople(error || !availability?.teamEnabled ? [] : bookingTeamPeople(availability.people, availability.slots));
-      setSlotRows(error ? [] : availability?.slots ?? []);
-      setCollaborators(error || !availability?.teamEnabled ? [] : availability.slots);
-      setAvailabilityError(Boolean(error));
-      setAvailabilityLoading(false);
+      setTeamPeople(availability.teamEnabled ? bookingTeamPeople(availability.people, availability.slots) : []);
+      setSlotRows(availability.slots);
+      setCollaborators(availability.teamEnabled ? availability.slots : []);
+    }).catch(() => {
+      if (!active) return;
+      setSlotRows([]);
+      setCollaborators([]);
+      setTeamPeople([]);
+      setAvailabilityBlocked(false);
+      setAvailabilityError(true);
+    }).finally(() => {
+      window.clearTimeout(timeout);
+      if (active) setAvailabilityLoading(false);
     });
     return () => { active = false; window.clearTimeout(timeout); controller.abort(); };
   }, [form.date, provider.profileId, service.id, availabilityAttempt]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible" && !submissionPending.current) {
+        setAvailabilityAttempt(attempt => attempt + 1);
+      }
+    };
+    const interval = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
 
   async function findNextAvailability(){
     const api=getSupabaseBrowserClient();if(!api||findingNext)return;
@@ -1014,7 +1040,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
         <div className="fast-booking-progress" aria-label={`${t("Étape")} ${step} ${t("sur")} 2`}><span className={step >= 1 ? "active" : ""}>1 <small>{t("Créneau")}</small></span><i /><span className={step >= 2 ? "active" : ""}>2 <small>{t("Confirmation")}</small></span></div>
         <div className="premium-booking-content">
           {submissionError && <p role="alert" className="booking-submit-error">{t(submissionError)}</p>}
-          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount, service.currency, locale)}</b></div><h3>{t("Quand êtes-vous disponible ?")}</h3><p>{t("Heure locale de l’établissement")}{" · "}{timeZone}</p><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} onClick={() => setForm({ ...form, date: item.date, time: "", slotStart: undefined })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>{t("Autre")}</small><strong>＋</strong><input aria-label={t("Choisir une autre date")} type="date" min={localToday} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "", slotStart: undefined })} /></label></div>{teamEnabled && !availabilityLoading && <fieldset className="booking-team-choice"><legend>{t("Avec qui réserver ?")}</legend><label><input type="radio" name="employee-choice" checked={!form.collaboratorId} onChange={() => setForm({ ...form, collaboratorId: "", time: "", slotStart: undefined })} />{t("Sans préférence — une personne disponible")}</label>{availablePeople.map(person => <label key={person.collaborator_id}><input type="radio" name="employee-choice" checked={form.collaboratorId === person.collaborator_id} onChange={() => setForm({ ...form, collaboratorId: person.collaborator_id, time: "", slotStart: undefined })} />{person.avatar_url && <Image unoptimized src={person.avatar_url} alt={person.display_name} width={48} height={48} />}<span><strong>{person.display_name}</strong><small>{person.title}</small><small>{person.specialties.join(" · ")}</small>{!collaborators.some(slot => slot.collaborator_id === person.collaborator_id) && <small>{t("Aucun créneau ce jour — choisissez une autre date")}</small>}</span></label>)}{!availablePeople.length && <p>{t("Aucun collaborateur réservable pour cette prestation.")}</p>}</fieldset>}<div className="slot-section-title"><strong>{t("Créneaux disponibles")}</strong><small>{t("Mis à jour en direct")}</small></div>{availabilityLoading ? <div className="slot-loading">{t("Recherche des meilleurs créneaux…")}</div> : availabilityBlocked ? <div role="status" className="no-slots">{t("Cette prestation n’est pas encore ouverte à la réservation. Le salon doit terminer sa publication.")}</div> : availabilityError ? <div role="alert" className="no-slots">{t("Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.")}<button onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Réessayer")}</button></div> : slots.length ? <div className="premium-slot-grid">{slots.map((slot) => <button className={form.slotStart === slot.instant ? "active" : ""} key={slot.instant} onClick={() => { const instant = new Date(slot.instant); setForm({ ...form, time: new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone }).format(instant), slotStart: instant.toISOString() }); setStep(2); }}>{slot.label}</button>)}</div> : <div className="no-slots">{t(form.collaboratorId ? "Aucun créneau pour cette personne ce jour. Essayez une autre date ou changez de personne." : "Aucun créneau publié ce jour. Essayez une autre date.")}<button type="button" onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Actualiser les disponibilités")}</button><button type="button" disabled={findingNext} onClick={()=>void findNextAvailability()}>{t(findingNext?"Recherche…":"Voir les prochaines disponibilités")}</button>{nextNotice && <p role="status">{nextNotice}</p>}</div>}</>}
+          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount, service.currency, locale)}</b></div><h3>{t("Quand êtes-vous disponible ?")}</h3><p>{t("Heure locale de l’établissement")}{" · "}{timeZone}</p><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} aria-pressed={form.date === item.date} onClick={() => setForm({ ...form, date: item.date, time: "", slotStart: undefined })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>{t("Autre")}</small><strong>＋</strong><input aria-label={t("Choisir une autre date")} type="date" min={localToday} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "", slotStart: undefined })} /></label></div>{teamEnabled && !availabilityLoading && <fieldset className="booking-team-choice"><legend>{t("Avec qui réserver ?")}</legend><label><input type="radio" name="employee-choice" checked={!form.collaboratorId} onChange={() => setForm({ ...form, collaboratorId: "", time: "", slotStart: undefined })} />{t("Sans préférence — une personne disponible")}</label>{availablePeople.map(person => <label key={person.collaborator_id}><input type="radio" name="employee-choice" checked={form.collaboratorId === person.collaborator_id} onChange={() => setForm({ ...form, collaboratorId: person.collaborator_id, time: "", slotStart: undefined })} />{person.avatar_url && <Image unoptimized src={person.avatar_url} alt={person.display_name} width={48} height={48} />}<span><strong>{person.display_name}</strong><small>{person.title}</small><small>{person.specialties.join(" · ")}</small>{!collaborators.some(slot => slot.collaborator_id === person.collaborator_id) && <small>{t("Aucun créneau ce jour — choisissez une autre date")}</small>}</span></label>)}{!availablePeople.length && <p>{t("Aucun collaborateur réservable pour cette prestation.")}</p>}</fieldset>}<div className="slot-section-title"><strong>{t("Créneaux disponibles")}</strong><small>{t("Actualisées chaque minute")}</small></div>{availabilityLoading ? <div className="slot-loading" role="status" aria-live="polite">{t("Recherche des meilleurs créneaux…")}</div> : availabilityBlocked ? <div role="status" className="no-slots">{t("Cette prestation n’est pas encore ouverte à la réservation. Le salon doit terminer sa publication.")}</div> : availabilityError ? <div role="alert" className="no-slots">{t("Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.")}<button onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Réessayer")}</button></div> : slots.length ? <div className="premium-slot-grid">{slots.map((slot) => <button className={form.slotStart === slot.instant ? "active" : ""} aria-pressed={form.slotStart === slot.instant} key={slot.instant} onClick={() => { const instant = new Date(slot.instant); setForm({ ...form, time: new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone }).format(instant), slotStart: instant.toISOString() }); setStep(2); }}>{slot.label}</button>)}</div> : <div className="no-slots">{t(form.collaboratorId ? "Aucun créneau pour cette personne ce jour. Essayez une autre date ou changez de personne." : "Aucun créneau publié ce jour. Essayez une autre date.")}<button type="button" onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Actualiser les disponibilités")}</button><button type="button" disabled={findingNext} onClick={()=>void findNextAvailability()}>{t(findingNext?"Recherche…":"Voir les prochaines disponibilités")}</button>{nextNotice && <p role="status">{nextNotice}</p>}</div>}</>}
           {step === 2 && <>
             <h3>{t("Vérifiez et confirmez")}</h3>
             <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date, locale)} {" "}{t("à")}{" "}{form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name} · {timeZone}</small></div><b>{formatPrice(service.price_amount, service.currency, locale)}</b></div>
