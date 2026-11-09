@@ -62,6 +62,6 @@ export async function createClientRescheduleDatabase() {
   await db.exec(salonSql.slice(salonSql.indexOf("create or replace function public.protect_salon_booking_contract()"), salonSql.indexOf("do $$ declare definition text; begin", salonSql.indexOf("create or replace function public.protect_salon_booking_contract()"))));
   await db.exec(`create trigger bookings_protect_salon_contract before update on public.bookings for each row execute function public.protect_salon_booking_contract();
     create trigger bookings_validate before update on public.bookings for each row execute function public.validate_booking_update();`);
-  await db.exec(await migration("20261109125316_client_booking_reschedule.sql"));
+  await db.exec(await migration("20261109145111_client_booking_reschedule.sql"));
   return db;
 }

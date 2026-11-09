@@ -73,3 +73,7 @@ La suite complète de qualité a réussi : 147 fichiers et 986 tests, lint sans 
 La migration de confidentialité `20261109143450` et la migration d'autorisation interne `20261109143532` ont été appliquées en production. La lecture après application confirme la seule politique propriétaire sur les absences et le contrôle `account_status='active'` dans les trois helpers. Leurs fichiers sont alignés sur les versions effectivement enregistrées. Les trois migrations report client, multi-soins et recherche de la deuxième livraison ne sont pas encore appliquées. Le code applicatif de cette passe n'est pas encore déployé.
 
 Références de revue : [sessions Supabase](https://supabase.com/docs/guides/auth/sessions), [guide SSR avancé](https://supabase.com/docs/guides/auth/server-side/advanced-guide), [indexation des clés étrangères](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys).
+
+## Mise à jour de publication — 9 novembre 2026
+
+Les trois migrations fonctionnelles ont été appliquées en production et leur présence vérifiée : report client `20261109145111`, contrat multi-soins `20261109145133`, recherche serveur `20261109145148`. Les fichiers et références de tests sont alignés sur ces versions effectives. Les 12 jobs GitHub Actions du commit applicatif `70cf4e02` ont réussi. Cette mise à jour remplace les indications de migrations encore en attente ci-dessus. La publication du code et sa vérification sont consignées dans la PR nº56.

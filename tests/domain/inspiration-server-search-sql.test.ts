@@ -42,7 +42,7 @@ beforeAll(async () => {
       from generate_series(1,15) n;
     insert into public.posts values('${post}','${provider}','${service}','Nattes élégantes','Élégance Dakar','Tresses','Dakar',array['coiffure'],now()-interval '1 day',true);
   `);
-  await db.exec(await readFile(new URL("../../supabase/migrations/20261109130527_server_filtered_inspiration_search.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261109145148_server_filtered_inspiration_search.sql", import.meta.url), "utf8"));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => { await db.exec("begin"); });

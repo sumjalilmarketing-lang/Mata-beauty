@@ -136,7 +136,7 @@ beforeAll(async () => {
   await db.exec(slotContract.slice(slotContract.indexOf("create or replace function public.get_available_slots("),slotContract.indexOf("-- Runs after server price/duration normalization")));
   await db.exec(slotContract.slice(slotContract.indexOf("create or replace function booking_private.validate_bookable_slot()")));
   await db.exec(await migration("20261104230907_enforce_configured_booking_notice.sql"));
-  await db.exec(await migration("20261109125316_client_booking_reschedule.sql"));
+  await db.exec(await migration("20261109145111_client_booking_reschedule.sql"));
   await db.exec(await readFile(new URL("../fixtures/team-agenda-production.sql", import.meta.url), "utf8"));
   await db.exec("begin");
   await db.exec(`create or replace function booking_private.provider_timezone(uuid,uuid) returns text language sql as $$select 'America/New_York'::text$$;
@@ -146,7 +146,7 @@ beforeAll(async () => {
       values('${client}','${owner}','${serviceA}',(${day}+time '22:00') at time zone 'America/New_York',(${day}+time '22:45') at time zone 'America/New_York',10000,'XOF','salon')`);
   } catch (error) { beforeTimezoneFix=(error as { code?: string }).code; }
   await db.exec("rollback");
-  await db.exec(await migration("20261109125333_atomic_multi_service_booking.sql"));
+  await db.exec(await migration("20261109145133_atomic_multi_service_booking.sql"));
   await db.exec(`
     grant usage on schema public,auth,booking_private to authenticated;
     grant select on public.profiles,public.businesses to authenticated;

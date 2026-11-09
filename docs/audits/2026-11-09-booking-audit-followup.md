@@ -89,7 +89,7 @@ Une lecture des métadonnées réelles a confirmé la fuite du champ `availabili
 | `2026-11-09-interactive-elements.csv` | Inventaire AST de tous les éléments JSX interactifs, avec fichier, ligne, label source, événements, disabled et attributs aria ; une boucle représente un modèle d'éléments dynamiques |
 | `2026-11-09-static-inventory.csv` | Registre des pages, composants/modules et endpoints ; inventaire initial à lire avec les nouveaux fichiers de cette branche |
 | `2026-11-09-api-rbac-followup.md` | Revue des routes existantes, contrôles d'accès, validation et idempotence ; nouvelle route `/api/bookings/reschedule` décrite dans le présent rapport |
-| Migrations `20261109125316`, `20261109125333`, `20261109130527`, `20261109143450` | Report client, contrat composite/variantes, recherche serveur et confidentialité des absences |
+| Migrations `20261109145111`, `20261109145133`, `20261109145148`, `20261109143450` | Report client, contrat composite/variantes, recherche serveur et confidentialité des absences |
 | Tests SQL et API de la branche | Reproduction des défauts, pile réelle de triggers/tarification/RLS, cas négatifs et nouveaux scénarios navigateur |
 
 Le schéma applicatif réel est PostgreSQL/Supabase. Le fichier Drizzle SQLite hérité du starter n'est pas utilisé comme ORM de production ; aucun modèle ORM fictif n'est présenté comme le schéma réel.
@@ -115,3 +115,7 @@ Le nom du fichier de la migration de report déjà publiée a été aligné sur 
 Les contrôles distants de la révision `6fc271c8` ont tous réussi (4 jobs qualité et 8 groupes Functional audit). Depuis, la passe décrite dans `2026-11-09-auth-security-audit.md` ajoute les contrôles de statut actif et MFA, corrige le cache des sessions et les retours Auth. Sa suite locale compte 986 tests réussis.
 
 Le correctif de confidentialité a finalement été appliqué et vérifié en production sous la version `20261109143450`. La politique publique a disparu ; la politique propriétaire est conservée. Le correctif d’autorisation interne des comptes actifs a aussi été appliqué sous `20261109143532`. Les trois autres nouvelles migrations (report, multi-soins et recherche) restent non appliquées et le nouveau code applicatif reste non déployé. Ces résultats remplacent le blocage de confirmation indiqué précédemment pour la confidentialité.
+
+## Mise à jour de publication — 9 novembre 2026
+
+Les trois migrations fonctionnelles ont été appliquées en production et leur présence vérifiée : report client `20261109145111`, contrat multi-soins `20261109145133`, recherche serveur `20261109145148`. Les fichiers et références de tests sont alignés sur ces versions effectives. Les 12 jobs GitHub Actions du commit applicatif `70cf4e02` ont réussi. Cette mise à jour remplace les indications de migrations encore en attente ci-dessus. La publication du code et sa vérification sont consignées dans la PR nº56.
