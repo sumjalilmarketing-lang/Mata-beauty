@@ -672,3 +672,11 @@ body{background:#080810;color:#fff8fc}
  .premium-bottom-nav{height:calc(72px + env(safe-area-inset-bottom,0px));padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}
  .premium-mobile-app{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 }
+
+.booking-service-selection { display:grid; gap:.6rem; margin:0 0 1rem; border:1px solid #d8c5a9; border-radius:1rem; padding:1rem; }
+.booking-service-selection label { display:flex; align-items:flex-start; gap:.65rem; padding:.6rem; border-radius:.5rem; }
+.booking-service-selection input { flex:none; width:1.1rem; height:1.1rem; accent-color:#8b633b; }
+.booking-service-selection label:focus-within { outline:2px solid #8b633b; outline-offset:2px; }
+.booking-service-selection label:hover { background:rgba(139,99,59,.08); }
+.premium-booking-modal button:focus-visible { outline:3px solid #8b633b; outline-offset:3px; }
+.premium-booking-modal button:disabled { cursor:not-allowed; opacity:.55; }

@@ -1,3 +1,4 @@
+import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 import {createSupabaseServerClient} from "@/lib/supabase/server";
 import {applicationOrigin} from "@/lib/payments/server";
 import {departmentTeamInput} from "@/lib/domain/department-teams";
@@ -8,7 +9,8 @@ export async function GET(request:Request){const auth=await manager(request);ret
 export async function POST(request:Request){
  if(request.headers.get("origin")!==new URL(applicationOrigin(request)).origin)return reply({error:"Origine refusée."},403);
  const auth=await manager(request);if(!auth)return reply({error:"Accès responsable refusé. Vérifiez votre session MFA."},403);
- const parsed=departmentTeamInput.safeParse(await request.json().catch(()=>null));if(!parsed.success)return reply({error:"Vérifiez les informations saisies."},400);const v=parsed.data;
+ let body:unknown;try{body=JSON.parse(await readBoundedText(request,16384));}catch(error){return reply({error:error instanceof BodyTooLargeError?"Requête trop volumineuse.":"Requête invalide."},error instanceof BodyTooLargeError?413:400);}
+ const parsed=departmentTeamInput.safeParse(body);if(!parsed.success)return reply({error:"Vérifiez les informations saisies."},400);const v=parsed.data;
  if(v.action==="hr-team"){const r=await auth.client.rpc("hr_create_team",{team_name:v.name,reason:v.reason});return r.error?reply({error:"Création refusée : responsable RH actif et nom unique requis."},409):reply({ok:true,id:r.data});}
  if(v.action==="commercial-team"){const r=await auth.client.rpc("commercial_create_team",{team_name:v.name,reason:v.reason});return r.error?reply({error:"Création refusée : rôle responsable commercial actif, nom unique et limite de trente équipes requis."},409):reply({ok:true,id:r.data});}
  if(v.action==="team"){const r=await auth.client.rpc("department_set_team",{target_team:v.teamId,target_version:v.version,target_department:v.department,target_name:v.name,manager_email:v.managerEmail,enabled:v.enabled,reason:v.reason});return r.error?reply({error:"Délégation refusée. Utilisez un autre compte confirmé actif sans rôle incompatible et actualisez l’équipe."},409):reply({ok:true,id:r.data});}

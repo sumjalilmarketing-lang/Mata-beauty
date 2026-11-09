@@ -57,7 +57,7 @@ beforeAll(async () => {
   const ownerSql = await migration("20261104171000_owner_booking_reschedule.sql");
   await db.exec(ownerSql.slice(ownerSql.indexOf("create function booking_private.owner_booking_slot_available"), ownerSql.indexOf("do $patch$")));
   beforeFix = { overlap: await available("09:30", "11:00"), overrun: await available("12:30", "14:00") };
-  await db.exec(await migration("20261109121051_independent_reschedule_historical_interval.sql"));
+  await db.exec(await migration("20261109122456_independent_reschedule_historical_interval.sql"));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => { await db.exec("begin"); });

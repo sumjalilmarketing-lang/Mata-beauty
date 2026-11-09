@@ -31,26 +31,36 @@ export async function GET(request: Request) {
     const supabase = await createSupabaseServerClient(request);
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
     if (exchangeError) return callbackRedirect(request, { auth_error: "oauth_exchange_failed" });
+    const { data: authenticated, error: userError } = await supabase.auth.getUser();
+    if (userError || !authenticated.user) {
+      await supabase.auth.signOut({ scope: "local" });
+      return callbackRedirect(request, { auth_error: "oauth_exchange_failed" });
+    }
     const { data: ensured, error: profileError } = await supabase.rpc("ensure_authenticated_profile");
-    if (profileError) {
-      await supabase.auth.signOut();
+    if (profileError || !ensured) {
+      await supabase.auth.signOut({ scope: "local" });
       return callbackRedirect(request, { auth_error: "profile_creation_failed" });
     }
-    const { error: statusError } = await supabase.rpc("synchronize_account_status");
-    if (statusError) return callbackRedirect(request, { auth_error: "profile_creation_failed" });
+    const { data: status, error: statusError } = await supabase.rpc("synchronize_account_status");
+    if (statusError || status !== "active") {
+      await supabase.auth.signOut({ scope: "local" });
+      return callbackRedirect(request, { auth_error: statusError ? "profile_creation_failed" : "account_suspended" });
+    }
     if (intent === "professional") {
       const { error: professionalError } = await supabase.rpc("request_professional_profile");
-      if (professionalError) return callbackRedirect(request, { auth_error: "professional_request_failed" });
+      if (professionalError) {
+        await supabase.auth.signOut({ scope: "local" });
+        return callbackRedirect(request, { auth_error: "professional_request_failed" });
+      }
     }
     const profile = ensured as { role?: string; is_suspended?: boolean; profile_incomplete?: boolean } | null;
     if (profile?.is_suspended) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       return callbackRedirect(request, { auth_error: "account_suspended" });
     }
-    const { data: authenticated } = await supabase.auth.getUser();
     if (authenticated.user) {
       try { await sendWelcomeEmail(authenticated.user.id); }
-      catch { /* Email delivery must not block a valid OAuth session. */ }
+      catch { console.error("welcome_email_delivery_failed"); }
     }
     // The role comes from the database RPC, never the OAuth intent or metadata.
     // Preserve explicit deep links, but route generic admin logins through the

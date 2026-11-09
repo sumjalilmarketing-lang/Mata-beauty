@@ -1,12 +1,13 @@
+import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { serviceSupabase } from "@/lib/payments/server";
 import { operationalAccounts } from "@/lib/domain/operational-accounts";
 
 const input = z.object({ action: z.enum(["preview", "suspend", "archive", "reactivate", "delete"]),
-  accounts: z.array(z.object({ userId: z.uuid(), operationId: z.uuid() })).min(1).max(20),
+  accounts: z.array(z.object({ userId: z.uuid(), operationId: z.uuid() }).strict()).min(1).max(20),
   reason: z.string().trim().max(1000).default(""), confirmation: z.string().max(100).default("")
-}).refine(value => new Set(value.accounts.map(account => account.userId)).size === value.accounts.length);
+}).strict().refine(value => new Set(value.accounts.map(account => account.userId)).size === value.accounts.length);
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 async function manager(request: Request) {
   const client = await createSupabaseServerClient(request);
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const client = await manager(request);
   if (!client) return reply({ error: "Super Admin avec MFA requis." }, 403);
   let body: unknown;
-  try { body = await request.json(); } catch { return reply({ error: "Requête invalide." }, 400); }
+  try { body = JSON.parse(await readBoundedText(request, 16_384)); } catch (error) { return reply({ error: error instanceof BodyTooLargeError ? "Requête trop volumineuse." : "Requête invalide." }, error instanceof BodyTooLargeError ? 413 : 400); }
   const parsed = input.safeParse(body);
   if (!parsed.success) return reply({ error: "Sélection invalide (20 comptes maximum)." }, 400);
   const { action, accounts, reason, confirmation } = parsed.data;

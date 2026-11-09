@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     }
     if (profile.data.role !== "admin") return go("/app/profile");
     const mfa = await client.rpc("admin_mfa_required");
-    if (mfa.error) return go("/?auth_error=workspace_unavailable");
+    if (mfa.error || typeof mfa.data !== "boolean") return go("/?auth_error=workspace_unavailable");
     // The shared verification screen returns to the actual department once
     // the second factor is verified; this does not expose Super Admin modules.
     if (mfa.data === true) return go("/admin");

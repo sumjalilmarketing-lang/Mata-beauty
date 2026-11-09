@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { clientBookingStatusTone, groupClientBookings, type ClientBookingItem } from "@/lib/domain/client-bookings";
+import { ClientBookingReschedule } from "./client-booking-reschedule";
 import { BookingReview } from "./booking-review";
 import "./client-booking-groups.css";
 
@@ -17,7 +18,11 @@ const dateTime = (value: string, timeZone = "UTC") => new Intl.DateTimeFormat("f
 
 export function ClientBookingGroups({ items, clientId, stats, hasMore, loadingMore, onLoadMore, onMessage, onCancel }: { items: readonly ClientBookingItem[]; clientId: string; stats: { upcoming: number; pending: number; past: number }; hasMore: boolean; loadingMore: boolean; onLoadMore: () => void; onMessage: (booking: ClientBookingItem) => void; onCancel: (booking: ClientBookingItem) => void }) {
   const [open, setOpen] = useState<string | null>(null);
-  const groups = groupClientBookings(items);
+  const [rescheduled, setRescheduled] = useState<Record<string, { startsAt: string; endsAt: string; previousStartsAt: string }>>({});
+  const groups = groupClientBookings(items.map(item => {
+    const saved = rescheduled[item.id];
+    return saved && item.startsAt === saved.previousStartsAt ? { ...item, startsAt: saved.startsAt, endsAt: saved.endsAt } : item;
+  }));
 
   return <>
     <section className="client-booking-overview" aria-label="Synthèse de vos rendez-vous">
@@ -61,6 +66,7 @@ export function ClientBookingGroups({ items, clientId, stats, hasMore, loadingMo
             <div className="client-booking-timeline__actions">
               <button type="button" onClick={() => onMessage(booking)}>Messages</button>
               {booking.status === "completed" && <BookingReview bookingId={booking.id} clientId={clientId} providerId={booking.providerId} performer={null} />}
+              {["pending", "confirmed"].includes(booking.status) && Date.parse(booking.startsAt) > Date.now() + 48 * 3_600_000 && <ClientBookingReschedule bookingId={booking.id} startsAt={booking.startsAt} timeZone={booking.timeZone} onSaved={saved => setRescheduled(current => ({ ...current, [saved.id]: { startsAt: saved.startsAt, endsAt: saved.endsAt, previousStartsAt: items.find(item => item.id === saved.id)?.startsAt ?? booking.startsAt } }))} />}
               {["pending", "confirmed"].includes(booking.status) && <button type="button" className="client-booking-cancel" onClick={() => onCancel(booking)}>Annuler</button>}
             </div>
           </li>)}

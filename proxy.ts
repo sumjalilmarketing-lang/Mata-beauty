@@ -22,11 +22,24 @@ export async function proxy(request: NextRequest) {
     }
     return secureResponse(NextResponse.next({ request: { headers } }));
   };
+  const refreshedCookies = new Map<string, { name: string; value: string; options: import("@supabase/ssr").CookieOptions }>();
+  const refreshHeaders = new Headers();
   const secureResponse = (result: NextResponse) => {
     if (policy) {
       result.headers.set("Content-Security-Policy", policy);
       result.headers.set("Content-Security-Policy-Report-Only", policy);
       result.headers.set("Cache-Control", "private, no-store");
+    }
+    for (const { name, value, options } of refreshedCookies.values()) {
+      result.cookies.set(name, value, options);
+    }
+    for (const [name, value] of refreshHeaders) result.headers.set(name, value);
+    if (refreshedCookies.size > 0) {
+      result.headers.set("Cache-Control", "private, no-cache, no-store, must-revalidate, max-age=0");
+      result.headers.set("CDN-Cache-Control", "no-store");
+      result.headers.set("Vercel-CDN-Cache-Control", "no-store");
+      result.headers.set("Pragma", "no-cache");
+      result.headers.set("Expires", "0");
     }
     return result;
   };
@@ -38,12 +51,13 @@ export async function proxy(request: NextRequest) {
   const supabase = createServerClient(url, anonKey, {
     cookies: {
       getAll: () => request.cookies.getAll(),
-      setAll: (cookies) => {
-        for (const { name, value } of cookies) request.cookies.set(name, value);
-        response = nextResponse();
+      setAll: (cookies, headers) => {
         for (const { name, value, options } of cookies) {
-          response.cookies.set(name, value, { ...options, path: "/", sameSite: "lax", secure: request.nextUrl.protocol === "https:" });
+          request.cookies.set(name, value);
+          refreshedCookies.set(name, { name, value, options: { ...options, path: "/", sameSite: "lax", secure: request.nextUrl.protocol === "https:" } });
         }
+        for (const [name, value] of Object.entries(headers ?? {})) refreshHeaders.set(name, value);
+        response = nextResponse();
       },
     },
   });

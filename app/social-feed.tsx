@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { discoverFeed, videoTopics, videoInterestAffinity, type DiscoveryTopic } from "@/lib/domain/social-feed";
 import type { CatalogCategory } from "@/lib/supabase/catalog";
-import { filterInspirationPosts, validSearchRadius, type InspirationSearchProvider } from "@/lib/domain/inspiration-search";
+import { filterInspirationPosts, type InspirationSearchProvider } from "@/lib/domain/inspiration-search";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { recordSessionMetric } from "@/lib/analytics/session-metric";
 import { readBrowserStorage, writeBrowserStorage } from "@/lib/browser-storage";
@@ -19,6 +19,8 @@ import { applicationText } from "@/lib/domain/application-copy";
 import { applicationLocale } from "@/lib/domain/booking-copy";
 import { createVideoRefreshQueue, reloadVideoSource, playFeedVideo, feedVideoPreload } from "@/lib/domain/video-recovery";
 import { deferPrivateVideoUntilActive, fetchPublicPostVideoResult, postUsesVideoMedia } from "@/lib/domain/public-post-video-media";
+import { inspirationCountryCode, inspirationCountryLabel, inspirationSearchHistoryState, readInspirationSearchUrl } from "@/lib/domain/inspiration-search-url";
+import { inspirationServerSearchArgs } from "@/lib/domain/inspiration-server-search";
 import "./inspiration-search.css";
 
 type FeedPost = {
@@ -155,8 +157,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const [selectedCountryCode, setSelectedCountryCode] = useState("");
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [radiusKm, setRadiusKm] = useState<2 | 5 | 10 | 20>(5);
-  const searchInitialized = useRef(false);
-  const pendingLegacyCategory = useRef("");
+  const [legacyCategory, setLegacyCategory] = useState("");
   const [commentsPost, setCommentsPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [commentText, setCommentText] = useState("");
@@ -193,46 +194,41 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const pageRequests = useRef(new AbortController());
   const initialPageReady = useRef(false);
   const loadGeneration = useRef(0);
+  const feedRequest = useRef<AbortController | null>(null);
   const feedCursor = useRef<{ publishedAt: string; id: string } | null>(null);
 
   useEffect(() => {
-    if (searchInitialized.current) return;
-    searchInitialized.current = true;
-    const params = new URLSearchParams(window.location.search);
-    const query = (params.get("q") ?? "").slice(0, 120);
-    const categoryId = params.get("categoryId") ?? "";
-    const countryCode = (params.get("country") ?? "").toUpperCase();
-    const providerId = params.get("providerId") ?? "";
-    pendingLegacyCategory.current = params.get("category") ?? "";
-    const requestedRadius = Number(params.get("radius"));
-    const nextRadius = [2, 5, 10, 20].includes(requestedRadius) ? validSearchRadius(requestedRadius) : 5;
-    const historyPosition = window.history.state?.mataInspirationPosition as Coordinates | undefined;
-    const validPosition = historyPosition && Number.isFinite(historyPosition.latitude) && Number.isFinite(historyPosition.longitude)
-      && Math.abs(historyPosition.latitude) <= 90 && Math.abs(historyPosition.longitude) <= 180 ? historyPosition : null;
-    const zone = (params.get("zone") ?? "").slice(0, 120);
-    const shouldOpen = params.get("search") === "1" && params.get("applied") !== "1";
-    const frame = requestAnimationFrame(() => {
-      setSearchQuery(query);
-      setSelectedCategoryId(categoryId);
-      setSelectedCountryCode(countryCode);
-      setSelectedProviderId(providerId);
-      setRadiusKm(nextRadius);
-      if (zone || validPosition) onLocationChange(zone, validPosition);
-      setSearchOpen(shouldOpen);
-    });
-    return () => cancelAnimationFrame(frame);
+    let frame = 0;
+    const restore = (initial = false) => {
+      const search = readInspirationSearchUrl(window.location.search, window.history.state);
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        setSearchQuery(search.query);
+        setSelectedCategoryId(search.categoryId);
+        setLegacyCategory(search.categoryId ? "" : search.legacyCategory);
+        setSelectedCountryCode(search.countryCode);
+        setSelectedProviderId(search.providerId);
+        setRadiusKm(search.radiusKm);
+        // Initial loading retains an optional session zone; Back/Forward must
+        // clear it when the restored entry has no location filter.
+        if (!initial || search.zone || search.position) onLocationChange(search.zone, search.position);
+        setSearchOpen(search.open);
+      });
+    };
+    restore(true);
+    const popstate = () => restore();
+    window.addEventListener("popstate", popstate);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("popstate", popstate); };
   }, [onLocationChange]);
 
   useEffect(() => {
-    const legacyCategory = pendingLegacyCategory.current;
     if (!legacyCategory || !categories.length) return;
     const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr").replace(/-/g, " ").trim();
     const normalized = normalize(legacyCategory);
     const match = categories.find((item) => normalize(item.name) === normalized || normalize(item.slug) === normalized);
     const frame = requestAnimationFrame(() => setSelectedCategoryId(match?.id ?? "__unavailable_category__"));
-    pendingLegacyCategory.current = "";
     return () => cancelAnimationFrame(frame);
-  }, [categories]);
+  }, [categories, legacyCategory]);
 
   useEffect(() => {
     if (!collection) return;
@@ -258,15 +254,20 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     radiusKm,
   }), [location.area, location.position, radiusKm, searchQuery, selectedCategoryId, selectedCountryCode, selectedProviderId]);
   const activeSearch = Boolean(searchQuery.trim() || selectedCategoryId || selectedCountryCode || selectedProviderId || location.area.trim() || location.position);
+  const serverSearchParameters = useMemo(() => activeSearch ? inspirationServerSearchArgs(searchFilters) : undefined, [activeSearch, searchFilters]);
+  const serverSearchKey = JSON.stringify(serverSearchParameters) ?? "unfiltered";
+  const [serverResultKey, setServerResultKey] = useState("");
   const visiblePosts = useMemo(() => {
-    const matches = collection ? collection.posts : filterInspirationPosts(posts, location.providers, searchFilters);
+    const matches = collection ? collection.posts : serverSearchParameters !== undefined
+      ? serverResultKey === serverSearchKey ? posts : []
+      : filterInspirationPosts(posts, location.providers, searchFilters);
     return matches.filter((post) => !unavailablePosts.has(post.id) && (collection || feedTab === "for-you" || followed.has(post.authorId))).map((post) => ({ ...post,
       distance: location.position ? distanceKm(location.position, location.providers.find((item) => item.serviceId === post.serviceId && item.profileId === post.authorId)?.coordinates) : null,
       followed: followed.has(post.authorId) || favoriteProviders.has(post.authorId),
       proximityScore: 0,
       availableSoon: Boolean((realAvailability[post.id] ?? post.availableAt) && new Date(realAvailability[post.id] ?? post.availableAt ?? 0).getTime() < FEED_RANKING_REFERENCE_TIME+72*3_600_000),
     })).sort((a, b) => location.position ? (a.distance ?? Infinity) - (b.distance ?? Infinity) : 0);
-  }, [collection, favoriteProviders, feedTab, followed, location, posts, realAvailability, searchFilters, unavailablePosts]);
+  }, [collection, favoriteProviders, feedTab, followed, location, posts, realAvailability, searchFilters, serverResultKey, serverSearchKey, serverSearchParameters, unavailablePosts]);
 
   const activePostId = visiblePosts[activeIndex]?.id;
   useEffect(() => {
@@ -296,14 +297,20 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const load = useCallback(async () => {
     if (collection) return;
     const generation = ++loadGeneration.current;
+    feedRequest.current?.abort();
+    const controller = new AbortController();
+    feedRequest.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
+    loadingMore.current = false;
+    feedCursor.current = null;
     interests.current.clear();
     setFollowingUnavailable(false);
     setLiked(new Set()); setSaved(new Set()); setFollowed(new Set()); setFavoriteProviders(new Set());
     initialPageReady.current = false;
-    const signal = pageRequests.current.signal;
-    if (signal.aborted) return;
+    const signal = AbortSignal.any([pageRequests.current.signal, controller.signal]);
+    if (signal.aborted) { window.clearTimeout(timeout); return; }
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) { setState("error"); return; }
+    if (!supabase) { window.clearTimeout(timeout); setState("error"); return; }
     // Cached posts can have been withdrawn since the previous visit. Never
     // render them before the public feed has confirmed their current status.
     try { window.sessionStorage.removeItem(FEED_CACHE_KEY); } catch { /* Optional storage. */ }
@@ -311,7 +318,12 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     setActiveIndex(0);
     setState("loading");
     try {
-    const { data, error } = await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE).abortSignal(signal);
+    const result = serverSearchParameters === null ? { data: [], error: null }
+      : serverSearchParameters !== undefined
+        ? await supabase.rpc("search_inspiration_feed", serverSearchParameters).abortSignal(signal)
+        : await supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE).abortSignal(signal);
+    const { data, error } = result;
+    if (!error && !Array.isArray(data)) throw new Error("Réponse de découverte invalide.");
     if (signal.aborted || generation !== loadGeneration.current) return;
     if (error) { setState("error"); return; }
     const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row, true)));
@@ -348,23 +360,36 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
     feedCursor.current = last ? { publishedAt: last.published_at, id: last.id } : null;
     initialPageReady.current = true;
-    setState(mapped.length ? "ready" : "empty");
-    } catch { if (!signal.aborted && generation === loadGeneration.current) setState("error"); }
-  }, [authenticated, collection]);
+    setServerResultKey(serverSearchKey);
+    setState(mapped.length || serverSearchParameters !== undefined || (data ?? []).length === FEED_BATCH_SIZE ? "ready" : "empty");
+    } catch { if (!pageRequests.current.signal.aborted && generation === loadGeneration.current) setState("error"); }
+    finally {
+      window.clearTimeout(timeout);
+      if (controller.signal.aborted && !pageRequests.current.signal.aborted && generation === loadGeneration.current) setState("error");
+    }
+  }, [authenticated, collection, serverSearchKey, serverSearchParameters]);
 
   const loadMore = useCallback(async () => {
     if (collection) { collection.onLoadMore(); return; }
     const generation = loadGeneration.current;
-    const signal = pageRequests.current.signal;
-    if (!initialPageReady.current || !hasMore || loadingMore.current || signal.aborted) return;
+    const signal = AbortSignal.any([pageRequests.current.signal, feedRequest.current?.signal ?? pageRequests.current.signal, AbortSignal.timeout(15_000)]);
+    if (!initialPageReady.current || !hasMore || loadingMore.current || signal.aborted || serverResultKey !== serverSearchKey) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     loadingMore.current = true;
     try {
-      let query = supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE);
       const cursor = feedCursor.current;
-      if (cursor) query = query.or(`published_at.lt.${cursor.publishedAt},and(published_at.eq.${cursor.publishedAt},id.lt.${cursor.id})`);
-      const { data, error } = await query.abortSignal(signal);
+      const parameters = serverSearchParameters === undefined ? undefined : inspirationServerSearchArgs(searchFilters, cursor);
+      let result;
+      if (parameters === null) result = { data: [], error: null };
+      else if (parameters !== undefined) result = await supabase.rpc("search_inspiration_feed", parameters).abortSignal(signal);
+      else {
+        let query = supabase.from("social_feed").select("*").order("published_at", { ascending: false }).order("id", { ascending: false }).limit(FEED_BATCH_SIZE);
+        if (cursor) query = query.or(`published_at.lt.${cursor.publishedAt},and(published_at.eq.${cursor.publishedAt},id.lt.${cursor.id})`);
+        result = await query.abortSignal(signal);
+      }
+      const { data, error } = result;
+      if (!error && !Array.isArray(data)) throw new Error("Réponse de découverte invalide.");
       if (signal.aborted || generation !== loadGeneration.current) return;
       if (error) { setFeedback("La suite des inspirations n’a pas pu être chargée. Actualisez pour réessayer."); return; }
       const resolved = await Promise.all((data ?? []).map((row: SocialFeedRow) => resolvePrivateMedia(row, true)));
@@ -374,8 +399,13 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       const last = (data ?? []).at(-1) as SocialFeedRow | undefined;
       if (last) feedCursor.current = { publishedAt: last.published_at, id: last.id };
       setHasMore((data ?? []).length === FEED_BATCH_SIZE);
-    } catch { queueMicrotask(() => { if (!signal.aborted && generation === loadGeneration.current) setFeedback("La suite des inspirations n’a pas pu être chargée. Actualisez pour réessayer."); }); } finally { loadingMore.current = false; }
-  }, [collection, hasMore]);
+    } catch { queueMicrotask(() => { if (!signal.aborted && generation === loadGeneration.current) setFeedback("La suite des inspirations n’a pas pu être chargée. Actualisez pour réessayer."); }); } finally {
+      if (generation === loadGeneration.current) {
+        loadingMore.current = false;
+        if (signal.aborted && !pageRequests.current.signal.aborted) setFeedback("La suite des inspirations n’a pas pu être chargée. Actualisez pour réessayer.");
+      }
+    }
+  }, [collection, hasMore, searchFilters, serverResultKey, serverSearchKey, serverSearchParameters]);
 
   useEffect(() => {
     if (collection || state !== "ready" || !hasMore || visiblePosts.length >= 4 || (!activeSearch && feedTab !== "following")) return;
@@ -401,9 +431,9 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
 
   useEffect(() => {
     if (collection) return;
-    const frame = requestAnimationFrame(() => { void load(); });
-    return () => cancelAnimationFrame(frame);
-  }, [collection, load]);
+    const timer = window.setTimeout(() => { void load(); }, serverSearchParameters !== undefined ? 250 : 0);
+    return () => window.clearTimeout(timer);
+  }, [collection, load, serverSearchParameters]);
 
   useEffect(() => {
     try {
@@ -742,18 +772,17 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   }
 
   const categoryLabel = categories.find((item) => item.id === selectedCategoryId)?.name ?? "";
-  const countryLabel = selectedCountryCode ? new Intl.DisplayNames([locale], { type: "region" }).of(selectedCountryCode) ?? selectedCountryCode : "";
+  const countryLabel = inspirationCountryLabel(selectedCountryCode, locale);
   const selectedProvider = location.providers.find((item) => item.profileId === selectedProviderId);
   const countryOptions = useMemo(() => {
-    const codes = [...new Set(location.providers.map((provider) => provider.countryCode).filter((code): code is string => Boolean(code && /^[A-Z]{2}$/.test(code))))];
-    const names = new Intl.DisplayNames([locale], { type: "region" });
-    return codes.sort((left, right) => (names.of(left) ?? left).localeCompare(names.of(right) ?? right, locale));
+    const codes = [...new Set(location.providers.map(provider => inspirationCountryCode(provider.countryCode)).filter(Boolean))];
+    return codes.sort((left, right) => inspirationCountryLabel(left, locale).localeCompare(inspirationCountryLabel(right, locale), locale));
   }, [location.providers, locale]);
   const providerOptions = useMemo(() => {
     const unique = new Map<string, InspirationSearchProvider>();
     for (const provider of location.providers) {
       if (selectedCategoryId && provider.categoryId !== selectedCategoryId) continue;
-      if (selectedCountryCode && provider.countryCode !== selectedCountryCode) continue;
+      if (selectedCountryCode && inspirationCountryCode(provider.countryCode) !== selectedCountryCode) continue;
       if (location.area.trim() && !matchesSearch(location.area, `${provider.area} ${provider.address ?? ""}`)) continue;
       if (location.position) {
         const distance = distanceKm(location.position, provider.coordinates);
@@ -765,7 +794,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 5);
   }, [location.area, location.position, location.providers, radiusKm, searchQuery, selectedCategoryId, selectedCountryCode]);
 
-  function writeSearchUrl(applied: boolean, providerIdOverride = selectedProviderId) {
+  function writeSearchUrl(applied: boolean, providerIdOverride = selectedProviderId, push = false) {
     const params = new URLSearchParams();
     if (activeSearch || providerIdOverride || (searchOpen && !applied)) params.set("search", "1");
     if (applied) params.set("applied", "1");
@@ -775,33 +804,36 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     if (providerIdOverride) params.set("providerId", providerIdOverride);
     if (location.area.trim()) params.set("zone", location.area.trim().slice(0, 120));
     if (location.position) params.set("radius", String(radiusKm));
-    const historyState = window.history.state && typeof window.history.state === "object" ? { ...window.history.state } : {};
-    if (location.position) historyState.mataInspirationPosition = location.position;
-    else delete historyState.mataInspirationPosition;
+    const historyState = inspirationSearchHistoryState(window.history.state, location.position);
     const query = params.toString();
-    window.history.replaceState(historyState, "", query ? `/?${query}` : "/");
+    const href = query ? `/?${query}` : "/";
+    if (push && href !== `${window.location.pathname}${window.location.search}`) window.history.pushState(historyState, "", href);
+    else window.history.replaceState(historyState, "", href);
   }
 
   function openSearch() {
     setSearchOpen(true);
-    writeSearchUrl(false);
   }
 
   function applySearch() {
     setSelectedCategoryId((current) => current.startsWith("__") ? "" : current);
-    writeSearchUrl(true);
+    setLegacyCategory("");
+    writeSearchUrl(true, selectedProviderId, true);
     setSearchOpen(false);
   }
 
   function clearSearch() {
     setSearchQuery("");
+    setLegacyCategory("");
     setSelectedCategoryId("");
     setSelectedCountryCode("");
     setSelectedProviderId("");
     setRadiusKm(5);
     location.onChange("", null);
     setSearchOpen(false);
-    window.history.replaceState({}, "", "/");
+    const historyState = inspirationSearchHistoryState(window.history.state, null);
+    if (window.location.pathname !== "/" || window.location.search) window.history.pushState(historyState, "", "/");
+    else window.history.replaceState(historyState, "", "/");
   }
 
   const openProfessionalFromSearch = (providerId: string) => {
@@ -819,7 +851,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       <form onSubmit={(event) => { event.preventDefault(); applySearch(); }}>
         <label className="inspiration-search-field">{t("Professionnel, salon ou prestation")}<input autoFocus maxLength={120} value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setSelectedProviderId(""); }} placeholder={t("Ex. Aïssatou Beauty, tresses…")} /></label>
         <label className="inspiration-search-field">{t("Prestation")}<select value={selectedCategoryId.startsWith("__") ? "" : selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Toutes les prestations")}</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="inspiration-search-field">{t("Pays")}<select aria-label={t("Pays")} value={selectedCountryCode} onChange={(event) => { setSelectedCountryCode(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Tous les pays avec des professionnels publiés")}</option>{countryOptions.map((code) => <option key={code} value={code}>{new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code}</option>)}</select></label>
+        <label className="inspiration-search-field">{t("Pays")}<select aria-label={t("Pays")} value={selectedCountryCode} onChange={(event) => { setSelectedCountryCode(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Tous les pays avec des professionnels publiés")}</option>{countryOptions.map((code) => <option key={code} value={code}>{inspirationCountryLabel(code, locale)}</option>)}</select></label>
         {categories.length === 0 && <p className="inspiration-search-note">{t("Les catégories publiées seront disponibles dès que le catalogue aura chargé.")}</p>}
         <LocationPicker area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} radiusKm={radiusKm} onRadiusChange={setRadiusKm} />
         {providerOptions.length > 0 && <div className="inspiration-provider-suggestions"><strong>{t("Professionnels correspondants")}</strong>{providerOptions.map((provider) => <button type="button" key={provider.profileId} aria-pressed={selectedProviderId === provider.profileId} onClick={() => openProfessionalFromSearch(provider.profileId)}><span><b>{provider.name}</b><small>{provider.specialty} · {provider.area}</small></span><i>{t("Profil ›")}</i></button>)}</div>}
@@ -828,7 +860,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     </section>
   </div> : null;
 
-  if (state === "loading") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}<div className="feed-skeleton" role="status" aria-label={t("Chargement du feed")} /></section>;
+  if (state === "loading") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="feed-skeleton" role="status" aria-label={t("Chargement du feed")} /></section>;
   if (state !== "ready") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="social-feed-empty"><span>▶</span><h1>{state === "error" ? t("Le feed est indisponible") : t("Les premières inspirations arrivent bientôt.")}</h1><p>{state === "error" ? t("Réessayez dans quelques instants.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={state === "error" ? () => void load() : openSearch}>{state === "error" ? t("Réessayer") : t("Rechercher une prestation")}</button></div></section>;
 
   return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="social-feed" aria-label={t("Vidéos beauté")} onScroll={(event) => { const node=event.currentTarget; const cardHeight=cards.current[0]?.getBoundingClientRect().height ?? node.clientHeight; const index=Math.round(node.scrollTop/Math.max(1,cardHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>

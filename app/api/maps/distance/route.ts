@@ -1,13 +1,16 @@
+import { BodyTooLargeError, readBoundedText } from "@/lib/http/bounded-body";
 import { limitMapsRequest } from "@/lib/maps-rate-limit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { distanceKm } from "@/lib/maps";
 
-const point = z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) });
-const inputSchema = z.object({ origin: point, destination: point });
+const point = z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }).strict();
+const inputSchema = z.object({ origin: point, destination: point }).strict();
 
 export async function POST(request: Request) {
-  const parsed = inputSchema.safeParse(await request.json().catch(() => null));
+  let body: unknown;
+  try { body = JSON.parse(await readBoundedText(request, 2048)); } catch (error) { return NextResponse.json({ error: error instanceof BodyTooLargeError ? "Requête trop volumineuse." : "Coordonnées invalides." }, { status: error instanceof BodyTooLargeError ? 413 : 400 }); }
+  const parsed = inputSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Coordonnées invalides." }, { status: 400 });
   const fallback = distanceKm(parsed.data.origin, parsed.data.destination);
   const key = process.env.GOOGLE_MAPS_SERVER_KEY;

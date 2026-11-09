@@ -148,10 +148,18 @@ test("Inspiration country filter uses public provider ISO codes", async ({ page 
     { profile_id: providerFrance, business_name: "Studio Paris", city: "Paris", country_code: "FR", timezone: "Europe/Paris", service_mode: "salon", average_rating: 0, review_count: 0, verified_at: null, cover_url: null, provider_services: [{ id: serviceFrance, title: "Manucure", duration_minutes: 60, price_amount: 30, currency: "EUR", services: { name: "Manucure", categories: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Onglerie" } } }] },
     { profile_id: providerSenegal, business_name: "Studio Dakar", city: "Dakar", country_code: "SN", timezone: "Africa/Dakar", service_mode: "salon", average_rating: 0, review_count: 0, verified_at: null, cover_url: null, provider_services: [{ id: serviceSenegal, title: "Tresses", duration_minutes: 60, price_amount: 10000, currency: "XOF", services: { name: "Tresses", categories: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Coiffure" } } }] },
   ]) }));
-  await page.route(`${testSupabaseOrigin}/rest/v1/social_feed**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+  const countryPosts = [
+
     { id: "66666666-6666-4666-8666-666666666666", author_id: providerFrance, caption: "Manucure Paris", video_url: `${testAppOrigin}/paris.mp4`, thumbnail_url: null, duration_seconds: 10, view_count: 0, like_count: 0, comment_count: 0, save_count: 0, share_count: 0, published_at: new Date().toISOString(), business_name: "Studio Paris", slug: "studio-paris", city: "Paris", verified_at: null, avatar_url: null, cover_url: null, is_sponsored: false, provider_service_id: serviceFrance, service_title: "Manucure", duration_minutes: 60, price_amount: 30, currency: "EUR", average_rating: 0, review_count: 0, hashtags: [], post_type: "video" },
     { id: "77777777-7777-4777-8777-777777777777", author_id: providerSenegal, caption: "Tresses Dakar", video_url: `${testAppOrigin}/dakar.mp4`, thumbnail_url: null, duration_seconds: 10, view_count: 0, like_count: 0, comment_count: 0, save_count: 0, share_count: 0, published_at: new Date(Date.now() - 1000).toISOString(), business_name: "Studio Dakar", slug: "studio-dakar", city: "Dakar", verified_at: null, avatar_url: null, cover_url: null, is_sponsored: false, provider_service_id: serviceSenegal, service_title: "Tresses", duration_minutes: 60, price_amount: 10000, currency: "XOF", average_rating: 0, review_count: 0, hashtags: [], post_type: "video" },
-  ]) }));
+  ];
+  await page.route(`${testSupabaseOrigin}/rest/v1/social_feed**`, route => route.fulfill({ json: countryPosts }));
+  await page.route(`${testSupabaseOrigin}/rest/v1/rpc/search_inspiration_feed`, route => {
+    const args = route.request().postDataJSON() as { target_country_code: string; page_size: number };
+    expect(args.target_country_code).toBe("FR");
+    expect(args.page_size).toBe(8);
+    return route.fulfill({ json: countryPosts.filter(post => post.author_id === providerFrance) });
+  });
 
   await page.goto("/");
   await expect(page.locator(".social-video-card")).toHaveCount(2, { timeout: 15000 });
@@ -178,6 +186,8 @@ test("primary mobile navigation keeps comfortable touch targets", async ({ page 
 });
 
 test("Inspiration swipes vertically with one active player, filters and an eight-item batch", async ({ page }) => {
+  // These synthetic services have no configured optional or required variants.
+  await page.route(`${testSupabaseOrigin}/rest/v1/service_options**`, route => route.fulfill({ json: [] }));
   const signedPosts: string[] = [];
   await page.route("**/api/public/social-posts/*/media", (route) => {
     const postId = new URL(route.request().url()).pathname.split("/").at(-2);
@@ -213,8 +223,8 @@ test("Inspiration swipes vertically with one active player, filters and an eight
       { id: "33333333-3333-4333-8333-333333333333", title: "Pose gel", duration_minutes: 60, price_amount: 8000, services: { name: "Pose gel", categories: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Onglerie" } } },
     ],
   }]) }));
-  await page.route(`${testSupabaseOrigin}/rest/v1/social_feed**`, (route) => {
-    requestedBatches.push(new URL(route.request().url()).searchParams.get("limit") ?? "");
+  const searchCalls: Array<{ target_category_id: string | null; target_zone: string }> = [];
+  const discoveryPosts = () => {
     const base = {
       author_id: "11111111-1111-4111-8111-111111111111", thumbnail_url: null, duration_seconds: 18,
       view_count: 120, like_count: 32, comment_count: 4, save_count: 7, share_count: 2,
@@ -223,11 +233,22 @@ test("Inspiration swipes vertically with one active player, filters and an eight
       provider_service_id: "22222222-2222-4222-8222-222222222222", service_title: "Tresses collées",
       duration_minutes: 90, price_amount: 10000, currency: "XOF", average_rating: 4.8, review_count: 12, hashtags: ["tresses", "dakar"],
     };
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+    return [
       { ...base, id: "66666666-6666-4666-8666-666666666666", caption: "Première transformation", video_url: `${testAppOrigin}/one.mp4` },
       { ...base, id: "77777777-7777-4777-8777-777777777777", caption: "Deuxième transformation", video_url: `${testAppOrigin}/two.mp4`, published_at: new Date(Date.now()-1000).toISOString() },
       { ...base, id: "88888888-8888-4888-8888-888888888888", caption: "Manucure gel", provider_service_id: "33333333-3333-4333-8333-333333333333", service_title: "Pose gel", video_url: `${testAppOrigin}/nails.mp4`, published_at: new Date(Date.now()-2000).toISOString() },
-    ]) });
+    ];
+  };
+  await page.route(`${testSupabaseOrigin}/rest/v1/social_feed**`, route => {
+    requestedBatches.push(new URL(route.request().url()).searchParams.get("limit") ?? "");
+    return route.fulfill({ json: discoveryPosts() });
+  });
+  await page.route(`${testSupabaseOrigin}/rest/v1/rpc/search_inspiration_feed`, route => {
+    const args = route.request().postDataJSON() as { target_category_id: string | null; target_zone: string; page_size: number };
+    searchCalls.push(args);
+    expect(args.page_size).toBe(8);
+    return route.fulfill({ json: discoveryPosts().filter(post => !args.target_category_id ||
+      (args.target_category_id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" ? post.provider_service_id === "22222222-2222-4222-8222-222222222222" : post.provider_service_id === "33333333-3333-4333-8333-333333333333")) });
   });
   await page.goto("/");
   const feed = page.locator(".social-feed");
@@ -278,6 +299,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await page.getByLabel("Ville, quartier ou pays").fill("Dakar");
   await page.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(2);
+  await expect.poll(() => searchCalls.some(call => call.target_category_id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" && call.target_zone === "Dakar")).toBe(true);
   await expect(page.getByRole("navigation", { name: "Filtres du feed" })).toHaveCount(0);
   await expect(page.locator(".social-video-card").filter({ hasText: "Manucure gel" })).toHaveCount(0);
   await page.getByRole("button", { name: "Effacer les filtres" }).click();

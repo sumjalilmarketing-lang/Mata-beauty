@@ -11,7 +11,7 @@ const location = (response: Response) => new URL(response.headers.get("location"
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.exchange.mockResolvedValue({ error: null });
-  mocks.rpc.mockResolvedValue({ error: null, data: { role: "client", profile_incomplete: false } });
+  mocks.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === "synchronize_account_status" ? "active" : { role: "client", profile_incomplete: false } }));
   mocks.user.mockResolvedValue({ data: { user: { id: "fixture-user" } } });
 });
 it("shows a Google cancellation on the public page and preserves the protected destination", async () => {
@@ -29,14 +29,14 @@ it("preserves an invitation destination when an expired session needs a new logi
   expect(mocks.rpc).not.toHaveBeenCalled();
 });
 it.each(["/", "/app", "/app/profile"])("routes verified admin logins for %s through department and MFA resolution", async destination => {
-  mocks.rpc.mockResolvedValue({ error: null, data: { role: "admin" } });
+  mocks.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === "synchronize_account_status" ? "active" : { role: "admin" } }));
   const response = await GET(request(`code=valid&next=${encodeURIComponent(destination)}`));
   expect(location(response).pathname).toBe("/auth/workspace");
   expect(response.headers.get("cache-control")).toBe("no-store");
   expect(response.headers.get("referrer-policy")).toBe("no-referrer");
 });
 it("keeps explicit admin department links", async () => {
-  mocks.rpc.mockResolvedValue({ error: null, data: { role: "admin" } });
+  mocks.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === "synchronize_account_status" ? "active" : { role: "admin" } }));
   expect(location(await GET(request("code=valid&next=%2Ffinance"))).pathname).toBe("/finance");
 });
 it("does not grant an admin destination based on the requested intent", async () => {
@@ -48,7 +48,7 @@ it("keeps successful invitation deep links", async () => {
   expect(url.pathname).toBe("/salon/invitation/accept"); expect(url.hash).toBe("#token=fixture");
 });
 it("does not redirect suspended admins into an internal space", async () => {
-  mocks.rpc.mockResolvedValue({ error: null, data: { role: "admin", is_suspended: true } });
+  mocks.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === "synchronize_account_status" ? "suspended" : { role: "admin", is_suspended: true } }));
   const url = location(await GET(request("code=valid&next=%2Fcommercial")));
   expect(url.pathname).toBe("/"); expect(url.searchParams.get("auth_error")).toBe("account_suspended");
   expect(mocks.signOut).toHaveBeenCalledOnce();
@@ -62,4 +62,26 @@ it("keeps a valid login successful when the welcome email fails", async () => {
   const response = await GET(request("code=valid&next=%2Fapp"));
   expect(location(response).pathname).toBe("/app"); expect(location(response).searchParams.get("auth")).toBe("google");
   expect(response.headers.get("cache-control")).toBe("no-store");
+});
+
+it.each(["disabled", "deleted", "suspended", "email_unverified", "phone_unverified", null, { status: "active" }])("refuses non-active synchronized status %j before professional upgrade or email", async status => {
+  const implementation = mocks.rpc.getMockImplementation()!;
+  mocks.rpc.mockImplementation((name: string) => name === "synchronize_account_status" ? Promise.resolve({ data: status, error: null }) : implementation(name));
+  expect(location(await GET(request("code=valid&intent=professional"))).searchParams.get("auth_error")).toBe("account_suspended");
+  expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  expect(mocks.rpc).not.toHaveBeenCalledWith("request_professional_profile");
+  expect(mocks.welcome).not.toHaveBeenCalled();
+});
+it("refuses an Auth verification error even if it includes a user", async () => {
+  mocks.user.mockResolvedValue({ data: { user: { id: "fixture-user" } }, error: { message: "offline" } });
+  expect(location(await GET(request("code=valid"))).searchParams.get("auth_error")).toBe("oauth_exchange_failed");
+  expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  expect(mocks.rpc).not.toHaveBeenCalled();
+});
+it("clears the local OAuth session if account synchronization fails", async () => {
+  const implementation = mocks.rpc.getMockImplementation()!;
+  mocks.rpc.mockImplementation((name: string) => name === "synchronize_account_status" ? Promise.resolve({ data: "active", error: { message: "offline" } }) : implementation(name));
+  expect(location(await GET(request("code=valid"))).searchParams.get("auth_error")).toBe("profile_creation_failed");
+  expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  expect(mocks.welcome).not.toHaveBeenCalled();
 });

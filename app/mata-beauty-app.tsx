@@ -5,6 +5,8 @@ import { UnreadBadge } from "./unread-inbox";
 import { bookingTeamPeople, selectedTeamSlots, type BookingTeamPerson, type BookingTeamSlot } from "@/lib/domain/booking-team";
 
 import Image from "next/image";
+import { bookableServiceSchema, multiServiceAvailabilitySchema, multiServiceConfirmationSchema, previewServiceSelection, type BookableService } from "@/lib/domain/multi-service-selection";
+import { useDialogFocus } from "./use-dialog-focus";
 import { serviceDepositQuote } from "@/lib/domain/service-deposit";
 import { formatServiceMoney } from "@/lib/domain/service-money";
 import { bookingText } from "@/lib/domain/booking-copy";
@@ -65,6 +67,8 @@ function providerTimeZone(provider: Pick<Provider, "timeZone" | "countryCode">):
 }
 
 type BookingRequest = {
+  optionIds?: string[];
+  serviceIds?: string[];
   date: string;
   time: string;
   slotStart?: string;
@@ -82,7 +86,7 @@ type PaymentCapabilities = {
   methods: PaymentMethod[];
 };
 
-type BookingConfirmation = { id: string; startsAt: string; date: string; time: string; location: string; collaboratorName?: string | null; collaboratorPhoto?: string | null };
+type BookingConfirmation = { totalAmount?: number; durationMinutes?: number; serviceTitle?: string; currency?: BookingCurrency; id: string; startsAt: string; date: string; time: string; location: string; collaboratorName?: string | null; collaboratorPhoto?: string | null };
 type ProviderService = { deposit_percentage?: number; id: string; title: string; duration_minutes: number; price_amount: number; currency?: BookingCurrency; business_id?: string | null };
 type ProviderDetail = { bio: string | null; services: ProviderService[]; portfolio: string[] };
 type BookingSelection = { provider: Provider; service: ProviderService; sourcePostId?: string };
@@ -97,10 +101,12 @@ const bookingDraftSchema = z.object({
       category: z.string(), area: z.string(), address: z.string().optional(), coordinates: z.object({ latitude: z.number(), longitude: z.number() }).optional(), price: z.number().int().nonnegative(), rating: z.number(), reviews: z.number().int().nonnegative(),
       initials: z.string(), verified: z.boolean(), homeService: z.boolean(), currency: z.enum(["XOF", "EUR", "USD", "GBP", "CAD"]).optional(), durationMinutes: z.number().int(), depositPercentage: z.number().int().min(0).max(60).optional(), businessId: z.string().uuid().optional(), countryCode: z.string().length(2).optional(), timeZone: z.string().optional(), coverUrl: z.string().optional(),
     }),
-    service: z.object({ deposit_percentage: z.number().int().min(0).max(60).optional(), id: z.string().min(1), title: z.string(), duration_minutes: z.number().int(), price_amount: z.number().int().nonnegative(), currency: z.enum(["XOF", "EUR", "USD", "GBP", "CAD"]).optional(), business_id: z.string().uuid().nullable().optional() }),
+    service: z.object({ deposit_percentage: z.number().int().min(0).max(60).optional(), id: z.uuid(), title: z.string().min(1), duration_minutes: z.number().int().min(15).max(720), price_amount: z.number().int().nonnegative(), currency: z.enum(["XOF", "EUR", "USD", "GBP", "CAD"]).optional(), business_id: z.string().uuid().nullable().optional() }),
     sourcePostId: z.string().uuid().optional(),
   }),
   request: z.object({
+    serviceIds: z.array(z.uuid()).min(1).max(8).optional(),
+    optionIds: z.array(z.uuid()).max(32).optional(),
     date: z.string(), time: z.string(), locationMode: z.enum(["salon", "client_address"]), address: z.string(), note: z.string(), collaboratorId: z.string().default(""),
     slotStart: z.string().datetime({ offset: true }).optional(), paymentMethod: z.enum(["on_site", "wave", "orange_money", "card"]),
   }),
@@ -111,6 +117,11 @@ const paymentCapabilitiesSchema = z.object({
   provider: z.enum(["none", "paydunya"]),
   methods: z.array(z.enum(["orange_money", "wave", "card"])),
 });
+const recordedBookingSchema = z.object({
+  id: z.uuid(), starts_at: z.iso.datetime({ offset: true }), ends_at: z.iso.datetime({ offset: true }),
+  total_amount: z.number().int().nonnegative(), currency: z.enum(["XOF", "EUR", "USD", "GBP", "CAD"]),
+  collaborator_name: z.string().nullable(), collaborator_avatar_url: z.string().nullable(),
+}).refine(value => Date.parse(value.ends_at) > Date.parse(value.starts_at), { message: "Durée enregistrée invalide." });
 const paymentCheckoutSchema = z.object({
   ok: z.literal(true),
   checkoutUrl: z.string().nullable(),
@@ -374,7 +385,7 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
     window.addEventListener("pagehide", cancelCatalog);
     const loadCatalog = () => {
       const signal = catalogRequest.signal;
-      void fetchPublishedProviders(supabase, undefined, signal).then((items) => {
+      void fetchPublishedProviders(supabase, undefined, signal, 100).then((items) => {
       if (!active || signal.aborted) return;
       const providers: Provider[] = items.map((item) => ({
         ...item,
@@ -581,9 +592,30 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       setNotice("Ce créneau n’est plus valide. Choisissez une nouvelle disponibilité.");
       return null;
     }
+    if (((request.serviceIds?.length ?? 0) > 1 || (request.optionIds?.length ?? 0) > 0) && !(request.locationMode === "client_address" && (request.serviceIds?.length ?? 1) === 1)) {
+      const serviceIds = request.serviceIds ?? [service.id];
+      if (request.locationMode !== "salon" || request.paymentMethod !== "on_site" || serviceIds[0] !== service.id) throw new Error("Sélection invalide.");
+      const result = await supabase.rpc("create_multi_service_booking", {
+        target_service_ids: serviceIds, target_option_ids: request.optionIds ?? [], target_starts_at: startsAt.toISOString(),
+        target_collaborator_id: request.collaboratorId || null, target_location_mode: "salon",
+        target_address: null, target_note: request.note.trim() || null, target_source_post_id: booking.sourcePostId ?? null,
+      }).abortSignal(AbortSignal.timeout(20_000));
+      if (result.error?.code === "23P01") throw new BookingSlotConflict();
+      const parsed = multiServiceConfirmationSchema.safeParse(result.data);
+      if (result.error || !parsed.success) throw new Error("Réservation non confirmée.");
+      const created = parsed.data;
+      removeBrowserStorage("sessionStorage", bookingDraftKey);
+      void recordProductEvent(supabase, "booking_completed", { booking_id: created.id, provider_id: provider.profileId, source: booking.sourcePostId ? "video" : "catalog" });
+      return { id: created.id, startsAt: created.starts_at, ...bookingLocalDateTime(created.starts_at, timeZone),
+        collaboratorName: created.collaborator_name, collaboratorPhoto: created.collaborator_avatar_url,
+        totalAmount: created.total_amount, currency: created.currency,
+        durationMinutes: (Date.parse(created.ends_at) - Date.parse(created.starts_at)) / 60000,
+        serviceTitle: created.services.map(item => item.title).join(" + "),
+        location: [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") };
+    }
     const endsAt = calculateBookingEnd(startsAt, service.duration_minutes);
     const quote = calculateBookingQuote(service.price_amount, 0, service.currency ?? "XOF");
-    const { data: created, error } = await supabase.from("bookings").insert({
+    const { data: rawCreated, error } = await supabase.from("bookings").insert({
       client_id: authenticated.userId,
       provider_id: provider.profileId,
       provider_service_id: service.id,
@@ -593,11 +625,14 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       location_mode: request.locationMode,
       appointment_address: request.locationMode === "client_address" ? request.address.trim() : null,
       collaborator_id: request.collaboratorId || null,
+      selected_option_ids: request.optionIds ?? [],
       total_amount: quote.totalAmount,
       currency: quote.currency,
       client_note: request.note.trim() || null,
       source_post_id: booking.sourcePostId ?? null,
-    }).select("id,starts_at,collaborator_name,collaborator_avatar_url").abortSignal(AbortSignal.timeout(20_000)).single();
+    }).select("id,starts_at,ends_at,total_amount,currency,collaborator_name,collaborator_avatar_url").abortSignal(AbortSignal.timeout(20_000)).single();
+    const parsedCreated = recordedBookingSchema.safeParse(rawCreated);
+    const created = parsedCreated.success ? parsedCreated.data : null;
     if (error?.code === "23P01") throw new BookingSlotConflict();
     if (error || !created) {
       setNotice("La réservation n’a pas pu être enregistrée.");
@@ -617,18 +652,18 @@ export function MataBeautyApp({ supabaseUrl, supabaseAnonKey, initialScreen = "f
       });
       if (!paymentResponse.ok) {
         setNotice("La réservation est enregistrée, mais le paiement n’a pas pu être préparé. Aucun débit n’a eu lieu.");
-        return { id: created.id, startsAt: created.starts_at, collaboratorName: created.collaborator_name, collaboratorPhoto: created.collaborator_avatar_url, ...bookingLocalDateTime(created.starts_at, timeZone), location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
+        return { totalAmount: created.total_amount, currency: created.currency, durationMinutes: (Date.parse(created.ends_at) - Date.parse(created.starts_at)) / 60000, id: created.id, startsAt: created.starts_at, collaboratorName: created.collaborator_name, collaboratorPhoto: created.collaborator_avatar_url, ...bookingLocalDateTime(created.starts_at, timeZone), location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
       }
       const checkout = paymentCheckoutSchema.safeParse(await paymentResponse.json().catch(() => null));
       if (!checkout.success || !checkout.data.checkoutUrl || !isTrustedSandboxCheckoutUrl(checkout.data.checkoutUrl)) {
         setNotice("La réservation est enregistrée, mais aucun checkout sandbox fiable n’est disponible. Aucun débit n’a eu lieu.");
-        return { id: created.id, startsAt: created.starts_at, collaboratorName: created.collaborator_name, collaboratorPhoto: created.collaborator_avatar_url, ...bookingLocalDateTime(created.starts_at, timeZone), location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
+        return { totalAmount: created.total_amount, currency: created.currency, durationMinutes: (Date.parse(created.ends_at) - Date.parse(created.starts_at)) / 60000, id: created.id, startsAt: created.starts_at, collaboratorName: created.collaborator_name, collaboratorPhoto: created.collaborator_avatar_url, ...bookingLocalDateTime(created.starts_at, timeZone), location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
       }
       setNotice("Redirection sécurisée vers PayDunya Sandbox…");
       window.location.assign(checkout.data.checkoutUrl);
       return null;
     }
-    return { id: created.id, startsAt: created.starts_at, collaboratorName: created.collaborator_name, collaboratorPhoto: created.collaborator_avatar_url, ...bookingLocalDateTime(created.starts_at, timeZone), location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
+    return { totalAmount: created.total_amount, currency: created.currency, durationMinutes: (Date.parse(created.ends_at) - Date.parse(created.starts_at)) / 60000, id: created.id, startsAt: created.starts_at, collaboratorName: created.collaborator_name, collaboratorPhoto: created.collaborator_avatar_url, ...bookingLocalDateTime(created.starts_at, timeZone), location: request.locationMode === "salon" ? [provider.name, provider.address, provider.area].filter(Boolean).join(" · ") : request.address };
   }
 
   async function signOut() {
@@ -876,10 +911,12 @@ function ProviderProfileScreen({ provider, favorite, onBack, onFavorite, onBook 
 function BookingModal({ selection, initialDate, initialRequest, authenticated, onClose, onSubmit }: { selection: BookingSelection; initialDate: string; initialRequest: BookingRequest | null; authenticated: boolean; onClose: () => void; onSubmit: (request: BookingRequest) => Promise<BookingConfirmation | null> }) {
   const locale = useApplicationLocale();
   const t = (text: string) => bookingText(text, locale);
-  const { provider, service } = selection;
+  const { provider, service: primaryService } = selection;
   const [step, setStep] = useState(initialRequest?.slotStart ? 2 : 1);
   const [submitting, setSubmitting] = useState(false);
   const submissionPending = useRef(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(dialogRef, onClose, submitting);
   const [submissionError, setSubmissionError] = useState("");
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
   const [slotRows, setSlotRows] = useState<AvailabilitySlot[]>([]);
@@ -898,8 +935,91 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
   const timeZone = providerTimeZone(provider);
   const localToday = localDateAt(new Date(), timeZone);
   const [form, setForm] = useState<BookingRequest>(initialRequest ?? { date: initialDate || addCalendarDays(localToday, 1), time: "", locationMode: "salon", address: "", note: "", collaboratorId: "", paymentMethod: "on_site" });
-  const depositQuote = serviceDepositQuote(service.price_amount, service.deposit_percentage ?? provider.depositPercentage ?? 0, service.currency ?? "XOF");
-  const onlinePaymentAvailable = depositQuote.percentage === 0 && paymentCapabilities.onlineCheckoutEnabled && (service.currency ?? "XOF") === "XOF";
+  const [serviceOptions, setServiceOptions] = useState<BookableService[]>([{ ...primaryService, business_id: primaryService.business_id ?? provider.businessId ?? null, currency: primaryService.currency ?? provider.currency ?? "XOF" }]);
+  const [variants, setVariants] = useState<Array<{ id: string; provider_service_id: string; name: string; price_amount: number; duration_minutes: number; is_required: boolean }>>([]);
+  const [variantsError, setVariantsError] = useState(false);
+  const [variantsLoading, setVariantsLoading] = useState(true);
+  const [serviceOptionsError, setServiceOptionsError] = useState(false);
+  const [serviceOptionsAttempt, setServiceOptionsAttempt] = useState(0);
+  const [availabilityQuote, setAvailabilityQuote] = useState<{ key: string; totalAmount: number; durationMinutes: number } | null>(null);
+  const selectedIds = form.serviceIds ?? [primaryService.id];
+  const selectionKey = selectedIds.join(",");
+  const multipleServices = selectedIds.length > 1;
+  const visibleVariants = variants.filter(item => selectedIds.includes(item.provider_service_id));
+  const effectiveOptionIds = [...new Set([...(form.optionIds ?? []), ...visibleVariants.filter(item => item.is_required).map(item => item.id)])];
+  const optionKey = effectiveOptionIds.join(",");
+  const compositeBooking = multipleServices || Boolean(optionKey);
+  const selectedServices = selectedIds.flatMap(id => serviceOptions.filter(item => item.id === id));
+  const selectionReady = selectedServices.length === selectedIds.length;
+  const preview = previewServiceSelection(selectedServices.length ? selectedServices : [{ ...primaryService, business_id: primaryService.business_id ?? provider.businessId ?? null, currency: primaryService.currency ?? provider.currency ?? "XOF" }]);
+  const selectedVariants = visibleVariants.filter(item => item.is_required || (form.optionIds ?? []).includes(item.id));
+  const quoteKey = `${selectionKey}|${optionKey}|${form.locationMode}`;
+  const quote = availabilityQuote?.key === quoteKey ? availabilityQuote : null;
+  const service: ProviderService = { ...primaryService, title: preview.title, currency: preview.currency,
+    price_amount: quote?.totalAmount ?? preview.totalAmount + selectedVariants.reduce((sum, item) => sum + item.price_amount, 0), duration_minutes: quote?.durationMinutes ?? preview.durationMinutes + selectedVariants.reduce((sum, item) => sum + item.duration_minutes, 0) };
+
+  useEffect(() => {
+    const api = getSupabaseBrowserClient();
+    if (!api) return;
+    let active = true;
+    const controller = new AbortController();
+    let request = api.from("provider_services").select("id,title,duration_minutes,price_amount,currency,business_id,deposit_percentage")
+      .eq("provider_id", provider.profileId).eq("is_active", true).is("archived_at", null).eq("status", "published");
+    const businessId = primaryService.business_id ?? provider.businessId;
+    request = businessId ? request.eq("business_id", businessId) : request.is("business_id", null);
+    void Promise.resolve(request.abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]))).then(({ data, error }) => {
+      if (!active) return;
+      const parsed = z.array(bookableServiceSchema.extend({ currency: bookableServiceSchema.shape.currency.default(primaryService.currency ?? provider.currency ?? "XOF") })).safeParse(data);
+      if (error || !parsed.success) throw new Error("Catalogue indisponible.");
+      const compatible = parsed.data.filter(item => item.currency === (primaryService.currency ?? provider.currency ?? "XOF"));
+      setServiceOptions([{ ...primaryService, business_id: primaryService.business_id ?? provider.businessId ?? null, currency: primaryService.currency ?? provider.currency ?? "XOF" }, ...compatible.filter(item => item.id !== primaryService.id)]);
+      setServiceOptionsError(false);
+    }).catch(() => { if (active) setServiceOptionsError(true); });
+    return () => { active = false; controller.abort(); };
+  }, [primaryService, provider.businessId, provider.currency, provider.profileId, serviceOptionsAttempt]);
+
+  useEffect(() => {
+    const api = getSupabaseBrowserClient();
+    if (!api) return;
+    const controller = new AbortController();
+    let active = true;
+    queueMicrotask(() => { if (active) setVariantsLoading(true); });
+    void Promise.resolve(api.from("service_options").select("id,provider_service_id,name,price_amount,duration_minutes,is_required")
+      .in("provider_service_id", selectionKey.split(",")).eq("is_active", true).order("sort_order")
+      .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]))).then(({ data, error }) => {
+        const schema = z.array(z.object({ id: z.uuid(), provider_service_id: z.uuid(), name: z.string().min(1),
+          price_amount: z.number().int().nonnegative(), duration_minutes: z.number().int().min(0).max(720), is_required: z.boolean() }));
+        const parsed = schema.safeParse(data);
+        if (!active) return;
+        if (error || !parsed.success) throw new Error("Options indisponibles.");
+        setVariants(parsed.data); setVariantsError(false);
+      }).catch(() => { if (active) { setVariants([]); setVariantsError(true); } }).finally(() => { if (active) setVariantsLoading(false); });
+    return () => { active = false; controller.abort(); };
+  }, [selectionKey, serviceOptionsAttempt]);
+
+  function toggleOption(id: string) {
+    const ids = form.optionIds ?? [];
+    const next = ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id];
+    if (next.length > 32 || submitting) return;
+    const duration = preview.durationMinutes + variants.filter(item => item.is_required || next.includes(item.id)).reduce((sum, item) => sum + item.duration_minutes, 0);
+    if (duration > 720) { setSubmissionError("La sélection ne peut pas dépasser 12 heures de soins."); return; }
+    setSubmissionError("");
+    setForm(current => ({ ...current, optionIds: next, serviceIds: selectedIds, time: "", slotStart: undefined, collaboratorId: "", locationMode: selectedIds.length > 1 ? "salon" : current.locationMode, paymentMethod: "on_site" }));
+    setStep(1);
+  }
+
+  function toggleService(id: string) {
+    if (id === primaryService.id || submitting) return;
+    const ids = selectedIds.includes(id) ? selectedIds.filter(item => item !== id) : [...selectedIds, id];
+    if (ids.length > 8) return;
+    try { previewServiceSelection(ids.flatMap(value => serviceOptions.filter(item => item.id === value))); }
+    catch { setSubmissionError("La sélection ne peut pas dépasser 12 heures de soins."); return; }
+    setSubmissionError("");
+    setForm(current => ({ ...current, serviceIds: ids, optionIds: [], time: "", slotStart: undefined, collaboratorId: "", locationMode: "salon", paymentMethod: "on_site" }));
+    setStep(1);
+  }
+  const depositQuote = serviceDepositQuote(service.price_amount, compositeBooking ? 0 : service.deposit_percentage ?? provider.depositPercentage ?? 0, service.currency ?? "XOF");
+  const onlinePaymentAvailable = !compositeBooking && depositQuote.percentage === 0 && paymentCapabilities.onlineCheckoutEnabled && (service.currency ?? "XOF") === "XOF";
 
   useEffect(() => {
     writeBrowserStorage("sessionStorage", bookingDraftKey, JSON.stringify({ selection, request: form }));
@@ -930,14 +1050,19 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 15_000);
     void Promise.resolve().then(() => { if (active) { setAvailabilityLoading(true); setAvailabilityError(false); } });
-    void Promise.resolve(supabase.rpc("get_booking_team_availability", {
-      target_service_id: service.id,
-      from_date: form.date,
-    }).abortSignal(controller.signal)).then(({ data, error }) => {
+    const request = compositeBooking
+      ? supabase.rpc("get_multi_service_availability", { target_service_ids: selectionKey.split(","), target_option_ids: optionKey ? optionKey.split(",") : [], target_collaborator_id: form.collaboratorId || null, target_location_mode: form.locationMode, from_date: form.date, days: 1 })
+      : supabase.rpc("get_booking_team_availability", { target_service_id: primaryService.id, from_date: form.date });
+    void Promise.resolve(request.abortSignal(controller.signal)).then(({ data, error }) => {
       if (!active) return;
-      const parsed = bookingAvailabilitySchema.safeParse(data);
+      const parsed = compositeBooking ? multiServiceAvailabilitySchema.safeParse(data) : bookingAvailabilitySchema.safeParse(data);
       if (error || !parsed.success) throw new Error("Disponibilités invalides ou indisponibles.");
       const availability = parsed.data;
+      if (compositeBooking) {
+        const priced = multiServiceAvailabilitySchema.parse(data);
+        if (priced.services.map(item => item.id).join(",") !== selectionKey) throw new Error("Sélection de soins incohérente.");
+        setAvailabilityQuote({ key: quoteKey, totalAmount: priced.totalAmount, durationMinutes: priced.durationMinutes });
+      } else setAvailabilityQuote(null);
       setTeamEnabled(availability.teamEnabled);
       setAvailabilityBlocked(availability.blockedReason === "salon_not_published");
       setNextNotice("");
@@ -956,7 +1081,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
       if (active) setAvailabilityLoading(false);
     });
     return () => { active = false; window.clearTimeout(timeout); controller.abort(); };
-  }, [form.date, provider.profileId, service.id, availabilityAttempt]);
+  }, [form.date, provider.profileId, primaryService.id, selectionKey, optionKey, quoteKey, form.collaboratorId, form.locationMode, compositeBooking, availabilityAttempt]);
 
   useEffect(() => {
     const refresh = () => {
@@ -979,11 +1104,13 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
     setFindingNext(true);setNextNotice("");
     const requestedDate=form.date,requestedPerson=form.collaboratorId;
     try{
-      const result=teamEnabled
+      const result=compositeBooking
+        ?await api.rpc("get_multi_service_availability",{target_service_ids:selectionKey.split(","),target_option_ids:optionKey?optionKey.split(","):[],target_collaborator_id:requestedPerson||null,target_location_mode:form.locationMode,from_date:addCalendarDays(form.date,1),days:14}).abortSignal(AbortSignal.timeout(15000))
+        :teamEnabled
         ?await api.rpc("get_team_available_slots",{target_provider_service_id:service.id,from_date:addCalendarDays(form.date,1),days:14}).abortSignal(AbortSignal.timeout(15000))
         :await api.rpc("get_available_slots",{target_provider_id:provider.profileId,target_provider_service_id:service.id,from_date:addCalendarDays(form.date,1),days:14}).abortSignal(AbortSignal.timeout(15000));
       if(result.error)throw result.error;
-      const rows=(result.data??[]) as {slot_start:string;collaborator_id?:string}[];
+      const rows=(compositeBooking ? multiServiceAvailabilitySchema.parse(result.data).slots : result.data??[]) as {slot_start:string;collaborator_id?:string}[];
       const next=nextBookingDate(rows,timeZone,teamEnabled,requestedPerson);
       if(next)setForm(current=>current.date===requestedDate&&current.collaboratorId===requestedPerson?{...current,date:next,time:"",slotStart:undefined}:current);
       else setNextNotice(t("Aucun créneau disponible dans les 14 prochains jours."));
@@ -1005,7 +1132,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
     setSubmitting(true);
     setSubmissionError("");
     try {
-      const result = await onSubmit(form);
+      const result = await onSubmit({ ...form, serviceIds: selectionKey.split(","), optionIds: optionKey ? optionKey.split(",") : [] });
       if (result) setConfirmation(result);
       else if (!authenticated) setWaitingForAuthentication(true);
       else setSubmissionError("La confirmation n’a pas pu être vérifiée. Consultez vos rendez-vous avant de réessayer.");
@@ -1024,7 +1151,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
       submissionPending.current = false;
       setSubmitting(false);
     }
-  }, [authenticated, form, onSubmit, setForm]);
+  }, [authenticated, form, onSubmit, setForm, selectionKey, optionKey]);
   useEffect(() => {
     if (!authenticated || !waitingForAuthentication) return;
     void Promise.resolve().then(() => {
@@ -1032,28 +1159,32 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
       void confirm();
     });
   }, [authenticated, confirm, waitingForAuthentication]);
-  const canConfirm = Boolean(form.time && form.slotStart) && (form.locationMode === "salon" || Boolean(form.address.trim()));
-  return <div className="modal-backdrop premium-booking-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <section className="modal premium-booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
-      <header className="booking-screen-header"><button aria-label={t("Fermer")} onClick={onClose}>‹</button><div><h2 id="booking-title">{t("Réserver")}</h2><p>{provider.name} {" · "}{t("réservation rapide")}</p></div></header>
+  const selectedSlotAvailable = Boolean(form.slotStart) && uniqueSlots.some(slot => Date.parse(slot.slot_start) === Date.parse(form.slotStart ?? ""));
+  const canConfirm = !variantsLoading && !variantsError && selectedSlotAvailable && selectionReady && !availabilityLoading && !availabilityError && !availabilityBlocked && (!compositeBooking || Boolean(quote)) && Boolean(form.time && form.slotStart) && (form.locationMode === "salon" || Boolean(form.address.trim()));
+  return <div className="modal-backdrop premium-booking-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !submissionPending.current && onClose()}>
+    <section ref={dialogRef} tabIndex={-1} className="modal premium-booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
+      <header className="booking-screen-header"><button aria-label={t("Fermer")} disabled={submitting} onClick={onClose}>‹</button><div><h2 id="booking-title">{t("Réserver")}</h2><p>{provider.name} {" · "}{t("réservation rapide")}</p></div></header>
       {confirmation ? <BookingSuccess provider={provider} service={service} confirmation={confirmation} onClose={onClose} /> : <>
         <div className="fast-booking-progress" aria-label={`${t("Étape")} ${step} ${t("sur")} 2`}><span className={step >= 1 ? "active" : ""}>1 <small>{t("Créneau")}</small></span><i /><span className={step >= 2 ? "active" : ""}>2 <small>{t("Confirmation")}</small></span></div>
         <div className="premium-booking-content">
           {submissionError && <p role="alert" className="booking-submit-error">{t(submissionError)}</p>}
-          {step === 1 && <><div className="fast-service-summary"><span>{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount, service.currency, locale)}</b></div><h3>{t("Quand êtes-vous disponible ?")}</h3><p>{t("Heure locale de l’établissement")}{" · "}{timeZone}</p><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} aria-pressed={form.date === item.date} onClick={() => setForm({ ...form, date: item.date, time: "", slotStart: undefined })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>{t("Autre")}</small><strong>＋</strong><input aria-label={t("Choisir une autre date")} type="date" min={localToday} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "", slotStart: undefined })} /></label></div>{teamEnabled && !availabilityLoading && <fieldset className="booking-team-choice"><legend>{t("Avec qui réserver ?")}</legend><label><input type="radio" name="employee-choice" checked={!form.collaboratorId} onChange={() => setForm({ ...form, collaboratorId: "", time: "", slotStart: undefined })} />{t("Sans préférence — une personne disponible")}</label>{availablePeople.map(person => <label key={person.collaborator_id}><input type="radio" name="employee-choice" checked={form.collaboratorId === person.collaborator_id} onChange={() => setForm({ ...form, collaboratorId: person.collaborator_id, time: "", slotStart: undefined })} />{person.avatar_url && <Image unoptimized src={person.avatar_url} alt={person.display_name} width={48} height={48} />}<span><strong>{person.display_name}</strong><small>{person.title}</small><small>{person.specialties.join(" · ")}</small>{!collaborators.some(slot => slot.collaborator_id === person.collaborator_id) && <small>{t("Aucun créneau ce jour — choisissez une autre date")}</small>}</span></label>)}{!availablePeople.length && <p>{t("Aucun collaborateur réservable pour cette prestation.")}</p>}</fieldset>}<div className="slot-section-title"><strong>{t("Créneaux disponibles")}</strong><small>{t("Actualisées chaque minute")}</small></div>{availabilityLoading ? <div className="slot-loading" role="status" aria-live="polite">{t("Recherche des meilleurs créneaux…")}</div> : availabilityBlocked ? <div role="status" className="no-slots">{t("Cette prestation n’est pas encore ouverte à la réservation. Le salon doit terminer sa publication.")}</div> : availabilityError ? <div role="alert" className="no-slots">{t("Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.")}<button onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Réessayer")}</button></div> : slots.length ? <div className="premium-slot-grid">{slots.map((slot) => <button className={form.slotStart === slot.instant ? "active" : ""} aria-pressed={form.slotStart === slot.instant} key={slot.instant} onClick={() => { const instant = new Date(slot.instant); setForm({ ...form, time: new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone }).format(instant), slotStart: instant.toISOString() }); setStep(2); }}>{slot.label}</button>)}</div> : <div className="no-slots">{t(form.collaboratorId ? "Aucun créneau pour cette personne ce jour. Essayez une autre date ou changez de personne." : "Aucun créneau publié ce jour. Essayez une autre date.")}<button type="button" onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Actualiser les disponibilités")}</button><button type="button" disabled={findingNext} onClick={()=>void findNextAvailability()}>{t(findingNext?"Recherche…":"Voir les prochaines disponibilités")}</button>{nextNotice && <p role="status">{nextNotice}</p>}</div>}</>}
+          {step === 1 && <>{serviceOptions.length > 1 && <fieldset className="booking-service-selection"><legend>{t("Vos soins")}</legend><p>{t("Ajoutez des soins pour réserver un seul créneau continu.")}</p>{serviceOptions.map(item => <label key={item.id}><input type="checkbox" checked={selectedIds.includes(item.id)} disabled={submitting || item.id === primaryService.id || (!selectedIds.includes(item.id) && selectedIds.length >= 8)} onChange={() => toggleService(item.id)} /><span>{item.title} · {formatDuration(item.duration_minutes)} · {formatPrice(item.price_amount, item.currency, locale)}</span></label>)}</fieldset>}{serviceOptionsError && <p role="status">{t("Les autres soins n’ont pas pu être chargés.")} <button type="button" onClick={() => setServiceOptionsAttempt(value => value + 1)}>{t("Réessayer")}</button></p>}{variantsLoading && <p role="status">{t("Vérification des options…")}</p>}{visibleVariants.length > 0 && <fieldset className="booking-service-selection"><legend>{t("Options et variantes")}</legend>{visibleVariants.map(item => <label key={item.id}><input type="checkbox" checked={item.is_required || (form.optionIds ?? []).includes(item.id)} disabled={submitting || item.is_required} onChange={() => toggleOption(item.id)} /><span>{item.name}{multipleServices ? ` · ${serviceOptions.find(service => service.id === item.provider_service_id)?.title ?? ""}` : ""} · +{formatPrice(item.price_amount, service.currency, locale)} · +{formatDuration(item.duration_minutes)}{item.is_required ? ` · ${t("Inclus obligatoirement")}` : ""}</span></label>)}</fieldset>}{variantsError && <p role="status">{t("Les options n’ont pas pu être chargées.")} <button type="button" onClick={() => setServiceOptionsAttempt(value => value + 1)}>{t("Réessayer")}</button></p>}{compositeBooking && <p role="status">{t(multipleServices ? "Panier personnalisé : réservation en salon, règlement sur place." : "Options comprises dans la durée et le prix. Règlement sur place.")}</p>}{provider.homeService && !multipleServices && <fieldset className="location-choice"><legend>{t("Lieu du rendez-vous")}</legend><label><input type="radio" name="slot-location" checked={form.locationMode === "salon"} onChange={() => setForm(current => ({ ...current, locationMode: "salon", time: "", slotStart: undefined }))} />{t("Chez le professionnel")}</label><label><input type="radio" name="slot-location" checked={form.locationMode === "client_address"} onChange={() => setForm(current => ({ ...current, locationMode: "client_address", time: "", slotStart: undefined }))} />{t("À mon domicile")}</label></fieldset>}<div className="fast-service-summary"><span>{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="54px" /> : provider.initials}</span><div><strong>{service.title}</strong><small>{provider.name} · {formatDuration(service.duration_minutes)}</small></div><b>{formatPrice(service.price_amount, service.currency, locale)}</b></div><h3>{t("Quand êtes-vous disponible ?")}</h3><p>{t("Heure locale de l’établissement")}{" · "}{timeZone}</p><div className="quick-date-strip">{quickDates.map((item) => <button key={item.date} className={form.date === item.date ? "active" : ""} aria-pressed={form.date === item.date} onClick={() => setForm({ ...form, date: item.date, time: "", slotStart: undefined })}><small>{item.weekday}</small><strong>{item.day}</strong><span>{item.month}</span></button>)}<label><small>{t("Autre")}</small><strong>＋</strong><input aria-label={t("Choisir une autre date")} type="date" min={localToday} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value, time: "", slotStart: undefined })} /></label></div>{teamEnabled && !availabilityLoading && <fieldset className="booking-team-choice"><legend>{t("Avec qui réserver ?")}</legend><label><input type="radio" name="employee-choice" checked={!form.collaboratorId} onChange={() => setForm({ ...form, collaboratorId: "", time: "", slotStart: undefined })} />{t("Sans préférence — une personne disponible")}</label>{availablePeople.map(person => <label key={person.collaborator_id}><input type="radio" name="employee-choice" checked={form.collaboratorId === person.collaborator_id} onChange={() => setForm({ ...form, collaboratorId: person.collaborator_id, time: "", slotStart: undefined })} />{person.avatar_url && <Image unoptimized src={person.avatar_url} alt={person.display_name} width={48} height={48} />}<span><strong>{person.display_name}</strong><small>{person.title}</small><small>{person.specialties.join(" · ")}</small>{!collaborators.some(slot => slot.collaborator_id === person.collaborator_id) && <small>{t("Aucun créneau ce jour — choisissez une autre date")}</small>}</span></label>)}{!availablePeople.length && <p>{t("Aucun collaborateur réservable pour cette prestation.")}</p>}</fieldset>}<div className="slot-section-title"><strong>{t("Créneaux disponibles")}</strong><small>{t("Actualisées chaque minute")}</small></div>{availabilityLoading ? <div className="slot-loading" role="status" aria-live="polite">{t("Recherche des meilleurs créneaux…")}</div> : availabilityBlocked ? <div role="status" className="no-slots">{t("Cette prestation n’est pas encore ouverte à la réservation. Le salon doit terminer sa publication.")}</div> : availabilityError ? <div role="alert" className="no-slots">{t("Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.")}<button onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Réessayer")}</button></div> : slots.length ? <div className="premium-slot-grid">{slots.map((slot) => <button className={form.slotStart === slot.instant ? "active" : ""} aria-pressed={form.slotStart === slot.instant} key={slot.instant} onClick={() => { const instant = new Date(slot.instant); setForm({ ...form, time: new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone }).format(instant), slotStart: instant.toISOString() }); setStep(2); }}>{slot.label}</button>)}</div> : <div className="no-slots">{t(form.collaboratorId ? "Aucun créneau pour cette personne ce jour. Essayez une autre date ou changez de personne." : "Aucun créneau publié ce jour. Essayez une autre date.")}<button type="button" onClick={() => setAvailabilityAttempt((attempt) => attempt + 1)}>{t("Actualiser les disponibilités")}</button><button type="button" disabled={findingNext} onClick={()=>void findNextAvailability()}>{t(findingNext?"Recherche…":"Voir les prochaines disponibilités")}</button>{nextNotice && <p role="status">{nextNotice}</p>}</div>}</>}
           {step === 2 && <>
+            {availabilityLoading && <p role="status">{t("Vérification du créneau…")}</p>}
+            {!availabilityLoading && !availabilityError && !availabilityBlocked && !selectedSlotAvailable && <p role="alert">{t("Ce créneau n’est plus disponible. Modifiez votre sélection pour choisir un nouvel horaire.")}</p>}
+            {availabilityError && <p role="alert">{t("Les disponibilités n’ont pas pu être chargées. Vérifiez votre connexion.")}</p>}
             <h3>{t("Vérifiez et confirmez")}</h3>
             <div className="booking-recap-card"><div className="recap-photo">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={service.title} sizes="70px" /> : provider.initials}</div><div><strong>{service.title}</strong><small>{formatBookingDate(form.date, locale)} {" "}{t("à")}{" "}{form.time} · {formatDuration(service.duration_minutes)}</small><small>{provider.name} · {timeZone}</small></div><b>{formatPrice(service.price_amount, service.currency, locale)}</b></div>
             <section className="booking-money-summary" aria-label={t("Détail du prix")}>
               <h4>{t("Détail du prix")}</h4><p>{t("Prix total")}{" : "}<strong>{formatPrice(depositQuote.totalAmount, service.currency, locale)}</strong></p>
-              <p>{t("Acompte prévu")}{" ("}{depositQuote.percentage}{" %) : "}<strong>{formatPrice(depositQuote.depositAmount, service.currency, locale)}</strong></p>
-              <p>{t("Solde après paiement de l’acompte")}{" : "}{formatPrice(depositQuote.balanceAmount, service.currency, locale)}</p>
+              {!compositeBooking && <p>{t("Acompte prévu")}{" ("}{depositQuote.percentage}{" %) : "}<strong>{formatPrice(depositQuote.depositAmount, service.currency, locale)}</strong></p>}
+              {!compositeBooking && <p>{t("Solde après paiement de l’acompte")}{" : "}{formatPrice(depositQuote.balanceAmount, service.currency, locale)}</p>}
               {depositQuote.percentage > 0 && <p>{t("Répartition prévue à l’activation du paiement en ligne.")}</p>}
               <p><strong>{t("À payer aujourd’hui")}{" : "}{formatPrice(0, service.currency, locale)}</strong></p>
               <p>{t("Aucun acompte encaissé. À régler sur place")}{" : "}<strong>{formatPrice(depositQuote.totalAmount, service.currency, locale)}</strong></p>
             </section>
             {teamEnabled && <p>{t("Professionnel :")}{" "}{availablePeople.find(person => person.collaborator_id === form.collaboratorId)?.display_name ?? t("Affectation automatique à une personne qualifiée et disponible")}</p>}
-            <fieldset className="location-choice"><legend>{t("Où ?")}</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>{t("Chez le professionnel")}</strong><small>{provider.address ? `${provider.address} · ${provider.area}` : `${provider.area} · ${t("adresse à confirmer avec le professionnel")}`}</small></span></label>{provider.homeService && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>{t("À mon domicile")}</strong><small>{t("Le professionnel se déplace")}</small></span></label>}</fieldset>
+            <fieldset className="location-choice"><legend>{t("Où ?")}</legend><label><input type="radio" name="location" checked={form.locationMode === "salon"} onChange={() => setForm({ ...form, locationMode: "salon" })} /><span><strong>{t("Chez le professionnel")}</strong><small>{provider.address ? `${provider.address} · ${provider.area}` : `${provider.area} · ${t("adresse à confirmer avec le professionnel")}`}</small></span></label>{provider.homeService && !multipleServices && <label><input type="radio" name="location" checked={form.locationMode === "client_address"} onChange={() => setForm({ ...form, locationMode: "client_address" })} /><span><strong>{t("À mon domicile")}</strong><small>{t("Le professionnel se déplace")}</small></span></label>}</fieldset>
             {form.locationMode === "client_address" && <label>{t("Adresse")}<textarea autoFocus value={form.address} placeholder={t("Votre adresse complète")} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>}
             <fieldset className="location-choice"><legend>{t("Paiement")}</legend>
               <label><input type="radio" name="payment" checked={form.paymentMethod === "on_site"} onChange={() => setForm({ ...form, paymentMethod: "on_site" })} /><span><strong>{t("Sur place")}</strong><small>{t("Aucun débit aujourd’hui")}</small></span></label>
@@ -1068,7 +1199,7 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
             <div className="payment-note">{form.paymentMethod === "on_site" ? t("Paiement sur place · aucun débit aujourd’hui.") : t("Paiement de démonstration · aucun argent réel.")}</div>
           </>}
         </div>
-        {step === 2 && <div className="premium-booking-nav"><button className="back-button" onClick={() => setStep(1)}>{t("Modifier")}</button><button disabled={submitting || !canConfirm} onClick={() => void confirm()}>{submitting ? t("Enregistrement…") : form.paymentMethod === "on_site" ? t("Confirmer · ") + formatPrice(service.price_amount, service.currency, locale) : t("Continuer vers la sandbox · ") + formatPrice(service.price_amount, service.currency, locale)}</button></div>}
+        {step === 2 && <div className="premium-booking-nav"><button className="back-button" disabled={submitting} onClick={() => setStep(1)}>{t("Modifier")}</button><button disabled={submitting || !canConfirm} onClick={() => void confirm()}>{submitting ? t("Enregistrement…") : form.paymentMethod === "on_site" ? t("Confirmer · ") + formatPrice(service.price_amount, service.currency, locale) : t("Continuer vers la sandbox · ") + formatPrice(service.price_amount, service.currency, locale)}</button></div>}
       </>}
     </section>
   </div>;
@@ -1077,6 +1208,8 @@ function BookingModal({ selection, initialDate, initialRequest, authenticated, o
 function BookingSuccess({ provider, service, confirmation, onClose }: { provider: Provider; service: ProviderService; confirmation: BookingConfirmation; onClose: () => void }) {
   const locale = useApplicationLocale();
   const t = (text: string) => bookingText(text, locale);
+  service = { ...service, title: confirmation.serviceTitle ?? service.title, price_amount: confirmation.totalAmount ?? service.price_amount,
+    currency: confirmation.currency ?? service.currency, duration_minutes: confirmation.durationMinutes ?? service.duration_minutes };
   const start = new Date(confirmation.startsAt);
   const end = new Date(start.getTime() + service.duration_minutes * 60000);
   const calendarDate = (value: Date) => value.toISOString().replace(/[-:]/g, "").replace(".000", "");

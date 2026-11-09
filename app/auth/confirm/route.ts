@@ -28,11 +28,14 @@ export async function GET(request: Request) {
       : await client.auth.exchangeCodeForSession(code!);
     if (error) return redirect(request, failure);
     const { data, error: userError } = await client.auth.getUser();
-    if (userError || !data.user) return redirect(request, failure);
+    if (userError || !data.user) {
+      await client.auth.signOut({ scope: "local" });
+      return redirect(request, failure);
+    }
     const { data: profile, error: profileError } = await client.rpc("ensure_authenticated_profile");
-    const { error: statusError } = await client.rpc("synchronize_account_status");
-    if (profileError || statusError || profile?.is_suspended) {
-      await client.auth.signOut();
+    const { data: status, error: statusError } = await client.rpc("synchronize_account_status");
+    if (profileError || !profile || statusError || status !== "active" || profile.is_suspended) {
+      await client.auth.signOut({ scope: "local" });
       return redirect(request, "/?auth_error=profile_creation_failed");
     }
     if (type === "recovery" || type === "invite") {

@@ -25,6 +25,9 @@ export async function requireWorkspace(space: WorkspaceSpaceKey, moduleKey: stri
     supabase.rpc("admin_mfa_required"),
   ]);
   const internal = !["client", "pro", "salon", "staff"].includes(space);
+  if (internal && (mfaResult.error || typeof mfaResult.data !== "boolean")) {
+    redirect("/?auth_error=workspace_unavailable");
+  }
   if (internal && mfaResult.data === true) redirect("/admin");
   const admin = (adminResult.data ?? {}) as AdminContext;
   const collaboratorAccess = (collaboratorResult.error ? [] : collaboratorResult.data ?? []) as CollaboratorAccess[];
