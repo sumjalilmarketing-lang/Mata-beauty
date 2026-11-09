@@ -98,6 +98,14 @@ Les fichiers réécrits restent complets, TypeScript strict, sans ajout de `any`
 
 ## 4. Validation et recette de livraison
 
-Suite qualité locale terminée avec succès : **145 fichiers / 929 tests**, TypeScript strict et build de production réussis ; lint sans erreur, 8 avertissements préexistants. Après retrait du fallback global, les 18 scénarios HTTP du routeur ont également réussi localement. Les résultats des scénarios navigateur distants, de la compatibilité sur la base de recette et de la publication éventuelle sont consignés dans la PR de cette livraison. Les tests ciblés déjà exécutés couvrent la tarification réelle, le report, les options, le bloc continu, les ACL/RLS, les filtres paginés et les requêtes surdimensionnées.
+Suite qualité locale terminée avec succès : **145 fichiers / 930 tests**, TypeScript strict et build de production réussis ; lint sans erreur, 8 avertissements préexistants. Après retrait du fallback global, les 18 scénarios HTTP du routeur ont également réussi localement. Les résultats des scénarios navigateur distants, de la compatibilité sur la base de recette et de la publication éventuelle sont consignés dans la PR de cette livraison. Les tests ciblés déjà exécutés couvrent la tarification réelle, le report, les options, le bloc continu, les ACL/RLS, les filtres paginés et les requêtes surdimensionnées.
 
 L'inventaire statique n'est pas présenté comme une validation de tous les états hover, focus, disabled et loading sur tous les appareils. Les tests de charge, les comptes multiples distants concurrents, le PSP réel et les notifications physiques restent des limites explicites tant qu'aucune preuve d'exécution ne les valide.
+
+## État de recette et de publication
+
+Les huit groupes Functional audit de la révision `59f1f396` ont réussi : réservations, report client, recherche, parcours publics, liens internes, scénarios négatifs, routage et avis. La comparaison en lecture seule des définitions de production a détecté une variante d’alias dans `get_team_agenda` ; la migration et les tests acceptent uniquement les deux définitions examinées.
+
+La base de prévisualisation liée au projet est restée au 20 octobre et ne contient pas les helpers de fuseau requis. L’essai de migration y a échoué atomiquement sans installation partielle. La vérification transactionnelle sans persistance sur la base globale et l’application du correctif de confidentialité en production ont demandé des confirmations techniques expirées. Ces opérations ne sont pas déclarées exécutées. Une lecture ultérieure confirme que la politique publique des absences est encore installée en production : le correctif est dans le code, pas encore actif sur le site.
+
+Le nom du fichier de la migration de report déjà publiée a été aligné sur la version réellement inscrite dans `supabase_migrations.schema_migrations` (`20261109122456`). Cela évite qu’un prochain déploiement CLI ne tente de réappliquer le même changement sous une autre version. Ce renommage ne modifie pas son SQL.

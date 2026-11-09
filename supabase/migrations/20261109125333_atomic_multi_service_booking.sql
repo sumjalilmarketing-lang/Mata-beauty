@@ -310,6 +310,13 @@ do $$ declare item record; definition text; patched text; begin
     if to_regprocedure(item.signature) is null then continue; end if;
     definition:=pg_get_functiondef(to_regprocedure(item.signature));
     patched:=replace(definition,item.old_call,item.new_call);
+    if patched=definition and item.signature='public.get_team_agenda(uuid,date,integer)' then
+      -- The reviewed production revision uses explicit booking/service aliases.
+      -- Retain support for the earlier repository revision, without guessing
+      -- aliases or weakening the source precondition for any other function.
+      patched:=replace(definition,'booking_private.can_assign(booking.provider_service_id,booking.collaborator_id,',
+        'booking_private.can_assign_services(booking.service_ids,booking.provider_service_id,booking.collaborator_id,');
+    end if;
     if patched=definition then raise exception 'Multi-service caller changed: %',item.signature; end if;
     execute patched;
   end loop;
@@ -324,6 +331,10 @@ do $$ declare definition text; patched text; begin
   if to_regprocedure('public.get_team_agenda(uuid,date,integer)') is not null then
     definition:=pg_get_functiondef('public.get_team_agenda(uuid,date,integer)'::regprocedure);
     patched:=replace(definition,'s.title as service_title','booking_private.service_snapshot_title(b.service_snapshot,s.title) as service_title');
+    if patched=definition then
+      patched:=replace(definition,'service.title as service_title',
+        'booking_private.service_snapshot_title(booking.service_snapshot,service.title) as service_title');
+    end if;
     if patched=definition then raise exception 'Team agenda service title changed'; end if;
     execute patched;
   end if;

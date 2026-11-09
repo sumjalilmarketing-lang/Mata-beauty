@@ -57,7 +57,7 @@ export async function createClientRescheduleDatabase() {
   const audit = await migration("20261103161056_audit_booking_and_legacy_media_guards.sql");
   await db.exec(audit.slice(audit.indexOf("do $migration$"), audit.indexOf("create policy")));
   await db.exec(await migration("20261104171000_owner_booking_reschedule.sql"));
-  await db.exec(await migration("20261109121051_independent_reschedule_historical_interval.sql"));
+  await db.exec(await migration("20261109122456_independent_reschedule_historical_interval.sql"));
   const salonSql = await migration("20261008170112_employee_booking_assignment.sql");
   await db.exec(salonSql.slice(salonSql.indexOf("create or replace function public.protect_salon_booking_contract()"), salonSql.indexOf("do $$ declare definition text; begin", salonSql.indexOf("create or replace function public.protect_salon_booking_contract()"))));
   await db.exec(`create trigger bookings_protect_salon_contract before update on public.bookings for each row execute function public.protect_salon_booking_contract();

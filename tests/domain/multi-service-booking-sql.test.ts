@@ -130,15 +130,14 @@ beforeAll(async () => {
   await db.exec(await migration("20261103200423_staff_booking_reassignment.sql"));
   await db.exec(await migration("20261104171000_owner_booking_reschedule.sql"));
   await db.exec(await migration("20261105163236_repair_self_booking_provider_actions.sql"));
-  await db.exec(await migration("20261109121051_independent_reschedule_historical_interval.sql"));
+  await db.exec(await migration("20261109122456_independent_reschedule_historical_interval.sql"));
   await db.exec(`create trigger bookings_validate before update on public.bookings for each row execute function public.validate_booking_update()`);
   const slotContract = await migration("20261031173823_enforce_international_booking_availability.sql");
   await db.exec(slotContract.slice(slotContract.indexOf("create or replace function public.get_available_slots("),slotContract.indexOf("-- Runs after server price/duration normalization")));
   await db.exec(slotContract.slice(slotContract.indexOf("create or replace function booking_private.validate_bookable_slot()")));
   await db.exec(await migration("20261104230907_enforce_configured_booking_notice.sql"));
   await db.exec(await migration("20261109125316_client_booking_reschedule.sql"));
-  const agenda = await migration("20261011092427_harden_employee_account_access.sql");
-  await db.exec(agenda.slice(agenda.indexOf("create or replace function public.get_team_agenda"), agenda.indexOf("revoke all on function public.get_team_agenda")));
+  await db.exec(await readFile(new URL("../fixtures/team-agenda-production.sql", import.meta.url), "utf8"));
   await db.exec("begin");
   await db.exec(`create or replace function booking_private.provider_timezone(uuid,uuid) returns text language sql as $$select 'America/New_York'::text$$;
     update public.business_hours set opens_at='20:00',closes_at='23:30'`);
@@ -361,4 +360,15 @@ it("provides duration-aware mobile single-service variant availability without i
   const r = (await db.query<{ result: { totalAmount: number; durationMinutes: number; distanceTravelPending: boolean } }>(`select public.get_multi_service_availability(array['${serviceA}']::uuid[],${day},1,array['${personA}']::uuid[],null,'client_address') result`)).rows[0].result;
   expect(r).toMatchObject({ totalAmount: 15000, durationMinutes: 75, distanceTravelPending: true });
   await expectFailure(() => db.query(`select public.get_multi_service_availability(${ids},${day},1,'{}'::uuid[],null,'client_address')`), '22023');
+});
+
+it("preserves the production team-agenda timezone boundary and its JSON field names", async () => {
+  await db.exec(`create or replace function booking_private.provider_timezone(uuid,uuid) returns text language sql as $$select 'America/New_York'::text$$;
+    update public.business_hours set opens_at='20:00',closes_at='23:30'`);
+  const created = (await db.query<{ result: Created }>(`select public.create_multi_service_booking(${ids},(${day}+time '22:00') at time zone 'America/New_York') result`)).rows[0].result;
+  await db.exec(`select set_config('test.user','${owner}',true)`);
+  const rows = (await db.query<{ result: { id: string; starts_at: string; service_title: string; client_name: string; assignment_conflict: boolean }[] }>(`select public.get_team_agenda('${business}',${day},1) result`)).rows[0].result;
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ id: created.id, service_title: 'Visage + Manucure', client_name: 'Client', assignment_conflict: false });
+  expect(Date.parse(rows[0].starts_at)).toBe(Date.parse(created.starts_at));
 });
