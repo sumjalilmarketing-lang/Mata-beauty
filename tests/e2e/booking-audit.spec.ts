@@ -649,3 +649,32 @@ for (const action of ['like', 'save', 'follow'] as const) test(`QA-B02: ${action
   try { await button.click(); await expect.poll(() => requests).toBe(1); await expect(button).toBeDisabled(); }
   finally { release(); }
 });
+
+
+test("le bouton des moyens de paiement reste accessible sans lancer un paiement indisponible", async ({ page }) => {
+  const state: AuditState = { bookingCreated: false, currentRole: "client", selectedSlot: "" };
+  await mockSupabase(page, state);
+  await page.route("**/api/payments/capabilities", route => json(route, {
+    onlineCheckoutEnabled: false, environment: "disabled", provider: "none", methods: [],
+  }));
+  let checkoutRequests = 0;
+  await page.route("**/api/payments/create", route => { checkoutRequests += 1; return json(route, { error: "Unexpected checkout" }, 500); });
+  await page.goto("/");
+  await openFirstFeedBooking(page);
+  await page.getByRole("button", { name: "10:00", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Réserver" });
+  const toggle = dialog.locator("details.payment-method-access summary");
+  await expect(toggle).toBeVisible();
+  await toggle.evaluate(element => element.focus());
+  await toggle.press("Enter");
+  await expect(dialog.locator("details.payment-method-access")).toHaveAttribute("open", "");
+  await expect(dialog.getByRole("list", { name: "Moyens de paiement en ligne" })).toContainText("Wave");
+  await expect(dialog.getByRole("list", { name: "Moyens de paiement en ligne" })).toContainText("Orange Money");
+  await expect(dialog.getByRole("status")).toContainText("L’encaissement en ligne n’est pas encore activé");
+  await expect(dialog.getByRole("radio", { name: /Sur place/ })).toBeChecked();
+  await expect(dialog.getByRole("button", { name: /Confirmer/ })).toBeEnabled();
+  await toggle.click();
+  await expect(dialog.locator("details.payment-method-access")).not.toHaveAttribute("open", "");
+  expect(checkoutRequests).toBe(0);
+  expect(state.bookingCreated).toBe(false);
+});
