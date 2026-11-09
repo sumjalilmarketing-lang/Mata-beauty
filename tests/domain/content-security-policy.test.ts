@@ -2,20 +2,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { contentSecurityPolicy, usesWorkspaceNonce } from "@/lib/security/content-security-policy";
 import { proxy } from "@/proxy";
+import type { CookieOptions } from "@supabase/ssr";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), refresh: true, maintenance: false }));
 vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.create }));
 const environment = { NODE_ENV: "production", NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co", NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: "public-key" };
 const scriptDirective = (policy: string) => policy.split(";").find(item => item.trim().startsWith("script-src")) ?? "";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.refresh = true;
+  mocks.maintenance = false;
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "public-test-key");
   mocks.create.mockImplementation((_url: string, _key: string, options: { cookies: { setAll: (values: { name: string; value: string; options: { sameSite: "lax" } }[]) => void } }) => ({
-    auth: { getUser: async () => { options.cookies.setAll([{ name: "refreshed", value: "session", options: { sameSite: "lax" } }]); return { data: { user: null } }; } },
-    rpc: () => ({ abortSignal: async () => ({ error: null, data: { enabled: false } }) }),
+    auth: { getUser: async () => { if (mocks.refresh) options.cookies.setAll([{ name: "refreshed", value: "session", options: { sameSite: "lax" } }]); return { data: { user: null } }; } },
+    rpc: () => ({ abortSignal: async () => ({ error: null, data: { enabled: mocks.maintenance } }) }),
   }));
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -59,13 +62,52 @@ describe("workspace CSP without changing public static rendering", () => {
     expect(response.headers.get("x-middleware-request-content-security-policy")).toBe(policy);
     expect(response.headers.get("x-middleware-request-cookie")).toContain("refreshed=session");
     expect(response.headers.get("Set-Cookie")).toContain("refreshed=session");
-    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("Cache-Control")).toContain("private");
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
     const second = await proxy(new NextRequest("https://mata.test/staff/profile", { headers: { accept: "text/html" } }));
     expect(second.headers.get("x-middleware-request-x-nonce")).not.toBe(nonce);
   });
   it("does not attach a per-request nonce or change cache headers for public static documents", async () => {
+    mocks.refresh = false;
     const response = await proxy(new NextRequest("https://mata.test/", { headers: { accept: "text/html", "x-nonce": "untrusted" } }));
     expect(response.headers.get("x-middleware-request-x-nonce")).toBeNull();
     expect(response.headers.get("Cache-Control")).toBeNull();
+  });
+  it.each(["/", "/api/push", "/app/profile"])("prevents caching a refreshed session on %s", async (path) => {
+    const response = await proxy(new NextRequest(`https://mata.test${path}`));
+    expect(response.headers.get("Set-Cookie")).toContain("refreshed=session");
+    expect(response.headers.get("Cache-Control")).toContain("private");
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
+    expect(response.headers.get("CDN-Cache-Control")).toBe("no-store");
+    expect(response.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
+    expect(response.headers.get("Pragma")).toBe("no-cache");
+    expect(response.headers.get("Expires")).toBe("0");
+  });
+  it("keeps refreshed cookies on maintenance responses without exposing session values in HTML", async () => {
+    mocks.maintenance = true;
+    const response = await proxy(new NextRequest("https://mata.test/"));
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Set-Cookie")).toContain("refreshed=session");
+    expect(response.headers.get("Cache-Control")).toContain("private");
+    expect(response.headers.get("Retry-After")).toBe("300");
+    expect(await response.text()).not.toContain("refreshed=session");
+  });
+  it("preserves multiple refresh batches and the SSR cache headers", async () => {
+    mocks.create.mockImplementation((_url: string, _key: string, options: { cookies: { setAll: (values: { name: string; value: string; options: CookieOptions }[], headers: Record<string, string>) => void } }) => ({
+      auth: { getUser: async () => {
+        options.cookies.setAll([{ name: "sb-token.0", value: "first", options: { maxAge: 60 } }], { "Pragma": "no-cache", "Expires": "0" });
+        options.cookies.setAll([{ name: "sb-token.1", value: "second", options: { maxAge: 60 } }], { "Cache-Control": "private, no-store" });
+        return { data: { user: null } };
+      } },
+      rpc: () => ({ abortSignal: async () => ({ error: null, data: { enabled: false } }) }),
+    }));
+    const response = await proxy(new NextRequest("https://mata.test/"));
+    expect(response.cookies.get("sb-token.0")?.value).toBe("first");
+    expect(response.cookies.get("sb-token.1")?.value).toBe("second");
+    expect(response.cookies.get("sb-token.0")?.secure).toBe(true);
+    expect(response.headers.get("x-middleware-request-cookie")).toContain("sb-token.0=first");
+    expect(response.headers.get("x-middleware-request-cookie")).toContain("sb-token.1=second");
+    expect(response.headers.get("Pragma")).toBe("no-cache");
+    expect(response.headers.get("Expires")).toBe("0");
   });
 });

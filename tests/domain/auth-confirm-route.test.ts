@@ -21,7 +21,7 @@ beforeEach(() => {
   mocks.verifyOtp.mockResolvedValue({ error: null });
   mocks.exchangeCodeForSession.mockResolvedValue({ error: null });
   mocks.getUser.mockResolvedValue({ data: { user: { id: "verified-user" } }, error: null });
-  mocks.rpc.mockResolvedValue({ data: { is_suspended: false }, error: null });
+  mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "synchronize_account_status" ? "active" : { is_suspended: false }, error: null }));
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -72,9 +72,37 @@ describe("email confirmation route", () => {
     expect(mocks.getUser).not.toHaveBeenCalled(); expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.service).not.toHaveBeenCalled();
   });
   it("signs out a suspended account before password setup", async () => {
-    mocks.rpc.mockResolvedValue({ data: { is_suspended: true }, error: null });
+    mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "synchronize_account_status" ? "suspended" : { is_suspended: true }, error: null }));
     const result = await GET(new Request(`${origin}/auth/confirm?type=recovery&token_hash=test-hash`));
     expect(result.headers.get("location")).toContain("auth_error=profile_creation_failed");
     expect(mocks.signOut).toHaveBeenCalledOnce();
   });
+});
+
+it.each(["invite", "recovery", "email"])("refuses a disabled %s account before password setup or email", async type => {
+  const implementation = mocks.rpc.getMockImplementation()!;
+  mocks.rpc.mockImplementation((name: string) => name === "synchronize_account_status" ? Promise.resolve({ data: "disabled", error: null }) : implementation(name));
+  expect((await GET(new Request(`${origin}/auth/confirm?type=${type}&token_hash=valid`))).headers.get("location")).toContain("auth_error=profile_creation_failed");
+  expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  expect(mocks.service).not.toHaveBeenCalled();
+  expect(mocks.welcome).not.toHaveBeenCalled();
+});
+it.each(["deleted", "suspended", "email_unverified", "phone_unverified", null, { status: "active" }])("refuses an unverified synchronized state %j", async status => {
+  const implementation = mocks.rpc.getMockImplementation()!;
+  mocks.rpc.mockImplementation((name: string) => name === "synchronize_account_status" ? Promise.resolve({ data: status, error: null }) : implementation(name));
+  expect((await GET(new Request(`${origin}/auth/confirm?type=recovery&token_hash=valid`))).headers.get("location")).toContain("auth_error=profile_creation_failed");
+  expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+});
+it("clears the local email session when Auth validation fails", async () => {
+  mocks.getUser.mockResolvedValue({ data: { user: { id: "verified-user" } }, error: { message: "offline" } });
+  expect((await GET(new Request(`${origin}/auth/confirm?type=invite&token_hash=valid`))).headers.get("location")).toContain("auth_error=email_link_invalid");
+  expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  expect(mocks.rpc).not.toHaveBeenCalled();
+});
+it("clears the local email session if status synchronization fails", async () => {
+  const implementation = mocks.rpc.getMockImplementation()!;
+  mocks.rpc.mockImplementation((name: string) => name === "synchronize_account_status" ? Promise.resolve({ data: "active", error: { message: "offline" } }) : implementation(name));
+  expect((await GET(new Request(`${origin}/auth/confirm?type=email&token_hash=valid`))).headers.get("location")).toContain("auth_error=profile_creation_failed");
+  expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  expect(mocks.welcome).not.toHaveBeenCalled();
 });

@@ -89,7 +89,7 @@ Une lecture des métadonnées réelles a confirmé la fuite du champ `availabili
 | `2026-11-09-interactive-elements.csv` | Inventaire AST de tous les éléments JSX interactifs, avec fichier, ligne, label source, événements, disabled et attributs aria ; une boucle représente un modèle d'éléments dynamiques |
 | `2026-11-09-static-inventory.csv` | Registre des pages, composants/modules et endpoints ; inventaire initial à lire avec les nouveaux fichiers de cette branche |
 | `2026-11-09-api-rbac-followup.md` | Revue des routes existantes, contrôles d'accès, validation et idempotence ; nouvelle route `/api/bookings/reschedule` décrite dans le présent rapport |
-| Migrations `20261109125316`, `20261109125333`, `20261109130527`, `20261109130832` | Report client, contrat composite/variantes, recherche serveur et confidentialité des absences |
+| Migrations `20261109125316`, `20261109125333`, `20261109130527`, `20261109143450` | Report client, contrat composite/variantes, recherche serveur et confidentialité des absences |
 | Tests SQL et API de la branche | Reproduction des défauts, pile réelle de triggers/tarification/RLS, cas négatifs et nouveaux scénarios navigateur |
 
 Le schéma applicatif réel est PostgreSQL/Supabase. Le fichier Drizzle SQLite hérité du starter n'est pas utilisé comme ORM de production ; aucun modèle ORM fictif n'est présenté comme le schéma réel.
@@ -109,3 +109,9 @@ Les huit groupes Functional audit de la révision `59f1f396` ont réussi : rése
 La base de prévisualisation liée au projet est restée au 20 octobre et ne contient pas les helpers de fuseau requis. L’essai de migration y a échoué atomiquement sans installation partielle. La vérification transactionnelle sans persistance sur la base globale et l’application du correctif de confidentialité en production ont demandé des confirmations techniques expirées. Ces opérations ne sont pas déclarées exécutées. Une lecture ultérieure confirme que la politique publique des absences est encore installée en production : le correctif est dans le code, pas encore actif sur le site.
 
 Le nom du fichier de la migration de report déjà publiée a été aligné sur la version réellement inscrite dans `supabase_migrations.schema_migrations` (`20261109122456`). Cela évite qu’un prochain déploiement CLI ne tente de réappliquer le même changement sous une autre version. Ce renommage ne modifie pas son SQL.
+
+## Mise à jour — passe authentification et sécurité
+
+Les contrôles distants de la révision `6fc271c8` ont tous réussi (4 jobs qualité et 8 groupes Functional audit). Depuis, la passe décrite dans `2026-11-09-auth-security-audit.md` ajoute les contrôles de statut actif et MFA, corrige le cache des sessions et les retours Auth. Sa suite locale compte 986 tests réussis.
+
+Le correctif de confidentialité a finalement été appliqué et vérifié en production sous la version `20261109143450`. La politique publique a disparu ; la politique propriétaire est conservée. Le correctif d’autorisation interne des comptes actifs a aussi été appliqué sous `20261109143532`. Les trois autres nouvelles migrations (report, multi-soins et recherche) restent non appliquées et le nouveau code applicatif reste non déployé. Ces résultats remplacent le blocage de confirmation indiqué précédemment pour la confidentialité.

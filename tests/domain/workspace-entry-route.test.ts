@@ -59,4 +59,18 @@ describe("verified workspace entry", () => {
     mocks.rpc.mockRejectedValue(new Error("offline"));
     expect((await open()).headers.get("location")).toContain("auth_error=workspace_unavailable");
   });
+  it.each([null, undefined, "false", 0, {}, []])("rejects an unverified MFA response %j", async (invalid) => {
+    const implementation = mocks.rpc.getMockImplementation()!;
+    mocks.rpc.mockImplementation((name: string) => name === "admin_mfa_required"
+      ? Promise.resolve({ data: invalid, error: null }) : implementation(name));
+    expect((await open()).headers.get("location")).toBe(`${origin}/?auth_error=workspace_unavailable`);
+    expect(mocks.rpc).not.toHaveBeenCalledWith("get_admin_context");
+  });
+  it("rejects an MFA lookup error even when its data says false", async () => {
+    const implementation = mocks.rpc.getMockImplementation()!;
+    mocks.rpc.mockImplementation((name: string) => name === "admin_mfa_required"
+      ? Promise.resolve({ data: false, error: { message: "offline" } }) : implementation(name));
+    expect((await open()).headers.get("location")).toBe(`${origin}/?auth_error=workspace_unavailable`);
+    expect(mocks.rpc).not.toHaveBeenCalledWith("get_admin_context");
+  });
 });

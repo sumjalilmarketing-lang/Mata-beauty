@@ -50,7 +50,7 @@ beforeAll(async () => {
   await db.exec(await migration("20261031180040_enforce_nonteam_business_hours.sql"));
   const available = await migration("20261031173823_enforce_international_booking_availability.sql");
   await db.exec(available.slice(available.indexOf("create or replace function public.get_available_slots"), available.indexOf("-- Runs after server price/duration normalization")));
-  await db.exec(await migration("20261109130832_private_availability_exceptions.sql"));
+  await db.exec(await migration("20261109143450_private_availability_exceptions.sql"));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => { await db.exec("begin"); });
