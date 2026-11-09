@@ -661,7 +661,7 @@ test("le bouton des moyens de paiement reste accessible sans lancer un paiement 
   await page.route("**/api/payments/create", route => { checkoutRequests += 1; return json(route, { error: "Unexpected checkout" }, 500); });
   await page.goto("/");
   await openFirstFeedBooking(page);
-  await page.getByRole("button", { name: "10:00", exact: true }).click();
+  await page.getByRole("dialog", { name: "Réserver" }).getByRole("button", { name: /^10:00/ }).click();
   const dialog = page.getByRole("dialog", { name: "Réserver" });
   const toggle = dialog.locator("details.payment-method-access summary");
   await expect(toggle).toBeVisible();
