@@ -1,6 +1,8 @@
 import { feedText } from "./feed-copy";
 
 const copy: Record<string, readonly [string, string]> = {
+  "Prix, acompte et solde": ["Price, deposit and balance", "Precio, anticipo y saldo"],
+  "Consulter les conditions": ["View conditions", "Ver las condiciones"],
   "Voir les moyens de paiement": ["View payment methods", "Ver los medios de pago"],
   "Moyens de paiement en ligne": ["Online payment methods", "Medios de pago en línea"],
   "Carte bancaire": ["Bank card", "Tarjeta bancaria"],
