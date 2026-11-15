@@ -3,7 +3,7 @@ import { applicationText } from "@/lib/domain/application-copy";
 import { useApplicationLocale } from "./use-application-locale";
 
 import { useEffect, useRef, useState } from "react";
-import type { Coordinates } from "@/lib/domain/location";
+import { worldwideCountrySuggestions, type Coordinates } from "@/lib/domain/location";
 
 export function LocationPicker({ area, position, suggestions, onChange, autoLocate = false, radiusKm, onRadiusChange }: {
   area: string; position: Coordinates | null; suggestions: string[];
@@ -13,6 +13,7 @@ export function LocationPicker({ area, position, suggestions, onChange, autoLoca
   const locale = useApplicationLocale();
   const t = (text: string) => applicationText(text, locale);
   const [pending, setPending] = useState(false);
+  const locationSuggestions = [...new Set([...worldwideCountrySuggestions(area), ...suggestions])].slice(0, 40);
   const [message, setMessage] = useState("");
   const request = useRef(0);
   const autoRequested = useRef(false);
@@ -48,8 +49,8 @@ export function LocationPicker({ area, position, suggestions, onChange, autoLoca
   return <section className="location-picker" aria-label={t("Choisir votre localisation")}>
     <div><strong>{position ? `Près de vous · ${radiusKm ?? 25} km` : area || t("Choisir une zone")}</strong><button type="button" disabled={pending} onClick={locate}>{pending ? t("Localisation…") : t("Utiliser ma position")}</button></div>
     {onRadiusChange && <label>{t("Rayon de recherche")}<select aria-label={t("Rayon de recherche")} value={radiusKm ?? 5} onChange={(event) => { const value = Number(event.target.value); if (value === 2 || value === 5 || value === 10 || value === 20) onRadiusChange(value); }}>{[2, 5, 10, 20].map((value) => <option key={value} value={value}>{value} km</option>)}</select></label>}
-    <label>{t("Zone géographique")}<input aria-label={t("Ville, quartier ou pays")} maxLength={120} list="mata-location-suggestions" placeholder={t("Pays, ville ou quartier")} value={area} onChange={(event) => { cancel(); setPending(false); setMessage(""); onChange(event.target.value, null); }} /></label>
-    <datalist id="mata-location-suggestions">{suggestions.map((value) => <option key={value} value={value} />)}</datalist>
+    <label>{t("Zone géographique")}<input aria-label={t("Ville, quartier ou pays")} maxLength={120} list="mata-location-suggestions" placeholder={t("Pays, ville ou quartier, partout dans le monde")} value={area} onChange={(event) => { cancel(); setPending(false); setMessage(""); onChange(event.target.value, null); }} /></label>
+    <datalist id="mata-location-suggestions">{locationSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
     {(area || position) && <button type="button" onClick={() => { cancel(); setPending(false); setMessage(""); onChange("", null); }}>{t("Effacer la localisation")}</button>}
     {message && <p role="status">{message}</p>}
   </section>;
