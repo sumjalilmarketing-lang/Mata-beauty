@@ -43,3 +43,11 @@
   .inspiration-search-dialog form>footer{margin-inline:-18px;padding-inline:18px}
   .inspiration-search-dialog .location-picker>div{align-items:flex-start;flex-direction:column}
 }
+
+/* Status bubbles stay in document flow so video controls are never covered. */
+.social-feed-shell:has(> [aria-label="Statuts des professionnels"]) > .social-feed {
+  height: calc(100% - 216px);
+}
+.social-feed-shell:has(> [aria-label="Statuts des professionnels"]) > .feed-publish-fab {
+  top: 226px;
+}
