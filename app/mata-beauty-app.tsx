@@ -5,6 +5,7 @@ import { UnreadBadge } from "./unread-inbox";
 import { bookingTeamPeople, selectedTeamSlots, type BookingTeamPerson, type BookingTeamSlot } from "@/lib/domain/booking-team";
 
 import Image from "next/image";
+import { ProfileStoryRing } from "./profile-story-ring";
 import { bookableServiceSchema, multiServiceAvailabilitySchema, multiServiceConfirmationSchema, previewServiceSelection, type BookableService } from "@/lib/domain/multi-service-selection";
 import { useDialogFocus } from "./use-dialog-focus";
 import { serviceDepositQuote } from "@/lib/domain/service-deposit";
@@ -869,7 +870,7 @@ function CatalogBlock({ providers, fallbackProviders = [], catalogState, favorit
 
 function ProviderCard({ provider, nextSlot, favorite, onFavorite, onView, onBook }: { provider: Provider; nextSlot?: string; favorite: boolean; onFavorite: () => void; onView: () => void; onBook: () => void }) {
   return <article className="premium-provider-card" onClick={onView}>
-    <div className="premium-provider-photo">{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={provider.specialty} sizes="120px" caption /> : <span>{provider.initials}</span>}</div>
+    <div className="premium-provider-photo"><ProfileStoryRing providerId={provider.profileId} name={provider.name} onOpenProfile={onView}>{provider.coverUrl ? <ServiceImage src={provider.coverUrl} category={provider.category} alt={provider.specialty} sizes="120px" caption /> : <span>{provider.initials}</span>}</ProfileStoryRing></div>
     <div><div className="provider-name-row"><h3><button className="provider-profile-link" onClick={(event) => { event.stopPropagation(); onView(); }}>{provider.name}</button></h3><button aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"} onClick={(event) => { event.stopPropagation(); onFavorite(); }}>{favorite ? "♥" : "♡"}</button></div>{provider.verified && <span className="gold-verified">✦ Vérifié</span>}<p>★ {provider.rating.toFixed(1)} ({provider.reviews} avis) · {provider.area}</p>{nextSlot && <p className="next-slot-badge">● {formatSlotLabel(nextSlot, provider.timeZone)}</p>}<div className="provider-booking-line"><span><strong>{formatPrice(provider.price, provider.currency)}</strong><small>{formatDuration(provider.durationMinutes)}</small></span><button onClick={(event) => { event.stopPropagation(); onBook(); }}>Voir les créneaux</button></div></div>
   </article>;
 }
