@@ -16,7 +16,7 @@ export function studioTransferMessage(status: number) {
 }
 
 /** Chunked transfer retries network interruptions without restarting the whole video. */
-export async function uploadStudioVideo(file: File, path: string, onProgress: (percent: number) => void, options: { bucket?: "provider-social-media" | "studio-video-inputs"; signal?: AbortSignal } = {}) {
+export async function uploadStudioVideo(file: File, path: string, onProgress: (percent: number) => void, options: { bucket?: "provider-social-media" | "studio-video-inputs" | "professional-stories"; signal?: AbortSignal } = {}) {
   const client = getSupabaseBrowserClient();
   if (!client) throw new StudioUploadError("Connexion au service vidéo indisponible.");
   const { data, error } = await client.auth.getSession();
@@ -29,7 +29,7 @@ export async function uploadStudioVideo(file: File, path: string, onProgress: (p
     const upload = new Upload(file, {
       endpoint: endpoint.href,
       headers: { authorization: `Bearer ${data.session!.access_token}`, apikey: anonKey, "x-upsert": "false" },
-      metadata: { bucketName: options.bucket ?? "provider-social-media", objectName: path, contentType: options.bucket === "studio-video-inputs" ? "application/octet-stream" : file.type, cacheControl: "31536000" },
+      metadata: { bucketName: options.bucket ?? "provider-social-media", objectName: path, contentType: options.bucket === "studio-video-inputs" ? "application/octet-stream" : file.type, cacheControl: options.bucket === "professional-stories" ? "60" : "31536000" },
       chunkSize: 6 * 1024 * 1024,
       uploadDataDuringCreation: true,
       retryDelays: [0, 1500, 3000, 5000, 10000],
