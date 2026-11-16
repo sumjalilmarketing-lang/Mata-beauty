@@ -163,7 +163,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (space === "client" && module.key === "favorites") return <ClientFavorites userId={userId} />;
   if (space === "client" && module.key === "inspirations") return <SocialDashboard role="client" userId={userId} />;
 
-  if (space === "salon" && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
+  if (space === "salon" && module.key === "messages") return <WorkspaceMessaging userId={userId} canPublishStatus={providerApproved} />;
   if (space === "staff" && module.key === "tasks") return <SalonStaffTasks />;
   if (space === "staff" && module.key === "availability") return <StaffCalendar />;
   if (space === "staff" && module.key === "messages") return <WorkspaceMessaging userId={userId} staffMode canReply={staffCanReply} />;
@@ -172,7 +172,7 @@ export function WorkspaceModuleView({ space, module, allowedModuleKeys, supabase
   if (space === "staff" && module.key === "services") return <StaffServices />;
   if (space === "salon" && module.key !== "videos") return <SalonControlCenter module={module} userId={userId} collaboratorAccessEnabled={collaboratorAccessEnabled} />;
   if ((space === "pro" || space === "salon") && module.key === "videos") return <CreatorStudio userId={userId} providerApproved={providerApproved} />;
-  if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} />;
+  if ((space === "client" || space === "pro") && module.key === "messages") return <WorkspaceMessaging userId={userId} canPublishStatus={providerApproved} />;
   if (space === "client" && module.key === "profile") return <ClientProfile userId={userId} />;
   if (space === "client" && module.key === "application") return <ProfessionalApplication userId={userId} />;
   if (space === "pro" && module.key === "portfolio") return <CreatorStudio userId={userId} providerApproved={providerApproved} initialTab="photos" />;

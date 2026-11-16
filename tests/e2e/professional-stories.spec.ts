@@ -71,7 +71,9 @@ test("approved professional publishes via avatar, views and deletes synthetic me
   await qaLogin(context, "provider");
   const posts: FixtureStory[] = [];
   await mockStories(page, posts);
-  await page.goto("/");
+  await page.goto("/pro/messages");
+  const sidebar = page.getByRole("complementary", { name: "Conversations" });
+  await expect(sidebar.getByRole("region", { name: "Statuts des professionnels" })).toBeVisible();
   const add = page.getByRole("button", { name: "Publier un statut" });
   await expect(add).toBeVisible();
   const image = await sharp({ create: { width: 10, height: 10, channels: 4, background: "#eda3ad" } }).png().toBuffer();
@@ -100,7 +102,9 @@ test("unapproved synthetic professional cannot upload a status", async ({ page, 
   await qaLogin(context, "provider");
   const posts: FixtureStory[] = [];
   await mockStories(page, posts, { rejectUpload: true });
-  await page.goto("/");
+  await page.goto("/pro/messages");
+  const sidebar = page.getByRole("complementary", { name: "Conversations" });
+  await expect(sidebar.getByRole("region", { name: "Statuts des professionnels" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Publier un statut" })).toBeVisible();
   const image = await sharp({ create: { width: 10, height: 10, channels: 4, background: "#f4b5b5" } }).png().toBuffer();
   await page.getByLabel("Choisir une photo ou vidéo pour votre statut").setInputFiles({
@@ -118,7 +122,9 @@ test("followed profiles keep their photos when a status expires", async ({ page,
     ...story(new Date(Date.now() + 18000).toISOString()), providerId: followedId, name: "Salon suivi",
   }, { ...story(), providerId: otherId, name: "Salon non suivi" }];
   await mockStories(page, posts);
-  await page.goto("/");
+  await page.goto("/pro/messages");
+  const sidebar = page.getByRole("complementary", { name: "Conversations" });
+  await expect(sidebar.getByRole("region", { name: "Statuts des professionnels" })).toBeVisible();
   const bubble = page.getByRole("button", { name: "Voir le statut de Salon suivi" });
   await expect(bubble.locator("img")).toBeVisible();
   await expect(page.getByText("Salon non suivi")).toHaveCount(0);
