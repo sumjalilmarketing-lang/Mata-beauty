@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ProfessionalStories } from "./professional-stories";
 import { BookingMessages } from "./booking-messages";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
@@ -28,7 +29,10 @@ type MessageRow = { conversation_id: string; body: string; created_at: string; s
 type ContextRow = { bookingId: string; participantId: string; name: string; avatarUrl: string | null; startsAt: string; status: string; profilePath?: string };
 type Contact = GroupedBookingConversation & { name: string; avatarUrl: string | null; profilePath?: string };
 
-export function WorkspaceMessaging({ userId, staffMode = false, canReply = true }: { userId: string; staffMode?: boolean; canReply?: boolean }) {
+const emptySubscriptions = new Set<string>();
+
+export function WorkspaceMessaging({ userId, staffMode = false, canReply = true, canPublishStatus = false }: { userId: string; staffMode?: boolean; canReply?: boolean; canPublishStatus?: boolean }) {
+  const router = useRouter();
   const requestedBooking = useSearchParams().get("booking");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selected, setSelected] = useState<Contact | null>(null);
@@ -204,6 +208,22 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true 
     return () => window.removeEventListener("mata-conversations-read", markRead);
   }, []);
 
+  const [subscriptions, setSubscriptions] = useState<{ userId: string; ids: Set<string> }>();
+  useEffect(() => {
+    if (staffMode) return;
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const controller = new AbortController();
+    void (async () => {
+      const { data, error } = await client.from("follows").select("followed_provider_id")
+        .eq("follower_id", userId).abortSignal(controller.signal);
+      if (!error && !controller.signal.aborted) {
+        setSubscriptions({ userId, ids: new Set((data ?? []).map(row => row.followed_provider_id)) });
+      }
+    })();
+    return () => controller.abort();
+  }, [staffMode, userId]);
+
   const filteredContacts = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("fr");
     if (!normalized) return contacts;
@@ -215,6 +235,9 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true 
     <div className="workspace-intro"><div><h2>Messages</h2><p>Un fil par interlocuteur, avec les rendez-vous associés.</p></div></div>
     <article className="panel messaging-shell" aria-label="Messagerie">
       <aside className="messaging-sidebar" aria-label="Conversations">
+        {!staffMode && <ProfessionalStories key={userId} userId={userId} canPublish={canPublishStatus}
+          followed={subscriptions?.userId === userId ? subscriptions.ids : emptySubscriptions}
+          onOpenProvider={id => router.push(`/professional/${encodeURIComponent(id)}`)} />}
         <div className="messaging-sidebar-heading"><h3>Conversations</h3><span>{contacts.length}</span></div>
         <label className="messaging-search"><span aria-hidden="true">⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher un interlocuteur" aria-label="Rechercher un interlocuteur" /></label>
         {error && <p role="alert" className="conversation-error">{error}</p>}
