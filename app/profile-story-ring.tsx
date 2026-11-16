@@ -45,13 +45,18 @@ export function ProfileStoryRing({
     const onFocus = () => { cached.delete(providerId); load(); };
     window.addEventListener("focus", onFocus);
     window.addEventListener("mata:stories:updated", onFocus);
-    const timer = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      setStory(current => current && Date.parse(current.expiresAt) <= Date.now() ? null : current);
-      setViewing(current => current && cached.get(providerId)?.story && Date.parse(cached.get(providerId)!.story!.expiresAt) <= Date.now() ? false : current);
-    }, 1000);
-    return () => { alive = false; window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("focus", onFocus); window.removeEventListener("mata:stories:updated", onFocus); };
+    return () => { alive = false; window.clearTimeout(initial); window.removeEventListener("focus", onFocus); window.removeEventListener("mata:stories:updated", onFocus); };
   }, [providerId]);
+  useEffect(() => {
+    if (!story) return;
+    const remainingMs = Date.parse(story.expiresAt) - Date.now();
+    const expiry = window.setTimeout(() => {
+      cached.delete(providerId);
+      setStory(null);
+      setViewing(false);
+    }, Math.max(0, remainingMs));
+    return () => window.clearTimeout(expiry);
+  }, [providerId, story]);
   const active = story !== null;
   return <>
     <button type="button" className={`${className ?? ""} ${styles.avatarButton} ${active ? styles.active : ""}`}
