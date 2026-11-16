@@ -127,9 +127,11 @@ export function ProfessionalStatusStrip({
   }, []);
 
   useEffect(() => {
-    void refresh().catch(() => undefined);
-    const timer = window.setInterval(() => void refresh().catch(() => undefined), 60000);
-    return () => window.clearInterval(timer);
+    // Schedule the initial network synchronization after the effect commits.
+    // This avoids a synchronous state-update cascade flagged by React lint.
+    const initial = window.requestAnimationFrame(() => { void refresh().catch(() => undefined); });
+    const timer = window.setInterval(() => { void refresh().catch(() => undefined); }, 60000);
+    return () => { window.cancelAnimationFrame(initial); window.clearInterval(timer); };
   }, [refresh]);
 
   useEffect(() => {
