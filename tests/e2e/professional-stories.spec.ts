@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import sharp from "sharp";
-import { qaLogin, qaSession } from "./helpers/qa-session";
+import { qaLogin } from "./helpers/qa-session";
+import { syntheticSession } from "./fixtures/department-workspaces.mjs";
 
 const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
-const ownerId = qaSession("provider").user.id;
+const ownerId = syntheticSession("provider").user.id;
 const fakeImage = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 const fakeId = "00000000-0000-4000-8000-000000009701";
 const fakePath = `${ownerId}/00000000-0000-4000-8000-000000009701.png`;
