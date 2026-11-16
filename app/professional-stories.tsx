@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import styles from "./professional-stories.module.css";
@@ -174,7 +175,7 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
       </button>)}
     </div>
     {error && <p role="alert" className={styles.error}>{error}</p>}
-    {preview && file && <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Publier mon statut">
+    {preview && file && typeof document !== "undefined" && createPortal(<div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Publier mon statut">
       <div className={styles.viewer}>
         <header><strong>Aperçu du statut</strong><button type="button" onClick={clearDraft} disabled={busy} aria-label="Fermer">×</button></header>
         {file.type.startsWith("video/") ? <video controls playsInline src={preview} className={styles.media} /> :
@@ -183,8 +184,8 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
         <button type="button" disabled={busy} className={styles.publish} onClick={() => void publish()}>{busy ? "Publication…" : "Publier · 24 h"}</button>
         {error && <p role="alert">{error}</p>}
       </div>
-    </div>}
-    {viewing && <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={`Statut de ${viewing.name}`}>
+    </div>, document.body)}
+    {viewing && typeof document !== "undefined" && createPortal(<div className={styles.overlay} role="dialog" aria-modal="true" aria-label={`Statut de ${viewing.name}`}>
       <div className={styles.viewer}>
         <header><strong>{viewing.name}</strong><button type="button" onClick={() => setSelected(null)} aria-label="Fermer le statut">×</button></header>
         {viewing.mediaType === "video" ? <video key={viewing.id} src={viewing.url} className={styles.media} controls autoPlay playsInline /> :
@@ -197,6 +198,6 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
         {error && <p role="alert" className={styles.error}>{error}</p>}
         <button className={styles.publish} type="button" onClick={() => { setSelected(null); onOpenProvider(viewing.providerId); }}>Voir le profil et réserver</button>
       </div>
-    </div>}
+    </div>, document.body)}
   </section>;
 }
