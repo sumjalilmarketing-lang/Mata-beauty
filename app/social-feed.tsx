@@ -8,6 +8,7 @@ import { discoverFeed, videoTopics, videoInterestAffinity, type DiscoveryTopic }
 import type { CatalogCategory } from "@/lib/supabase/catalog";
 import { filterInspirationPosts, type InspirationSearchProvider } from "@/lib/domain/inspiration-search";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { SUPPORTED_COUNTRIES } from "@/lib/domain/international";
 import { recordSessionMetric } from "@/lib/analytics/session-metric";
 import { readBrowserStorage, writeBrowserStorage } from "@/lib/browser-storage";
 import type { AuthenticatedProfile } from "./auth-modal";
@@ -775,12 +776,50 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const countryLabel = inspirationCountryLabel(selectedCountryCode, locale);
   const selectedProvider = location.providers.find((item) => item.profileId === selectedProviderId);
   const countryOptions = useMemo(() => {
-    const codes = [...new Set(location.providers.map(provider => inspirationCountryCode(provider.countryCode)).filter(Boolean))];
+    const codes = [...new Set([...SUPPORTED_COUNTRIES.map(country => country.code), ...location.providers.map(provider => inspirationCountryCode(provider.countryCode)).filter(Boolean)])];
     return codes.sort((left, right) => inspirationCountryLabel(left, locale).localeCompare(inspirationCountryLabel(right, locale), locale));
   }, [location.providers, locale]);
+  // Search the approved salon directory directly. The startup catalogue intentionally
+  // loads only 100 profiles; it must not determine whether a salon is searchable.
+  const salonLookupKey = JSON.stringify([searchQuery.trim().toLocaleLowerCase("fr"), selectedCountryCode]);
+  const [remoteSalonLookup, setRemoteSalonLookup] = useState<{ key: string; providers: InspirationSearchProvider[] }>({ key: "", providers: [] });
+  useEffect(() => {
+    const query = searchQuery.trim().replace(/[%_]/g, "").slice(0, 120);
+    if (selectedCategoryId || selectedProviderId || (!query && !selectedCountryCode)) return;
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        let request = client.from("provider_profiles")
+          .select("profile_id,business_name,city,country_code,region,latitude,longitude")
+          .eq("status", "approved")
+          .order("business_name")
+          .limit(30);
+        if (query) request = request.ilike("business_name", `%${query}%`);
+        if (selectedCountryCode) request = request.eq("country_code", selectedCountryCode);
+        const { data, error } = await request.abortSignal(controller.signal);
+        if (controller.signal.aborted || error) return;
+        const providers: InspirationSearchProvider[] = (data ?? []).map(item => ({
+          profileId: item.profile_id, serviceId: "", name: item.business_name,
+          specialty: "Salon de beauté", category: "Beauté",
+          area: [item.city, item.region].filter(Boolean).join(", "),
+          countryCode: item.country_code ?? undefined,
+          coordinates: item.latitude != null && item.longitude != null
+            ? { latitude: Number(item.latitude), longitude: Number(item.longitude) }
+            : undefined,
+        }));
+        setRemoteSalonLookup({ key: salonLookupKey, providers });
+      } catch { /* The searchable starter catalogue remains a safe fallback. */ }
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [salonLookupKey, searchQuery, selectedCategoryId, selectedCountryCode, selectedProviderId]);
+  const remoteSalonProviders = remoteSalonLookup.key === salonLookupKey && !selectedCategoryId && !selectedProviderId
+    ? remoteSalonLookup.providers : [];
+
   const providerOptions = useMemo(() => {
     const unique = new Map<string, InspirationSearchProvider>();
-    for (const provider of location.providers) {
+    for (const provider of [...remoteSalonProviders, ...location.providers]) {
       if (selectedCategoryId && provider.categoryId !== selectedCategoryId) continue;
       if (selectedCountryCode && inspirationCountryCode(provider.countryCode) !== selectedCountryCode) continue;
       if (location.area.trim() && !matchesSearch(location.area, `${provider.area} ${provider.address ?? ""}`)) continue;
@@ -791,8 +830,8 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       if (searchQuery.trim() && !matchesSearch(searchQuery, `${provider.name} ${provider.specialty} ${provider.category} ${provider.area}`)) continue;
       if (!unique.has(provider.profileId)) unique.set(provider.profileId, provider);
     }
-    return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 5);
-  }, [location.area, location.position, location.providers, radiusKm, searchQuery, selectedCategoryId, selectedCountryCode]);
+    return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 20);
+  }, [location.area, location.position, location.providers, radiusKm, remoteSalonProviders, searchQuery, selectedCategoryId, selectedCountryCode]);
 
   function writeSearchUrl(applied: boolean, providerIdOverride = selectedProviderId, push = false) {
     const params = new URLSearchParams();
@@ -851,19 +890,21 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       <form onSubmit={(event) => { event.preventDefault(); applySearch(); }}>
         <label className="inspiration-search-field">{t("Professionnel, salon ou prestation")}<input autoFocus maxLength={120} value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setSelectedProviderId(""); }} placeholder={t("Ex. Aïssatou Beauty, tresses…")} /></label>
         <label className="inspiration-search-field">{t("Prestation")}<select value={selectedCategoryId.startsWith("__") ? "" : selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Toutes les prestations")}</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="inspiration-search-field">{t("Pays")}<select aria-label={t("Pays")} value={selectedCountryCode} onChange={(event) => { setSelectedCountryCode(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Tous les pays avec des professionnels publiés")}</option>{countryOptions.map((code) => <option key={code} value={code}>{inspirationCountryLabel(code, locale)}</option>)}</select></label>
+        <label className="inspiration-search-field">{t("Pays")}<select aria-label={t("Pays")} value={selectedCountryCode} onChange={(event) => { setSelectedCountryCode(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Tous les pays")}</option>{countryOptions.map((code) => <option key={code} value={code}>{inspirationCountryLabel(code, locale)}</option>)}</select></label>
         {categories.length === 0 && <p className="inspiration-search-note">{t("Les catégories publiées seront disponibles dès que le catalogue aura chargé.")}</p>}
         <LocationPicker area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} radiusKm={radiusKm} onRadiusChange={setRadiusKm} />
         {providerOptions.length > 0 && <div className="inspiration-provider-suggestions"><strong>{t("Professionnels correspondants")}</strong>{providerOptions.map((provider) => <button type="button" key={provider.profileId} aria-pressed={selectedProviderId === provider.profileId} onClick={() => openProfessionalFromSearch(provider.profileId)}><span><b>{provider.name}</b><small>{provider.specialty} · {provider.area}</small></span><i>{t("Profil ›")}</i></button>)}</div>}
-        <footer><button type="button" className="inspiration-search-clear" onClick={clearSearch}>{t("Effacer")}</button><button type="submit" className="inspiration-search-submit">{t("Afficher les vidéos")}</button></footer>
+        <footer><button type="button" className="inspiration-search-clear" onClick={clearSearch}>{t("Effacer")}</button><button type="submit" className="inspiration-search-submit">{t("Afficher les résultats")}</button></footer>
       </form>
     </section>
   </div> : null;
 
-  if (state === "loading") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="feed-skeleton" role="status" aria-label={t("Chargement du feed")} /></section>;
-  if (state !== "ready") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="social-feed-empty"><span>▶</span><h1>{state === "error" ? t("Le feed est indisponible") : t("Les premières inspirations arrivent bientôt.")}</h1><p>{state === "error" ? t("Réessayez dans quelques instants.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={state === "error" ? () => void load() : openSearch}>{state === "error" ? t("Réessayer") : t("Rechercher une prestation")}</button></div></section>;
+  const salonResults = !collection && activeSearch && providerOptions.length > 0 ? <section className="inspiration-salon-results" aria-label={t("Salons correspondants")} style={{ padding: "12px 16px" }}><h2 style={{ fontSize: "1rem", marginBottom: 8 }}>{t("Salons et professionnels correspondants")}</h2><div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>{providerOptions.map((provider) => <button type="button" key={provider.profileId} onClick={() => onOpenProvider(provider.profileId)} style={{ flex: "0 0 auto", maxWidth: 240, padding: "10px 14px", borderRadius: 12, border: "1px solid currentColor", background: "transparent", color: "inherit", textAlign: "left" }}><strong style={{ display: "block" }}>{provider.name}</strong><small>{provider.area}</small></button>)}</div></section> : null;
 
-  return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="social-feed" aria-label={t("Vidéos beauté")} onScroll={(event) => { const node=event.currentTarget; const cardHeight=cards.current[0]?.getBoundingClientRect().height ?? node.clientHeight; const index=Math.round(node.scrollTop/Math.max(1,cardHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>
+  if (state === "loading") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}<div className="feed-skeleton" role="status" aria-label={t("Chargement du feed")} /></section>;
+  if (state !== "ready") return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}{salonResults}<div className="social-feed-empty"><span>▶</span><h1>{state === "error" ? t("Le feed est indisponible") : t("Les premières inspirations arrivent bientôt.")}</h1><p>{state === "error" ? t("Réessayez dans quelques instants.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={state === "error" ? () => void load() : openSearch}>{state === "error" ? t("Réessayer") : t("Rechercher une prestation")}</button></div></section>;
+
+  return <section className="social-feed-shell" data-feed-mode={feedMode} lang={locale}>{header}{searchDialog}{salonResults}<div className="social-feed" aria-label={t("Vidéos beauté")} onScroll={(event) => { const node=event.currentTarget; const cardHeight=cards.current[0]?.getBoundingClientRect().height ?? node.clientHeight; const index=Math.round(node.scrollTop/Math.max(1,cardHeight)); if(index!==activeIndex && index>=0 && index<visiblePosts.length) setActiveIndex(index); }}>
     {feedTab === "following" && followingUnavailable && !collection ? <div className="social-feed-empty" role="alert"><h1>{t("Vos abonnements n’ont pas pu être chargés.")}</h1><button type="button" onClick={() => void load()}>{t("Réessayer")}</button></div> : visiblePosts.length === 0 && <div className="social-feed-empty following-empty"><span>♡</span><h1>{activeSearch ? t("Aucune vidéo pour ces filtres") : t(feedTab === "following" ? "Aucune vidéo de vos abonnements pour le moment." : "Les premières inspirations arrivent bientôt.")}</h1><p>{activeSearch ? t("Aucun contenu publié ne correspond à cette prestation, ce professionnel ou cette zone.") : t("Explorez les prestations et les professionnels près de vous.")}</p><button onClick={activeSearch ? clearSearch : openSearch}>{activeSearch ? t("Voir toutes les vidéos") : t("Rechercher une prestation")}</button></div>}
     {visiblePosts.map((post, index) => <article className="social-video-card" data-post-id={post.id} data-video-state={post.postType === "video" ? videoErrors.has(post.id) ? "error" : index === activeIndex && (videoLoading.has(post.id) || videoRefreshing.has(post.id)) ? "loading" : videoReady.has(post.id) ? "ready" : "waiting" : undefined} key={post.id} ref={(node) => { cards.current[index]=node; }} aria-label={`${t("Publication de")} ${post.businessName}`}>
       {post.postType === "video" ? (

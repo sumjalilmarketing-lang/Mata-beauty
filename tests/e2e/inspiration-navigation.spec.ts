@@ -56,11 +56,11 @@ test("Back and Forward restore the applied feed filters", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Rechercher", exact: true }).click();
   await page.getByRole("dialog").getByLabel("Professionnel, salon ou prestation", { exact: true }).fill("tresses");
-  await page.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
+  await page.getByRole("button", { name: "Afficher les résultats", exact: true }).click();
   await expect(page).toHaveURL(/q=tresses/);
   await page.getByRole("button", { name: "Rechercher", exact: true }).click();
   await page.getByRole("dialog").getByLabel("Professionnel, salon ou prestation", { exact: true }).fill("massage");
-  await page.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
+  await page.getByRole("button", { name: "Afficher les résultats", exact: true }).click();
   await expect(page).toHaveURL(/q=massage/);
 
   await page.goBack();
