@@ -47,10 +47,11 @@ export function ProfileStoryRing({
     window.addEventListener("mata:stories:updated", onFocus);
     const timer = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      if (story && Date.parse(story.expiresAt) <= Date.now()) { setStory(null); setViewing(false); }
+      setStory(current => current && Date.parse(current.expiresAt) <= Date.now() ? null : current);
+      setViewing(current => current && cached.get(providerId)?.story && Date.parse(cached.get(providerId)!.story!.expiresAt) <= Date.now() ? false : current);
     }, 1000);
     return () => { alive = false; window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("focus", onFocus); window.removeEventListener("mata:stories:updated", onFocus); };
-  }, [providerId, story]);
+  }, [providerId]);
   const active = story !== null;
   return <>
     <button type="button" className={`${className ?? ""} ${styles.avatarButton} ${active ? styles.active : ""}`}
