@@ -28,7 +28,7 @@ type ConversationRow = {
 type MembershipRow = { conversation_id: string; profile_id: string; last_read_at: string | null };
 type MessageRow = { conversation_id: string; body: string; created_at: string; sender_id: string };
 type ContextRow = { bookingId: string; participantId: string; name: string; avatarUrl: string | null; startsAt: string; status: string; profilePath?: string };
-type Contact = GroupedBookingConversation & { name: string; avatarUrl: string | null; profilePath?: string; participantId?: string };
+type Contact = GroupedBookingConversation & { name: string; avatarUrl: string | null; profilePath?: string };
 
 const emptySubscriptions = new Set<string>();
 
@@ -180,7 +180,7 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true,
           ...group,
           name: group.isGroup ? "Conversation de groupe" : bookingContext?.name ?? "Interlocuteur",
           avatarUrl: group.isGroup ? null : bookingContext?.avatarUrl ?? null,
-          participantId: group.isGroup ? undefined : bookingContext?.participantId,
+          participantId: group.isGroup ? null : bookingContext?.participantId ?? null,
           ...(bookingContext?.profilePath ? { profilePath: bookingContext.profilePath } : {}),
         };
       });
