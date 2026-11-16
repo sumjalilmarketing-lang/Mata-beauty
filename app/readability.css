@@ -461,7 +461,7 @@
   :is(.conversation-panel, .support-thread) .message-composer { grid-template-columns: minmax(0, 1fr); }
   :is(.conversation-panel, .support-thread) .message-composer .primary-button { width: 100%; }
   :is(.conversation-panel, .support-thread) .message-list { padding: 10px; }
-  .workspace-layout:has(.message-composer textarea:focus) .workspace-mobile-nav { display: none; }
+  .workspace-layout:has(.message-composer:focus-within) .workspace-mobile-nav { display: none; }
 }
 
 /* Client privacy settings own both sides of their light-surface contrast.
