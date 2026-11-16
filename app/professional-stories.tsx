@@ -55,7 +55,19 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
       setStories((result.stories ?? []).filter(story => Date.parse(story.expiresAt) > Date.now()));
     } catch { /* Inspiration remains usable if statuses are unavailable. */ }
   }
-  useEffect(() => { const timer = window.setTimeout(() => { void reload(); }, 0); return () => window.clearTimeout(timer); }, []);
+  useEffect(() => {
+    const initial = window.setTimeout(() => { void reload(); }, 0);
+    const refresh = window.setInterval(() => {
+      if (document.visibilityState === "visible") void reload();
+    }, 90_000);
+    const onVisible = () => { if (document.visibilityState === "visible") void reload(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
   useEffect(() => () => { if (previewUrl.current) URL.revokeObjectURL(previewUrl.current); }, []);
 
   function clearDraft() {
