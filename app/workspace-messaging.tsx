@@ -232,13 +232,11 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true,
   }, [contacts, query]);
 
   return <section className={`workspace-content messaging-workspace${selected ? " has-selection" : ""}`}>
-    <div className="workspace-intro"><div><h2>Messages</h2><p>Un fil par interlocuteur, avec les rendez-vous associés.</p></div></div>
     <article className="panel messaging-shell" aria-label="Messagerie">
       <aside className="messaging-sidebar" aria-label="Conversations">
         {!staffMode && <ProfessionalStories key={userId} userId={userId} canPublish={canPublishStatus}
           followed={subscriptions?.userId === userId ? subscriptions.ids : emptySubscriptions}
           onOpenProvider={id => router.push(`/professional/${encodeURIComponent(id)}`)} />}
-        <div className="messaging-sidebar-heading"><h3>Conversations</h3><span>{contacts.length}</span></div>
         <label className="messaging-search"><span aria-hidden="true">⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher un interlocuteur" aria-label="Rechercher un interlocuteur" /></label>
         {error && <p role="alert" className="conversation-error">{error}</p>}
         {loading && <p className="compact-empty">Chargement des conversations…</p>}

@@ -74,6 +74,10 @@ test("approved professional publishes via avatar, views and deletes synthetic me
   await page.goto("/pro/messages");
   const sidebar = page.getByRole("complementary", { name: "Conversations" });
   await expect(sidebar.getByRole("region", { name: "Statuts des professionnels" })).toBeVisible();
+  await expect(sidebar.locator(":scope > :first-child")).toHaveAttribute("aria-label", "Statuts des professionnels");
+  await expect(sidebar.getByRole("textbox", { name: "Rechercher un interlocuteur" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Messages", exact: true, level: 2 })).toHaveCount(0);
+  await expect(sidebar.getByText("Créer", { exact: true })).toBeVisible();
   const add = page.getByRole("button", { name: "Publier un statut" });
   await expect(add).toBeVisible();
   const image = await sharp({ create: { width: 10, height: 10, channels: 4, background: "#eda3ad" } }).png().toBuffer();
@@ -127,9 +131,12 @@ test("followed profiles keep their photos when a status expires", async ({ page,
   await expect(sidebar.getByRole("region", { name: "Statuts des professionnels" })).toBeVisible();
   const bubble = page.getByRole("button", { name: "Voir le statut de Salon suivi" });
   await expect(bubble.locator("img")).toBeVisible();
+  await expect(bubble.locator("span").first()).toHaveCSS("border-top-color", "rgb(237, 113, 31)");
   await expect(page.getByText("Salon non suivi")).toHaveCount(0);
   await bubble.click();
   await expect(page.getByRole("dialog", { name: "Statut de Salon suivi" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Statut de Salon suivi" })).toHaveCount(0, { timeout: 23000 });
-  await expect(page.getByRole("button", { name: "Voir le profil de Salon suivi" }).locator("img")).toBeVisible();
+  const profile = page.getByRole("button", { name: "Voir le profil de Salon suivi" });
+  await expect(profile.locator("img")).toBeVisible();
+  await expect(profile.locator("span").first()).toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
 });
