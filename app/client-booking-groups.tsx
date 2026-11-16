@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { ProfileStoryRing } from "./profile-story-ring";
 import { clientBookingStatusTone, groupClientBookings, type ClientBookingItem } from "@/lib/domain/client-bookings";
 import { ClientBookingReschedule } from "./client-booking-reschedule";
 import { BookingReview } from "./booking-review";
@@ -17,6 +19,7 @@ const money = (amount: number, currency: string) => `${amount.toLocaleString("fr
 const dateTime = (value: string, timeZone = "UTC") => new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(value));
 
 export function ClientBookingGroups({ items, clientId, stats, hasMore, loadingMore, onLoadMore, onMessage, onCancel }: { items: readonly ClientBookingItem[]; clientId: string; stats: { upcoming: number; pending: number; past: number }; hasMore: boolean; loadingMore: boolean; onLoadMore: () => void; onMessage: (booking: ClientBookingItem) => void; onCancel: (booking: ClientBookingItem) => void }) {
+  const router = useRouter();
   const [open, setOpen] = useState<string | null>(null);
   const [rescheduled, setRescheduled] = useState<Record<string, { startsAt: string; endsAt: string; previousStartsAt: string }>>({});
   const groups = groupClientBookings(items.map(item => {
@@ -42,7 +45,7 @@ export function ClientBookingGroups({ items, clientId, stats, hasMore, loadingMo
 
       return <article className="client-booking-card" key={group.id}>
         <div className="client-booking-card__top">
-          {group.providerImage ? <Image className="client-booking-card__avatar" src={group.providerImage} alt="" width={64} height={64} unoptimized /> : <span className="client-booking-card__avatar client-booking-card__avatar--fallback" aria-hidden="true">{group.providerName.slice(0, 1).toLocaleUpperCase("fr")}</span>}
+          <ProfileStoryRing providerId={group.bookings[0].providerId} name={group.providerName} onOpenProfile={profileHref ? () => router.push(profileHref) : undefined}>{group.providerImage ? <Image className="client-booking-card__avatar" src={group.providerImage} alt="" width={64} height={64} unoptimized /> : <span className="client-booking-card__avatar client-booking-card__avatar--fallback" aria-hidden="true">{group.providerName.slice(0, 1).toLocaleUpperCase("fr")}</span>}</ProfileStoryRing>
           <div className="client-booking-card__identity">
             <h3>{profileHref ? <Link href={profileHref}>{group.providerName}</Link> : group.providerName}</h3>
             <p>{group.address ?? "Adresse non renseignée"}</p>
