@@ -158,6 +158,8 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
 
   const grouped = [...new Map(stories.map(story => [story.providerId, story])).values()];
   const viewing = selected;
+  // Do not reserve space in Inspiration when no one has an active status.
+  if (!canPublish && grouped.length === 0) return null;
   return <section className={styles.strip} aria-label="Statuts des professionnels">
     <div className={styles.rail}>
       {canPublish && <button type="button" className={styles.add} aria-label="Publier un statut" onClick={() => fileInput.current?.click()}>
