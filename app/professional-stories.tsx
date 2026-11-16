@@ -55,7 +55,7 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
       setStories((result.stories ?? []).filter(story => Date.parse(story.expiresAt) > Date.now()));
     } catch { /* Inspiration remains usable if statuses are unavailable. */ }
   }
-  useEffect(() => { void reload(); }, []);
+  useEffect(() => { const timer = window.setTimeout(() => { void reload(); }, 0); return () => window.clearTimeout(timer); }, []);
   useEffect(() => () => { if (previewUrl.current) URL.revokeObjectURL(previewUrl.current); }, []);
 
   function clearDraft() {
@@ -104,7 +104,7 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
   }
 
   const grouped = [...new Map(stories.map(story => [story.providerId, story])).values()];
-  const viewing = selected && Date.parse(selected.expiresAt) > Date.now() ? selected : null;
+  const viewing = selected;
   return <section className={styles.strip} aria-label="Statuts des professionnels">
     <div className={styles.rail}>
       {canPublish && <button type="button" className={styles.add} aria-label="Publier un statut" onClick={() => fileInput.current?.click()}>
