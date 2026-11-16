@@ -855,7 +855,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
         {categories.length === 0 && <p className="inspiration-search-note">{t("Les catégories publiées seront disponibles dès que le catalogue aura chargé.")}</p>}
         <LocationPicker area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} radiusKm={radiusKm} onRadiusChange={setRadiusKm} />
         {providerOptions.length > 0 && <div className="inspiration-provider-suggestions"><strong>{t("Professionnels correspondants")}</strong>{providerOptions.map((provider) => <button type="button" key={provider.profileId} aria-pressed={selectedProviderId === provider.profileId} onClick={() => openProfessionalFromSearch(provider.profileId)}><span><b>{provider.name}</b><small>{provider.specialty} · {provider.area}</small></span><i>{t("Profil ›")}</i></button>)}</div>}
-        <footer><button type="button" className="inspiration-search-clear" onClick={clearSearch}>{t("Effacer")}</button><button type="submit" className="inspiration-search-submit">{t("Afficher les vidéos")}</button></footer>
+        <footer><button type="button" className="inspiration-search-clear" onClick={clearSearch}>{t("Effacer")}</button><button type="submit" className="inspiration-search-submit">{t("Afficher les résultats")}</button></footer>
       </form>
     </section>
   </div> : null;
