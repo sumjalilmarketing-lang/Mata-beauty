@@ -165,7 +165,7 @@ test("Inspiration country filter uses public provider ISO codes", async ({ page 
   await expect(page.locator(".social-video-card")).toHaveCount(2, { timeout: 15000 });
   await page.getByRole("button", { name: "Rechercher" }).click();
   await page.getByLabel("Pays", { exact: true }).selectOption("FR");
-  await page.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
+  await page.getByRole("button", { name: "Afficher les résultats", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(1);
   await expect(page.locator(".social-video-card")).toContainText("Studio Paris");
   await expect(page.locator(".social-video-card")).not.toContainText("Studio Dakar");
@@ -297,7 +297,7 @@ test("Inspiration swipes vertically with one active player, filters and an eight
   await page.getByRole("button", { name: "Rechercher" }).click();
   await page.getByRole("dialog").locator("select").first().selectOption("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   await page.getByLabel("Ville, quartier ou pays").fill("Dakar");
-  await page.getByRole("button", { name: "Afficher les vidéos", exact: true }).click();
+  await page.getByRole("button", { name: "Afficher les résultats", exact: true }).click();
   await expect(page.locator(".social-video-card")).toHaveCount(2);
   await expect.poll(() => searchCalls.some(call => call.target_category_id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" && call.target_zone === "Dakar")).toBe(true);
   await expect(page.getByRole("navigation", { name: "Filtres du feed" })).toHaveCount(0);
