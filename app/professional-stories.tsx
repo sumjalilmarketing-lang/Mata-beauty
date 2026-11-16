@@ -78,7 +78,7 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
         return active.length === current.length ? current : active;
       });
       setSelected(current => current && Date.parse(current.expiresAt) <= now ? null : current);
-    }, 15000);
+    }, 1000);
     return () => window.clearInterval(timer);
   }, []);
 
