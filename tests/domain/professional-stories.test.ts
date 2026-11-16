@@ -16,6 +16,12 @@ describe("24-hour professional statuses", () => {
     expect(migration).toMatch(/p\.status = 'approved'/);
     expect(migration).toMatch(/storage\.foldername\(name\)/);
   });
+  it("keeps story media private even under older permissive storage policies", () => {
+    expect(migration).toContain('Professional story private media boundary');
+    expect(migration).toContain('as restrictive for select to authenticated');
+    expect(migration).toContain("bucket_id <> 'professional-stories'");
+    expect(migration).toContain("(storage.foldername(name))[1] = auth.uid()::text");
+  });
   it("never returns expired statuses and creates temporary signed URLs", () => {
     expect(route).toContain('.gt("expires_at", now)');
     expect(route).toContain("createSignedUrl");
