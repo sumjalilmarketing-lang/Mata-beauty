@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { ProfileStoryRing } from "./profile-story-ring";
 import { useRouter } from "next/navigation";
 import { formatServiceMoney } from "@/lib/domain/service-money";
 import Link from "next/link";
@@ -185,7 +186,7 @@ export function PublicSocialProfile({ profile, initialVideoId = null, initialEdi
     <section className={styles.profileCard} aria-label={"Profil " + profile.name}>
       <div className={styles.identityRow}>
         <div className={styles.avatarWrap}>
-          {profile.avatarUrl ? <Image className={styles.avatar} src={profile.avatarUrl} alt={"Photo de " + profile.name} width={112} height={112} unoptimized priority /> : <span className={styles.avatarFallback}>{initials}</span>}
+          {profile.kind === "client" ? (profile.avatarUrl ? <Image className={styles.avatar} src={profile.avatarUrl} alt={"Photo de " + profile.name} width={112} height={112} unoptimized priority /> : <span className={styles.avatarFallback}>{initials}</span>) : <ProfileStoryRing providerId={profile.id} name={profile.name}>{profile.avatarUrl ? <Image className={styles.avatar} src={profile.avatarUrl} alt={"Photo de " + profile.name} width={112} height={112} unoptimized priority /> : <span className={styles.avatarFallback}>{initials}</span>}</ProfileStoryRing>}
           {profile.verified && <span className={styles.verified} aria-label="Profil vérifié">✓</span>}
         </div>
         <div className={styles.identity}>
