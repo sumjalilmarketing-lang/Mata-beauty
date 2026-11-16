@@ -61,6 +61,7 @@ export function BookingMessages({
   const [context, setContext] = useState<{ name: string; startsAt: string; status: string; profilePath?: string | null } | null>(null);
   const [timeZone, setTimeZone] = useState("UTC");
   const [contextError, setContextError] = useState("");
+  const composerReady = Boolean(conversationId) && !loading;
   const sendingRef = useRef(false);
   const loadingOlderRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -229,7 +230,7 @@ export function BookingMessages({
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const client = getSupabaseBrowserClient();
-    if (!client || !conversationId || sendingRef.current) return;
+    if (!client || !conversationId || !composerReady || sendingRef.current) return;
     const form = event.currentTarget;
     const body = String(new FormData(form).get("message") ?? "").trim();
     if (!body) return;
@@ -286,8 +287,8 @@ export function BookingMessages({
     </div>
     {canReply ? <form className="message-composer" onSubmit={event => void sendMessage(event)}>
       <label className="sr-only" htmlFor="booking-message">Votre message</label>
-      <textarea id="booking-message" name="message" required minLength={1} maxLength={4000} rows={2} placeholder="Écrire un message…" disabled={!conversationId || sending} />
-      <button className="primary-button" type="submit" disabled={!conversationId || sending}>{sending ? "Envoi…" : "Envoyer"}</button>
+      <textarea id="booking-message" name="message" required minLength={1} maxLength={4000} rows={2} placeholder="Écrire un message…" disabled={!composerReady || sending} />
+      <button className="primary-button" type="submit" disabled={!composerReady || sending}>{sending ? "Envoi…" : "Envoyer"}</button>
     </form> : <p className="salon-feedback">Accès en lecture seule : votre rôle ne permet pas de répondre.</p>}
   </article>;
 }

@@ -186,15 +186,15 @@ export function ProfessionalStories({ userId, canPublish, followed, onOpenProvid
         <button type="button" className={styles.item} aria-label={ownStory ? "Voir mon statut" : "Mon profil"}
           onClick={() => ownStory ? setSelected(ownStory) : onOpenProvider(userId)}>
           <span className={ownStory ? styles.ring : styles.plain}><ProfilePhoto profile={ownProfile} /></span>
-          <small>Mon statut</small>
+          <small>{ownStory ? "Mon statut" : "Créer"}</small>
         </button>
-        <button type="button" className={styles.plus} aria-label="Publier un statut" onClick={() => fileInput.current?.click()}>+</button>
+        <button type="button" className={styles.plus} aria-label="Publier un statut" onClick={() => fileInput.current?.click()}><span aria-hidden="true">+</span></button>
       </div>}
-      <input ref={fileInput} className={styles.hidden} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+      <input ref={fileInput} className={styles.hidden} type="file" tabIndex={-1} accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
         onChange={event => { void pickFile(event.target.files?.[0]); event.target.value = ""; }} aria-label="Choisir une photo ou vidéo pour votre statut" />
       {followedProfiles.map(profile => {
         const story = latest.get(profile.providerId);
-        return <button key={profile.providerId} type="button" className={styles.item}
+        return <button key={profile.providerId} type="button" className={styles.item} title={profile.name}
           aria-label={story ? `Voir le statut de ${profile.name}` : `Voir le profil de ${profile.name}`}
           onClick={() => { setError(""); if (story) setSelected(story); else onOpenProvider(profile.providerId); }}>
           <span className={story ? styles.ring : styles.plain}><ProfilePhoto profile={profile} /></span>
