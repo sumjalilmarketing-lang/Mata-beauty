@@ -98,7 +98,7 @@ test("approved professional publishes via avatar, views and deletes synthetic me
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("unapproved synthetic professional cannot upload a status", async ({ page, context }) => {
+test("professional sees an error when status upload is denied", async ({ page, context }) => {
   await qaLogin(context, "provider");
   const posts: FixtureStory[] = [];
   await mockStories(page, posts, { rejectUpload: true });

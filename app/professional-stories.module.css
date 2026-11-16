@@ -3,3 +3,5 @@
 .own{position:relative;flex:none}
 .plain{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;border:1px solid #574655}
 .plus{position:absolute;top:44px;right:3px;display:grid;place-items:center;width:23px;height:23px;padding:0;border:2px solid #17121a;border-radius:50%;background:#e72f8c;color:white;font-size:17px;line-height:1;cursor:pointer}
+
+.strip > .error { color: #8f194f; }
