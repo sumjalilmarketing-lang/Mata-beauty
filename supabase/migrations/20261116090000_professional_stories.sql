@@ -51,6 +51,15 @@ create policy "Professional story owners read their private media"
 on storage.objects for select to authenticated
 using (bucket_id = 'professional-stories' and (storage.foldername(name))[1] = auth.uid()::text);
 
+-- Other historical storage.objects SELECT policies have broad permissive
+-- conditions for buckets they were not designed to protect. PostgreSQL ORs
+-- permissive policies. Without this restrictive boundary authenticated users
+-- could read or sign another professional's private story object.
+create policy "Professional story private media boundary"
+on storage.objects as restrictive for select to authenticated
+using (bucket_id <> 'professional-stories'
+  or (storage.foldername(name))[1] = auth.uid()::text);
+
 create policy "Professional story owners remove their media"
 on storage.objects for delete to authenticated
 using (bucket_id = 'professional-stories' and (storage.foldername(name))[1] = auth.uid()::text);
