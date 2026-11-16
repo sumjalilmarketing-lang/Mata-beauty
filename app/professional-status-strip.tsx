@@ -135,8 +135,7 @@ export function ProfessionalStatusStrip({
   useEffect(() => {
     const client = getSupabaseBrowserClient();
     if (!client || !authenticated?.roles.includes("provider")) {
-      setCanPublish(false);
-      setMyAvatar(null);
+      queueMicrotask(() => { setCanPublish(false); setMyAvatar(null); });
       return;
     }
     let active = true;
@@ -170,8 +169,7 @@ export function ProfessionalStatusStrip({
     const client = getSupabaseBrowserClient();
     if (!client) return;
     let live = true;
-    setSignedUrl("");
-    setLoadingMedia(true);
+    queueMicrotask(() => { if (live) { setSignedUrl(""); setLoadingMedia(true); } });
     void client.storage.from(BUCKET).createSignedUrl(current.media_path, 90)
       .then(({ data, error: signError }) => {
         if (!live) return;
@@ -206,9 +204,9 @@ export function ProfessionalStatusStrip({
   }, [provider, selectedFile, next]);
 
   useEffect(() => {
-    if (!selectedFile) { setPreviewUrl(""); return; }
+    if (!selectedFile) { queueMicrotask(() => setPreviewUrl("")); return; }
     const url = URL.createObjectURL(selectedFile);
-    setPreviewUrl(url);
+    queueMicrotask(() => setPreviewUrl(url));
     return () => URL.revokeObjectURL(url);
   }, [selectedFile]);
 
