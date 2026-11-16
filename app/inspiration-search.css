@@ -43,3 +43,27 @@
   .inspiration-search-dialog form>footer{margin-inline:-18px;padding-inline:18px}
   .inspiration-search-dialog .location-picker>div{align-items:flex-start;flex-direction:column}
 }
+
+/* Status bubbles sit beneath the floating Inspiration header and above the feed.
+   The feed must shrink rather than allowing the header to cover mobile tap targets. */
+.social-feed-shell:has(> nav[aria-label="Statuts des professionnels"]) {
+  display: flex;
+  flex-direction: column;
+}
+.social-feed-shell > nav[aria-label="Statuts des professionnels"] {
+  box-sizing: border-box;
+  width: min(100%, 520px);
+  max-width: 100%;
+  margin: 108px auto 0;
+  position: relative;
+  z-index: 13;
+  flex: none;
+}
+.social-feed-shell > .social-feed-header:has(.inspiration-active-filters) + nav[aria-label="Statuts des professionnels"] {
+  margin-top: 128px;
+}
+.social-feed-shell:has(> nav[aria-label="Statuts des professionnels"]) > .social-feed {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
