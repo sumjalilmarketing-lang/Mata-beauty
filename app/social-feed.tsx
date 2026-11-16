@@ -8,6 +8,7 @@ import { discoverFeed, videoTopics, videoInterestAffinity, type DiscoveryTopic }
 import type { CatalogCategory } from "@/lib/supabase/catalog";
 import { filterInspirationPosts, type InspirationSearchProvider } from "@/lib/domain/inspiration-search";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { SUPPORTED_COUNTRIES } from "@/lib/domain/international";
 import { recordSessionMetric } from "@/lib/analytics/session-metric";
 import { readBrowserStorage, writeBrowserStorage } from "@/lib/browser-storage";
 import type { AuthenticatedProfile } from "./auth-modal";
@@ -775,7 +776,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
   const countryLabel = inspirationCountryLabel(selectedCountryCode, locale);
   const selectedProvider = location.providers.find((item) => item.profileId === selectedProviderId);
   const countryOptions = useMemo(() => {
-    const codes = [...new Set(location.providers.map(provider => inspirationCountryCode(provider.countryCode)).filter(Boolean))];
+    const codes = [...new Set([...SUPPORTED_COUNTRIES.map(country => country.code), ...location.providers.map(provider => inspirationCountryCode(provider.countryCode)).filter(Boolean)])];
     return codes.sort((left, right) => inspirationCountryLabel(left, locale).localeCompare(inspirationCountryLabel(right, locale), locale));
   }, [location.providers, locale]);
   // Search the approved salon directory directly. The startup catalogue intentionally
@@ -889,7 +890,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       <form onSubmit={(event) => { event.preventDefault(); applySearch(); }}>
         <label className="inspiration-search-field">{t("Professionnel, salon ou prestation")}<input autoFocus maxLength={120} value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setSelectedProviderId(""); }} placeholder={t("Ex. Aïssatou Beauty, tresses…")} /></label>
         <label className="inspiration-search-field">{t("Prestation")}<select value={selectedCategoryId.startsWith("__") ? "" : selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Toutes les prestations")}</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="inspiration-search-field">{t("Pays")}<select aria-label={t("Pays")} value={selectedCountryCode} onChange={(event) => { setSelectedCountryCode(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Tous les pays avec des professionnels publiés")}</option>{countryOptions.map((code) => <option key={code} value={code}>{inspirationCountryLabel(code, locale)}</option>)}</select></label>
+        <label className="inspiration-search-field">{t("Pays")}<select aria-label={t("Pays")} value={selectedCountryCode} onChange={(event) => { setSelectedCountryCode(event.target.value); setSelectedProviderId(""); }}><option value="">{t("Tous les pays")}</option>{countryOptions.map((code) => <option key={code} value={code}>{inspirationCountryLabel(code, locale)}</option>)}</select></label>
         {categories.length === 0 && <p className="inspiration-search-note">{t("Les catégories publiées seront disponibles dès que le catalogue aura chargé.")}</p>}
         <LocationPicker area={location.area} position={location.position} suggestions={[...new Set(location.providers.flatMap((provider) => provider.area.split(",").map((part) => part.trim())).filter(Boolean))]} onChange={location.onChange} radiusKm={radiusKm} onRadiusChange={setRadiusKm} />
         {providerOptions.length > 0 && <div className="inspiration-provider-suggestions"><strong>{t("Professionnels correspondants")}</strong>{providerOptions.map((provider) => <button type="button" key={provider.profileId} aria-pressed={selectedProviderId === provider.profileId} onClick={() => openProfessionalFromSearch(provider.profileId)}><span><b>{provider.name}</b><small>{provider.specialty} · {provider.area}</small></span><i>{t("Profil ›")}</i></button>)}</div>}
