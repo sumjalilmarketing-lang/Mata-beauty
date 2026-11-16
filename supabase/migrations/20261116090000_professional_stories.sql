@@ -47,6 +47,10 @@ with check (bucket_id = 'professional-stories'
   and (storage.foldername(name))[1] = auth.uid()::text
   and exists (select 1 from public.provider_profiles p where p.profile_id = auth.uid() and p.status = 'approved')
 );
+create policy "Professional story owners read their private media"
+on storage.objects for select to authenticated
+using (bucket_id = 'professional-stories' and (storage.foldername(name))[1] = auth.uid()::text);
+
 create policy "Professional story owners remove their media"
 on storage.objects for delete to authenticated
 using (bucket_id = 'professional-stories' and (storage.foldername(name))[1] = auth.uid()::text);
