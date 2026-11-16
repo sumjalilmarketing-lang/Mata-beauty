@@ -4,6 +4,7 @@ create table if not exists public.professional_statuses (
   id uuid primary key default gen_random_uuid(),
   provider_id uuid not null references public.provider_profiles(profile_id) on delete cascade,
   media_kind text not null check (media_kind in ('image', 'video')),
+  media_format text not null check (media_format in ('jpg','mp4','mov','webm')),
   media_path text not null unique,
   caption text not null default '' check (char_length(caption) <= 180),
   created_at timestamptz not null default now(),
@@ -11,7 +12,11 @@ create table if not exists public.professional_statuses (
   hidden_at timestamptz,
   constraint professional_status_path_valid check (
     media_path = provider_id::text || '/' || id::text ||
-    case when media_kind = 'image' then '.jpg' else '.mp4' end
+    '.' || media_format
+  ),
+  constraint professional_status_media_match check (
+    (media_kind='image' and media_format='jpg') or
+    (media_kind='video' and media_format in ('mp4','mov','webm'))
   ),
   constraint professional_status_lifetime check (
     expires_at > created_at and expires_at <= created_at + interval '24 hours'
@@ -93,7 +98,7 @@ grant insert,delete on public.professional_statuses to authenticated;
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values (
   'professional-status-media','professional-status-media',false,20971520,
-  array['image/jpeg','video/mp4']
+  array['image/jpeg','video/mp4','video/quicktime','video/webm']
 ) on conflict (id) do nothing;
 
 drop policy if exists "professional status authorized read" on storage.objects;
@@ -132,7 +137,7 @@ for delete to authenticated using (
 -- A slim public feed, independent of social video posts.
 create or replace view public.active_professional_statuses
 with (security_invoker=true) as
-select s.id,s.provider_id,s.media_kind,s.media_path,s.caption,s.created_at,s.expires_at,
+select s.id,s.provider_id,s.media_kind,s.media_format,s.media_path,s.caption,s.created_at,s.expires_at,
        pp.business_name,pp.slug,pp.city,account.avatar_url
 from public.professional_statuses s
 join public.provider_profiles pp on pp.profile_id=s.provider_id and pp.status='approved'
