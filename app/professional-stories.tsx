@@ -156,7 +156,14 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
     } finally { setRemoving(false); }
   }
 
-  const grouped = [...new Map(stories.map(story => [story.providerId, story])).values()];
+  // API orders newest first. Keep the first active item per provider, not the last.
+  // Map(stories) would overwrite newer stories with older ones from the same salon.
+  const seenProviders = new Set<string>();
+  const grouped = stories.filter(story => {
+    if (seenProviders.has(story.providerId)) return false;
+    seenProviders.add(story.providerId);
+    return true;
+  });
   const viewing = selected;
   // Do not reserve space in Inspiration when no one has an active status.
   if (!canPublish && grouped.length === 0) return null;
