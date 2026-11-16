@@ -108,6 +108,7 @@ export function ProfessionalStatusStrip({
   const [previewUrl, setPreviewUrl] = useState("");
   const [caption, setCaption] = useState("");
   const [publishing, setPublishing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
@@ -249,6 +250,25 @@ export function ProfessionalStatusStrip({
     } finally { setPublishing(false); }
   }
 
+  async function removeOwnStatus() {
+    if (!authenticated || !current || current.provider_id !== authenticated.userId || deleting) return;
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const removed = await client.storage.from(BUCKET).remove([current.media_path]);
+      if (removed.error) throw new Error("Impossible de retirer cette vidéo ou photo.");
+      const deleted = await client.from("professional_statuses").delete()
+        .eq("id", current.id).eq("provider_id", authenticated.userId);
+      if (deleted.error) throw new Error("Le statut n'a pas pu être retiré. Réessayez.");
+      setProvider(null); setIndex(0);
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "La suppression a échoué.");
+    } finally { setDeleting(false); }
+  }
+
   function openStatus(id: string) {
     setProvider(id); setIndex(0); setError("");
   }
@@ -294,8 +314,8 @@ export function ProfessionalStatusStrip({
           type="button" aria-label="Fermer" disabled={publishing} onClick={closeDialog}>×</button></div>
         <div className={styles.media}>
           {isPhoto(selectedFile)
-            ? <Image src={previewUrl} width={420} height={620} unoptimized alt="Aperçu de la photo" />
-            : <video src={previewUrl} controls playsInline aria-label="Aperçu de la vidéo" />}
+            ? (previewUrl ? <Image src={previewUrl} width={420} height={620} unoptimized alt="Aperçu de la photo" /> : <p>Préparation de la photo…</p>)
+            : (previewUrl ? <video src={previewUrl} controls playsInline aria-label="Aperçu de la vidéo" /> : <p>Préparation de la vidéo…</p>)}
         </div>
         <form className={styles.form} onSubmit={event => { event.preventDefault(); void publish(); }}>
           <label>Ajouter un message (facultatif)<input type="text" value={caption} maxLength={180}
@@ -332,6 +352,10 @@ export function ProfessionalStatusStrip({
           <button type="button" className={styles.action} onClick={() => {
             const id = current.provider_id; closeDialog(); onOpenProvider(id);
           }}>Voir le salon et réserver</button>
+          {authenticated?.userId === current.provider_id && <button type="button"
+            disabled={deleting} className={styles.action} onClick={() => void removeOwnStatus()}>
+            {deleting ? "Suppression…" : "Supprimer"}
+          </button>}
           <button type="button" className={styles.action} onClick={next}>
             {index + 1 === group.length ? "Terminer" : "Suivant"}
           </button>
