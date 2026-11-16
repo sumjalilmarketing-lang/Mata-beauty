@@ -3,6 +3,7 @@
 import { feedProfilePath } from "@/lib/domain/feed-profile-path";
 
 import Image from "next/image";
+import { ProfileStoryRing } from "./profile-story-ring";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { discoverFeed, videoTopics, videoInterestAffinity, type DiscoveryTopic } from "@/lib/domain/social-feed";
 import type { CatalogCategory } from "@/lib/supabase/catalog";
@@ -994,7 +995,7 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       <div className="video-progress" role="progressbar" aria-label={t("Progression de la vidéo")} aria-valuenow={Math.round((progress[post.id] ?? 0)*100)}><i style={{ transform: `scaleX(${progress[post.id] ?? 0})` }} /></div>
       {post.postType === "video" && !videoErrors.has(post.id) && <><button className="play-toggle" aria-label={t(pausedPosts.has(post.id) ? t("Lire la vidéo") : t("Mettre la vidéo en pause"))} onClick={() => { const next = new Set(pausedPosts); const video = videos.current[index]; if (next.has(post.id)) { next.delete(post.id); void video?.play().catch(() => undefined); } else { next.add(post.id); video?.pause(); } setPausedPosts(next); }}>{pausedPosts.has(post.id) && index===activeIndex ? "▶" : ""}</button><button className="sound-toggle" aria-label={t(muted ? t("Activer le son") : t("Couper le son"))} onClick={() => setMuted((value) => !value)}>{muted ? "♩×" : "♩"}</button></>}
       <aside className="social-actions" aria-label={t("Interactions de la publication")}>
-        <button className="creator-orb" aria-label={`${t("Profil de")} ${post.businessName}`} onClick={() => void openProvider(post)}>{post.avatarUrl ? <Image src={post.avatarUrl} alt="" width={50} height={50} unoptimized /> : post.businessName.slice(0,2).toUpperCase()}</button>
+        <ProfileStoryRing className="creator-orb" providerId={post.authorId} name={post.businessName} onOpenProfile={() => void openProvider(post)}>{post.avatarUrl ? <Image src={post.avatarUrl} alt="" width={50} height={50} unoptimized /> : post.businessName.slice(0,2).toUpperCase()}</ProfileStoryRing>
         <button disabled={authPending || socialBusy.has(`like:${post.id}`)} aria-pressed={liked.has(post.id)} className={liked.has(post.id) ? "active" : ""} aria-label={t("J’aime")} onClick={() => void toggle("like",post)}>♥</button>
         <button disabled={authPending} aria-label={t("Commentaires")} onClick={() => void openComments(post)}>◌</button>
         <button disabled={authPending} aria-label={t("Partager")} onClick={() => void share(post)}>↗</button>
