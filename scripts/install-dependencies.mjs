@@ -24,6 +24,28 @@ try {
       console.log('Using verified runner FFmpeg binary for CI.');
     }
   }
+  if (!source && process.env.CI === 'true') {
+    // Hosted Ubuntu 26 runners do not consistently include ffmpeg.
+    // Their apt repository avoids the GitHub release-assets API (403).
+    const sudo = spawnSync('sh', ['-c', 'command -v sudo'], { encoding: 'utf8' });
+    if (sudo.status === 0) {
+      const update = spawnSync('sudo', ['apt-get', 'update', '-qq'], {
+        stdio: 'inherit', timeout: 120000, env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' },
+      });
+      if (update.status === 0) {
+        const install = spawnSync('sudo', ['apt-get', 'install', '-y', '-qq', 'ffmpeg'], {
+          stdio: 'inherit', timeout: 120000, env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' },
+        });
+        if (install.status === 0) {
+          const probe = spawnSync('/usr/bin/ffmpeg', ['-version'], { encoding: 'utf8' });
+          if (probe.status === 0 && /^ffmpeg version /m.test(probe.stdout ?? '')) {
+            source = '/usr/bin/ffmpeg';
+            console.log('Using runner package-manager FFmpeg for CI.');
+          }
+        }
+      }
+    }
+  }
   if (!source) {
     const archive = join(directory, 'ffmpeg.gz');
     const binary = join(directory, 'ffmpeg');
