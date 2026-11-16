@@ -7,6 +7,8 @@ const api = process.env.MATA_SUPABASE_FIXTURE_ORIGIN;
 const ownerId = syntheticSession("provider").user.id;
 const fakeImage = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 const fakeId = "00000000-0000-4000-8000-000000009701";
+const followedId = "00000000-0000-4000-8000-000000009702";
+const otherId = "00000000-0000-4000-8000-000000009703";
 const fakePath = `${ownerId}/00000000-0000-4000-8000-000000009701.png`;
 
 type FixtureStory = {
@@ -33,9 +35,16 @@ function story(expiresAt = new Date(Date.now() + 86400000).toISOString()): Fixtu
 }
 
 async function mockStories(page: Page, stories: FixtureStory[], options: { rejectUpload?: boolean } = {}) {
-  await page.route("**/api/public/stories", route => route.fulfill({
-    status: 200, contentType: "application/json", body: JSON.stringify({ stories }),
-  }));
+  await page.route(`${api}/rest/v1/follows**`, route => route.fulfill({ json: [{ followed_provider_id: followedId }] }));
+  await page.route("**/api/public/stories?*", route => {
+    const ids = new URL(route.request().url()).searchParams.get("providers")?.split(",") ?? [];
+    const profiles = [
+      { providerId: ownerId, name: "Salon fictif QA", avatar: fakeImage },
+      { providerId: followedId, name: "Salon suivi", avatar: fakeImage },
+      { providerId: otherId, name: "Salon non suivi", avatar: fakeImage },
+    ];
+    return route.fulfill({ json: { stories, profiles: profiles.filter(profile => ids.includes(profile.providerId)) } });
+  });
   await page.route(`${api}/storage/v1/object/professional-stories/**`, route => {
     if (options.rejectUpload) return route.fulfill({ status: 403, json: { message: "Approval required" } });
     return route.fulfill({ status: 200, json: { Key: fakePath } });
@@ -73,7 +82,7 @@ test("approved professional publishes via avatar, views and deletes synthetic me
   await expect(draft).toBeVisible();
   await draft.getByRole("button", { name: "Publier · 24 h" }).click();
   await expect(draft).toHaveCount(0);
-  const bubble = page.getByRole("button", { name: "Voir le statut de Salon fictif QA" });
+  const bubble = page.getByRole("button", { name: "Voir mon statut" });
   await expect(bubble).toBeVisible();
   await bubble.click();
   const viewer = page.getByRole("dialog", { name: "Statut de Salon fictif QA" });
@@ -82,6 +91,7 @@ test("approved professional publishes via avatar, views and deletes synthetic me
   await viewer.getByRole("button", { name: "Supprimer mon statut" }).click();
   await expect(viewer).toHaveCount(0);
   await expect(bubble).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Mon profil" }).locator("img")).toBeVisible();
   expect(posts).toHaveLength(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
@@ -102,14 +112,18 @@ test("unapproved synthetic professional cannot upload a status", async ({ page, 
   expect(posts).toHaveLength(0);
 });
 
-test("expired statuses are hidden and open viewers close when 24 hours elapse", async ({ page }) => {
-  const posts: FixtureStory[] = [story(new Date(Date.now() + 4000).toISOString())];
+test("followed profiles keep their photos when a status expires", async ({ page, context }) => {
+  await qaLogin(context, "provider");
+  const posts: FixtureStory[] = [{
+    ...story(new Date(Date.now() + 18000).toISOString()), providerId: followedId, name: "Salon suivi",
+  }, { ...story(), providerId: otherId, name: "Salon non suivi" }];
   await mockStories(page, posts);
   await page.goto("/");
-  const bubble = page.getByRole("button", { name: "Voir le statut de Salon fictif QA" });
-  await expect(bubble).toBeVisible();
+  const bubble = page.getByRole("button", { name: "Voir le statut de Salon suivi" });
+  await expect(bubble.locator("img")).toBeVisible();
+  await expect(page.getByText("Salon non suivi")).toHaveCount(0);
   await bubble.click();
-  await expect(page.getByRole("dialog", { name: "Statut de Salon fictif QA" })).toBeVisible();
-  await expect(page.getByRole("dialog", { name: "Statut de Salon fictif QA" })).toHaveCount(0, { timeout: 12000 });
-  await expect(bubble).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Statut de Salon suivi" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Statut de Salon suivi" })).toHaveCount(0, { timeout: 23000 });
+  await expect(page.getByRole("button", { name: "Voir le profil de Salon suivi" }).locator("img")).toBeVisible();
 });
