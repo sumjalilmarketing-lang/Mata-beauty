@@ -15,7 +15,10 @@ import { useApplicationLocale } from "./use-application-locale";
 import { type ReactNode, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { AuthModal, type AuthenticatedProfile } from "./auth-modal";
-import { LiveDashboard } from "./live-dashboard";
+import dynamic from "next/dynamic";
+const LiveDashboard = dynamic(() => import("./live-dashboard").then((module) => module.LiveDashboard), {
+  loading: () => <p role="status" aria-live="polite">Ouverture de votre espace…</p>,
+});
 import { SocialFeed } from "./social-feed";
 import { LocationPicker } from "./location-picker";
 import { distanceKm, matchesSearch, type Coordinates } from "@/lib/domain/location";
