@@ -86,6 +86,20 @@ test("approved professional publishes via avatar, views and deletes synthetic me
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test("a salon bubble opens its newest active status when multiple exist", async ({ page }) => {
+  const newest = { ...story(), id: "00000000-0000-4000-8000-000000009702", caption: "Statut récent" };
+  const older = { ...story(), id: "00000000-0000-4000-8000-000000009703", caption: "Statut ancien" };
+  const posts: FixtureStory[] = [newest, older];
+  await mockStories(page, posts);
+  await page.goto("/");
+  const bubble = page.getByRole("button", { name: "Voir le statut de Salon fictif QA" });
+  await expect(bubble).toHaveCount(1);
+  await bubble.click();
+  const viewer = page.getByRole("dialog", { name: "Statut de Salon fictif QA" });
+  await expect(viewer).toContainText("Statut récent");
+  await expect(viewer).not.toContainText("Statut ancien");
+});
+
 test("unapproved synthetic professional cannot upload a status", async ({ page, context }) => {
   await qaLogin(context, "provider");
   const posts: FixtureStory[] = [];
