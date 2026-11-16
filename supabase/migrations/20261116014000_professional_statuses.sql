@@ -128,5 +128,17 @@ for delete to authenticated using (
   bucket_id='professional-status-media' and
   (storage.foldername(name))[1]=auth.uid()::text
 );
+
+-- A slim public feed, independent of social video posts.
+create or replace view public.active_professional_statuses
+with (security_invoker=true) as
+select s.id,s.provider_id,s.media_kind,s.media_path,s.caption,s.created_at,s.expires_at,
+       pp.business_name,pp.slug,pp.city,account.avatar_url
+from public.professional_statuses s
+join public.provider_profiles pp on pp.profile_id=s.provider_id and pp.status='approved'
+join public.profiles account on account.id=s.provider_id and not account.is_suspended
+where s.hidden_at is null and s.created_at<=now() and s.expires_at>now();
+grant select on public.active_professional_statuses to anon,authenticated;
+
 -- Expired entries are hidden by SQL immediately. Physical storage cleanup
 -- requires a separately deployed service-role job (not a SQL metadata delete).
