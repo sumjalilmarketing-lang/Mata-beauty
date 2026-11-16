@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProfessionalStories } from "./professional-stories";
+import { ProfileStoryRing } from "./profile-story-ring";
 import { BookingMessages } from "./booking-messages";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { publicErrorMessage } from "@/lib/ui/public-error";
@@ -27,7 +28,7 @@ type ConversationRow = {
 type MembershipRow = { conversation_id: string; profile_id: string; last_read_at: string | null };
 type MessageRow = { conversation_id: string; body: string; created_at: string; sender_id: string };
 type ContextRow = { bookingId: string; participantId: string; name: string; avatarUrl: string | null; startsAt: string; status: string; profilePath?: string };
-type Contact = GroupedBookingConversation & { name: string; avatarUrl: string | null; profilePath?: string };
+type Contact = GroupedBookingConversation & { name: string; avatarUrl: string | null; profilePath?: string; participantId?: string };
 
 const emptySubscriptions = new Set<string>();
 
@@ -179,6 +180,7 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true,
           ...group,
           name: group.isGroup ? "Conversation de groupe" : bookingContext?.name ?? "Interlocuteur",
           avatarUrl: group.isGroup ? null : bookingContext?.avatarUrl ?? null,
+          participantId: group.isGroup ? undefined : bookingContext?.participantId,
           ...(bookingContext?.profilePath ? { profilePath: bookingContext.profilePath } : {}),
         };
       });
@@ -243,11 +245,16 @@ export function WorkspaceMessaging({ userId, staffMode = false, canReply = true,
         {!loading && !error && filteredContacts.length === 0 && <p className="compact-empty">{query ? "Aucun interlocuteur ne correspond." : "Aucune conversation pour le moment."}</p>}
         <div className="messaging-contact-list">
           {filteredContacts.map(contact => {
-            return <button key={contact.key} type="button" className={`messaging-contact${selected?.key === contact.key ? " selected" : ""}`} aria-current={selected?.key === contact.key ? "true" : undefined} onClick={() => setSelected(contact)}>
-              <span className="messaging-avatar">{contact.avatarUrl ? <Image src={contact.avatarUrl} alt="" width={48} height={48} unoptimized /> : <span aria-hidden="true">{contact.name.slice(0, 1).toLocaleUpperCase("fr")}</span>}</span>
-              <span className="messaging-contact-copy"><strong>{contact.name}</strong><small>{contact.preview ?? "Aucun message"}</small></span>
-              <span className="messaging-contact-meta"><time dateTime={contact.latestActivityAt}>{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(new Date(contact.latestActivityAt))}</time>{contact.unreadCount > 0 && <span className="messaging-unread-count" aria-label={`${contact.unreadCount} messages non lus`}>{contact.unreadCount > 99 ? "99+" : contact.unreadCount}</span>}{contact.bookings.length > 1 && <small>{contact.bookings.length} rendez-vous</small>}</span>
-            </button>;
+            return <div key={contact.key} className={`messaging-contact${selected?.key === contact.key ? " selected" : ""}`} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {contact.participantId ? <ProfileStoryRing providerId={contact.participantId} name={contact.name} className="messaging-avatar"
+                onOpenProfile={() => setSelected(contact)}>{contact.avatarUrl ? <Image src={contact.avatarUrl} alt="" width={48} height={48} unoptimized /> : <span aria-hidden="true">{contact.name.slice(0, 1).toLocaleUpperCase("fr")}</span>}</ProfileStoryRing>
+                : <span className="messaging-avatar">{contact.avatarUrl ? <Image src={contact.avatarUrl} alt="" width={48} height={48} unoptimized /> : <span aria-hidden="true">{contact.name.slice(0, 1).toLocaleUpperCase("fr")}</span>}</span>}
+              <button type="button" aria-current={selected?.key === contact.key ? "true" : undefined} aria-label={`Ouvrir la conversation avec ${contact.name}`}
+                onClick={() => setSelected(contact)} style={{ display: "flex", flex: 1, minWidth: 0, alignItems: "center", gap: 10, textAlign: "left", border: 0, padding: 0, background: "transparent", color: "inherit", cursor: "pointer" }}>
+                <span className="messaging-contact-copy"><strong>{contact.name}</strong><small>{contact.preview ?? "Aucun message"}</small></span>
+                <span className="messaging-contact-meta"><time dateTime={contact.latestActivityAt}>{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(new Date(contact.latestActivityAt))}</time>{contact.unreadCount > 0 && <span className="messaging-unread-count" aria-label={`${contact.unreadCount} messages non lus`}>{contact.unreadCount > 99 ? "99+" : contact.unreadCount}</span>}{contact.bookings.length > 1 && <small>{contact.bookings.length} rendez-vous</small>}</span>
+              </button>
+            </div>;
           })}
         </div>
       </aside>
