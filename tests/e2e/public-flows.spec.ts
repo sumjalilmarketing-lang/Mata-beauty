@@ -30,6 +30,7 @@ test.beforeEach(async ({ page }) => {
   // non-routable, so leaving these reads unmocked leaves the UI in loading.
   await page.route(`${testSupabaseOrigin}/rest/v1/provider_services**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.route(`${testSupabaseOrigin}/rest/v1/social_feed**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.route(`${testSupabaseOrigin}/rest/v1/active_professional_statuses**`, route => route.fulfill({ json: [] }));
   await page.route(`${testSupabaseOrigin}/rest/v1/promotions**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.route(`${testSupabaseOrigin}/rest/v1/rpc/**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: route.request().url().includes("get_available_slots") ? "[]" : "null" }));
   page.on("pageerror", (error) => { throw error; });
