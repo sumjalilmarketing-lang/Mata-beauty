@@ -171,6 +171,38 @@ test("Inspiration country filter uses public provider ISO codes", async ({ page 
   await expect(page.locator(".social-video-card")).not.toContainText("Studio Dakar");
 });
 
+test("a named French salon without video is discoverable beyond the initial catalogue", async ({ page }) => {
+  await page.route(`${testSupabaseOrigin}/rest/v1/provider_profiles**`, route => {
+    const request = new URL(route.request().url());
+    const searched = request.searchParams.has("business_name");
+    if (searched) return route.fulfill({ json: [{
+      profile_id: "99999999-9999-4999-8999-999999999999",
+      business_name: "Mata Paris", city: "Paris", region: "Île-de-France",
+      country_code: "FR", latitude: null, longitude: null,
+    }] });
+    return route.fulfill({ json: [{
+      profile_id: "11111111-1111-4111-8111-111111111111",
+      business_name: "Atelier Dakar", city: "Dakar", country_code: "SN",
+      service_mode: "salon", average_rating: 0, review_count: 0, verified_at: null,
+      cover_url: null, provider_services: [{
+        id: "22222222-2222-4222-8222-222222222222",
+        title: "Tresses", duration_minutes: 60, price_amount: 10000,
+        services: { name: "Tresses", categories: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tresses" } },
+      }],
+    }] });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Rechercher", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Que souhaitez-vous découvrir ?" });
+  await dialog.getByLabel("Professionnel, salon ou prestation", { exact: true }).fill("Mata");
+  await dialog.getByLabel("Pays", { exact: true }).selectOption("FR");
+  await expect(dialog.getByRole("button", { name: /Mata Paris/ })).toBeVisible({ timeout: 15000 });
+  await dialog.getByRole("button", { name: "Afficher les résultats", exact: true }).click();
+  const results = page.getByRole("region", { name: "Salons correspondants" });
+  await expect(results.getByRole("button", { name: /Mata Paris/ })).toBeVisible();
+  await expect(page.locator(".social-video-card")).toHaveCount(0);
+});
+
 test("primary mobile navigation keeps comfortable touch targets", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/");
