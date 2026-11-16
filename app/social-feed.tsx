@@ -778,9 +778,47 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
     const codes = [...new Set(location.providers.map(provider => inspirationCountryCode(provider.countryCode)).filter(Boolean))];
     return codes.sort((left, right) => inspirationCountryLabel(left, locale).localeCompare(inspirationCountryLabel(right, locale), locale));
   }, [location.providers, locale]);
+  // Search the approved salon directory directly. The startup catalogue intentionally
+  // loads only 100 profiles; it must not determine whether a salon is searchable.
+  const salonLookupKey = JSON.stringify([searchQuery.trim().toLocaleLowerCase("fr"), selectedCountryCode]);
+  const [remoteSalonLookup, setRemoteSalonLookup] = useState<{ key: string; providers: InspirationSearchProvider[] }>({ key: "", providers: [] });
+  useEffect(() => {
+    const query = searchQuery.trim().replace(/[%_]/g, "").slice(0, 120);
+    if (selectedCategoryId || selectedProviderId || (!query && !selectedCountryCode)) return;
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        let request = client.from("provider_profiles")
+          .select("profile_id,business_name,city,country_code,region,latitude,longitude")
+          .eq("status", "approved")
+          .order("business_name")
+          .limit(30);
+        if (query) request = request.ilike("business_name", `%${query}%`);
+        if (selectedCountryCode) request = request.eq("country_code", selectedCountryCode);
+        const { data, error } = await request.abortSignal(controller.signal);
+        if (controller.signal.aborted || error) return;
+        const providers: InspirationSearchProvider[] = (data ?? []).map(item => ({
+          profileId: item.profile_id, serviceId: "", name: item.business_name,
+          specialty: "Salon de beauté", category: "Beauté",
+          area: [item.city, item.region].filter(Boolean).join(", "),
+          countryCode: item.country_code ?? undefined,
+          coordinates: item.latitude != null && item.longitude != null
+            ? { latitude: Number(item.latitude), longitude: Number(item.longitude) }
+            : undefined,
+        }));
+        setRemoteSalonLookup({ key: salonLookupKey, providers });
+      } catch { /* The searchable starter catalogue remains a safe fallback. */ }
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [salonLookupKey, searchQuery, selectedCategoryId, selectedCountryCode, selectedProviderId]);
+  const remoteSalonProviders = remoteSalonLookup.key === salonLookupKey && !selectedCategoryId && !selectedProviderId
+    ? remoteSalonLookup.providers : [];
+
   const providerOptions = useMemo(() => {
     const unique = new Map<string, InspirationSearchProvider>();
-    for (const provider of location.providers) {
+    for (const provider of [...remoteSalonProviders, ...location.providers]) {
       if (selectedCategoryId && provider.categoryId !== selectedCategoryId) continue;
       if (selectedCountryCode && inspirationCountryCode(provider.countryCode) !== selectedCountryCode) continue;
       if (location.area.trim() && !matchesSearch(location.area, `${provider.area} ${provider.address ?? ""}`)) continue;
@@ -791,8 +829,8 @@ export function SocialFeed({ authenticated, authPending = false, onRequireAuth, 
       if (searchQuery.trim() && !matchesSearch(searchQuery, `${provider.name} ${provider.specialty} ${provider.category} ${provider.area}`)) continue;
       if (!unique.has(provider.profileId)) unique.set(provider.profileId, provider);
     }
-    return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 5);
-  }, [location.area, location.position, location.providers, radiusKm, searchQuery, selectedCategoryId, selectedCountryCode]);
+    return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 20);
+  }, [location.area, location.position, location.providers, radiusKm, remoteSalonProviders, searchQuery, selectedCategoryId, selectedCountryCode]);
 
   function writeSearchUrl(applied: boolean, providerIdOverride = selectedProviderId, push = false) {
     const params = new URLSearchParams();
