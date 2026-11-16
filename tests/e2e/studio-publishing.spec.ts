@@ -99,7 +99,7 @@ test('le Studio renvoie la gestion des prestations vers l’espace Salon', async
   await expect(catalogLink).toHaveAttribute('href', '/salon/services');
   await catalogLink.click();
   await expect(page).toHaveURL(/\/salon\/services$/);
-  await expect(page.getByRole('heading', { name: 'Prestations', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Prestations', exact: true, level: 1 })).toBeVisible();
 });
 
 test('une prestation non publiée se valide depuis Salon, jamais depuis le Studio', async ({ page, context }) => {
