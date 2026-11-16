@@ -45,6 +45,7 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
   const [preview, setPreview] = useState("");
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [error, setError] = useState("");
 
   async function reload() {
@@ -69,6 +70,17 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
     };
   }, []);
   useEffect(() => () => { if (previewUrl.current) URL.revokeObjectURL(previewUrl.current); }, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      setStories(current => {
+        const active = current.filter(story => Date.parse(story.expiresAt) > now);
+        return active.length === current.length ? current : active;
+      });
+      setSelected(current => current && Date.parse(current.expiresAt) <= now ? null : current);
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   function clearDraft() {
     if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
@@ -115,6 +127,34 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
     } finally { setBusy(false); }
   }
 
+  async function deleteStory(story: Story) {
+    if (!userId || story.providerId !== userId || removing) return;
+    const client = getSupabaseBrowserClient();
+    if (!client) { setError("Connexion momentanément indisponible."); return; }
+    setRemoving(true); setError("");
+    try {
+      const { data: identity, error: identityError } = await client.auth.getUser();
+      if (identityError || identity.user?.id !== userId)
+        throw new Error("Reconnectez-vous pour supprimer votre statut.");
+      const ownerRow = await client.from("professional_stories").select("media_path")
+        .eq("id", story.id).eq("provider_id", userId).maybeSingle();
+      if (ownerRow.error || !ownerRow.data?.media_path)
+        throw new Error("Statut introuvable ou accès refusé.");
+      // Remove the private file first. If the following row deletion fails,
+      // its public URL can no longer be signed and the expiry job removes the row.
+      const fileRemoval = await client.storage.from("professional-stories").remove([ownerRow.data.media_path]);
+      if (fileRemoval.error) throw new Error("Impossible de supprimer le média du statut.");
+      const rowRemoval = await client.from("professional_stories").delete()
+        .eq("id", story.id).eq("provider_id", userId);
+      if (rowRemoval.error) throw new Error("Média supprimé, mais la suppression du statut doit être réessayée.");
+      setSelected(null);
+      setStories(current => current.filter(item => item.id !== story.id));
+      await reload();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Suppression impossible.");
+    } finally { setRemoving(false); }
+  }
+
   const grouped = [...new Map(stories.map(story => [story.providerId, story])).values()];
   const viewing = selected;
   return <section className={styles.strip} aria-label="Statuts des professionnels">
@@ -125,7 +165,7 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
       <input ref={fileInput} className={styles.hidden} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
         onChange={event => { void pickFile(event.target.files?.[0]); event.target.value = ""; }} aria-label="Choisir une photo ou vidéo pour votre statut" />
       {grouped.map(story => <button key={story.providerId} type="button" className={styles.item}
-        aria-label={`Voir le statut de ${story.name}`} onClick={() => setSelected(story)}>
+        aria-label={`Voir le statut de ${story.name}`} onClick={() => { setError(""); setSelected(story); }}>
         <span className={styles.ring}>{story.avatar
           ? <Image src={story.avatar} alt="" width={58} height={58} unoptimized className={styles.photo} />
           : <span className={styles.initials}>{story.name.slice(0, 2).toUpperCase()}</span>}
@@ -150,6 +190,11 @@ export function ProfessionalStories({ userId, canPublish, onOpenProvider }: {
         {viewing.mediaType === "video" ? <video key={viewing.id} src={viewing.url} className={styles.media} controls autoPlay playsInline /> :
           <Image src={viewing.url} alt={viewing.caption || "Photo du statut"} width={600} height={900} unoptimized className={styles.media} />}
         {viewing.caption && <p>{viewing.caption}</p>}
+        {userId === viewing.providerId && <button type="button" disabled={removing}
+          onClick={() => void deleteStory(viewing)} aria-label="Supprimer mon statut">
+          {removing ? "Suppression…" : "Supprimer mon statut"}
+        </button>}
+        {error && <p role="alert" className={styles.error}>{error}</p>}
         <button className={styles.publish} type="button" onClick={() => { setSelected(null); onOpenProvider(viewing.providerId); }}>Voir le profil et réserver</button>
       </div>
     </div>}
