@@ -43,6 +43,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
         <p className="seo-directory-professional">Vous êtes un professionnel de la beauté ? <Link href="/app/application">Présentez votre activité sur MATA Beauty.</Link></p>
         <Suspense fallback={null}><HomeSeoDirectory /></Suspense>
       </div>
+      <footer className="launch-legal-links" aria-label="Informations légales">
+        <Link href="/legal/conditions-generales">Conditions générales</Link>
+        <Link href="/legal/annulation">Politique d’annulation et de remboursement</Link>
+      </footer>
     </section>
   </>;
 }

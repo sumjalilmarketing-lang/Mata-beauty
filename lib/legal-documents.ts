@@ -1,7 +1,7 @@
 export const legalDocuments = [
   ["mentions-legales", "Mentions légales"], ["conditions-generales", "Conditions générales"], ["confidentialite", "Politique de confidentialité"],
   ["cookies", "Politique cookies"], ["conditions-prestataires", "Conditions prestataires"],
-  ["annulation", "Politique d’annulation"], ["regles-communautaires", "Règles communautaires"],
+  ["annulation", "Politique d’annulation et de remboursement"], ["regles-communautaires", "Règles communautaires"],
   ["politique-contenus", "Politique contenus"], ["signalement-moderation", "Signalement / modération"],
 ] as const;
 
