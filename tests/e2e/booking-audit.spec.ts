@@ -385,7 +385,7 @@ test.describe("audit chronométré de réservation", () => {
     const search = page.getByRole("dialog", { name: "Que souhaitez-vous découvrir ?" });
     await expect(search.locator("select").first()).toContainText("Tresses");
     await search.locator("select").first().selectOption("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"); actions += 1;
-    await search.getByRole("button", { name: "Afficher les vidéos", exact: true }).click(); actions += 1;
+    await search.getByRole("button", { name: "Afficher les résultats", exact: true }).click(); actions += 1;
     await expect(page.locator(".social-video-card")).toHaveCount(1);
     expect(state.lastSearch).toMatchObject({ target_category_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" });
     await page.locator(".social-video-card").first().locator(".feed-book").click(); actions += 1;
