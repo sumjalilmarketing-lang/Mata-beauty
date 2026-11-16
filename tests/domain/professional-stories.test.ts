@@ -26,6 +26,18 @@ describe("24-hour professional statuses", () => {
     expect(cron).toContain('remove([story.media_path])');
     expect(cron).toContain("timingSafeEqual");
   });
+  it("allows the owner to delete a live status and private media", () => {
+    expect(migration).toContain('Professionals delete their own stories');
+    expect(migration).toContain('Professional story owners remove their media');
+    expect(viewer).toContain('aria-label="Supprimer mon statut"');
+    expect(viewer).toContain('story.providerId !== userId');
+    expect(viewer).toContain('.eq("provider_id", userId)');
+    expect(viewer).toContain('remove([ownerRow.data.media_path])');
+  });
+  it("expires the open viewer without a page reload", () => {
+    expect(viewer).toContain('window.setInterval');
+    expect(viewer).toContain('Date.parse(current.expiresAt) <= now ? null : current');
+  });
   it("keeps the creator flow one-tap with a 30-second video limit", () => {
     expect(viewer).toContain('fileInput.current?.click()');
     expect(viewer).toContain("MAX_VIDEO_SECONDS = 30");
