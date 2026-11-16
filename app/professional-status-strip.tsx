@@ -165,7 +165,7 @@ export function ProfessionalStatusStrip({
   const firstStatuses = [...groups.values()].map(items => items[0]);
 
   useEffect(() => {
-    if (!current) { setSignedUrl(""); return; }
+    if (!current) { queueMicrotask(() => setSignedUrl("")); return; }
     const client = getSupabaseBrowserClient();
     if (!client) return;
     let live = true;
