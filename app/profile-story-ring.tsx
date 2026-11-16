@@ -31,10 +31,10 @@ async function fetchStory(id: string): Promise<Story | null> {
 
 /** A profile avatar is a status entry point anywhere the same professional appears. */
 export function ProfileStoryRing({
-  providerId, name, className, children, onOpenProfile,
+  providerId, name, className, children, onOpenProfile, href,
 }: {
   providerId: string; name: string; className?: string;
-  children: ReactNode; onOpenProfile?: () => void;
+  children: ReactNode; onOpenProfile?: () => void; href?: string;
 }) {
   const [story, setStory] = useState<Story | null>(null);
   const [viewing, setViewing] = useState(false);
@@ -59,13 +59,19 @@ export function ProfileStoryRing({
   }, [providerId, story]);
   const active = story !== null;
   return <>
-    <button type="button" className={`${className ?? ""} ${styles.avatarButton} ${active ? styles.active : ""}`}
+    {href ? <a href={href} className={`${className ?? ""} ${styles.avatarButton} ${active ? styles.active : ""}`}
+      aria-label={active ? `Voir le statut de ${name}` : "Mon profil et mes paramètres"}
+      onClick={event => {
+        if (active) { event.preventDefault(); event.stopPropagation(); setViewing(true); }
+        else if (onOpenProfile) { event.preventDefault(); onOpenProfile(); }
+      }}>{children}</a>
+      : <button type="button" className={`${className ?? ""} ${styles.avatarButton} ${active ? styles.active : ""}`}
       aria-label={active ? `Voir le statut de ${name}` : `Profil de ${name}`}
       onClick={event => {
         event.stopPropagation();
         if (active) setViewing(true);
         else onOpenProfile?.();
-      }}>{children}</button>
+      }}>{children}</button>}
     {viewing && story && typeof document !== "undefined" && createPortal(
       <div className={styles.backdrop} role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setViewing(false); }}>
         <section role="dialog" aria-modal="true" aria-label={`Statut de ${name}`} className={styles.viewer}>
